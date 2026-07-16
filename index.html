@@ -2778,6 +2778,23 @@ function loadState(){
       try { localStorage.setItem(APP_KEY + "_seedver", String(SEED_VERSION)); } catch(e){}
       saveState();
     }
+    /* Auto-reparación de GIFs: reescribe URLs guardadas que apuntan al repo inexistente US19-MEDIA */
+    try {
+      var _js = JSON.stringify(state);
+      if (_js.indexOf("US19-MEDIA") !== -1){
+        _js = _js.split("ultrasport19-boop.github.io/US19-MEDIA/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/");
+        _js = _js.split("raw.githubusercontent.com/ultrasport19-boop/US19-MEDIA/main/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/");
+        _js = _js.split("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-MEDIA@main/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/");
+        var _fx = JSON.parse(_js);
+        state.clients = Array.isArray(_fx.clients) ? _fx.clients : state.clients;
+        state.routines = Array.isArray(_fx.routines) ? _fx.routines : state.routines;
+        state.exercises = Array.isArray(_fx.exercises) ? _fx.exercises : state.exercises;
+        state.protocols = Array.isArray(_fx.protocols) ? _fx.protocols : state.protocols;
+        state.trash = Array.isArray(_fx.trash) ? _fx.trash : state.trash;
+        saveState();
+        console.log("GIFs auto-reparados: US19-MEDIA -> US19-APP/videos (jsDelivr)");
+      }
+    } catch(eFix){ console.error("Auto-reparación de GIFs falló:", eFix); }
   } catch(e){
     console.error("loadState failed:", e);
     state.clients = SEED_DATA.clients || [];
