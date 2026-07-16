@@ -9039,22 +9039,21 @@ window.ultrasport19 = { state: state, settings: settings, version: 1 };
 init();
 
 
-/* ============ CATALOGO US19 (GIFs propios en US19-MEDIA) ============ */
-var US19_CATALOGO_URL = "us19_catalogo.json"; // mismo repo de la app
+/* ============ CATALOGO US19 (GIFs en US19-APP/videos vía jsDelivr) ============ */
+var US19_CATALOGO_URL = "us19_catalogo.json";
 
 function importarCatalogoUS19(){
   var bodyHtml = '<div class="hint" style="margin-bottom:.8rem;">'
-    + 'Importa el catálogo de ejercicios con GIF propio (hosteados en US19-MEDIA). '
-    + 'Los ejercicios que ya existan con el mismo nombre se omiten.</div>'
+    + 'Importa o <strong>repara</strong> los ejercicios con GIF propio. Si un ejercicio ya existe, se le actualiza el GIF y la técnica (no se duplica).</div>'
     + '<div id="cus19-status" style="margin-bottom:.8rem;color:var(--text);">Cargando catálogo…</div>'
     + '<div id="cus19-groups"></div>'
     + '<input type="file" id="cus19-file" accept=".json" style="display:none;">';
   openModal({
-    title: "Importar Catálogo US19",
+    title: "Importar / Reparar Catálogo US19",
     bodyHtml: bodyHtml,
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
-      { label:"Importar seleccionados", cls:"btn-primary", onClick:function(){ _cus19Import(); return true; } }
+      { label:"Aplicar", cls:"btn-primary", onClick:function(){ _cus19Import(); return true; } }
     ]
   });
   _cus19Data = null;
@@ -9064,7 +9063,7 @@ function importarCatalogoUS19(){
     .catch(function(){
       var st = document.getElementById("cus19-status");
       if (!st) return;
-      st.innerHTML = 'No se pudo cargar automáticamente (¿estás en local?). '
+      st.innerHTML = 'No se pudo cargar automáticamente. '
         + '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'cus19-file\').click()">Elegir us19_catalogo.json</button>';
       var inp = document.getElementById("cus19-file");
       inp.onchange = function(){
@@ -9082,22 +9081,25 @@ function _cus19Ready(data){
   var st = document.getElementById("cus19-status");
   var gp = document.getElementById("cus19-groups");
   if (!st || !gp) return;
-  var existentes = {};
-  state.exercises.forEach(function(e){ existentes[(e.name||"").toLowerCase()] = true; });
+  var idx = {};
+  state.exercises.forEach(function(e){ idx[(e.name||"").toLowerCase()] = e; });
   var grupos = {};
   _cus19Data.forEach(function(e){
     var g = e.muscle || "Otro";
-    if (!grupos[g]) grupos[g] = { total:0, nuevos:0 };
-    grupos[g].total++;
-    if (!existentes[(e.name||"").toLowerCase()]) grupos[g].nuevos++;
+    if (!grupos[g]) grupos[g] = { nuevos:0, reparar:0 };
+    var ex = idx[(e.name||"").toLowerCase()];
+    if (!ex) grupos[g].nuevos++;
+    else if (ex.gif !== e.gif) grupos[g].reparar++;
   });
-  var nuevosTotal = Object.keys(grupos).reduce(function(a,k){ return a+grupos[k].nuevos; },0);
-  st.innerHTML = '<strong>'+_cus19Data.length+'</strong> ejercicios en el catálogo · <strong>'+nuevosTotal+'</strong> nuevos. Elige grupos:';
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:.4rem;">';
+  var nuevos = 0, reparar = 0;
+  Object.keys(grupos).forEach(function(k){ nuevos+=grupos[k].nuevos; reparar+=grupos[k].reparar; });
+  st.innerHTML = '<strong>'+nuevos+'</strong> nuevos · <strong>'+reparar+'</strong> a reparar (GIF corregido). Elige grupos:';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.4rem;">';
   Object.keys(grupos).sort().forEach(function(g){
+    var tot = grupos[g].nuevos + grupos[g].reparar;
     html += '<label style="display:flex;gap:.45rem;align-items:center;font-size:.85rem;cursor:pointer;">'
       + '<input type="checkbox" class="cus19-g" value="'+escapeAttr(g)+'" checked> '
-      + escapeHtml(g)+' <span style="color:var(--text-dim);">('+grupos[g].nuevos+')</span></label>';
+      + escapeHtml(g)+' <span style="color:var(--text-dim);">('+tot+')</span></label>';
   });
   html += '</div>';
   gp.innerHTML = html;
@@ -9106,30 +9108,40 @@ function _cus19Ready(data){
 function _cus19Import(){
   if (!_cus19Data){ toast("Catálogo no cargado aún","warning"); return; }
   var sel = {};
-  var boxes = document.querySelectorAll(".cus19-g");
-  for (var i=0;i<boxes.length;i++){ if (boxes[i].checked) sel[boxes[i].value] = true; }
-  var existentes = {};
-  state.exercises.forEach(function(e){ existentes[(e.name||"").toLowerCase()] = true; });
-  var added = 0;
+  document.querySelectorAll(".cus19-g").forEach(function(b){ if (b.checked) sel[b.value]=true; });
+  var idx = {};
+  state.exercises.forEach(function(e){ idx[(e.name||"").toLowerCase()] = e; });
+  var added = 0, fixed = 0;
   _cus19Data.forEach(function(e){
     if (!sel[e.muscle || "Otro"]) return;
     var key = (e.name||"").toLowerCase();
-    if (existentes[key]) return;
-    existentes[key] = true;
-    state.exercises.push({
-      id: e.id || genId(),
-      name: e.name || "",
-      muscle: e.muscle || "",
-      equipment: e.equipment || "",
-      desc: e.desc || "",
-      gif: e.gif || ""
-    });
-    added++;
+    var ex = idx[key];
+    if (ex){
+      // reparar/actualizar existente
+      var changed = false;
+      if (e.gif && ex.gif !== e.gif){ ex.gif = e.gif; changed = true; }
+      if (e.desc && !ex.desc){ ex.desc = e.desc; changed = true; }
+      if (e.muscle && !ex.muscle){ ex.muscle = e.muscle; changed = true; }
+      if (e.equipment && !ex.equipment){ ex.equipment = e.equipment; changed = true; }
+      if (changed) fixed++;
+    } else {
+      var nuevo = {
+        id: e.id || genId(),
+        name: e.name || "",
+        muscle: e.muscle || "",
+        equipment: e.equipment || "",
+        desc: e.desc || "",
+        gif: e.gif || ""
+      };
+      state.exercises.push(nuevo);
+      idx[key] = nuevo;
+      added++;
+    }
   });
   saveState();
   closeModal();
   renderLibrary();
-  toast(added + " ejercicio" + (added===1?"":"s") + " importado" + (added===1?"":"s") + " del catálogo US19", "success");
+  toast(added + " nuevos · " + fixed + " reparados", "success");
 }
 
 </script>
