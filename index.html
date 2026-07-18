@@ -3151,6 +3151,7 @@ function renderDashboard(){
   html += buildIncomeHtml();
   html += buildClientDatesAlertsHtml();
   html += buildAlertsHtml();
+  html += buildClinicalInboxHtml();
 
   html += '<div class="section-head" style="margin-top:1.5rem;"><h2 class="section-title">RUTINAS <span class="accent">/ RECIENTES</span></h2>';
   if (state.routines.length>3) html += '<button class="btn btn-ghost btn-sm" onclick="showView(\'routines\')">Ver todas →</button>';
@@ -6313,6 +6314,42 @@ function deriveSegment(region){
   }
   return "otro";
 }
+
+/* Catálogo cerrado de patologías estandarizadas (estandariza las plantillas).
+ * Al elegir una, autocompleta nombre, región y segmento del protocolo.
+ * seg: id de PROTOCOL_SEGMENTS · region: debe coincidir con las opciones del form. */
+var RC_PATOLOGIAS = [
+  // Miembro superior
+  { id:"mr-postop",       nombre:"Reparación de manguito rotador (postoperatorio)", region:"Hombro", seg:"miembro-superior" },
+  { id:"tendinopatia-mr", nombre:"Tendinopatía del manguito rotador",               region:"Hombro", seg:"miembro-superior" },
+  { id:"inestab-hombro",  nombre:"Inestabilidad / luxación de hombro",              region:"Hombro", seg:"miembro-superior" },
+  { id:"capsulitis",      nombre:"Capsulitis adhesiva (hombro congelado)",          region:"Hombro", seg:"miembro-superior" },
+  { id:"epicond-lat",     nombre:"Epicondialgia lateral (codo de tenista)",         region:"Codo",   seg:"miembro-superior" },
+  { id:"epicond-med",     nombre:"Epicondialgia medial (codo de golfista)",         region:"Codo",   seg:"miembro-superior" },
+  { id:"tunel-carpiano",  nombre:"Síndrome del túnel carpiano",                     region:"Muñeca / Mano", seg:"miembro-superior" },
+  { id:"esguince-muneca", nombre:"Esguince de muñeca",                              region:"Muñeca / Mano", seg:"miembro-superior" },
+  // Miembro inferior
+  { id:"lca-postop",      nombre:"Reconstrucción de LCA (postoperatorio)",          region:"Rodilla",       seg:"miembro-inferior" },
+  { id:"tendinop-rotul",  nombre:"Tendinopatía rotuliana",                          region:"Rodilla",       seg:"miembro-inferior" },
+  { id:"femoropatelar",   nombre:"Síndrome femoropatelar / condromalacia",          region:"Rodilla",       seg:"miembro-inferior" },
+  { id:"menisco",         nombre:"Lesión meniscal",                                 region:"Rodilla",       seg:"miembro-inferior" },
+  { id:"esguince-tobillo",nombre:"Esguince lateral de tobillo",                     region:"Tobillo / Pie", seg:"miembro-inferior" },
+  { id:"tendinop-aquiles",nombre:"Tendinopatía aquiliana",                          region:"Tobillo / Pie", seg:"miembro-inferior" },
+  { id:"fascitis",        nombre:"Fascitis plantar",                                region:"Tobillo / Pie", seg:"miembro-inferior" },
+  { id:"pubalgia",        nombre:"Pubalgia / dolor inguinal",                       region:"Cadera",        seg:"miembro-inferior" },
+  { id:"trocanteritis",   nombre:"Síndrome de dolor trocantérico",                  region:"Cadera",        seg:"miembro-inferior" },
+  { id:"isquiotibial",    nombre:"Lesión de isquiotibiales",                        region:"Otro",          seg:"miembro-inferior" },
+  // Columna / core
+  { id:"lumbago",         nombre:"Lumbago mecánico inespecífico",                   region:"Columna lumbar",   seg:"columna-core" },
+  { id:"hernia-lumbar",   nombre:"Hernia discal lumbar / ciática",                  region:"Columna lumbar",   seg:"columna-core" },
+  { id:"cervicalgia",     nombre:"Cervicalgia mecánica",                            region:"Columna cervical", seg:"columna-core" },
+  { id:"dorsalgia",       nombre:"Dorsalgia postural",                              region:"Columna dorsal",   seg:"columna-core" }
+];
+function getPatologia(id){
+  if (!id) return null;
+  for (var i=0;i<RC_PATOLOGIAS.length;i++) if (RC_PATOLOGIAS[i].id===id) return RC_PATOLOGIAS[i];
+  return null;
+}
 function getProtocolSegment(p){
   if (!p) return "otro";
   if (p.segment && getSegmentById(p.segment)) return p.segment;
@@ -6430,6 +6467,7 @@ function protocolCardHtml(p){
     + '<div class="card-sub" style="gap:.6rem;margin-top:.35rem;flex-wrap:wrap;">'
       + segmentBadge(getProtocolSegment(p))
       + (p.region?'<span class="badge teal">'+escapeHtml(p.region)+'</span>':'')
+      + (getPatologia(p.patologia)?'<span class="badge" style="background:rgba(180,230,80,.14);color:#b4e650;border:1px solid rgba(180,230,80,.35);">🏷 Estandarizada</span>':'')
       + '<span class="badge muted">'+total+' ejercicio'+(total===1?'':'s')+'</span>'
     + '</div>'
     + '<div class="card-sub" style="gap:.85rem;margin-top:.5rem;">'+phaseDots+'</div>'
@@ -6467,8 +6505,24 @@ function openProtocolForm(id){
   if (data.region && regionOpts.indexOf(data.region)<0) regionHtml += '<option value="'+escapeAttr(data.region)+'" selected>'+escapeHtml(data.region)+'</option>';
   regionHtml += '</select>';
 
+  // Catálogo estandarizado de patologías (agrupado por segmento)
+  var patHtml = '<select id="pf-patologia"><option value="">— Otra / personalizada (texto libre) —</option>';
+  for (var ps=0; ps<PROTOCOL_SEGMENTS.length; ps++){
+    var segp = PROTOCOL_SEGMENTS[ps];
+    var items = RC_PATOLOGIAS.filter(function(x){ return x.seg===segp.id; });
+    if (!items.length) continue;
+    patHtml += '<optgroup label="'+escapeAttr(segp.icon+' '+segp.label)+'">';
+    for (var pi=0; pi<items.length; pi++){
+      patHtml += '<option value="'+escapeAttr(items[pi].id)+'"'+(data.patologia===items[pi].id?" selected":"")+'>'+escapeHtml(items[pi].nombre)+'</option>';
+    }
+    patHtml += '</optgroup>';
+  }
+  patHtml += '</select>';
+
   var bodyHtml = '';
-  bodyHtml += '<div class="form-row"><label class="form-label">Patología / Condición clínica *</label>'
+  bodyHtml += '<div class="form-row"><label class="form-label">Patología estandarizada</label>'+patHtml
+    + '<div class="text-xs text-muted" style="margin-top:.3rem;">Elige del catálogo para autocompletar nombre, región y segmento. Luego puedes ajustar el nombre.</div></div>';
+  bodyHtml += '<div class="form-row"><label class="form-label">Nombre del protocolo *</label>'
     + '<input type="text" id="pf-name" value="'+escapeAttr(data.name)+'" placeholder="Ej. Tendinopatía de Manguito Rotador"></div>';
   bodyHtml += '<div class="form-row"><label class="form-label">Segmento corporal</label>'+segHtml+'</div>';
   bodyHtml += '<div class="form-row"><label class="form-label">Región anatómica</label>'+regionHtml+'</div>';
@@ -6499,6 +6553,18 @@ function openProtocolForm(id){
           if (derived) segSel.value = derived;
         });
       }
+      // Al elegir patología del catálogo: autocompletar nombre, región y segmento
+      var patSel = document.getElementById("pf-patologia");
+      if (patSel){
+        patSel.addEventListener("change", function(){
+          var pat = getPatologia(this.value);
+          if (!pat) return;
+          var nameEl = document.getElementById("pf-name");
+          if (nameEl) nameEl.value = pat.nombre;
+          if (regSel) regSel.value = pat.region;
+          if (segSel) segSel.value = pat.seg;
+        });
+      }
     }
   });
 }
@@ -6509,15 +6575,17 @@ function saveProtocolForm(id){
   var region = document.getElementById("pf-region").value || "";
   var segment = document.getElementById("pf-segment").value || "";
   var desc = (document.getElementById("pf-desc").value||"").trim();
+  var patEl = document.getElementById("pf-patologia");
+  var patologia = patEl ? (patEl.value || "") : "";
 
   var p = id ? getProtocol(id) : null;
   if (p){
-    p.name = name; p.region = region; p.segment = segment; p.description = desc; p.updatedAt = Date.now();
+    p.name = name; p.region = region; p.segment = segment; p.description = desc; p.patologia = patologia; p.updatedAt = Date.now();
     saveState(); closeModal(); toast("Protocolo actualizado", "success");
     renderRehab();
   } else {
     var np = {
-      id: genId(), name:name, region:region, segment:segment, description:desc,
+      id: genId(), name:name, region:region, segment:segment, description:desc, patologia:patologia,
       phases: makeProtocolPhases(), references: [],
       createdAt: Date.now(), updatedAt: Date.now()
     };
@@ -9072,6 +9140,100 @@ window.validarRut = validarRut; window.formatearRut = formatearRut;
 function semaforoClass(n){ n = Number(n)||0; return n <= 3 ? "v" : (n <= 5 ? "a" : "r"); }
 function semaforoLabel(n){ n = Number(n)||0; return n <= 3 ? "Verde · progresar" : (n <= 5 ? "Amarillo · mantener carga" : "Rojo · reducir / reevaluar"); }
 window.semaforoClass = semaforoClass;
+
+/* ============================================================
+   BANDEJA CLÍNICA — alertas de seguimiento (offline, sin backend)
+   3 reglas sobre datos ya existentes (painLog, redFlags, reevalDate).
+   Se calculan al abrir la app y se muestran en el Panel de inicio.
+   ============================================================ */
+function _rcDaysSince(dateStr){
+  if (!dateStr) return null;
+  var d = new Date(String(dateStr).slice(0,10) + "T00:00:00");
+  if (isNaN(d.getTime())) return null;
+  var now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((now - d) / 86400000);
+}
+function _rcWaLink(phone){
+  var d = String(phone||"").replace(/[^0-9]/g,"");
+  if (!d) return "";
+  if (d.length === 9 && d.charAt(0) === "9") d = "56" + d;   // 9 XXXX XXXX -> +56
+  else if (d.length === 8) d = "569" + d;                    // fallback fijo antiguo
+  return "https://wa.me/" + d;
+}
+function computeClinicalAlerts(){
+  var out = [];
+  if (!rehabClinicoOn()) return out;
+  var today = new Date().toISOString().slice(0,10);
+  for (var i=0;i<state.clients.length;i++){
+    var c = state.clients[i];
+    if (getClientType(c) !== "rehab") continue;
+    if (c.alta && c.alta.fecha) continue; // dado de alta: fuera de seguimiento
+    var pains = Array.isArray(c.painLog) ? c.painLog : [];
+
+    // R1 — Pico de dolor (último registro ≥6, o salto ≥3 vs sesión previa)
+    if (pains.length){
+      var last = pains[pains.length-1];
+      var lastMax = Math.max(last.durante||0, last.despues||0);
+      var salto = 0;
+      if (pains.length >= 2){ var pv = pains[pains.length-2]; salto = lastMax - Math.max(pv.durante||0, pv.despues||0); }
+      if (lastMax >= 6 || salto >= 3){
+        out.push({ clientId:c.id, name:c.name||"", sev:"alta", icon:"🔴",
+          msg:"Dolor "+lastMax+"/10"+(salto>=3?" (↑"+salto+" vs sesión previa)":"")+" · reducir carga / reevaluar",
+          phone:c.phone||"" });
+      }
+    }
+
+    // R2 — Baja adherencia (con protocolo activo y sin registro hace ≥7 días)
+    if (c.rehabProtocolId){
+      var refDate = pains.length ? pains[pains.length-1].fecha
+                    : (c.createdAt ? new Date(c.createdAt).toISOString().slice(0,10) : null);
+      var dias = _rcDaysSince(refDate);
+      if (dias != null && dias >= 7){
+        out.push({ clientId:c.id, name:c.name||"", sev:"media", icon:"⚠",
+          msg: (pains.length ? "Sin registro de sesión hace "+dias+" días" : "Protocolo asignado sin ninguna sesión registrada ("+dias+" días)"),
+          phone:c.phone||"" });
+      }
+    }
+
+    // R3 — Derivación / reevaluación pendiente
+    if (c.redFlags && c.redFlags.blocked){
+      out.push({ clientId:c.id, name:c.name||"", sev:"alta", icon:"🚩",
+        msg:"Banderas rojas activas · derivación médica pendiente", phone:c.phone||"" });
+    }
+    if (c.reevalDate && c.reevalDate <= today){
+      out.push({ clientId:c.id, name:c.name||"", sev:"media", icon:"🔁",
+        msg:"Reevaluación programada para "+c.reevalDate, phone:c.phone||"" });
+    }
+  }
+  function _rcRank(s){ return s==="alta" ? 0 : (s==="media" ? 1 : 2); }
+  out.sort(function(a,b){ return _rcRank(a.sev) - _rcRank(b.sev); });
+  return out;
+}
+window.computeClinicalAlerts = computeClinicalAlerts;
+
+function buildClinicalInboxHtml(){
+  if (!rehabClinicoOn()) return "";
+  var alerts = computeClinicalAlerts();
+  if (!alerts.length) return "";
+  var sevCls = { alta:"bad", media:"warn", baja:"ok" };
+  var html = '<div class="card" style="margin-top:1.2rem;border-left:3px solid var(--danger);">'
+    + '<div class="card-main">'
+    + '<div class="card-title">🩺 Bandeja clínica <span class="badge muted">'+alerts.length+'</span></div>'
+    + '<p class="text-xs text-muted" style="margin:.3rem 0 .2rem;">Seguimiento de pacientes en rehabilitación. Toca una alerta para abrir su panel clínico.</p>'
+    + '<div style="display:flex;flex-direction:column;gap:.5rem;margin-top:.6rem;">';
+  for (var i=0;i<alerts.length;i++){
+    var a = alerts[i];
+    var wl = _rcWaLink(a.phone);
+    var wa = wl ? '<a class="btn btn-ghost btn-sm" href="'+wl+'" target="_blank" rel="noopener" title="WhatsApp" onclick="event.stopPropagation()">💬</a>' : '';
+    html += '<div class="rc-banner '+(sevCls[a.sev]||"warn")+'" style="display:flex;align-items:center;gap:.6rem;cursor:pointer;" onclick="openPanelClinico(\''+a.clientId+'\')">'
+      + '<span>'+a.icon+'</span>'
+      + '<span style="flex:1;line-height:1.35;"><strong>'+escapeHtml(a.name)+'</strong> — '+escapeHtml(a.msg)+'</span>'
+      + wa
+      + '</div>';
+  }
+  html += '</div></div></div>';
+  return html;
+}
 
 /* ---------- Banderas rojas musculoesqueléticas ---------- */
 var RC_RED_FLAGS = [
