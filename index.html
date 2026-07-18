@@ -3,11 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0b1014">
+<meta name="theme-color" content="#E21C25">
 <title>Ultra-Sport 19 · Planificador de Rutinas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- PWA -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="US19">
 <style>
 :root{
   --bg:#0b1014;
@@ -541,6 +548,32 @@ img{max-width:100%;display:block;}
 .gs-item{padding:.55rem .8rem;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--border);}
 .gs-item:last-child{border-bottom:none;}
 .gs-item:hover{background:var(--surface-2);}
+/* — REHAB-CLÍNICO — */
+.rc-sem{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:.3rem;vertical-align:middle;flex-shrink:0;}
+.rc-sem.v{background:#2fbf71;}.rc-sem.a{background:#eab308;}.rc-sem.r{background:#e5484d;box-shadow:0 0 6px rgba(229,72,77,.6);}
+.rc-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.55rem;margin:.7rem 0 .4rem;}
+.rc-tile{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:.7rem .8rem;cursor:pointer;text-align:left;color:var(--text);font:inherit;transition:border-color .15s;}
+.rc-tile:hover{border-color:var(--accent);}
+.rc-tile .rc-tile-ic{font-size:1.15rem;}
+.rc-tile .rc-tile-lb{font-weight:700;font-size:.85rem;}
+.rc-tile .rc-tile-sub{font-size:.7rem;color:var(--muted);}
+.rc-banner{border-radius:12px;padding:.65rem .9rem;font-size:.85rem;font-weight:600;display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;}
+.rc-banner.ok{background:rgba(47,191,113,.1);border:1px solid rgba(47,191,113,.35);color:#6fe0a8;}
+.rc-banner.bad{background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.45);color:#ff8a8e;}
+.rc-banner.warn{background:rgba(234,179,8,.09);border:1px solid rgba(234,179,8,.35);color:var(--warn,#eab308);}
+.rc-dynrow{display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:.4rem;align-items:center;margin-bottom:.4rem;}
+.rc-dynrow input,.rc-dynrow select{width:100%;font-size:.85rem;padding:.4rem .5rem;}
+.rc-dynrow.t3{grid-template-columns:2.2fr 1fr auto;}
+.rc-cmp{width:100%;border-collapse:collapse;font-size:.85rem;margin-top:.5rem;}
+.rc-cmp th{text-align:left;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;padding:.4rem .5rem;border-bottom:1px solid var(--border);}
+.rc-cmp td{padding:.45rem .5rem;border-bottom:1px solid var(--border);}
+.rc-up{color:#2fbf71;font-weight:700;}.rc-down{color:#e5484d;font-weight:700;}.rc-eq{color:var(--muted);}
+.rc-painrow{display:flex;align-items:center;gap:.6rem;padding:.4rem .1rem;border-bottom:1px solid var(--border);font-size:.83rem;flex-wrap:wrap;}
+.rc-painrow:last-child{border-bottom:none;}
+.rc-flagitem{display:flex;gap:.55rem;align-items:flex-start;padding:.35rem 0;cursor:pointer;font-size:.86rem;line-height:1.35;}
+.rc-flagitem input{width:17px;height:17px;accent-color:#e5484d;flex-shrink:0;margin-top:.1rem;}
+.rc-disclaimer{font-size:.68rem;color:var(--muted);opacity:.8;line-height:1.4;margin-top:.9rem;border-top:1px dashed var(--border);padding-top:.55rem;}
+@media (max-width:560px){ .rc-dynrow{grid-template-columns:1.6fr 1fr 1fr 1fr auto;} }
 </style>
 
 <div class="toast-wrap" id="toast-wrap"></div>
@@ -2757,6 +2790,15 @@ var settings = { baseUrl: DEFAULT_BASE_URL, githubToken: "", githubRepo: "ultras
 
 var SEED_VERSION = 20260612;
 
+/* REHAB-CLÍNICO: interruptor global de la capa clínica (ficha, banderas rojas,
+ * evaluación funcional, semáforo del dolor, reevaluación y alta).
+ * true  = capa clínica visible y operativa.
+ * false = capa clínica oculta por completo; los protocolos siguen funcionando igual.
+ * Recomendado: mantener el uso enmarcado como "readaptación física" hasta la
+ * titulación de kinesiología (fin 2026); luego dejar en true de forma definitiva. */
+var MODULO_REHAB_CLINICO_ACTIVO = true;
+function rehabClinicoOn(){ return !!MODULO_REHAB_CLINICO_ACTIVO; }
+
 function loadState(){
   try {
     var raw = localStorage.getItem(APP_KEY);
@@ -3229,16 +3271,27 @@ function clientCardHtml(c){
 
   if (type === "rehab"){
     var copy = c.rehabProtocolId ? getProtocol(c.rehabProtocolId) : null;
+    /* REHAB-CLÍNICO: badges de estado clínico en la tarjeta */
+    var rcBadges = '';
+    if (rehabClinicoOn()){
+      if (c.redFlags && c.redFlags.blocked) rcBadges += '<span class="badge" style="background:rgba(229,72,77,.15);color:#ff8a8e;border:1px solid rgba(229,72,77,.4);">🚩 Derivar a médico</span>';
+      if (c.alta && c.alta.fecha) rcBadges += '<span class="badge green">✔ Alta '+escapeHtml(c.alta.fecha)+'</span>';
+      var lastPain = (c.painLog && c.painLog.length) ? c.painLog[c.painLog.length-1] : null;
+      if (lastPain && !((c.alta&&c.alta.fecha))) rcBadges += '<span class="badge muted"><span class="rc-sem '+semaforoClass(Math.max(lastPain.durante||0,lastPain.despues||0))+'"></span>Dolor '+Math.max(lastPain.durante||0,lastPain.despues||0)+'/10</span>';
+    }
     if (copy){
       var cp = (typeof copy.currentPhase === "number") ? copy.currentPhase : 0;
       var focus = (copy.phases[cp] && copy.phases[cp].focus) ? copy.phases[cp].focus.split("·")[0].trim() : "";
       infoLine = '<span class="badge teal">📋 '+escapeHtml(copy.name||"Protocolo")+'</span>'
-        + '<span class="badge muted">Fase '+(cp+1)+'/4'+(focus?' · '+escapeHtml(focus):'')+'</span>';
-      actionsExtra = '<button class="btn btn-primary btn-sm" onclick="openPhaseShareModal(\''+copy.id+'\','+cp+')" title="Compartir la fase actual">📤 Fase '+(cp+1)+'</button>'
+        + '<span class="badge muted">Fase '+(cp+1)+'/4'+(focus?' · '+escapeHtml(focus):'')+'</span>'
+        + rcBadges;
+      actionsExtra = (rehabClinicoOn() ? '<button class="btn btn-primary btn-sm" onclick="openPanelClinico(\''+c.id+'\')" title="Ficha, evaluación, dolor y reevaluación">🩺 Clínico</button>' : '')
+        + '<button class="btn btn-secondary btn-sm" onclick="openPhaseShareModal(\''+copy.id+'\','+cp+')" title="Compartir la fase actual">📤 Fase '+(cp+1)+'</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="openClientProtocol(\''+c.id+'\')">Abrir protocolo</button>';
     } else {
-      infoLine = '<span class="badge muted">Sin protocolo asignado</span>';
-      actionsExtra = '<button class="btn btn-primary btn-sm" onclick="openAssignProtocolModal(\''+c.id+'\')">+ Asignar protocolo</button>';
+      infoLine = '<span class="badge muted">Sin protocolo asignado</span>' + rcBadges;
+      actionsExtra = (rehabClinicoOn() ? '<button class="btn btn-primary btn-sm" onclick="openPanelClinico(\''+c.id+'\')" title="Ficha, evaluación, dolor y reevaluación">🩺 Clínico</button>' : '')
+        + '<button class="btn btn-secondary btn-sm" onclick="openAssignProtocolModal(\''+c.id+'\')">+ Asignar protocolo</button>';
     }
   } else {
     var routinesCount = state.routines.filter(function(r){ return r.clientId === c.id; }).length;
@@ -3274,7 +3327,7 @@ window.filterClients = filterClients;
 function openClientForm(id){
   var client = id ? getClient(id) : null;
   var isEdit = !!client;
-  var c = client || { name:"", phone:"", email:"", goal:"", notes:"", type:"gym", reevalDate:"", planEndDate:"", targetWeight:"", targetDate:"", planPrice:"" };
+  var c = client || { name:"", rut:"", phone:"", email:"", goal:"", notes:"", type:"gym", reevalDate:"", planEndDate:"", targetWeight:"", targetDate:"", planPrice:"" };
   var curType = getClientType(c);
 
   var typeHtml = '<select id="cf-type">'
@@ -3290,9 +3343,10 @@ function openClientForm(id){
       + formField("Tipo de cliente", typeHtml)
       + '</div>'
       + '<div class="form-grid cols-2">'
+      + formField("RUT", '<input type="text" id="cf-rut" value="'+escapeAttr(c.rut||"")+'" placeholder="12.345.678-9">')
       + formField("Teléfono", '<input type="text" id="cf-phone" value="'+escapeAttr(c.phone)+'" placeholder="+56 9 1234 5678">')
-      + formField("Email", '<input type="email" id="cf-email" value="'+escapeAttr(c.email||"")+'" placeholder="opcional">')
       + '</div>'
+      + formField("Email", '<input type="email" id="cf-email" value="'+escapeAttr(c.email||"")+'" placeholder="opcional">')
       + '<div class="form-grid cols-2">'
       + formField("Próxima reevaluación", '<input type="date" id="cf-reeval" value="'+escapeAttr(c.reevalDate||"")+'">')
       + formField("Vencimiento de plan / pago", '<input type="date" id="cf-planend" value="'+escapeAttr(c.planEndDate||"")+'">')
@@ -3309,8 +3363,14 @@ function openClientForm(id){
       { label: isEdit ? "Guardar" : "Crear", cls:"btn-primary", onClick: function(){
         var name = document.getElementById("cf-name").value.trim();
         if (!name){ toast("Nombre requerido","error"); return; }
+        /* REHAB-CLÍNICO: RUT como identificador definitivo (matching de pagos) */
+        var rutVal = document.getElementById("cf-rut").value.trim();
+        if (rutVal && !validarRut(rutVal)){
+          if (!confirm("El RUT ingresado parece inválido (dígito verificador no coincide).\n¿Guardar de todos modos?")) return;
+        }
         var data = {
           name: name,
+          rut: rutVal ? formatearRut(rutVal) : "",
           type: document.getElementById("cf-type").value || "gym",
           phone: document.getElementById("cf-phone").value.trim(),
           email: document.getElementById("cf-email").value.trim(),
@@ -6296,6 +6356,7 @@ function renderProtocolList(){
 
   html += '<p class="text-sm text-muted" style="margin:-.4rem 0 1.1rem;line-height:1.5;">'
     + 'Protocolos clínicos por patología, organizados por segmento corporal y divididos en 4 fases progresivas.'
+    + (rehabClinicoOn() ? '<br><span class="text-xs" style="opacity:.75;">⚕ Herramienta de apoyo a la prescripción profesional. No reemplaza la evaluación clínica presencial ni el diagnóstico médico.</span>' : '')
     + '</p>';
 
   var templates = state.protocols.filter(function(p){ return !p.ownerClientId; });
@@ -7239,6 +7300,20 @@ window.openClientProtocol = openClientProtocol;
 function openAssignProtocolModal(clientId){
   var c = getClient(clientId);
   if (!c) return;
+  /* REHAB-CLÍNICO: tamizaje de banderas rojas antes de prescribir */
+  if (rehabClinicoOn()){
+    if (c.redFlags && c.redFlags.blocked){
+      toast("🚩 Este paciente tiene banderas rojas activas: derivar a evaluación médica antes de prescribir.","error");
+      openRedFlags(clientId);
+      return;
+    }
+    if (!c.redFlags || !c.redFlags.fecha){
+      if (confirm("Este paciente aún no tiene tamizaje de banderas rojas.\n\nSe recomienda realizarlo ANTES de asignar un protocolo.\n\nAceptar = hacer el tamizaje ahora · Cancelar = continuar sin tamizaje")){
+        openRedFlags(clientId, function(){ openAssignProtocolModal(clientId); });
+        return;
+      }
+    }
+  }
   var templates = state.protocols.filter(function(p){ return !p.ownerClientId; });
   if (!templates.length){
     toast("Primero crea un protocolo en la pestaña Protocolos","warn");
@@ -7278,6 +7353,11 @@ function assignProtocolToClient(clientId, templateId){
   var c = getClient(clientId);
   var tpl = getProtocol(templateId);
   if (!c || !tpl) return;
+  /* REHAB-CLÍNICO: bloqueo duro si hay banderas rojas activas */
+  if (rehabClinicoOn() && c.redFlags && c.redFlags.blocked){
+    toast("🚩 Prescripción bloqueada: banderas rojas activas. Derivar a evaluación médica.","error");
+    return;
+  }
   if (c.rehabProtocolId){
     state.protocols = state.protocols.filter(function(p){ return p.id !== c.rehabProtocolId; });
   }
@@ -8954,10 +9034,745 @@ window.deleteTrainerLog = function(cid, lid){
   saveState(); closeModal(); openClientTracking(cid);
 };
 
+/* ============================================================
+ * REHAB-CLÍNICO · Capa clínica de prescripción de ejercicio
+ * terapéutico (lesiones musculoesqueléticas) — Ultra-Sport 19
+ * Todo el dato clínico vive DENTRO del objeto cliente para que
+ * sincronice y respalde con el sistema existente sin cambios:
+ *   c.rut, c.ficha, c.redFlags, c.evals[], c.painLog[], c.alta
+ * ============================================================ */
+
+/* ---------- RUT (identificador definitivo, matching de pagos) ---------- */
+function limpiarRut(r){ return String(r||"").replace(/[^0-9kK]/g,"").toUpperCase(); }
+function validarRut(r){
+  var s = limpiarRut(r);
+  if (s.length < 7) return false;
+  var cuerpo = s.slice(0,-1), dv = s.slice(-1);
+  if (!/^\d+$/.test(cuerpo)) return false;
+  var suma = 0, mul = 2;
+  for (var i = cuerpo.length-1; i >= 0; i--){
+    suma += parseInt(cuerpo[i],10) * mul;
+    mul = (mul === 7) ? 2 : mul+1;
+  }
+  var res = 11 - (suma % 11);
+  var dvCalc = (res === 11) ? "0" : (res === 10) ? "K" : String(res);
+  return dv === dvCalc;
+}
+function formatearRut(r){
+  var s = limpiarRut(r);
+  if (s.length < 2) return r;
+  var cuerpo = s.slice(0,-1), dv = s.slice(-1), out = "";
+  while (cuerpo.length > 3){ out = "." + cuerpo.slice(-3) + out; cuerpo = cuerpo.slice(0,-3); }
+  return cuerpo + out + "-" + dv;
+}
+window.validarRut = validarRut; window.formatearRut = formatearRut;
+
+/* ---------- Semáforo del dolor ---------- */
+/* Verde 0-3: continuar/progresar · Amarillo 4-5: mantener carga · Rojo ≥6: reducir/detener y reevaluar */
+function semaforoClass(n){ n = Number(n)||0; return n <= 3 ? "v" : (n <= 5 ? "a" : "r"); }
+function semaforoLabel(n){ n = Number(n)||0; return n <= 3 ? "Verde · progresar" : (n <= 5 ? "Amarillo · mantener carga" : "Rojo · reducir / reevaluar"); }
+window.semaforoClass = semaforoClass;
+
+/* ---------- Banderas rojas musculoesqueléticas ---------- */
+var RC_RED_FLAGS = [
+  "Dolor nocturno constante, no mecánico, que no cede con reposo ni cambio de posición",
+  "Pérdida de peso inexplicada reciente",
+  "Antecedente oncológico (cáncer previo o activo)",
+  "Fiebre, escalofríos o sospecha de infección",
+  "Déficit neurológico progresivo (pérdida de fuerza o sensibilidad que avanza)",
+  "Alteración de esfínteres o anestesia en silla de montar (sospecha cauda equina)",
+  "Trauma mayor reciente (caída de altura, accidente de tránsito) sin estudio médico",
+  "Trauma menor en paciente con osteoporosis o uso prolongado de corticoides",
+  "Dolor torácico o abdominal asociado, disnea o síntomas cardiovasculares con el esfuerzo",
+  "Deformidad evidente, bloqueo articular completo o incapacidad total de carga",
+  "Signos inflamatorios severos sin causa clara (calor, rubor, edema marcado)",
+  "Dolor que no ha cambiado nada tras 4-6 semanas de manejo conservador bien llevado"
+];
+
+function openRedFlags(clientId, onDone){
+  var c = getClient(clientId); if (!c) return;
+  var prev = (c.redFlags && Array.isArray(c.redFlags.flags)) ? c.redFlags.flags : [];
+  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Tamizaje de seguridad previo a la prescripción. Marca todo signo presente. <strong>Cualquier bandera marcada bloquea la prescripción</strong> y obliga a derivar a evaluación médica.</p>';
+  body += '<div style="max-height:46vh;overflow-y:auto;padding-right:.3rem;">';
+  for (var i=0;i<RC_RED_FLAGS.length;i++){
+    var checked = prev.indexOf(i) >= 0 ? " checked" : "";
+    body += '<label class="rc-flagitem"><input type="checkbox" data-rcflag="'+i+'"'+checked+'><span>'+escapeHtml(RC_RED_FLAGS[i])+'</span></label>';
+  }
+  body += '</div>';
+  if (c.redFlags && c.redFlags.fecha){
+    body += '<p class="text-xs text-muted" style="margin-top:.6rem;">Último tamizaje: '+escapeHtml(c.redFlags.fecha)+' · '+(c.redFlags.blocked ? '🚩 con banderas' : '✔ sin banderas')+'</p>';
+  }
+  openModal({
+    title: "🚩 Banderas rojas · " + (c.name||""),
+    bodyHtml: body,
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar tamizaje", cls:"btn-primary", onClick: function(){
+        var marked = [];
+        var boxes = document.querySelectorAll("[data-rcflag]");
+        for (var b=0;b<boxes.length;b++) if (boxes[b].checked) marked.push(parseInt(boxes[b].getAttribute("data-rcflag"),10));
+        c.redFlags = { fecha: new Date().toISOString().slice(0,10), flags: marked, blocked: marked.length > 0 };
+        saveState(); closeModal(); renderClients();
+        if (marked.length){
+          toast("🚩 "+marked.length+" bandera(s) roja(s): prescripción bloqueada. Derivar a evaluación médica.","error");
+        } else {
+          toast("✔ Tamizaje limpio: sin banderas rojas","success");
+          if (typeof onDone === "function") onDone();
+        }
+      }}
+    ]
+  });
+}
+window.openRedFlags = openRedFlags;
+
+/* ---------- Ficha clínica ---------- */
+function openFichaClinica(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var f = c.ficha || {};
+  function fld(label, id, val, ph, area){
+    return '<div class="form-row"><label class="form-label">'+escapeHtml(label)+'</label>'
+      + (area
+        ? '<textarea id="'+id+'" style="min-height:56px;" placeholder="'+escapeAttr(ph||"")+'">'+escapeHtml(val||"")+'</textarea>'
+        : '<input type="text" id="'+id+'" value="'+escapeAttr(val||"")+'" placeholder="'+escapeAttr(ph||"")+'">')
+      + '</div>';
+  }
+  var body = ''
+    + '<div class="form-grid cols-2">'
+    + fld("Motivo de consulta","rcf-motivo",f.motivo,"Ej. dolor de hombro derecho al elevar el brazo")
+    + fld("Inicio de síntomas","rcf-inicio",f.inicio,"Ej. hace 3 semanas / 10-06-2026")
+    + '</div>'
+    + fld("Mecanismo de lesión / evolución","rcf-mecanismo",f.mecanismo,"Cómo ocurrió, cómo ha evolucionado, qué lo agrava y qué lo alivia",true)
+    + fld("Tratamientos previos","rcf-tratamientos",f.tratamientos,"Kinesiología previa, medicamentos, infiltraciones, cirugías por esta lesión...",true)
+    + '<div class="form-grid cols-2">'
+    + fld("Antecedentes médicos","rcf-antecedentes",f.antecedentes,"HTA, DM2, patologías relevantes")
+    + fld("Cirugías previas","rcf-cirugias",f.cirugias,"Tipo y fecha")
+    + '</div>'
+    + '<div class="form-grid cols-2">'
+    + fld("Medicación actual","rcf-medicacion",f.medicacion,"")
+    + fld("Alergias","rcf-alergias",f.alergias,"")
+    + '</div>'
+    + fld("Imagenología / exámenes","rcf-imagen",f.imagen,"Ej. RM rodilla (05-2026): rotura LCA + asa de balde menisco medial",true)
+    + fld("Diagnóstico kinésico / hipótesis","rcf-dx",f.dx,"Ej. tendinopatía de manguito rotador en etapa reactiva",true)
+    + '<div class="form-grid cols-2">'
+    + fld("Objetivo corto plazo (2-4 sem)","rcf-obj-c",f.objCorto,"Ej. EVA ≤3, ROM funcional")
+    + fld("Objetivo mediano plazo (1-2 m)","rcf-obj-m",f.objMediano,"Ej. fuerza 80% vs lado sano")
+    + '</div>'
+    + fld("Objetivo largo plazo / retorno","rcf-obj-l",f.objLargo,"Ej. retorno al fútbol amateur sin dolor")
+    + '<p class="rc-disclaimer">⚕ Registro interno del profesional. No se comparte con el paciente en los enlaces de fase.</p>';
+  openModal({
+    title: "📄 Ficha clínica · " + (c.name||""),
+    large: true,
+    bodyHtml: body,
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar ficha", cls:"btn-primary", onClick: function(){
+        function gv(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; }
+        c.ficha = {
+          motivo: gv("rcf-motivo"), inicio: gv("rcf-inicio"), mecanismo: gv("rcf-mecanismo"),
+          tratamientos: gv("rcf-tratamientos"), antecedentes: gv("rcf-antecedentes"),
+          cirugias: gv("rcf-cirugias"), medicacion: gv("rcf-medicacion"), alergias: gv("rcf-alergias"),
+          imagen: gv("rcf-imagen"), dx: gv("rcf-dx"),
+          objCorto: gv("rcf-obj-c"), objMediano: gv("rcf-obj-m"), objLargo: gv("rcf-obj-l"),
+          updatedAt: Date.now()
+        };
+        saveState(); closeModal(); toast("Ficha clínica guardada","success"); openPanelClinico(clientId);
+      }}
+    ]
+  });
+}
+window.openFichaClinica = openFichaClinica;
+
+/* ---------- Evaluación funcional (con histórico) ---------- */
+var RC_ROM_SUGERENCIAS = ["Hombro — Flexión","Hombro — Abducción","Hombro — Rot. externa","Hombro — Rot. interna","Codo — Flexión","Codo — Extensión","Muñeca — Extensión","Muñeca — Flexión","Cadera — Flexión","Rodilla — Flexión","Rodilla — Extensión","Tobillo — Dorsiflexión","Tobillo — Flexión plantar","Columna lumbar — Flexión"];
+var RC_TESTS_SUGERENCIAS = ["Jobe (empty can)","Hawkins-Kennedy","Neer","Speed","Test de aprensión","Lachman","Cajón anterior rodilla","Pivot shift","McMurray","Thessaly","Apley","Cajón anterior tobillo","Talar tilt","Squeeze test","Cozen","Mill","Maudsley","SLR / Lasègue","FABER","Thomas","Ober","Single leg hop test","Y-Balance"];
+
+function rcRomRowHtml(r){
+  r = r || {};
+  return '<div class="rc-dynrow rc-rom-row">'
+    + '<input type="text" class="rc-mov" list="rc-rom-dl" placeholder="Articulación — Movimiento" value="'+escapeAttr(r.mov||"")+'">'
+    + '<select class="rc-lado">'
+      + '<option value="D"'+(r.lado==="D"?" selected":"")+'>Der.</option>'
+      + '<option value="I"'+(r.lado==="I"?" selected":"")+'>Izq.</option>'
+      + '<option value="B"'+(r.lado==="B"?" selected":"")+'>Bilat.</option>'
+    + '</select>'
+    + '<input type="number" class="rc-grados" placeholder="° afect." value="'+escapeAttr(r.grados!=null?r.grados:"")+'">'
+    + '<input type="number" class="rc-sano" placeholder="° sano" value="'+escapeAttr(r.sano!=null?r.sano:"")+'">'
+    + '<button class="btn btn-ghost btn-sm" onclick="this.parentNode.remove()" title="Quitar">×</button>'
+    + '</div>';
+}
+function rcFuerzaRowHtml(r){
+  r = r || {};
+  function danielsSel(cls, val){
+    var s = '<select class="'+cls+'">';
+    var ops = ["","0","1","2","3","3+","4-","4","4+","5"];
+    for (var i=0;i<ops.length;i++) s += '<option value="'+ops[i]+'"'+(String(val||"")===ops[i]?" selected":"")+'>'+(ops[i]===""?"—":ops[i])+'</option>';
+    return s + '</select>';
+  }
+  return '<div class="rc-dynrow rc-fza-row">'
+    + '<input type="text" class="rc-grupo" placeholder="Grupo muscular (ej. rot. externos hombro)" value="'+escapeAttr(r.grupo||"")+'">'
+    + '<select class="rc-lado"><option value="D"'+(r.lado==="D"?" selected":"")+'>Der.</option><option value="I"'+(r.lado==="I"?" selected":"")+'>Izq.</option><option value="B"'+(r.lado==="B"?" selected":"")+'>Bilat.</option></select>'
+    + danielsSel("rc-af", r.af)
+    + danielsSel("rc-sn", r.sano)
+    + '<button class="btn btn-ghost btn-sm" onclick="this.parentNode.remove()" title="Quitar">×</button>'
+    + '</div>';
+}
+function rcTestRowHtml(r){
+  r = r || {};
+  return '<div class="rc-dynrow t3 rc-test-row">'
+    + '<input type="text" class="rc-test" list="rc-tests-dl" placeholder="Test especial / funcional" value="'+escapeAttr(r.nombre||"")+'">'
+    + '<select class="rc-res">'
+      + '<option value="+"'+(r.res==="+"?" selected":"")+'>+ Positivo</option>'
+      + '<option value="-"'+(r.res==="-"?" selected":"")+'>− Negativo</option>'
+      + '<option value="±"'+(r.res==="±"?" selected":"")+'>± Dudoso</option>'
+    + '</select>'
+    + '<button class="btn btn-ghost btn-sm" onclick="this.parentNode.remove()" title="Quitar">×</button>'
+    + '</div>';
+}
+function rcAddRom(){ document.getElementById("rc-rom-rows").insertAdjacentHTML("beforeend", rcRomRowHtml()); }
+function rcAddFuerza(){ document.getElementById("rc-fza-rows").insertAdjacentHTML("beforeend", rcFuerzaRowHtml()); }
+function rcAddTest(){ document.getElementById("rc-test-rows").insertAdjacentHTML("beforeend", rcTestRowHtml()); }
+window.rcAddRom = rcAddRom; window.rcAddFuerza = rcAddFuerza; window.rcAddTest = rcAddTest;
+
+function rcDatalists(){
+  var h = '<datalist id="rc-rom-dl">';
+  for (var i=0;i<RC_ROM_SUGERENCIAS.length;i++) h += '<option value="'+escapeAttr(RC_ROM_SUGERENCIAS[i])+'">';
+  h += '</datalist><datalist id="rc-tests-dl">';
+  for (var j=0;j<RC_TESTS_SUGERENCIAS.length;j++) h += '<option value="'+escapeAttr(RC_TESTS_SUGERENCIAS[j])+'">';
+  return h + '</datalist>';
+}
+
+function openEvalForm(clientId, evalId){
+  var c = getClient(clientId); if (!c) return;
+  if (!Array.isArray(c.evals)) c.evals = [];
+  var ev = null;
+  if (evalId){ for (var i=0;i<c.evals.length;i++) if (c.evals[i].id===evalId) ev = c.evals[i]; }
+  var isEdit = !!ev;
+  ev = ev || { fecha: new Date().toISOString().slice(0,10), evaReposo:"", evaActividad:"", rom:[{},{}], fuerza:[{},{}], tests:[{}], notas:"" };
+
+  var body = rcDatalists()
+    + '<div class="form-grid cols-2">'
+    + '<div class="form-row"><label class="form-label">Fecha</label><input type="date" id="rc-ev-fecha" value="'+escapeAttr(ev.fecha)+'"></div>'
+    + '<div class="form-row"><label class="form-label">&nbsp;</label><span class="text-xs text-muted" style="line-height:1.4;">Se guarda con histórico para comparar evolución.</span></div>'
+    + '</div>'
+    + '<div class="form-grid cols-2">'
+    + '<div class="form-row"><label class="form-label">Dolor EVA en reposo (0-10)</label><input type="number" min="0" max="10" id="rc-ev-reposo" value="'+escapeAttr(ev.evaReposo)+'" placeholder="0"></div>'
+    + '<div class="form-row"><label class="form-label">Dolor EVA con actividad (0-10)</label><input type="number" min="0" max="10" id="rc-ev-act" value="'+escapeAttr(ev.evaActividad)+'" placeholder="0"></div>'
+    + '</div>'
+    + '<div class="form-row"><label class="form-label">📐 Rango de movimiento (goniometría)</label><div id="rc-rom-rows">';
+  for (var r=0;r<ev.rom.length;r++) body += rcRomRowHtml(ev.rom[r]);
+  body += '</div><button class="btn btn-secondary btn-sm" onclick="rcAddRom()">+ Agregar movimiento</button></div>'
+    + '<div class="form-row"><label class="form-label">💪 Fuerza — escala de Daniels (0-5) · afectado vs sano</label><div id="rc-fza-rows">';
+  for (var f=0;f<ev.fuerza.length;f++) body += rcFuerzaRowHtml(ev.fuerza[f]);
+  body += '</div><button class="btn btn-secondary btn-sm" onclick="rcAddFuerza()">+ Agregar grupo muscular</button></div>'
+    + '<div class="form-row"><label class="form-label">🧪 Tests especiales / funcionales</label><div id="rc-test-rows">';
+  for (var t=0;t<ev.tests.length;t++) body += rcTestRowHtml(ev.tests[t]);
+  body += '</div><button class="btn btn-secondary btn-sm" onclick="rcAddTest()">+ Agregar test</button></div>'
+    + '<div class="form-row"><label class="form-label">Notas de la evaluación</label><textarea id="rc-ev-notas" style="min-height:56px;">'+escapeHtml(ev.notas||"")+'</textarea></div>';
+
+  openModal({
+    title: (isEdit ? "✏️ Editar evaluación" : "📐 Nueva evaluación funcional") + " · " + (c.name||""),
+    large: true,
+    bodyHtml: body,
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar evaluación", cls:"btn-primary", onClick: function(){
+        var rom = [], fza = [], tests = [];
+        var rr = document.querySelectorAll(".rc-rom-row");
+        for (var a=0;a<rr.length;a++){
+          var mov = rr[a].querySelector(".rc-mov").value.trim();
+          if (!mov) continue;
+          rom.push({ mov: mov, lado: rr[a].querySelector(".rc-lado").value,
+            grados: parseFloat(rr[a].querySelector(".rc-grados").value)||null,
+            sano: parseFloat(rr[a].querySelector(".rc-sano").value)||null });
+        }
+        var fr = document.querySelectorAll(".rc-fza-row");
+        for (var b=0;b<fr.length;b++){
+          var gr = fr[b].querySelector(".rc-grupo").value.trim();
+          if (!gr) continue;
+          fza.push({ grupo: gr, lado: fr[b].querySelector(".rc-lado").value,
+            af: fr[b].querySelector(".rc-af").value, sano: fr[b].querySelector(".rc-sn").value });
+        }
+        var tr = document.querySelectorAll(".rc-test-row");
+        for (var d=0;d<tr.length;d++){
+          var tn = tr[d].querySelector(".rc-test").value.trim();
+          if (!tn) continue;
+          tests.push({ nombre: tn, res: tr[d].querySelector(".rc-res").value });
+        }
+        var data = {
+          id: isEdit ? ev.id : genId(),
+          fecha: document.getElementById("rc-ev-fecha").value || new Date().toISOString().slice(0,10),
+          evaReposo: parseFloat(document.getElementById("rc-ev-reposo").value),
+          evaActividad: parseFloat(document.getElementById("rc-ev-act").value),
+          rom: rom, fuerza: fza, tests: tests,
+          notas: document.getElementById("rc-ev-notas").value.trim(),
+          createdAt: isEdit ? (ev.createdAt||Date.now()) : Date.now()
+        };
+        if (isNaN(data.evaReposo)) data.evaReposo = null;
+        if (isNaN(data.evaActividad)) data.evaActividad = null;
+        if (isEdit){
+          for (var k=0;k<c.evals.length;k++) if (c.evals[k].id===ev.id) c.evals[k] = data;
+        } else {
+          c.evals.push(data);
+        }
+        c.evals.sort(function(x,y){ return (x.fecha||"").localeCompare(y.fecha||""); });
+        saveState(); closeModal();
+        toast("Evaluación guardada ("+c.evals.length+" en histórico)","success");
+        openPanelClinico(clientId);
+      }}
+    ]
+  });
+}
+window.openEvalForm = openEvalForm;
+
+function rcEvalResumen(ev){
+  var parts = [];
+  if (ev.evaReposo != null || ev.evaActividad != null) parts.push("EVA "+(ev.evaReposo!=null?ev.evaReposo:"—")+"/"+(ev.evaActividad!=null?ev.evaActividad:"—"));
+  if (ev.rom && ev.rom.length) parts.push(ev.rom.length+" ROM");
+  if (ev.fuerza && ev.fuerza.length) parts.push(ev.fuerza.length+" fuerza");
+  if (ev.tests && ev.tests.length) parts.push(ev.tests.length+" tests");
+  return parts.join(" · ");
+}
+
+function deleteEval(clientId, evalId){
+  var c = getClient(clientId); if (!c || !Array.isArray(c.evals)) return;
+  if (!confirm("¿Eliminar esta evaluación del histórico?")) return;
+  c.evals = c.evals.filter(function(e){ return e.id !== evalId; });
+  saveState(); toast("Evaluación eliminada","success"); openPanelClinico(clientId);
+}
+window.deleteEval = deleteEval;
+
+/* ---------- Reevaluación comparativa (inicial vs actual) ---------- */
+function rcDelta(ini, act, mejorSiSube){
+  if (ini == null || act == null || isNaN(ini) || isNaN(act)) return '<span class="rc-eq">—</span>';
+  var d = act - ini;
+  if (d === 0) return '<span class="rc-eq">= igual</span>';
+  var mejora = mejorSiSube ? d > 0 : d < 0;
+  var arrow = d > 0 ? "▲" : "▼";
+  return '<span class="'+(mejora?"rc-up":"rc-down")+'">'+arrow+' '+(d>0?"+":"")+Math.round(d*10)/10+(mejora?" mejora":" empeora")+'</span>';
+}
+function danielsNum(v){
+  if (v == null || v === "") return null;
+  var map = {"0":0,"1":1,"2":2,"3":3,"3+":3.3,"4-":3.7,"4":4,"4+":4.3,"5":5};
+  return (v in map) ? map[v] : null;
+}
+function openReevalCompare(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var evs = Array.isArray(c.evals) ? c.evals : [];
+  if (evs.length < 2){
+    toast("Necesitas al menos 2 evaluaciones para comparar (inicial vs actual)","warn");
+    if (evs.length < 1) openEvalForm(clientId);
+    return;
+  }
+  var ini = evs[0], act = evs[evs.length-1];
+  var body = '<p class="text-sm text-muted" style="margin-bottom:.6rem;">Comparando <strong>'+escapeHtml(ini.fecha)+'</strong> (inicial) vs <strong>'+escapeHtml(act.fecha)+'</strong> (actual) · '+evs.length+' evaluaciones en total.</p>';
+
+  body += '<table class="rc-cmp"><tr><th>Dolor (EVA)</th><th>Inicial</th><th>Actual</th><th>Evolución</th></tr>';
+  body += '<tr><td>En reposo</td><td>'+(ini.evaReposo!=null?ini.evaReposo:"—")+'</td><td>'+(act.evaReposo!=null?act.evaReposo:"—")+'</td><td>'+rcDelta(ini.evaReposo, act.evaReposo, false)+'</td></tr>';
+  body += '<tr><td>Con actividad</td><td>'+(ini.evaActividad!=null?ini.evaActividad:"—")+'</td><td>'+(act.evaActividad!=null?act.evaActividad:"—")+'</td><td>'+rcDelta(ini.evaActividad, act.evaActividad, false)+'</td></tr></table>';
+
+  function matchList(listIni, listAct, keyFn, valFn, titulo, unidad, mejorSiSube){
+    var rows = "";
+    for (var i=0;i<listAct.length;i++){
+      var a = listAct[i], m = null;
+      for (var j=0;j<listIni.length;j++){
+        if (keyFn(listIni[j]).toLowerCase() === keyFn(a).toLowerCase()){ m = listIni[j]; break; }
+      }
+      var vi = m ? valFn(m) : null, va = valFn(a);
+      rows += '<tr><td>'+escapeHtml(keyFn(a))+'</td><td>'+(vi!=null?vi+unidad:"—")+'</td><td>'+(va!=null?va+unidad:"—")+'</td><td>'+rcDelta(vi, va, mejorSiSube)+'</td></tr>';
+    }
+    if (!rows) return "";
+    return '<table class="rc-cmp"><tr><th>'+titulo+'</th><th>Inicial</th><th>Actual</th><th>Evolución</th></tr>'+rows+'</table>';
+  }
+  body += matchList(ini.rom||[], act.rom||[], function(x){ return (x.mov||"")+" ("+(x.lado||"")+")"; }, function(x){ return x.grados; }, "📐 ROM", "°", true);
+  body += matchList(ini.fuerza||[], act.fuerza||[], function(x){ return (x.grupo||"")+" ("+(x.lado||"")+")"; }, function(x){ return danielsNum(x.af); }, "💪 Fuerza (Daniels)", "", true);
+
+  if (act.tests && act.tests.length){
+    body += '<table class="rc-cmp"><tr><th>🧪 Tests (actual)</th><th>Resultado</th></tr>';
+    for (var t=0;t<act.tests.length;t++){
+      body += '<tr><td>'+escapeHtml(act.tests[t].nombre)+'</td><td>'+escapeHtml(act.tests[t].res||"")+'</td></tr>';
+    }
+    body += '</table>';
+  }
+  body += '<p class="rc-disclaimer">⚕ Criterios de alta sugeridos: dolor EVA ≤2 en actividad, fuerza ≥90% vs lado sano, tests funcionales negativos y retorno a la actividad sin aprensión.</p>';
+
+  openModal({
+    title: "🔁 Reevaluación · " + (c.name||""),
+    large: true,
+    bodyHtml: body,
+    footer: [
+      { label:"Cerrar", cls:"btn-ghost" },
+      { label:"✔ Dar de alta terapéutica", cls:"btn-primary", onClick: function(){ darAltaClinica(clientId); } }
+    ]
+  });
+}
+window.openReevalCompare = openReevalCompare;
+
+/* ---------- Registro de sesión / semáforo del dolor ---------- */
+function openPainSession(clientId){
+  var c = getClient(clientId); if (!c) return;
+  if (!Array.isArray(c.painLog)) c.painLog = [];
+  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Registra el dolor de la sesión. <strong>Regla del semáforo:</strong> <span class="rc-sem v"></span>0-3 progresar · <span class="rc-sem a"></span>4-5 mantener carga · <span class="rc-sem r"></span>≥6 (o dolor que persiste al día siguiente) reducir carga y reevaluar.</p>'
+    + '<div class="form-grid cols-2">'
+    + '<div class="form-row"><label class="form-label">Fecha de la sesión</label><input type="date" id="rc-ps-fecha" value="'+new Date().toISOString().slice(0,10)+'"></div>'
+    + '<div class="form-row"><label class="form-label">Dolor durante la sesión (0-10)</label><input type="number" min="0" max="10" id="rc-ps-durante" placeholder="0"></div>'
+    + '</div>'
+    + '<div class="form-grid cols-2">'
+    + '<div class="form-row"><label class="form-label">Dolor 24h después (sesión anterior)</label><input type="number" min="0" max="10" id="rc-ps-despues" placeholder="opcional"></div>'
+    + '<div class="form-row"><label class="form-label">Notas</label><input type="text" id="rc-ps-notas" placeholder="Ej. molestia solo en última serie"></div>'
+    + '</div>';
+  openModal({
+    title: "🌡 Registrar sesión · " + (c.name||""),
+    bodyHtml: body,
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar registro", cls:"btn-primary", onClick: function(){
+        var durante = parseFloat(document.getElementById("rc-ps-durante").value);
+        var despues = parseFloat(document.getElementById("rc-ps-despues").value);
+        if (isNaN(durante) && isNaN(despues)){ toast("Ingresa al menos un valor de dolor","error"); return; }
+        var entry = {
+          id: genId(),
+          fecha: document.getElementById("rc-ps-fecha").value || new Date().toISOString().slice(0,10),
+          durante: isNaN(durante) ? null : durante,
+          despues: isNaN(despues) ? null : despues,
+          notas: document.getElementById("rc-ps-notas").value.trim()
+        };
+        c.painLog.push(entry);
+        if (c.painLog.length > 60) c.painLog = c.painLog.slice(-60);
+        saveState(); closeModal(); renderClients();
+        var mx = Math.max(entry.durante||0, entry.despues||0);
+        if (mx >= 6) toast("🔴 Dolor "+mx+"/10: reducir carga o detener y reevaluar","error");
+        else if (mx >= 4) toast("🟡 Dolor "+mx+"/10: mantener carga, no progresar","warn");
+        else toast("🟢 Dolor "+mx+"/10: puede progresar","success");
+        openPanelClinico(clientId);
+      }}
+    ]
+  });
+}
+window.openPainSession = openPainSession;
+
+/* ---------- Alta terapéutica (con cross-sell a entrenamiento) ---------- */
+function darAltaClinica(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var crit = prompt("Criterios de alta cumplidos (queda en el registro):", "Dolor EVA ≤2, fuerza ≥90% vs lado sano, tests negativos, retorno funcional completo.");
+  if (crit === null) return;
+  c.alta = { fecha: new Date().toISOString().slice(0,10), criterios: crit };
+  saveState(); closeModal(); renderClients();
+  toast("✔ Alta terapéutica registrada","success");
+  setTimeout(function(){
+    if (confirm("Paciente dado de alta.\n\n¿Convertirlo a cliente de ENTRENAMIENTO (plan de mantención)?\nSu protocolo y registros clínicos se conservan.")){
+      c.type = "gym";
+      saveState(); renderClients();
+      toast("Cliente movido a Gimnasio: ofrécele su plan de mantención 💪","success");
+    }
+  }, 300);
+}
+window.darAltaClinica = darAltaClinica;
+
+/* ---------- Panel clínico (hub por paciente) ---------- */
+function openPanelClinico(clientId){
+  var c = getClient(clientId); if (!c) return;
+  if (!rehabClinicoOn()){ toast("Módulo clínico desactivado","warn"); return; }
+  var evs = Array.isArray(c.evals) ? c.evals : [];
+  var pains = Array.isArray(c.painLog) ? c.painLog : [];
+
+  var banner;
+  if (c.redFlags && c.redFlags.blocked){
+    banner = '<div class="rc-banner bad">🚩 '+c.redFlags.flags.length+' bandera(s) roja(s) activa(s) — prescripción bloqueada. Derivar a evaluación médica.</div>';
+  } else if (c.redFlags && c.redFlags.fecha){
+    banner = '<div class="rc-banner ok">✔ Tamizaje limpio ('+escapeHtml(c.redFlags.fecha)+') — apto para prescripción de ejercicio.</div>';
+  } else {
+    banner = '<div class="rc-banner warn">⚠ Sin tamizaje de banderas rojas. Realízalo antes de prescribir.</div>';
+  }
+  if (c.alta && c.alta.fecha){
+    banner += '<div class="rc-banner ok" style="margin-top:.4rem;">✔ Alta terapéutica el '+escapeHtml(c.alta.fecha)+'.</div>';
+  }
+
+  function tile(ic, lb, sub, fn){
+    return '<button class="rc-tile" onclick="'+fn+'"><span class="rc-tile-ic">'+ic+'</span><span class="rc-tile-lb">'+lb+'</span><span class="rc-tile-sub">'+sub+'</span></button>';
+  }
+  var body = banner
+    + '<div class="rc-tiles">'
+    + tile("📄","Ficha clínica", (c.ficha && c.ficha.dx) ? "Dx: "+escapeHtml(c.ficha.dx.slice(0,34)) : (c.ficha ? "Registrada" : "Sin registrar"), "openFichaClinica('"+clientId+"')")
+    + tile("🚩","Banderas rojas", (c.redFlags&&c.redFlags.fecha) ? "Último: "+escapeHtml(c.redFlags.fecha) : "Pendiente", "openRedFlags('"+clientId+"')")
+    + tile("📐","Nueva evaluación","EVA · ROM · Daniels · tests","openEvalForm('"+clientId+"')")
+    + tile("🔁","Reevaluación", evs.length>=2 ? "Comparar inicial vs actual" : "Requiere ≥2 evaluaciones","openReevalCompare('"+clientId+"')")
+    + tile("🌡","Registrar sesión","Semáforo del dolor","openPainSession('"+clientId+"')")
+    + tile("✔","Alta terapéutica", (c.alta&&c.alta.fecha) ? "Alta: "+escapeHtml(c.alta.fecha) : "Cerrar el caso","darAltaClinica('"+clientId+"')")
+    + '</div>';
+
+  if (evs.length){
+    body += '<div class="form-label" style="margin-top:.5rem;">Histórico de evaluaciones ('+evs.length+')</div>';
+    for (var i=evs.length-1;i>=0;i--){
+      var ev = evs[i];
+      body += '<div class="rc-painrow"><strong>'+escapeHtml(ev.fecha)+'</strong>'
+        + '<span class="text-muted">'+rcEvalResumen(ev)+'</span>'
+        + '<span style="margin-left:auto;display:flex;gap:.3rem;">'
+        + '<button class="btn btn-ghost btn-sm" onclick="openEvalForm(\''+clientId+'\',\''+ev.id+'\')" title="Ver / editar">✎</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="deleteEval(\''+clientId+'\',\''+ev.id+'\')" title="Eliminar">🗑</button>'
+        + '</span></div>';
+    }
+  }
+  if (pains.length){
+    body += '<div class="form-label" style="margin-top:.8rem;">Semáforo del dolor (últimas sesiones)</div>';
+    var last = pains.slice(-8).reverse();
+    for (var p=0;p<last.length;p++){
+      var pl = last[p], mx = Math.max(pl.durante||0, pl.despues||0);
+      body += '<div class="rc-painrow"><span class="rc-sem '+semaforoClass(mx)+'"></span><strong>'+escapeHtml(pl.fecha)+'</strong>'
+        + '<span>Durante: '+(pl.durante!=null?pl.durante:"—")+'/10 · 24h: '+(pl.despues!=null?pl.despues:"—")+'/10</span>'
+        + (pl.notas ? '<span class="text-muted text-xs">'+escapeHtml(pl.notas)+'</span>' : '')
+        + '<span class="text-xs" style="margin-left:auto;color:var(--muted);">'+semaforoLabel(mx)+'</span></div>';
+    }
+  }
+  body += '<p class="rc-disclaimer">⚕ Herramienta de apoyo a la prescripción de ejercicio terapéutico. No reemplaza la evaluación clínica presencial ni el diagnóstico médico. El paciente ve solo su protocolo compartido; esta información es interna.</p>';
+
+  openModal({
+    title: "🩺 Panel clínico · " + (c.name||"") + (c.rut ? " · " + c.rut : ""),
+    large: true,
+    bodyHtml: body,
+    footer: [{ label:"Cerrar", cls:"btn-ghost" }]
+  });
+}
+window.openPanelClinico = openPanelClinico;
+
+/* ---------- Ejercicios terapéuticos base que faltaban en la biblioteca ---------- */
+var RC_EJERCICIOS_BASE = [
+  { id:"us19r_pendulos", name:"Péndulos de Codman", muscle:"Hombro", equipment:"Peso corporal", desc:"Inclinado con apoyo, deja colgar el brazo y realiza círculos suaves relajados.", gif:"" },
+  { id:"us19r_slr", name:"Elevación de pierna recta (SLR)", muscle:"Pierna", equipment:"Peso corporal", desc:"Acostado, rodilla extendida y cuádriceps activo, eleva la pierna ~40 cm sin perder la extensión.", gif:"" },
+  { id:"us19r_bombeo", name:"Bombeo de tobillo (flexo-extensión activa)", muscle:"Movilidad", equipment:"Peso corporal", desc:"Flexión dorsal y plantar activa del tobillo, rango libre de dolor, para control de edema y movilidad.", gif:"" },
+  { id:"us19r_balance_suelo", name:"Balance unipodal en suelo", muscle:"Pierna", equipment:"Peso corporal", desc:"Equilibrio a una pierna en superficie firme; progresar cerrando ojos o con perturbaciones.", gif:"" },
+  { id:"us19r_plio", name:"Saltos y aterrizajes controlados (pliometría básica)", muscle:"Pierna", equipment:"Peso corporal", desc:"Saltos bilaterales a unipodales con aterrizaje suave, rodilla alineada, sin valgo.", gif:"" },
+  { id:"us19r_cod", name:"Cambios de dirección progresivos", muscle:"Cardio", equipment:"Peso corporal", desc:"Desplazamientos con giros y frenos a velocidad progresiva, previa tolerancia al trote lineal.", gif:"" },
+  { id:"us19r_mb_pared", name:"Lanzamiento de balón medicinal a pared", muscle:"Hombro", equipment:"Balón medicinal", desc:"Lanzamientos controlados contra pared para potencia y control de cadena superior.", gif:"" },
+  { id:"us19r_ext_mun_iso", name:"Extensión de muñeca isométrica", muscle:"Brazo", equipment:"Peso corporal", desc:"Sostén la muñeca en extensión contra resistencia de la otra mano, sin movimiento. 30-45s.", gif:"" },
+  { id:"us19r_ext_mun_exc", name:"Extensión de muñeca excéntrica con mancuerna", muscle:"Brazo", equipment:"Mancuernas", desc:"Antebrazo apoyado, baja la mancuerna lento (3-4s) desde extensión; ayuda con la otra mano para subir.", gif:"" },
+  { id:"us19r_flex_mun", name:"Flexión de muñeca con mancuerna", muscle:"Brazo", equipment:"Mancuernas", desc:"Antebrazo apoyado con palma hacia arriba, flexiona y extiende la muñeca controlado.", gif:"" },
+  { id:"us19r_supino", name:"Supinación / pronación con mancuerna", muscle:"Brazo", equipment:"Mancuernas", desc:"Codo a 90° apoyado, gira el antebrazo palma arriba y palma abajo de forma lenta y controlada.", gif:"" },
+  { id:"us19r_grip", name:"Grip isométrico (apretar pelota o toalla)", muscle:"Brazo", equipment:"Peso corporal", desc:"Apretón sostenido 5-10s con intensidad tolerable, sin aumento de dolor.", gif:"" },
+  { id:"us19r_est_ext", name:"Estiramiento de extensores de muñeca", muscle:"Movilidad", equipment:"Peso corporal", desc:"Codo extendido, muñeca en flexión asistida por la otra mano. Sensación de tensión suave, no dolor.", gif:"" }
+];
+
+/* ---------- 5 Protocolos plantilla base (musculoesqueléticos) ---------- */
+function rcPe(id, sets, reps, rest, notes){ return { exerciseId:id, sets:sets, reps:reps, weight:"", rest:rest, notes:notes||"" }; }
+function rcPh(focus, objetivo, criterios, exs){ return { name:"", focus:focus, objetivo:objetivo, criterios:criterios, exercises:exs }; }
+function rcProto(id, name, region, segment, description, phases){
+  for (var i=0;i<phases.length;i++) phases[i].name = "Fase "+(i+1);
+  return { id:id, name:name, region:region, segment:segment, description:description, phases:phases, references:[], createdAt:Date.now(), updatedAt:Date.now() };
+}
+
+function rcProtocolosBase(){
+  return [
+
+  rcProto("us19p_manguito","Tendinopatía de Manguito Rotador","Hombro","miembro-superior",
+    "Manejo con ejercicio progresivo. Regla transversal: semáforo del dolor (≤3 aceptable durante, sin aumento a las 24h). Evitar arcos dolorosos al inicio; progresar carga antes que rango por sobre la cabeza.",
+    [
+      rcPh("Aguda · Protección",
+        "Controlar dolor, mantener movilidad libre de dolor y cargar el tendón con isométricos.",
+        "EVA ≤3 en reposo, sin dolor nocturno significativo y sin aumento de síntomas 24h post ejercicio.",
+        [ rcPe("us19r_pendulos","2","60s","30s","Suave, sin dolor"),
+          rcPe("2dy5u26q","4","30-45s","60s","ISOMÉTRICO: sostener contra banda sin mover, intensidad tolerable"),
+          rcPe("o7r7h267","4","30-45s","60s","ISOMÉTRICO rotación interna"),
+          rcPe("s1sdq5m2","3","10","45s","Rango libre de dolor"),
+          rcPe("3oej23qo","3","12","45s","Banda liviana, foco escapular") ]),
+      rcPh("Recuperación",
+        "Recuperar rango completo e iniciar fortalecimiento dinámico de manguito y escápula.",
+        "ROM activo casi completo sin dolor y fuerza ~70% vs lado sano en rotadores.",
+        [ rcPe("2dy5u26q","3","12-15","60s","Dinámico, codo pegado, lento"),
+          rcPe("o7r7h267","3","12-15","60s","Dinámico controlado"),
+          rcPe("vo5gy7md","3","10-12","60s","Scaption bajo el umbral de dolor, pulgar arriba"),
+          rcPe("d94kiush","3","12","45s","Serratus punch"),
+          rcPe("b1xj4g9g","3","8-10","60s","Y-T-W con banda liviana") ]),
+      rcPh("Fortalecimiento",
+        "Carga progresiva del manguito y la cadena escapular, incluir trabajo por sobre la cabeza tolerado.",
+        "Fuerza ≥90% vs lado sano, sin dolor con carga media y buen control escapular.",
+        [ rcPe("nhvza9n8","4","12","60s","Face pull, codos altos"),
+          rcPe("fkevh8gb","3","10","90s","Remo unilateral, retracción completa"),
+          rcPe("hxuhtdyy","3","8-10","90s","Press militar mancuernas, rango tolerado"),
+          rcPe("bg58mqok","3","12-15","60s","Elevaciones laterales hasta 80-90°"),
+          rcPe("2dy5u26q","3","10","60s","Rot. externa con énfasis excéntrico 3s") ]),
+      rcPh("Retorno funcional",
+        "Gestos por sobre la cabeza, potencia y retorno progresivo a la actividad o deporte.",
+        "Tests (Jobe, Hawkins) negativos o no dolorosos, fuerza simétrica y gesto deportivo sin aprensión.",
+        [ rcPe("4vq5o72k","4","6-8","2min","Press militar con barra progresivo"),
+          rcPe("08pukekq","3","8-10","90s","Dominada australiana"),
+          rcPe("us19r_mb_pared","3","10","60s","Lanzamientos controlados, progresar velocidad"),
+          rcPe("9j6py7e7","3","5-8","2min","Dominadas si el gesto lo requiere"),
+          rcPe("b7n6bs4h","3","30m","60s","Farmer carry, carga alta tolerada") ])
+    ]),
+
+  rcProto("us19p_lca","Reconstrucción de LCA (post-quirúrgico)","Rodilla","miembro-inferior",
+    "Post-operatorio de reconstrucción de ligamento cruzado anterior. Respetar indicaciones del cirujano. Prioridades tempranas: extensión completa, control de cuádriceps y de derrame. Retorno deportivo idealmente ≥9 meses con criterios objetivos (LSI >90%).",
+    [
+      rcPh("Aguda · Protección",
+        "Controlar dolor y derrame, lograr extensión completa (0°) y activar el cuádriceps.",
+        "Extensión completa igual al lado sano, derrame mínimo, SLR sin retraso extensor (sin lag).",
+        [ rcPe("awh44p0o","5","10 x 10s","30s","Isométrico de cuádriceps, apretar fuerte"),
+          rcPe("us19r_slr","3","10","60s","SLR sin lag; si hay lag, seguir con isométricos"),
+          rcPe("us19r_bombeo","3","20","30s","Control de edema"),
+          rcPe("nhzm75zl","3","12","45s","Puente bilateral suave"),
+          rcPe("rsfxf5wb","3","12","45s","TKE con banda, extensión terminal") ]),
+      rcPh("Recuperación",
+        "Recuperar flexión progresiva, normalizar la marcha e iniciar fuerza en cadena cinética controlada.",
+        "Flexión ≥120°, marcha sin claudicación, sentadilla a 60° sin dolor ni derrame posterior.",
+        [ rcPe("grgwwddk","3","12","60s","Sentadilla parcial 0-60°"),
+          rcPe("93669dei","3","12","90s","Prensa rango controlado, carga ligera-media"),
+          rcPe("ob9nm3qk","3","30-45s","60s","Wall sit"),
+          rcPe("3zrynnlg","3","12","60s","Curl femoral suave y controlado"),
+          rcPe("4by853es","3","15","45s","Elevación de talones"),
+          rcPe("us19r_balance_suelo","3","30s","30s","Balance unipodal en suelo") ]),
+      rcPh("Fortalecimiento",
+        "Fuerza de cuádriceps e isquiotibiales con cargas progresivas y control unipodal.",
+        "LSI ≥80% en fuerza, sentadilla profunda sin molestias, step-down con buen control de valgo.",
+        [ rcPe("6anuy8t2","4","10","90s","Sentadilla goblet a rango completo tolerado"),
+          rcPe("skwox951","3","10","90s","Búlgara con control de rodilla"),
+          rcPe("wk6hv8q7","4","8-10","90s","Peso muerto rumano"),
+          rcPe("mtnjp3ta","3","10","60s","Step-down lento, rodilla alineada"),
+          rcPe("41vimswj","3","12","60s","Spanish squat"),
+          rcPe("ut20qveb","3","4-6","90s","Nordic asistido, excéntrico") ]),
+      rcPh("Retorno funcional",
+        "Pliometría, carrera, cambios de dirección y criterios objetivos de retorno deportivo.",
+        "LSI >90% (fuerza y hop tests), sin dolor ni derrame con carga deportiva, confianza completa (sin aprensión). Retorno al deporte de pivote idealmente ≥9 meses post-cirugía.",
+        [ rcPe("5bu9lyvc","4","6-8","2min","Sentadilla con barra progresiva"),
+          rcPe("us19r_plio","4","8","90s","Aterrizajes controlados: bilateral → unipodal"),
+          rcPe("r9h8tscr","1","15-25min","0","Trote progresivo lineal"),
+          rcPe("us19r_cod","4","30s","60s","Cambios de dirección a velocidad progresiva"),
+          rcPe("ut20qveb","3","5-8","90s","Nordic hamstring completo") ])
+    ]),
+
+  rcProto("us19p_menisco","Sutura Meniscal (post-quirúrgico)","Rodilla","miembro-inferior",
+    "Post-operatorio de REPARACIÓN meniscal (sutura). Más conservador que la meniscectomía: la sutura debe cicatrizar. Regla clave: evitar flexión >90° CON CARGA y rotaciones bajo carga las primeras ~6 semanas; carga y ROM según indicación del cirujano. Progresar solo sin dolor en interlínea ni derrame.",
+    [
+      rcPh("Aguda · Protección",
+        "Proteger la sutura (carga y ROM según cirujano), controlar derrame y activar cuádriceps.",
+        "Derrame mínimo, extensión completa, control de cuádriceps (SLR sin lag). No forzar flexión.",
+        [ rcPe("awh44p0o","5","10 x 10s","30s","Isométrico de cuádriceps"),
+          rcPe("us19r_slr","3","10","60s","SLR sin lag"),
+          rcPe("us19r_bombeo","3","20","30s","Bombeos de tobillo"),
+          rcPe("nhzm75zl","3","10","60s","Puente corto, sin dolor en interlínea"),
+          rcPe("rsfxf5wb","3","12","45s","TKE con banda") ]),
+      rcPh("Recuperación",
+        "ROM progresivo (flexión profunda solo SIN carga), marcha normal y fuerza inicial en rangos seguros.",
+        "Flexión ≥120° sin carga y sin dolor, marcha normal, mini-squat 0-60° indoloro, sin derrame reactivo.",
+        [ rcPe("grgwwddk","3","12","60s","Mini-squat 0-60°, SIN flexión profunda cargada"),
+          rcPe("93669dei","3","12","90s","Prensa rango corto 0-60°"),
+          rcPe("4by853es","3","15","45s","Elevación de talones"),
+          rcPe("3zrynnlg","3","12","60s","Curl femoral suave"),
+          rcPe("us19r_balance_suelo","3","30s","30s","Propiocepción en apoyo") ]),
+      rcPh("Fortalecimiento",
+        "Fuerza completa evitando flexión profunda cargada y giros bajo carga hasta ~3 meses.",
+        "Fuerza ≥80-90% vs lado sano, sentadilla a 90° sin dolor en interlínea, sin derrame con carga.",
+        [ rcPe("6anuy8t2","4","10","90s","Goblet hasta 90°, profundizar gradual según tolerancia"),
+          rcPe("wk6hv8q7","4","8-10","90s","Peso muerto rumano"),
+          rcPe("62fy9y5f","3","10","60s","Step-up controlado"),
+          rcPe("skwox951","3","8-10","90s","Búlgara rango controlado"),
+          rcPe("3zrynnlg","3","10-12","60s","Curl femoral con carga progresiva") ]),
+      rcPh("Retorno funcional",
+        "Rango completo bajo carga, pliometría y giros progresivos con autorización médica.",
+        "Autorización del cirujano, sin dolor en interlínea con flexión profunda cargada, fuerza simétrica y hop tests sin dolor.",
+        [ rcPe("5bu9lyvc","4","6-8","2min","Sentadilla progresiva a rango completo"),
+          rcPe("us19r_plio","3","8","90s","Pliometría suave y progresiva"),
+          rcPe("r9h8tscr","1","15-20min","0","Trote lineal, luego progresar"),
+          rcPe("us19r_cod","3","30s","60s","Giros y cambios de dirección graduales") ])
+    ]),
+
+  rcProto("us19p_tobillo","Esguince Lateral de Tobillo","Tobillo / Pie","miembro-inferior",
+    "Esguince de ligamentos laterales (LTFA/LPC). Carga precoz según tolerancia, ejercicio desde el inicio y ÉNFASIS en propiocepción para prevenir recidiva e inestabilidad crónica. Grado III o sospecha de fractura (reglas de Ottawa) → evaluación médica primero.",
+    [
+      rcPh("Aguda · Protección",
+        "Controlar edema y dolor, cargar según tolerancia y mantener movilidad activa libre de dolor.",
+        "Marcha con carga completa tolerada, edema en descenso, ROM activo sin dolor significativo.",
+        [ rcPe("us19r_bombeo","4","20","30s","Bombeos frecuentes durante el día"),
+          rcPe("pv9jlxbs","3","30s","45s","ISOMÉTRICO eversión suave contra banda"),
+          rcPe("lymhn1zl","3","10","45s","Movilidad de dorsiflexión sin dolor"),
+          rcPe("zgujntmk","3","15","45s","Elevación de talón sentado"),
+          rcPe("rtxdv082","1","10min","0","Caminata según tolerancia") ]),
+      rcPh("Recuperación",
+        "Fuerza de peroneos y tríceps sural, propiocepción básica y marcha normalizada.",
+        "Balance unipodal ≥30s estable, elevación de talón bilateral sin dolor, sin edema reactivo.",
+        [ rcPe("pv9jlxbs","3","15","45s","Eversión/inversión dinámica con banda"),
+          rcPe("4by853es","3","15","45s","Elevación de talón de pie bilateral"),
+          rcPe("wpgx854z","3","15","45s","Tibialis raises"),
+          rcPe("0hivtlvp","3","10 x 5s","30s","Short foot"),
+          rcPe("us19r_balance_suelo","4","30s","30s","Balance unipodal, progresar cerrando ojos") ]),
+      rcPh("Fortalecimiento",
+        "Fuerza unipodal, propiocepción avanzada en superficies inestables y cadena de cadera.",
+        "Elevación de talón unipodal ≥90% de reps vs lado sano, balance en superficie inestable estable.",
+        [ rcPe("4by853es","4","12","60s","Elevación de talón UNIPODAL"),
+          rcPe("1ftf1txw","3","30-45s","45s","Isométrico de gemelos con banda"),
+          rcPe("9gygvdhn","4","30s","45s","Balance unipodal en bosu"),
+          rcPe("4qhffffu","3","10m","45s","Monster walks"),
+          rcPe("rv060aky","3","15","45s","Abducción de cadera con banda") ]),
+      rcPh("Retorno funcional",
+        "Saltos, carrera y cambios de dirección con tobillo estable; prevención de recidiva.",
+        "Hop tests sin dolor ni inestabilidad, balance simétrico, cambios de dirección a velocidad sin aprensión.",
+        [ rcPe("us19r_plio","4","10","60s","Saltos bilateral → unipodal, aterrizaje estable"),
+          rcPe("r9h8tscr","1","15-20min","0","Trote progresivo"),
+          rcPe("us19r_cod","4","30s","60s","Cambios de dirección y frenos"),
+          rcPe("9gygvdhn","3","45s","45s","Bosu con perturbaciones"),
+          rcPe("seg69eps","3","60s","60s","Saltar la cuerda") ])
+    ]),
+
+  rcProto("us19p_epicondilo","Epicondilalgia Lateral (codo de tenista)","Codo","miembro-superior",
+    "Tendinopatía de extensores de muñeca (origen común extensor). Manejo de carga: reducir el gesto agravante, isométricos para modular dolor y progresión excéntrica-concéntrica. Incluir cadena de hombro/escápula. Evolución habitual: semanas a meses; la paciencia con la carga es parte del tratamiento.",
+    [
+      rcPh("Aguda · Protección",
+        "Modular dolor con isométricos y modificar la carga o gesto que agrava (agarre, mouse, herramienta).",
+        "EVA ≤3 en actividades diarias, dolor a la palpación tolerable, sin dolor nocturno.",
+        [ rcPe("us19r_ext_mun_iso","5","30-45s","60s","Isométrico de extensores, intensidad tolerable"),
+          rcPe("us19r_grip","3","5 x 8s","45s","Grip suave sin aumento de dolor"),
+          rcPe("us19r_est_ext","3","30s","30s","Estiramiento suave de extensores"),
+          rcPe("saahbvfj","2","10","30s","Movilidad cervical si hay tensión asociada") ]),
+      rcPh("Recuperación",
+        "Carga excéntrica progresiva de extensores e inicio de fuerza de antebrazo en todos los planos.",
+        "Excéntricos con mancuerna liviana sin dolor >3/10, fuerza de agarre en aumento, Cozen menos doloroso.",
+        [ rcPe("us19r_ext_mun_exc","3","12","60s","EXCÉNTRICO 3-4s de bajada, subir asistido"),
+          rcPe("us19r_flex_mun","3","12","45s","Flexión de muñeca liviana"),
+          rcPe("us19r_supino","3","10","45s","Supinación/pronación lenta"),
+          rcPe("us19r_grip","3","8 x 8s","45s","Grip progresivo"),
+          rcPe("2dy5u26q","3","12","45s","Rot. externa de hombro (cadena)") ]),
+      rcPh("Fortalecimiento",
+        "Fuerza concéntrica-excéntrica con más carga y trabajo de cadena superior completa.",
+        "Fuerza de agarre ≥85% vs lado sano, gesto laboral o deportivo suave sin dolor relevante.",
+        [ rcPe("us19r_ext_mun_exc","4","10","60s","Aumentar carga de mancuerna"),
+          rcPe("yj5uc0jk","3","10-12","60s","Curl martillo"),
+          rcPe("3oej23qo","3","12","60s","Remo con banda"),
+          rcPe("b1xj4g9g","3","10","60s","Y-T-W: control escapular"),
+          rcPe("us19r_supino","3","12","45s","Con más carga") ]),
+      rcPh("Retorno funcional",
+        "Agarre de alta demanda y retorno pleno al gesto laboral o deportivo.",
+        "Fuerza de agarre simétrica sin dolor, Cozen/Mill negativos o no limitantes, actividad completa sin recaída a las 24h.",
+        [ rcPe("b7n6bs4h","4","30m","60s","Farmer carry con carga alta"),
+          rcPe("08pukekq","3","8-10","90s","Dominada australiana"),
+          rcPe("fkevh8gb","3","10","90s","Remo con mancuerna"),
+          rcPe("us19r_ext_mun_exc","3","12","60s","Mantención excéntrica 1-2x/semana"),
+          rcPe("z7ibmpe8","3","10","60s","Curl con barra (agarre en extensión)") ])
+    ])
+  ];
+}
+
+/* ---------- Siembra idempotente (no duplica, no toca lo existente) ---------- */
+function ensureRehabClinico(){
+  var changed = false;
+  for (var i=0;i<RC_EJERCICIOS_BASE.length;i++){
+    if (!getExercise(RC_EJERCICIOS_BASE[i].id)){ state.exercises.push(RC_EJERCICIOS_BASE[i]); changed = true; }
+  }
+  var protos = rcProtocolosBase();
+  for (var j=0;j<protos.length;j++){
+    if (!getProtocol(protos[j].id)){ state.protocols.push(protos[j]); changed = true; }
+  }
+  for (var k=0;k<state.clients.length;k++){
+    var c = state.clients[k];
+    if (typeof c.rut === "undefined"){ c.rut = ""; changed = true; }
+  }
+  if (changed) saveState();
+}
+
+/* ============================================================ */
+
 function init(){
   loadSettings();
   loadState();
   runDataFixups();
+  ensureRehabClinico(); /* REHAB-CLÍNICO: siembra protocolos base + campo rut */
   showPreviewBannerIfNeeded();
 
   // Self-heal: when served over http(s), the real location is the source of
@@ -9161,6 +9976,68 @@ function _cus19Import(){
   toast(added + " nuevos · " + fixed + " reparados", "success");
 }
 
+</script>
+
+<!-- ===== PWA: service worker + botón de instalación (aislado del app.js principal) ===== -->
+<script>
+(function(){
+  "use strict";
+
+  // --- Registro del service worker (no bloquea nada; falla en silencio) ---
+  if ("serviceWorker" in navigator &&
+      (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")){
+    window.addEventListener("load", function(){
+      navigator.serviceWorker.register("sw.js").then(function(reg){
+        console.log("US19 SW registrado:", reg.scope);
+      }).catch(function(err){
+        console.warn("US19 SW no se pudo registrar:", err);
+      });
+    });
+  }
+
+  // --- Botón discreto "Instalar app": solo aparece si el navegador ofrece instalar ---
+  var deferredPrompt = null;
+  var btn = null;
+
+  function makeButton(){
+    if (btn) return btn;
+    btn = document.createElement("button");
+    btn.type = "button";
+    btn.id = "us19-install-btn";
+    btn.textContent = "⬇ Instalar app";
+    btn.setAttribute("aria-label", "Instalar Ultra-Sport 19");
+    var s = btn.style;
+    s.position = "fixed"; s.right = "14px"; s.bottom = "14px"; s.zIndex = "9999";
+    s.padding = "10px 14px"; s.border = "0"; s.borderRadius = "999px";
+    s.background = "#E21C25"; s.color = "#fff";
+    s.font = "600 13px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    s.boxShadow = "0 4px 14px rgba(0,0,0,.35)"; s.cursor = "pointer";
+    s.display = "none";
+    btn.addEventListener("click", function(){
+      if (!deferredPrompt){ hideButton(); return; }
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function(){
+        deferredPrompt = null;
+        hideButton();
+      });
+    });
+    (document.body || document.documentElement).appendChild(btn);
+    return btn;
+  }
+  function showButton(){ makeButton().style.display = "block"; }
+  function hideButton(){ if (btn) btn.style.display = "none"; }
+
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();     // evita el mini-infobar automático de Chrome
+    deferredPrompt = e;
+    showButton();           // muestra nuestro botón discreto
+  });
+
+  window.addEventListener("appinstalled", function(){
+    deferredPrompt = null;
+    hideButton();
+  });
+})();
 </script>
 </body>
 </html>
