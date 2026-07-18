@@ -325,6 +325,8 @@ img{max-width:100%;display:block;}
 .ex-gif-block{background:#000;border-bottom:1px solid var(--border);display:flex;justify-content:center;align-items:center;max-height:240px;overflow:hidden;cursor:pointer;position:relative;}
 .ex-gif-block img{max-height:240px;width:100%;object-fit:contain;display:block;}
 .ex-gif-block .gif-placeholder{padding:2rem;color:var(--muted);font-size:2.5rem;text-align:center;}
+.badge.terap{background:rgba(226,28,37,.16);color:#ff8a8f;border:1px solid rgba(226,28,37,.45);}
+.badge.contr{background:rgba(58,134,255,.16);color:#7db2ff;border:1px solid rgba(58,134,255,.45);}
 .ex-gif-expand{position:absolute;bottom:.4rem;right:.4rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:.2rem .45rem;font-size:.7rem;cursor:pointer;}
 
 .ex-tips{padding:.75rem 1.1rem;border-bottom:1px solid var(--border);background:rgba(168,209,57,.04);}
@@ -2799,6 +2801,46 @@ var SEED_VERSION = 20260612;
 var MODULO_REHAB_CLINICO_ACTIVO = true;
 function rehabClinicoOn(){ return !!MODULO_REHAB_CLINICO_ACTIVO; }
 
+var TERAP_ZONES = ["Pierna","Brazo/Hombro","Columna/Core","Cuello"];
+var TERAP_DEFAULTS = {
+  "7lhgd7fh":"Pierna","rv060aky":"Pierna","35yv2xhc":"Pierna","fmh626bt":"Pierna","4qhffffu":"Pierna",
+  "mtnjp3ta":"Pierna","ob9nm3qk":"Pierna","rsfxf5wb":"Pierna","41vimswj":"Pierna","ze7q9sbc":"Pierna",
+  "qviagj5a":"Pierna","zgujntmk":"Pierna","wpgx854z":"Pierna","pv9jlxbs":"Pierna","9gygvdhn":"Pierna",
+  "0hivtlvp":"Pierna","awh44p0o":"Pierna","1ftf1txw":"Pierna","65v26rww":"Pierna","wb7efzat":"Pierna",
+  "ut20qveb":"Pierna","ztvorhsp":"Pierna","ftrj4vta":"Pierna","nhzm75zl":"Pierna","td9k3mnw":"Pierna",
+  "u2yh462j":"Pierna","lymhn1zl":"Pierna","ljav0z1w":"Pierna","fx43j725":"Pierna",
+  "2dy5u26q":"Brazo/Hombro","o7r7h267":"Brazo/Hombro","vo5gy7md":"Brazo/Hombro","s1sdq5m2":"Brazo/Hombro",
+  "d94kiush":"Brazo/Hombro","b1xj4g9g":"Brazo/Hombro","3oej23qo":"Brazo/Hombro","nhvza9n8":"Brazo/Hombro",
+  "b006joyr":"Columna/Core","hsqs24tn":"Columna/Core","sy4b18f2":"Columna/Core","p9vi84pn":"Columna/Core",
+  "h6esb0xx":"Columna/Core","d7u8n5d0":"Columna/Core",
+  "saahbvfj":"Cuello","00t41cts":"Cuello"
+};
+function applyTerapDefaults(){
+  if (!state.exercises || !state.exercises.length) return false;
+  var changed = false;
+  for (var i=0;i<state.exercises.length;i++){
+    var e = state.exercises[i];
+    if (e && typeof e.terap === "undefined" && TERAP_DEFAULTS[e.id]){ e.terap = TERAP_DEFAULTS[e.id]; changed = true; }
+  }
+  return changed;
+}
+var CONTR_TYPES = ["Isométrico","Concéntrico","Excéntrico"];
+var CONTR_DEFAULTS = {
+  "ob9nm3qk":"Isométrico","ze7q9sbc":"Isométrico","awh44p0o":"Isométrico","1ftf1txw":"Isométrico",
+  "65v26rww":"Isométrico","wb7efzat":"Isométrico","ftrj4vta":"Isométrico","qviagj5a":"Isométrico",
+  "d7u8n5d0":"Isométrico","h6esb0xx":"Isométrico","0hivtlvp":"Isométrico","9gygvdhn":"Isométrico",
+  "ut20qveb":"Excéntrico","ztvorhsp":"Excéntrico","mtnjp3ta":"Excéntrico"
+};
+function applyContrDefaults(){
+  if (!state.exercises || !state.exercises.length) return false;
+  var changed = false;
+  for (var i=0;i<state.exercises.length;i++){
+    var e = state.exercises[i];
+    if (e && typeof e.contr === "undefined" && CONTR_DEFAULTS[e.id]){ e.contr = CONTR_DEFAULTS[e.id]; changed = true; }
+  }
+  return changed;
+}
+
 function loadState(){
   try {
     var raw = localStorage.getItem(APP_KEY);
@@ -2837,6 +2879,9 @@ function loadState(){
         console.log("GIFs auto-reparados: US19-MEDIA -> US19-APP/videos (jsDelivr)");
       }
     } catch(eFix){ console.error("Auto-reparación de GIFs falló:", eFix); }
+    var _migTerap = applyTerapDefaults();
+    var _migContr = applyContrDefaults();
+    if (_migTerap || _migContr) saveState();
   } catch(e){
     console.error("loadState failed:", e);
     state.clients = SEED_DATA.clients || [];
@@ -2844,6 +2889,7 @@ function loadState(){
     state.exercises = SEED_DATA.exercises || [];
     state.protocols = SEED_DATA.protocols || [];
     state.trash = [];
+    try { applyTerapDefaults(); applyContrDefaults(); } catch(e2){}
   }
 }
 
@@ -3802,6 +3848,14 @@ function openExercisePicker(onPick){
     + '<input type="text" id="ep-search" placeholder="Buscar ejercicio...">'
     + '<select id="ep-muscle"><option value="">Todos los grupos</option>'
     + muscles.map(function(m){ return '<option value="'+escapeAttr(m)+'">'+escapeHtml(m)+'</option>'; }).join("")
+    + '<optgroup label="🩺 Terapéuticos (rehab)">'
+    + '<option value="terap:">Terapéuticos — todos</option>'
+    + TERAP_ZONES.map(function(z){ return '<option value="terap:'+escapeAttr(z)+'">Terapéutico — '+escapeHtml(z)+'</option>'; }).join("")
+    + '</optgroup>'
+    + '<optgroup label="⚡ Tipo de contracción">'
+    + '<option value="contr:">Contracción — todas</option>'
+    + CONTR_TYPES.map(function(c){ return '<option value="contr:'+escapeAttr(c)+'">'+escapeHtml(c)+'</option>'; }).join("")
+    + '</optgroup>'
     + '</select>'
     + '</div>'
     + '<div id="ep-list" style="max-height:50vh;overflow-y:auto;display:grid;grid-template-columns:1fr;gap:.4rem;"></div>';
@@ -3817,9 +3871,15 @@ function openExercisePicker(onPick){
         var muscle = document.getElementById("ep-muscle").value;
         var list = document.getElementById("ep-list");
         var filtered = state.exercises.filter(function(e){
-          if (muscle && e.muscle !== muscle) return false;
+          if (muscle){
+            if (muscle === "terap:"){ if (!e.terap) return false; }
+            else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
+            else if (muscle === "contr:"){ if (!e.contr) return false; }
+            else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
+            else if (e.muscle !== muscle) return false;
+          }
           if (q){
-            var hay = (e.name+" "+e.muscle+" "+(e.equipment||"")).toLowerCase();
+            var hay = (e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")).toLowerCase();
             if (hay.indexOf(q) < 0) return false;
           }
           return true;
@@ -3829,12 +3889,22 @@ function openExercisePicker(onPick){
           return;
         }
         list.innerHTML = filtered.map(function(e){
-          return '<button class="card" style="margin:0;cursor:pointer;text-align:left;display:flex;width:100%;background:var(--surface-2);" data-id="'+escapeAttr(e.id)+'">'
-            + '<div class="card-main">'
+          var hasGif = e.gif && /^https?:\/\//.test(e.gif);
+          var thumb = hasGif
+            ? '<img src="'+escapeAttr(e.gif)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'🏋️\'">'
+            : '<span style="font-size:1.5rem;">🏋️</span>';
+          return '<div class="card" style="margin:0;display:flex;align-items:stretch;width:100%;background:var(--surface-2);overflow:hidden;">'
+            + '<div class="ep-thumb" data-prev="'+escapeAttr(e.id)+'" title="Ver vista previa" style="flex:0 0 84px;min-height:70px;background:#000;display:flex;align-items:center;justify-content:center;cursor:zoom-in;overflow:hidden;">'+thumb+'</div>'
+            + '<button class="card-main" data-id="'+escapeAttr(e.id)+'" style="flex:1;cursor:pointer;text-align:left;background:none;border:none;padding:.55rem .75rem;color:inherit;font:inherit;">'
             + '<div class="card-title" style="font-size:.95rem;">'+escapeHtml(e.name)+'</div>'
-            + '<div class="card-sub"><span class="badge green">'+escapeHtml(e.muscle||"")+'</span>'+(e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')+'</div>'
+            + '<div class="card-sub">'
+              + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
+              + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
+              + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
+              + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
             + '</div>'
-          + '</button>';
+            + '</button>'
+          + '</div>';
         }).join("");
         var items = list.querySelectorAll("[data-id]");
         for (var i=0;i<items.length;i++){
@@ -3842,6 +3912,13 @@ function openExercisePicker(onPick){
             var id = this.getAttribute("data-id");
             closeModal();
             onPick(id);
+          });
+        }
+        var prevs = list.querySelectorAll("[data-prev]");
+        for (var p=0;p<prevs.length;p++){
+          prevs[p].addEventListener("click", function(ev){
+            ev.stopPropagation();
+            showExercisePreview(this.getAttribute("data-prev"));
           });
         }
       }
@@ -3855,6 +3932,30 @@ function openExercisePicker(onPick){
     }
   });
 }
+
+function showExercisePreview(exId){
+  var e = getExercise(exId);
+  if (!e) return;
+  var old = document.getElementById("ex-preview-overlay");
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+  var ov = document.createElement("div");
+  ov.id = "ex-preview-overlay";
+  ov.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:1rem;cursor:zoom-out;";
+  var media = (e.gif && /^https?:\/\//.test(e.gif))
+    ? '<img src="'+escapeAttr(e.gif)+'" alt="" style="max-height:62vh;max-width:92vw;border-radius:10px;background:#000;" onerror="this.outerHTML=\'<div style=&quot;font-size:4rem;padding:2rem;&quot;>🏋️</div>\'">'
+    : '<div style="font-size:4rem;padding:2rem;">🏋️</div>';
+  ov.innerHTML = '<div style="max-width:560px;width:100%;text-align:center;">'
+    + media
+    + '<div style="color:#fff;font-weight:700;margin-top:.7rem;font-size:1.05rem;">'+escapeHtml(e.name||"")+'</div>'
+    + (e.terap?'<div style="margin-top:.35rem;"><span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span></div>':'')
+    + (e.contr?'<div style="margin-top:.35rem;"><span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span></div>':'')
+    + (e.desc?'<div style="color:rgba(255,255,255,.75);font-size:.85rem;margin-top:.4rem;line-height:1.45;">'+escapeHtml(e.desc)+'</div>':'')
+    + '<div style="color:rgba(255,255,255,.5);font-size:.75rem;margin-top:.6rem;">Toca para cerrar</div>'
+    + '</div>';
+  ov.addEventListener("click", function(){ if (ov.parentNode) ov.parentNode.removeChild(ov); });
+  document.body.appendChild(ov);
+}
+window.showExercisePreview = showExercisePreview;
 
 function saveBuilder(){
   if (!_builderRoutine) return;
@@ -4523,6 +4624,20 @@ function renderLibrary(){
     var m = muscles[i];
     html += '<option value="'+escapeAttr(m)+'"'+(_libFilter.muscle===m?" selected":"")+'>'+escapeHtml(m)+'</option>';
   }
+  html += '<optgroup label="🩺 Terapéuticos (rehab)">';
+  html += '<option value="terap:"'+(_libFilter.muscle==="terap:"?" selected":"")+'>Terapéuticos — todos</option>';
+  for (var t=0;t<TERAP_ZONES.length;t++){
+    var tz = "terap:"+TERAP_ZONES[t];
+    html += '<option value="'+escapeAttr(tz)+'"'+(_libFilter.muscle===tz?" selected":"")+'>Terapéutico — '+escapeHtml(TERAP_ZONES[t])+'</option>';
+  }
+  html += '</optgroup>';
+  html += '<optgroup label="⚡ Tipo de contracción">';
+  html += '<option value="contr:"'+(_libFilter.muscle==="contr:"?" selected":"")+'>Contracción — todas</option>';
+  for (var c1=0;c1<CONTR_TYPES.length;c1++){
+    var cv = "contr:"+CONTR_TYPES[c1];
+    html += '<option value="'+escapeAttr(cv)+'"'+(_libFilter.muscle===cv?" selected":"")+'>'+escapeHtml(CONTR_TYPES[c1])+'</option>';
+  }
+  html += '</optgroup>';
   html += '</select>';
   html += '</div>';
 
@@ -4546,9 +4661,15 @@ function renderLibraryGrid(){
   var q = (_libFilter.search||"").trim().toLowerCase();
   var muscle = _libFilter.muscle;
   var filtered = state.exercises.filter(function(e){
-    if (muscle && e.muscle !== muscle) return false;
+    if (muscle){
+      if (muscle === "terap:"){ if (!e.terap) return false; }
+      else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
+      else if (muscle === "contr:"){ if (!e.contr) return false; }
+      else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
+      else if (e.muscle !== muscle) return false;
+    }
     if (q){
-      var hay = (e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")).toLowerCase();
+      var hay = (e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")).toLowerCase();
       if (hay.indexOf(q) < 0) return false;
     }
     return true;
@@ -4575,6 +4696,8 @@ function renderLibraryGrid(){
         + '<div class="ex-meta">'
           + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
           + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
+          + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
+          + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
           + (heavy?'<span class="badge warn" title="GIF pesado, solo local">⚠ local</span>':'')
         + '</div>'
         + (e.desc?'<p class="text-xs text-muted" style="line-height:1.4;">'+escapeHtml(e.desc)+'</p>':'')
@@ -4591,7 +4714,7 @@ function renderLibraryGrid(){
 function openExerciseForm(id){
   var ex = id ? getExercise(id) : null;
   var isEdit = !!ex;
-  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"" };
+  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"", terap:"", contr:"" };
 
   var muscleOpts = ["Pecho","Espalda","Hombro","Brazo","Pierna","Glúteo","Core","Cardio","Movilidad"];
   var equipOpts = ["Peso corporal","Barra","Mancuernas","Polea","Máquina","Caminadora","Rueda"];
@@ -4616,6 +4739,26 @@ function openExerciseForm(id){
   }
   equipHtml += '</select>';
 
+  var terapHtml = '<select id="ef-terap">';
+  terapHtml += '<option value="">— No terapéutico —</option>';
+  for (var k=0;k<TERAP_ZONES.length;k++){
+    terapHtml += '<option value="'+escapeAttr(TERAP_ZONES[k])+'"'+(e.terap===TERAP_ZONES[k]?" selected":"")+'>'+escapeHtml(TERAP_ZONES[k])+'</option>';
+  }
+  if (e.terap && TERAP_ZONES.indexOf(e.terap)<0){
+    terapHtml += '<option value="'+escapeAttr(e.terap)+'" selected>'+escapeHtml(e.terap)+'</option>';
+  }
+  terapHtml += '</select>';
+
+  var contrHtml = '<select id="ef-contr">';
+  contrHtml += '<option value="">— Sin especificar —</option>';
+  for (var c2=0;c2<CONTR_TYPES.length;c2++){
+    contrHtml += '<option value="'+escapeAttr(CONTR_TYPES[c2])+'"'+(e.contr===CONTR_TYPES[c2]?" selected":"")+'>'+escapeHtml(CONTR_TYPES[c2])+'</option>';
+  }
+  if (e.contr && CONTR_TYPES.indexOf(e.contr)<0){
+    contrHtml += '<option value="'+escapeAttr(e.contr)+'" selected>'+escapeHtml(e.contr)+'</option>';
+  }
+  contrHtml += '</select>';
+
   openModal({
     title: isEdit ? "Editar ejercicio" : "Nuevo ejercicio",
     bodyHtml:
@@ -4623,6 +4766,10 @@ function openExerciseForm(id){
       + '<div class="form-grid cols-2">'
         + formField("Grupo muscular", muscleHtml)
         + formField("Equipamiento", equipHtml)
+      + '</div>'
+      + '<div class="form-grid cols-2">'
+        + formField("Categoría terapéutica (rehab)", terapHtml)
+        + formField("Tipo de contracción", contrHtml)
       + '</div>'
       + formField("Descripción", '<textarea id="ef-desc" placeholder="Cómo ejecutar el ejercicio">'+escapeHtml(e.desc||"")+'</textarea>')
       + formField("URL del GIF / imagen",
@@ -4642,6 +4789,8 @@ function openExerciseForm(id){
           name: name,
           muscle: document.getElementById("ef-muscle").value,
           equipment: document.getElementById("ef-equip").value,
+          terap: document.getElementById("ef-terap").value,
+          contr: document.getElementById("ef-contr").value,
           desc: document.getElementById("ef-desc").value.trim(),
           gif: gif
         };
@@ -7568,7 +7717,7 @@ function openPhaseShareModal(protocolId, phaseIdx){
         }).catch(function(err){
           var msg = err.message || "";
           if (msg.indexOf("403") >= 0){
-            setStatus('<span style="color:var(--danger);">⚠ Tu token no tiene permiso <strong>Contents</strong>. Edítalo en GitHub → Settings → Tokens → <strong>Contents: Read and write</strong>.</span>');
+            setStatus('<span style="color:var(--danger);">⚠ Tu token no tiene permiso <strong>Contents</strong>. Edítalo en GitHub �� Settings → Tokens → <strong>Contents: Read and write</strong>.</span>');
           } else {
             setStatus('<span style="color:var(--warn);">⚠ GitHub: '+escapeHtml(msg)+'</span>');
           }
@@ -10276,7 +10425,7 @@ var US19_CATALOGO_URL = "us19_catalogo.json";
 function importarCatalogoUS19(){
   var bodyHtml = '<div class="hint" style="margin-bottom:.8rem;">'
     + 'Importa o <strong>repara</strong> los ejercicios con GIF propio. Si un ejercicio ya existe, se le actualiza el GIF y la técnica (no se duplica).</div>'
-    + '<div id="cus19-status" style="margin-bottom:.8rem;color:var(--text);">Cargando catálogo…</div>'
+    + '<div id="cus19-status" style="margin-bottom:.8rem;color:var(--text);">Cargando catálogo��</div>'
     + '<div id="cus19-groups"></div>'
     + '<input type="file" id="cus19-file" accept=".json" style="display:none;">';
   openModal({
