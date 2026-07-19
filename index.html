@@ -2960,6 +2960,7 @@ function loadSettings(){
       if (typeof p.githubToken === "string") settings.githubToken = p.githubToken;
       if (p.githubRepo) settings.githubRepo = p.githubRepo;
       if (p.githubBranch) settings.githubBranch = p.githubBranch;
+      var _du = document.getElementById('set-dash-url'); if (_du && _du.value.trim()) settings.dashApiUrl = _du.value.trim();
       if (typeof p.bitlyToken === "string") settings.bitlyToken = p.bitlyToken;
       if (typeof p.bitlyDomain === "string") settings.bitlyDomain = p.bitlyDomain;
       if (typeof p.syncEnabled === "boolean") settings.syncEnabled = p.syncEnabled;
@@ -6104,6 +6105,10 @@ function openSettings(){
   bodyHtml += formField("Personal Access Token", '<input type="password" id="set-cal-token" value="'+escapeAttr(settings.calendlyToken)+'" placeholder="eyJraW..." autocomplete="new-password">');
   bodyHtml += '<div style="margin-top:.5rem;"><button class="btn btn-secondary btn-sm" id="btn-cal-test">🔍 Verificar token</button> <span id="cal-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
   bodyHtml += '<div class="divider"></div>';
+  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.2rem;">⚡ Apps Script · Notion Sync</h3>';
+  bodyHtml += '<p style="font-size:.82rem;color:var(--muted);margin-bottom:.7rem;">URL de tu Web App de Google Apps Script (termina en /exec). Se usa para sincronizar Finanzas e importar clientes desde Notion.</p>';
+  bodyHtml += formField('URL Apps Script (/exec)', '<input type="url" id="set-dash-url" value="'+escapeAttr(settings.dashApiUrl||'')+'" placeholder="https://script.google.com/macros/s/…/exec?clave=…" style="width:100%">') + '<hr style="border-color:rgba(255,255,255,.07);margin:1.2rem 0;">';
+
   bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.2rem;">🔗 Bitly (links cortos · recomendado)</h3>';
   bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">Prioridad más alta que GitHub. Obtén tu token en <span class="kbd">app.bitly.com/settings/api</span>. Genera links como <span class="kbd">bit.ly/XXXXX</span>.</p>';
   bodyHtml += '<div class="form-grid cols-2">';
