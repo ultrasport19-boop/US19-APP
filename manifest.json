@@ -1,19 +1,16 @@
 {
   "name": "Ultra-Sport 19",
   "short_name": "US19",
-  "description": "Planificador de rutinas y kinesiologia — Ultra-Sport 19",
-  "lang": "es",
-  "dir": "ltr",
-  "start_url": "./?source=pwa",
+  "description": "Planificador de rutinas, clientes y finanzas Ultra-Sport 19",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "theme_color": "#E21C25",
-  "background_color": "#102A43",
-  "categories": ["health", "fitness", "sports"],
+  "orientation": "any",
+  "background_color": "#0b0e13",
+  "theme_color": "#0b0e13",
+  "lang": "es-CL",
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
