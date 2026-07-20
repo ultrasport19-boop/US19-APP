@@ -3498,6 +3498,7 @@ function clientCardHtml(c){
     + '<div class="card-actions">'
       + actionsExtra
       + '<button class="btn btn-ghost btn-sm" onclick="openClientTracking(\''+c.id+'\')" title="Medidas corporales y evaluaciones">📏 Seguimiento</button>'
+      + ((c.progressions && c.progressions.length) ? '<button class="btn btn-ghost btn-sm" onclick="openProgressHistory(\''+c.id+'\')" title="Progresiones importadas (cargas, reps, RPE)">📈 Progresiones ('+c.progressions.length+')</button>' : '')
       + (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\''+c.id+'\')" title="Enviar resumen semanal por WhatsApp">📊 Resumen</button>' : '')
       + waBtn
       + '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\''+c.id+'\')">Editar</button>'
@@ -12591,6 +12592,87 @@ function progApplyFromModal(){
   toast("Progresión de "+c.name+" registrada ("+ejercicios.length+" ejercicios, "+totalSets+" sets)"+(updated?(" · "+updated+" cargas actualizadas"):(r?"":" · rutina no encontrada, solo historial")),"success");
   if(document.querySelector(".view.active")&&document.querySelector(".view.active").id==="view-routines") renderRoutines();
 }
+
+/* Mini-gráfico de línea (peso por sesión) — SVG, sin dependencias. */
+function _progSparkline(pts){
+  if(!pts||!pts.length) return "";
+  var W=280, H=70, padX=10, padTop=12, padBot=18, n=pts.length;
+  var vals=pts.map(function(p){ return p.peso; });
+  var min=Math.min.apply(null,vals), max=Math.max.apply(null,vals);
+  if(max===min){ max=min+1; min=min-1; }
+  function X(i){ return padX + (n===1?0.5:(i/(n-1)))*(W-padX*2); }
+  function Y(v){ return padTop + (1-(v-min)/(max-min))*(H-padTop-padBot); }
+  var line="", dots="";
+  pts.forEach(function(p,i){ line += (i===0?"M":"L")+X(i).toFixed(1)+" "+Y(p.peso).toFixed(1)+" "; });
+  pts.forEach(function(p,i){
+    dots += '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.peso).toFixed(1)+'" r="2.6" fill="var(--accent)"><title>'+escapeHtml((p.fecha||"")+" · "+p.peso+"kg"+(p.reps!=null?(" · "+p.reps+" reps"):"")+(p.rpe!=null?(" · RPE "+p.rpe):""))+'</title></circle>';
+    dots += '<text x="'+X(i).toFixed(1)+'" y="'+(Y(p.peso)-6).toFixed(1)+'" font-size="8" fill="var(--text)" text-anchor="middle">'+p.peso+'</text>';
+  });
+  var svg='<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;max-height:96px;display:block;margin-top:.3rem;">';
+  svg += '<path d="'+line+'" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  svg += dots;
+  svg += '<text x="'+X(0)+'" y="'+(H-4)+'" font-size="8" fill="var(--muted)" text-anchor="start">'+(pts[0].fecha?pts[0].fecha.slice(5):"")+'</text>';
+  if(n>1) svg += '<text x="'+X(n-1)+'" y="'+(H-4)+'" font-size="8" fill="var(--muted)" text-anchor="end">'+(pts[n-1].fecha?pts[n-1].fecha.slice(5):"")+'</text>';
+  svg += '</svg>';
+  return svg;
+}
+window.openProgressHistory = function(clientId){
+  var c=getClient(clientId); if(!c) return;
+  var progs=Array.isArray(c.progressions)?c.progressions.slice():[];
+  if(!progs.length){ toast("Este cliente aún no tiene progresiones importadas","warn"); return; }
+  progs.sort(function(a,b){ return (b.fecha||"").localeCompare(a.fecha||"") || (b.importadoEl||0)-(a.importadoEl||0); });
+
+  // Evolución de cargas: por ejercicio, peso del mejor set en cada fecha (orden cronológico)
+  var byEx={};
+  progs.slice().sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); }).forEach(function(p){
+    (p.ejercicios||[]).forEach(function(e){
+      var best=e.mejorSet; if(!best||best.peso_kg==null) return;
+      if(!byEx[e.nombre]) byEx[e.nombre]=[];
+      byEx[e.nombre].push({ fecha:String(p.fecha||""), peso:best.peso_kg, reps:best.reps, rpe:best.rpe });
+    });
+  });
+
+  var body='';
+  var exNames=Object.keys(byEx);
+  if(exNames.length){
+    body+='<div class="form-label">📊 Evolución de cargas (mejor set por sesión)</div>';
+    exNames.forEach(function(nm){
+      var pts=byEx[nm], first=pts[0].peso, last=pts[pts.length-1].peso, delta=Math.round((last-first)*10)/10;
+      var deltaTxt = delta>0?('<span style="color:var(--success);font-weight:700;">▲ +'+delta+'kg</span>'):(delta<0?('<span style="color:var(--danger);font-weight:700;">▼ '+delta+'kg</span>'):'<span class="text-muted">= igual</span>');
+      body+='<div class="card" style="margin-bottom:.5rem;"><div class="card-main">'
+        +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.3rem;"><strong>'+escapeHtml(nm)+'</strong> '+deltaTxt+(pts.length===1?'<span class="text-xs text-muted">1 sesión</span>':'')+'</div>'
+        +_progSparkline(pts)
+        +'</div></div>';
+    });
+  }
+
+  body+='<div class="form-label" style="margin-top:.9rem;">Sesiones importadas ('+progs.length+')</div>';
+  progs.forEach(function(p){
+    body+='<div class="card" style="margin-bottom:.5rem;"><div class="card-main">';
+    body+='<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:.4rem;align-items:center;"><strong>'+escapeHtml(p.fecha||"—")+'</strong>'
+      +'<span class="text-xs text-muted">'+(p.rutinaNombre?escapeHtml(p.rutinaNombre):"rutina no vinculada")+(p.cumplimiento!=null?(" · "+p.cumplimiento+"% cumplim."):"")+'</span></div>';
+    if(p.nota) body+='<div class="text-xs" style="font-style:italic;margin:.3rem 0;color:var(--text);">💬 '+escapeHtml(p.nota)+'</div>';
+    body+='<table class="rc-cmp" style="width:100%;margin-top:.4rem;"><tr><th>Ejercicio</th><th>Mejor set</th><th>RPE</th></tr>';
+    (p.ejercicios||[]).forEach(function(e){
+      var b=e.mejorSet;
+      var mset=b?((b.reps!=null?b.reps:"—")+" × "+(b.peso_kg!=null?b.peso_kg+"kg":"—")):"—";
+      body+='<tr><td>'+escapeHtml(e.nombre||"—")+'</td><td>'+mset+'</td><td>'+(b&&b.rpe!=null?b.rpe:"—")+'</td></tr>';
+    });
+    body+='</table>';
+    body+='<div style="text-align:right;margin-top:.3rem;"><button class="btn btn-ghost btn-sm" onclick="progDelete(\''+clientId+'\',\''+p.id+'\')" title="Eliminar esta progresión">🗑</button></div>';
+    body+='</div></div>';
+  });
+
+  openModal({ title:"📈 Progresiones · "+(c.name||""), large:true, bodyHtml:body, footer:[{ label:"Cerrar", cls:"btn-ghost" }] });
+};
+window.progDelete = function(clientId, progId){
+  var c=getClient(clientId); if(!c||!Array.isArray(c.progressions)) return;
+  if(!confirm("¿Eliminar esta progresión del historial?")) return;
+  c.progressions=c.progressions.filter(function(p){ return p.id!==progId; });
+  saveState(); closeModal();
+  if(c.progressions.length) openProgressHistory(clientId);
+  else { toast("Progresión eliminada","success"); if(typeof renderClients==="function") renderClients(); }
+};
 
 function init(){
   loadSettings();
