@@ -3639,6 +3639,7 @@ function renderRoutines(){
   html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button class="btn btn-primary" onclick="openRoutineBuilder()">+ Nueva Rutina</button>';
   html += '<button class="btn btn-secondary" onclick="openTextImporter()">📋 Importar texto</button>';
   html += '<button class="btn btn-secondary" onclick="openFromTemplateModal()">➕ Desde plantilla</button>';
+  html += '<button class="btn btn-secondary" onclick="openProgressImport()">📥 Importar progresión</button>';
   if (state.trash && state.trash.length) html += '<button class="btn btn-ghost" onclick="openTrashModal()">🗑 Papelera ('+state.trash.length+')</button>';
   html += '</div>';
   html += '</div>';
@@ -12432,6 +12433,164 @@ window.infGuardar = function(){
   saveState();
   toast("Informe guardado en el historial de "+c.name+" ✓","success");
 };
+
+/* ============================================================
+   IMPORTAR PROGRESIÓN — el cliente envía el PDF "Reporte de
+   Progreso" (generado por esta misma app), una IA lo convierte a
+   JSON con PROG_IMPORT_PROMPT, y aquí se pega para:
+   1) registrar la progresión en el historial del cliente
+      (c.progressions[], cifrado y sincronizado), y
+   2) opcionalmente actualizar las cargas prescritas de la rutina
+      con el mejor set logrado por ejercicio.
+   ============================================================ */
+var PROG_IMPORT_PROMPT = [
+'Actúa como un sistema de extracción de datos (OCR + parser estructurado) para el PDF "Reporte de Progreso" de Ultra-Sport 19. Te adjuntaré el PDF (o capturas). Devuélveme UN ÚNICO JSON estricto, sin texto adicional, sin markdown, sin backticks.',
+'',
+'ESTRUCTURA DEL PDF:',
+'- Encabezado: "REPORTE DE PROGRESO", nombre de la rutina (título grande), nombre del cliente, "📅 Sesión: <fecha>", "Enviado: <fecha>", y un porcentaje de CUMPLIMIENTO.',
+'- Puede traer "Nota del cliente: ..." bajo el resumen.',
+'- Secciones por día (Lunes...Domingo). Cada ejercicio tiene una tabla con columnas: Set | Plan | Reps | Peso | RPE | EVA | Estado.',
+'  · Set: "S1", "S2"... · Plan: prescripción, ej. "10 · 60kg" (reps · peso).',
+'  · Reps: repeticiones logradas (número). · Peso: carga lograda, ej. "62kg".',
+'  · RPE: esfuerzo percibido, ej. "8/10". · EVA: dolor, ej. "2/10".',
+'  · Estado: "✓ Hecho", "◑ Parcial" o "○ Pendiente".',
+'  · Bajo la tabla puede haber un comentario del cliente: "💬 ...".',
+'',
+'REGLAS:',
+'1) Lee TODOS los días y ejercicios presentes. Un guion "—" o celda vacía = null. NUNCA inventes valores.',
+'2) Números: quita unidades ("62kg"→62, "8/10"→8). Comas decimales → puntos.',
+'3) Fechas a formato YYYY-MM-DD.',
+'4) estado: "hecho" | "parcial" | "pendiente" (según el símbolo ✓/◑/○).',
+'5) rir: solo si aparece explícito en el PDF; si no, null (NO lo calcules desde el RPE).',
+'6) Si el documento NO es un Reporte de Progreso de Ultra-Sport 19, responde: {"error":"documento_no_reconocido","detalle":"explicación corta"}',
+'',
+'DEVUELVE EXACTAMENTE ESTA ESTRUCTURA:',
+'{',
+'  "fuente": "us19_reporte_progreso",',
+'  "cliente": { "nombre": null },',
+'  "rutina": { "nombre": null },',
+'  "fecha_sesion": "YYYY-MM-DD",',
+'  "cumplimiento_pct": null,',
+'  "nota_cliente": null,',
+'  "dias": [',
+'    { "dia": "Lunes",',
+'      "ejercicios": [',
+'        { "nombre": null,',
+'          "plan": { "reps": null, "peso_kg": null },',
+'          "series": [ { "n": 1, "reps": null, "peso_kg": null, "rpe": null, "rir": null, "eva": null, "estado": "hecho" } ],',
+'          "comentario": null } ] } ]',
+'}',
+'',
+'Reemplaza los null por los valores reales. Deja null SOLO lo ilegible o ausente. Devuelve SOLO el JSON.'
+].join('\n');
+
+function _prgNorm(s){ return String(s||"").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/\s+/g," ").trim(); }
+function progValidate(d){
+  if(!d||typeof d!=="object") return "no es un objeto JSON";
+  if(d.error) return "la IA no reconoció el documento ("+(d.detalle||d.error)+")";
+  if(!Array.isArray(d.dias)||!d.dias.length) return 'falta el array "dias"';
+  var n=0;
+  for(var i=0;i<d.dias.length;i++){ var ex=d.dias[i].ejercicios; if(Array.isArray(ex)) n+=ex.length; }
+  if(!n) return "no hay ejercicios en ningún día";
+  return null;
+}
+function _prgMatchClient(nombre){
+  var nn=_prgNorm(nombre);
+  if(!nn) return null;
+  for(var i=0;i<state.clients.length;i++) if(_prgNorm(state.clients[i].name)===nn) return state.clients[i];
+  for(var j=0;j<state.clients.length;j++){ var cn=_prgNorm(state.clients[j].name); if(cn && (cn.indexOf(nn)===0||nn.indexOf(cn)===0)) return state.clients[j]; }
+  return null;
+}
+function _prgMatchRoutine(nombre, clientId){
+  var nn=_prgNorm(nombre), cand=null;
+  for(var i=0;i<state.routines.length;i++){
+    var r=state.routines[i];
+    if(_prgNorm(r.name)!==nn) continue;
+    if(clientId && r.clientId===clientId) return r;
+    if(!cand) cand=r;
+  }
+  return cand;
+}
+/* Mejor set logrado por ejercicio: mayor peso con reps>0; empate → más reps. */
+function _prgBestSet(series){
+  var best=null;
+  (series||[]).forEach(function(s){
+    if(s==null || s.reps==null || !(s.reps>0)) return;
+    if(!best || (s.peso_kg||0)>(best.peso_kg||0) || ((s.peso_kg||0)===(best.peso_kg||0)&&(s.reps||0)>(best.reps||0))) best=s;
+  });
+  return best;
+}
+window.progCopyPrompt = function(){
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(PROG_IMPORT_PROMPT).then(function(){ toast("Prompt copiado ✓","success"); }, function(){ toast("No se pudo copiar","error"); }); }
+  else { toast("Copia manual: revisa la consola","warn"); console.log(PROG_IMPORT_PROMPT); }
+};
+window.openProgressImport = function(){
+  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">1) Pasa el PDF del cliente por una IA con el prompt. 2) Pega aquí el JSON. Se registra la progresión en el historial del cliente y, si quieres, se actualizan las cargas de la rutina con el mejor set logrado.</p>'
+    + '<button class="btn btn-secondary btn-sm" style="margin-bottom:.7rem;" onclick="progCopyPrompt()">📋 Copiar prompt de extracción</button>'
+    + '<div class="form-row"><label class="form-label">JSON del reporte</label><textarea id="prg-json" style="min-height:120px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;fuente&quot;:&quot;us19_reporte_progreso&quot;, ... }"></textarea></div>'
+    + '<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;margin-bottom:.4rem;"><input type="checkbox" id="prg-update" checked style="width:18px;height:18px;accent-color:var(--accent);"> Actualizar cargas prescritas de la rutina con el mejor set</label>'
+    + '<div id="prg-msg" class="text-xs" style="min-height:1.1em;"></div>';
+  openModal({ title:"📥 Importar progresión", large:true, bodyHtml:body, footer:[
+    { label:"Cancelar", cls:"btn-ghost" },
+    { label:"Aplicar progresión", cls:"btn-primary", onClick:function(){ progApplyFromModal(); } }
+  ]});
+};
+function progApplyFromModal(){
+  var msg=document.getElementById("prg-msg");
+  function fail(m){ if(msg) msg.innerHTML='<span style="color:var(--danger);">✗ '+escapeHtml(m)+'</span>'; }
+  var raw=(document.getElementById("prg-json")||{}).value||"";
+  var d; try{ d=JSON.parse(raw); }catch(e){ return fail("El texto pegado no es JSON válido."); }
+  var err=progValidate(d); if(err) return fail(err);
+
+  var c=_prgMatchClient(d.cliente&&d.cliente.nombre);
+  if(!c) return fail('Cliente "'+((d.cliente&&d.cliente.nombre)||"?")+'" no encontrado en la app. Créalo o corrige el nombre en el JSON.');
+  var r=_prgMatchRoutine(d.rutina&&d.rutina.nombre, c.id);
+
+  // 1) Registro de progresión en el historial del cliente
+  var ejercicios=[], totalSets=0;
+  (d.dias||[]).forEach(function(dia){
+    (dia.ejercicios||[]).forEach(function(ex){
+      if(!ex||!ex.nombre) return;
+      var series=(ex.series||[]).map(function(s){ return { n:s.n!=null?s.n:null, reps:s.reps!=null?s.reps:null, peso_kg:s.peso_kg!=null?s.peso_kg:null, rpe:s.rpe!=null?s.rpe:null, rir:s.rir!=null?s.rir:null, eva:s.eva!=null?s.eva:null, estado:s.estado||null }; });
+      totalSets+=series.length;
+      ejercicios.push({ dia:dia.dia||null, nombre:ex.nombre, plan:ex.plan||null, series:series, comentario:ex.comentario||null, mejorSet:_prgBestSet(series) });
+    });
+  });
+  if(!Array.isArray(c.progressions)) c.progressions=[];
+  c.progressions.push({
+    id:genId(), fecha:d.fecha_sesion||new Date().toISOString().slice(0,10),
+    routineId:r?r.id:null, rutinaNombre:(d.rutina&&d.rutina.nombre)||null,
+    cumplimiento:d.cumplimiento_pct!=null?d.cumplimiento_pct:null,
+    nota:d.nota_cliente||null, ejercicios:ejercicios, importadoEl:Date.now()
+  });
+  if(c.progressions.length>120) c.progressions=c.progressions.slice(-120);
+
+  // 2) Actualizar cargas prescritas (opcional)
+  var updated=0, chk=document.getElementById("prg-update");
+  if(chk && chk.checked && r && r.days){
+    ejercicios.forEach(function(pe){
+      var best=pe.mejorSet;
+      if(!best || best.peso_kg==null || !(best.peso_kg>0)) return;
+      for(var di=0;di<r.days.length;di++){
+        var day=r.days[di];
+        if(!day||!day.exercises) continue;
+        for(var ei=0;ei<day.exercises.length;ei++){
+          var rx=day.exercises[ei];
+          var def=getExercise(rx.exerciseId);
+          if(def && _prgNorm(def.name)===_prgNorm(pe.nombre)){
+            var prev=parseFloat(String(rx.weight||"").replace(",","."));
+            if(isNaN(prev) || best.peso_kg!==prev){ rx.weight=String(best.peso_kg); updated++; }
+          }
+        }
+      }
+    });
+    if(updated) r.updatedAt=Date.now();
+  }
+
+  saveState(); closeModal();
+  toast("Progresión de "+c.name+" registrada ("+ejercicios.length+" ejercicios, "+totalSets+" sets)"+(updated?(" · "+updated+" cargas actualizadas"):(r?"":" · rutina no encontrada, solo historial")),"success");
+  if(document.querySelector(".view.active")&&document.querySelector(".view.active").id==="view-routines") renderRoutines();
+}
 
 function init(){
   loadSettings();
