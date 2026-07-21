@@ -12526,14 +12526,13 @@ window.progCopyPrompt = function(){
   else { toast("Copia manual: revisa la consola","warn"); console.log(PROG_IMPORT_PROMPT); }
 };
 window.openProgressImport = function(){
-  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">1) Pasa el PDF del cliente por una IA con el prompt. 2) Pega aquí el JSON. Se registra la progresión en el historial del cliente y, si quieres, se actualizan las cargas de la rutina con el mejor set logrado.</p>'
+  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">1) Pasa el PDF del cliente por una IA con el prompt. 2) Pega aquí el JSON. Se guarda la sesión en el historial y luego te propongo los <strong>objetivos de la próxima semana</strong> (según el RPE) para que los confirmes.</p>'
     + '<button class="btn btn-secondary btn-sm" style="margin-bottom:.7rem;" onclick="progCopyPrompt()">📋 Copiar prompt de extracción</button>'
     + '<div class="form-row"><label class="form-label">JSON del reporte</label><textarea id="prg-json" style="min-height:120px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;fuente&quot;:&quot;us19_reporte_progreso&quot;, ... }"></textarea></div>'
-    + '<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.85rem;margin-bottom:.4rem;"><input type="checkbox" id="prg-update" checked style="width:18px;height:18px;accent-color:var(--accent);"> Actualizar cargas prescritas de la rutina con el mejor set</label>'
     + '<div id="prg-msg" class="text-xs" style="min-height:1.1em;"></div>';
   openModal({ title:"📥 Importar progresión", large:true, bodyHtml:body, footer:[
     { label:"Cancelar", cls:"btn-ghost" },
-    { label:"Aplicar progresión", cls:"btn-primary", onClick:function(){ progApplyFromModal(); } }
+    { label:"Continuar →", cls:"btn-primary", onClick:function(){ progApplyFromModal(); } }
   ]});
 };
 function progApplyFromModal(){
@@ -12565,31 +12564,91 @@ function progApplyFromModal(){
     nota:d.nota_cliente||null, ejercicios:ejercicios, importadoEl:Date.now()
   });
   if(c.progressions.length>120) c.progressions=c.progressions.slice(-120);
+  saveState();
 
-  // 2) Actualizar cargas prescritas (opcional)
-  var updated=0, chk=document.getElementById("prg-update");
-  if(chk && chk.checked && r && r.days){
-    ejercicios.forEach(function(pe){
-      var best=pe.mejorSet;
-      if(!best || best.peso_kg==null || !(best.peso_kg>0)) return;
-      for(var di=0;di<r.days.length;di++){
-        var day=r.days[di];
-        if(!day||!day.exercises) continue;
-        for(var ei=0;ei<day.exercises.length;ei++){
-          var rx=day.exercises[ei];
-          var def=getExercise(rx.exerciseId);
-          if(def && _prgNorm(def.name)===_prgNorm(pe.nombre)){
-            var prev=parseFloat(String(rx.weight||"").replace(",","."));
-            if(isNaN(prev) || best.peso_kg!==prev){ rx.weight=String(best.peso_kg); updated++; }
-          }
-        }
+  // 2) Construir sugerencias de objetivo (según RPE) y abrir la revisión
+  var sugerencias=[];
+  ejercicios.forEach(function(pe){
+    var best=pe.mejorSet;
+    if(!best || best.peso_kg==null || !(best.peso_kg>0)) return;
+    var sug=_progSuggestTarget(best);
+    sugerencias.push({ nombre:pe.nombre, dia:pe.dia||"", diaIdx:_progDayIdx(pe.dia),
+      logrado:best.peso_kg, reps:best.reps, rpe:best.rpe, sugerido:sug.target, motivo:sug.motivo });
+  });
+
+  closeModal();
+  toast("Sesión de "+c.name+" guardada ("+ejercicios.length+" ejercicios, "+totalSets+" sets)","success");
+  if(sugerencias.length && r) _progOpenReview(c, r, sugerencias);
+  else if(sugerencias.length && !r) toast('Rutina "'+((d.rutina&&d.rutina.nombre)||"?")+'" no encontrada: guardé el historial, pero sin rutina no puedo aplicar objetivos.',"warn");
+  else if(document.querySelector(".view.active")&&document.querySelector(".view.active").id==="view-routines") renderRoutines();
+}
+
+function _progDayIdx(nombre){
+  var n=_prgNorm(nombre);
+  if(!n) return -1;
+  for(var i=0;i<DAY_NAMES.length;i++){ var dn=_prgNorm(DAY_NAMES[i]); if(dn===n || dn.indexOf(n)===0 || n.indexOf(dn)===0) return i; }
+  return -1;
+}
+/* Sugerencia de objetivo semanal según el RPE del mejor set (autorregulación). */
+function _progSuggestTarget(best){
+  var w=best.peso_kg, rpe=best.rpe, inc=0, motivo="";
+  if(rpe==null){ inc=2.5; motivo="sin RPE: +2.5 kg conservador"; }
+  else if(rpe<=6){ inc=5; motivo="RPE "+rpe+" (fácil): +5 kg"; }
+  else if(rpe<8){ inc=2.5; motivo="RPE "+rpe+": +2.5 kg"; }
+  else if(rpe<9){ inc=2.5; motivo="RPE "+rpe+": +2.5 kg (lento)"; }
+  else if(rpe<10){ inc=0; motivo="RPE "+rpe+" (alto): mantener carga"; }
+  else { inc=-2.5; motivo="RPE "+rpe+" (máximo): bajar 2.5 kg"; }
+  var target=Math.round((w+inc)*2)/2;
+  if(target<=0) target=w;
+  return { target:target, motivo:motivo };
+}
+function _progGetRoutine(id){ for(var i=0;i<state.routines.length;i++) if(state.routines[i].id===id) return state.routines[i]; return null; }
+var _progReview=null;
+function _progOpenReview(c, r, sugerencias){
+  _progReview={ clientId:c.id, routineId:r.id, items:sugerencias };
+  var body='<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Objetivos sugeridos para la próxima semana (según el RPE logrado). Ajusta el peso o desmarca los que no quieras. Se escribirán como nueva prescripción en <strong>'+escapeHtml(r.name||"la rutina")+'</strong>, respetando el día.</p>'
+    + '<div style="max-height:52vh;overflow-y:auto;padding-right:.3rem;">';
+  sugerencias.forEach(function(s,i){
+    var flecha=s.sugerido>s.logrado?'<span style="color:var(--success);font-weight:700;">▲</span>':(s.sugerido<s.logrado?'<span style="color:var(--danger);font-weight:700;">▼</span>':'<span class="text-muted">=</span>');
+    body+='<div style="border-bottom:1px solid var(--border);padding:.55rem 0;">'
+      +'<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">'
+      +'<input type="checkbox" class="prg-sug" data-i="'+i+'" checked style="width:17px;height:17px;accent-color:var(--accent);">'
+      +'<span style="flex:1;"><strong>'+escapeHtml(s.nombre)+'</strong>'+(s.diaIdx>=0?(' <span class="text-xs text-muted">('+DAY_NAMES[s.diaIdx]+')</span>'):'')+'</span>'
+      +'<span class="text-xs text-muted">logró '+s.logrado+'kg'+(s.rpe!=null?(" @RPE "+s.rpe):"")+'</span></label>'
+      +'<div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem;padding-left:1.65rem;flex-wrap:wrap;">'
+      +flecha+' <span class="text-xs text-muted">objetivo</span> '
+      +'<input type="number" step="0.5" class="prg-tgt" data-i="'+i+'" value="'+s.sugerido+'" style="width:88px;"><span class="text-xs text-muted">kg</span>'
+      +'<span class="text-xs text-muted" style="margin-left:auto;">'+escapeHtml(s.motivo)+'</span></div></div>';
+  });
+  body+='</div>';
+  openModal({ title:"🎯 Objetivos próxima semana · "+(c.name||""), large:true, bodyHtml:body, footer:[
+    { label:"Solo historial", cls:"btn-ghost", onClick:function(){ closeModal(); toast("Historial guardado · rutina sin cambios","success"); } },
+    { label:"Aplicar objetivos", cls:"btn-primary", onClick:function(){ _progApplyTargets(); } }
+  ]});
+}
+function _progApplyTargets(){
+  if(!_progReview) return;
+  var r=_progGetRoutine(_progReview.routineId);
+  if(!r || !r.days){ toast("No encuentro la rutina","error"); closeModal(); return; }
+  var checks=document.querySelectorAll(".prg-sug"), tgts=document.querySelectorAll(".prg-tgt"), val={};
+  for(var t=0;t<tgts.length;t++) val[tgts[t].getAttribute("data-i")]=parseFloat(tgts[t].value);
+  var updated=0;
+  for(var k=0;k<checks.length;k++){
+    if(!checks[k].checked) continue;
+    var i=checks[k].getAttribute("data-i"), s=_progReview.items[i], nuevo=val[i];
+    if(s==null || isNaN(nuevo) || nuevo<=0) continue;
+    for(var di=0;di<r.days.length;di++){
+      if(s.diaIdx>=0 && di!==s.diaIdx) continue;   // respeta el día si viene indicado
+      var day=r.days[di]; if(!day||!day.exercises) continue;
+      for(var ei=0;ei<day.exercises.length;ei++){
+        var rx=day.exercises[ei], def=getExercise(rx.exerciseId);
+        if(def && _prgNorm(def.name)===_prgNorm(s.nombre)){ rx.weight=String(nuevo); updated++; }
       }
-    });
-    if(updated) r.updatedAt=Date.now();
+    }
   }
-
+  if(updated) r.updatedAt=Date.now();
   saveState(); closeModal();
-  toast("Progresión de "+c.name+" registrada ("+ejercicios.length+" ejercicios, "+totalSets+" sets)"+(updated?(" · "+updated+" cargas actualizadas"):(r?"":" · rutina no encontrada, solo historial")),"success");
+  toast(updated+" carga"+(updated===1?"":"s")+" actualizada"+(updated===1?"":"s")+" en "+(r.name||"la rutina"),"success");
   if(document.querySelector(".view.active")&&document.querySelector(".view.active").id==="view-routines") renderRoutines();
 }
 
