@@ -9674,7 +9674,7 @@ window.globalSearch = function(q){
   var res = [];
   state.clients.forEach(function(c){ if ((c.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoClient(\''+c.id+'\')"><span class="badge muted">Cliente</span> '+escapeHtml(c.name)+'</div>'); });
   state.routines.forEach(function(r){ if ((r.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoRoutine(\''+r.id+'\')"><span class="badge muted">Rutina</span> '+escapeHtml(r.name||"Sin nombre")+'</div>'); });
-  state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoLibrary()"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
+  state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoExercise(\''+e.id+'\')"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
   res = res.slice(0,12);
   box.innerHTML = res.length ? res.join("") : '<div class="gs-item text-muted">Sin resultados</div>';
   box.style.display = "block";
@@ -9684,6 +9684,7 @@ function closeGSearch(){ window.hideGSearch(); var i=document.getElementById("gs
 window.gsGoClient = function(id){ closeGSearch(); showView("clients"); setTimeout(function(){ openClientForm(id); }, 120); };
 window.gsGoRoutine = function(id){ closeGSearch(); openRoutineBuilder(id); };
 window.gsGoLibrary = function(){ closeGSearch(); showView("library"); };
+window.gsGoExercise = function(id){ closeGSearch(); showExercisePreview(id); };
 
 /* --- Meta medible del cliente --- */
 function buildObjectiveHtml(c){
