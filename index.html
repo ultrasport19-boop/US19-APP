@@ -594,10 +594,16 @@ img{max-width:100%;display:block;}
 .gsearch-wrap{position:relative;}
 .gsearch-input{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;color:var(--text);font-size:.85rem;width:130px;}
 .gsearch-input:focus{width:190px;outline:none;border-color:var(--accent);}
-.gsearch-results{position:absolute;top:120%;right:0;min-width:260px;max-height:340px;overflow-y:auto;background:var(--surface-1,#111);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:9999;display:none;}
+.gsearch-results{position:absolute;top:120%;right:0;min-width:300px;max-height:340px;overflow-y:auto;background:var(--surface-1,#111);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:9999;display:none;}
 .gs-item{padding:.55rem .8rem;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--border);}
 .gs-item:last-child{border-bottom:none;}
 .gs-item:hover{background:var(--surface-2);}
+.gs-client{cursor:default;}
+.gs-client:hover{background:transparent;}
+.gs-cli-head{font-size:.85rem;margin-bottom:.4rem;}
+.gs-cli-acts{display:flex;flex-wrap:wrap;gap:.3rem;}
+.gs-act{font-size:.72rem;padding:.22rem .5rem;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);cursor:pointer;white-space:nowrap;line-height:1.2;}
+.gs-act:hover{border-color:var(--accent);color:var(--accent);}
 /* — REHAB-CLÍNICO — */
 .rc-sem{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:.3rem;vertical-align:middle;flex-shrink:0;}
 .rc-sem.v{background:#2fbf71;}.rc-sem.a{background:#eab308;}.rc-sem.r{background:#e5484d;box-shadow:0 0 6px rgba(229,72,77,.6);}
@@ -3345,7 +3351,16 @@ function renderClients(){
   if (notionCount) html += '<span class="cat-pill'+(_clientFilter==="notion"?" active":"")+'" onclick="filterClients(\'notion\')"><span class="cat-icon">🟢</span>Activos Notion<span class="cat-count">'+notionCount+'</span></span>';
   html += '</div>';
 
-  var sorted = state.clients.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+  // Orden: clientes CON plan primero (gym = tiene rutina; rehab = tiene protocolo),
+  // luego alfabético. Así se llega rápido a Resumen/Seguimiento/Progresiones de los activos.
+  var _hasRoutine = {};
+  state.routines.forEach(function(r){ if (r.clientId) _hasRoutine[r.clientId] = true; });
+  function _cliHasPlan(c){ return getClientType(c)==="rehab" ? !!c.rehabProtocolId : !!_hasRoutine[c.id]; }
+  var sorted = state.clients.slice().sort(function(a,b){
+    var pa = _cliHasPlan(a)?0:1, pb = _cliHasPlan(b)?0:1;
+    if (pa!==pb) return pa-pb;
+    return (a.name||"").localeCompare(b.name||"");
+  });
 
   if (_clientFilter){
     var filtered = sorted.filter(function(c){ return _clientFilter==="notion" ? !!c.notionId : getClientType(c)===_clientFilter; });
@@ -9672,7 +9687,7 @@ window.globalSearch = function(q){
   if (!box) return;
   if (q.length < 2){ box.style.display="none"; box.innerHTML=""; return; }
   var res = [];
-  state.clients.forEach(function(c){ if ((c.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoClient(\''+c.id+'\')"><span class="badge muted">Cliente</span> '+escapeHtml(c.name)+'</div>'); });
+  state.clients.forEach(function(c){ if ((c.name||"").toLowerCase().indexOf(q)>=0) res.push(gsClientItem(c)); });
   state.routines.forEach(function(r){ if ((r.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoRoutine(\''+r.id+'\')"><span class="badge muted">Rutina</span> '+escapeHtml(r.name||"Sin nombre")+'</div>'); });
   state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoExercise(\''+e.id+'\')"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
   res = res.slice(0,12);
@@ -9681,6 +9696,26 @@ window.globalSearch = function(q){
 };
 window.hideGSearch = function(){ var b=document.getElementById("gsearch-results"); if(b) b.style.display="none"; };
 function closeGSearch(){ window.hideGSearch(); var i=document.getElementById("gsearch-input"); if(i) i.value=""; }
+/* Resultado de cliente en la búsqueda: nombre + acciones directas (perfil, seguimiento,
+   progresiones, resumen), para no tener que abrir siempre el perfil. */
+function gsClientItem(c){
+  var progN = (c.progressions && c.progressions.length) ? c.progressions.length : 0;
+  var acts = '<button class="gs-act" onclick="gsGoClient(\''+c.id+'\')">👤 Perfil</button>'
+    + '<button class="gs-act" onclick="gsAct(\'track\',\''+c.id+'\')">📏 Seguimiento</button>'
+    + '<button class="gs-act" onclick="gsAct(\'prog\',\''+c.id+'\')">📈 Progresiones'+(progN?' ('+progN+')':'')+'</button>'
+    + (c.phone ? '<button class="gs-act" onclick="gsAct(\'resumen\',\''+c.id+'\')">📊 Resumen</button>' : '');
+  return '<div class="gs-item gs-client">'
+    + '<div class="gs-cli-head"><span class="badge muted">Cliente</span> <strong>'+escapeHtml(c.name)+'</strong></div>'
+    + '<div class="gs-cli-acts">'+acts+'</div>'
+    + '</div>';
+}
+window.gsAct = function(kind, id){
+  closeGSearch();
+  if (kind==="track") openClientTracking(id);
+  else if (kind==="prog") openProgressHistory(id);
+  else if (kind==="resumen") sendClientSummary(id);
+  else openClientForm(id);
+};
 window.gsGoClient = function(id){ closeGSearch(); showView("clients"); setTimeout(function(){ openClientForm(id); }, 120); };
 window.gsGoRoutine = function(id){ closeGSearch(); openRoutineBuilder(id); };
 window.gsGoLibrary = function(){ closeGSearch(); showView("library"); };
@@ -12571,10 +12606,16 @@ function progApplyFromModal(){
   var sugerencias=[];
   ejercicios.forEach(function(pe){
     var best=pe.mejorSet;
-    if(!best || best.peso_kg==null || !(best.peso_kg>0)) return;
-    var sug=_progSuggestTarget(best);
-    sugerencias.push({ nombre:pe.nombre, dia:pe.dia||"", diaIdx:_progDayIdx(pe.dia),
-      logrado:best.peso_kg, reps:best.reps, rpe:best.rpe, sugerido:sug.target, motivo:sug.motivo });
+    if(!best) return;
+    var hasW=best.peso_kg!=null && best.peso_kg>0, hasR=best.reps!=null && best.reps>0;
+    if(!hasW && !hasR) return;
+    var diaIdx=_progDayIdx(pe.dia);
+    var cur=(r?_progFindPrescription(r, pe.nombre, diaIdx):null)||{};
+    var sug=_progSuggestProgression(best, cur);
+    sugerencias.push({ nombre:pe.nombre, dia:pe.dia||"", diaIdx:diaIdx,
+      logrado:(hasW?best.peso_kg:null), repsLog:best.reps, rpe:best.rpe,
+      curWeight:(cur.weight!=null?String(cur.weight):""), curReps:(cur.reps!=null?String(cur.reps):""), curSets:(cur.sets!=null?String(cur.sets):""),
+      sugPeso:sug.sugPeso, sugReps:sug.sugReps, sugSets:sug.sugSets, motivo:sug.motivo });
   });
 
   closeModal();
@@ -12590,36 +12631,99 @@ function _progDayIdx(nombre){
   for(var i=0;i<DAY_NAMES.length;i++){ var dn=_prgNorm(DAY_NAMES[i]); if(dn===n || dn.indexOf(n)===0 || n.indexOf(dn)===0) return i; }
   return -1;
 }
-/* Sugerencia de objetivo semanal según el RPE del mejor set (autorregulación). */
-function _progSuggestTarget(best){
-  var w=best.peso_kg, rpe=best.rpe, inc=0, motivo="";
-  if(rpe==null){ inc=2.5; motivo="sin RPE: +2.5 kg conservador"; }
-  else if(rpe<=6){ inc=5; motivo="RPE "+rpe+" (fácil): +5 kg"; }
-  else if(rpe<8){ inc=2.5; motivo="RPE "+rpe+": +2.5 kg"; }
-  else if(rpe<9){ inc=2.5; motivo="RPE "+rpe+": +2.5 kg (lento)"; }
-  else if(rpe<10){ inc=0; motivo="RPE "+rpe+" (alto): mantener carga"; }
-  else { inc=-2.5; motivo="RPE "+rpe+" (máximo): bajar 2.5 kg"; }
-  var target=Math.round((w+inc)*2)/2;
-  if(target<=0) target=w;
-  return { target:target, motivo:motivo };
+/* Constantes de doble progresión (esquema de hipertrofia por defecto).
+   Ajusta estos dos números si trabajas otro rango objetivo de reps. */
+var PROG_REP_CEIL = 12;   // al alcanzar estas reps → progresar subiendo el peso
+var PROG_REP_RESET = 8;   // reps a las que se reinicia tras subir el peso
+function _prgToInt(v){ var n=parseInt(String(v==null?"":v).replace(",","."),10); return isNaN(n)?null:n; }
+function _prgRepsIsPlainInt(s){ return /^\d+$/.test(String(s==null?"":s).trim()); }
+/* Sugerencia de objetivo semanal (autorregulación por RPE) con DOBLE PROGRESIÓN.
+   best = mejor set logrado {peso_kg, reps, rpe}; cur = prescripción actual de la
+   rutina {sets, reps, weight} (strings). Devuelve {sugPeso, sugReps, sugSets, motivo}.
+   Criterio: con RPE cómodo (≤7) sube primero las reps manteniendo el peso; al llegar
+   al tope de reps sube el peso y reinicia las reps. Con RPE alto mantiene o baja carga.
+   Las series se precargan con lo actual (se ajustan a mano). */
+function _progSuggestProgression(best, cur){
+  cur = cur || {};
+  var rpe = best.rpe;
+  var w = (best.peso_kg!=null && best.peso_kg>0) ? best.peso_kg : null;
+  var curWeight = cur.weight!=null?String(cur.weight):"";
+  var curReps   = cur.reps!=null?String(cur.reps):"";
+  var curSets   = cur.sets!=null?String(cur.sets):"";
+  var repsNum   = _prgRepsIsPlainInt(curReps) ? _prgToInt(curReps) : null;
+  var out = { sugPeso: (w!=null?w:curWeight), sugReps: curReps, sugSets: curSets, motivo: "" };
+  function wT(inc){ var t=Math.round((w+inc)*2)/2; return (t<=0)?w:t; }
+
+  // --- Ejercicio sin carga (peso corporal / banda sin kg): progresa solo reps ---
+  if(w==null){
+    out.sugPeso = curWeight;
+    if(rpe!=null && rpe<=7 && repsNum!=null){ var ri=(rpe<=6)?2:1; out.sugReps=String(repsNum+ri); out.motivo="RPE "+rpe+" (cómodo, sin carga): +"+ri+" rep"; }
+    else if(rpe!=null && rpe>=9){ out.motivo="RPE "+rpe+" (alto): mantener"; }
+    else out.motivo = (rpe==null?"sin RPE":"RPE "+rpe)+": mantener";
+    return out;
+  }
+
+  // --- Sin RPE: conservador (igual que antes) ---
+  if(rpe==null){ out.sugPeso=wT(2.5); out.motivo="sin RPE: +2.5 kg conservador"; return out; }
+  // --- RPE alto: mantener o descargar (igual que antes) ---
+  if(rpe>=10){ out.sugPeso=wT(-2.5); out.motivo="RPE "+rpe+" (máximo): bajar 2.5 kg"; return out; }
+  if(rpe>=9){  out.sugPeso=wT(0);    out.motivo="RPE "+rpe+" (alto): mantener carga"; return out; }
+  if(rpe>=8){  out.sugPeso=wT(2.5);  out.motivo="RPE "+rpe+": +2.5 kg (lento)"; return out; }
+
+  // --- RPE cómodo (≤7): DOBLE PROGRESIÓN ---
+  var repInc = (rpe<=6)?2:1;              // muy fácil = +2 reps, cómodo = +1 rep
+  if(repsNum!=null && repsNum>=PROG_REP_RESET && repsNum<PROG_REP_CEIL){
+    var newReps=Math.min(repsNum+repInc, PROG_REP_CEIL);
+    out.sugReps=String(newReps); out.sugPeso=wT(0);
+    out.motivo="RPE "+rpe+" (cómodo): +"+(newReps-repsNum)+" rep, mantén "+wT(0)+"kg";
+  } else if(repsNum!=null && repsNum>=PROG_REP_CEIL){
+    var incW=(rpe<=6)?5:2.5;
+    out.sugPeso=wT(incW); out.sugReps=String(PROG_REP_RESET);
+    out.motivo="RPE "+rpe+" + reps al tope ("+repsNum+"): +"+incW+" kg y reinicia a "+PROG_REP_RESET+" reps";
+  } else {
+    // reps no numéricas (tiempo/rango) o esquema de fuerza (<8 reps): progresa con peso
+    var incW2=(rpe<=6)?5:2.5;
+    out.sugPeso=wT(incW2); out.motivo="RPE "+rpe+" (fácil): +"+incW2+" kg";
+  }
+  return out;
 }
 function _progGetRoutine(id){ for(var i=0;i<state.routines.length;i++) if(state.routines[i].id===id) return state.routines[i]; return null; }
+/* Prescripción actual (sets/reps/weight) de un ejercicio en la rutina, respetando el día. */
+function _progFindPrescription(r, nombre, diaIdx){
+  if(!r || !r.days) return null;
+  for(var di=0;di<r.days.length;di++){
+    if(diaIdx>=0 && di!==diaIdx) continue;
+    var day=r.days[di]; if(!day||!day.exercises) continue;
+    for(var ei=0;ei<day.exercises.length;ei++){
+      var rx=day.exercises[ei], def=getExercise(rx.exerciseId);
+      if(def && _prgNorm(def.name)===_prgNorm(nombre)) return { sets:rx.sets, reps:rx.reps, weight:rx.weight };
+    }
+  }
+  return null;
+}
 var _progReview=null;
 function _progOpenReview(c, r, sugerencias){
   _progReview={ clientId:c.id, routineId:r.id, items:sugerencias };
-  var body='<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Objetivos sugeridos para la próxima semana (según el RPE logrado). Ajusta el peso o desmarca los que no quieras. Se escribirán como nueva prescripción en <strong>'+escapeHtml(r.name||"la rutina")+'</strong>, respetando el día.</p>'
+  var body='<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Objetivos sugeridos para la próxima semana (doble progresión según el RPE logrado). Ajusta el <strong>peso</strong>, las <strong>reps</strong> y las <strong>series</strong>, o desmarca los que no quieras. Solo se escribirán en <strong>'+escapeHtml(r.name||"la rutina")+'</strong> los campos que cambies, respetando el día.</p>'
     + '<div style="max-height:52vh;overflow-y:auto;padding-right:.3rem;">';
+  var _tag='font-size:.6rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;font-weight:700;display:block;margin-bottom:.12rem;';
+  function _flecha(a,b){ if(a==null||b==null||isNaN(a)||isNaN(b)||a===b) return '<span class="text-muted" style="font-weight:700;">=</span>'; return a>b?'<span style="color:var(--success);font-weight:700;">▲</span>':'<span style="color:var(--danger);font-weight:700;">▼</span>'; }
   sugerencias.forEach(function(s,i){
-    var flecha=s.sugerido>s.logrado?'<span style="color:var(--success);font-weight:700;">▲</span>':(s.sugerido<s.logrado?'<span style="color:var(--danger);font-weight:700;">▼</span>':'<span class="text-muted">=</span>');
-    body+='<div style="border-bottom:1px solid var(--border);padding:.55rem 0;">'
+    var baseW=(s.logrado!=null?Math.round(s.logrado*2)/2:null);
+    var fW=_flecha(parseFloat(s.sugPeso), baseW);
+    var fR=_flecha(_prgToInt(s.sugReps), _prgToInt(s.curReps));
+    var logro=[]; if(s.repsLog!=null) logro.push(s.repsLog+" rep"); if(s.logrado!=null) logro.push(s.logrado+"kg");
+    var logroTxt=(logro.length?"logró "+logro.join(" × "):"")+(s.rpe!=null?(" @RPE "+s.rpe):"");
+    body+='<div style="border-bottom:1px solid var(--border);padding:.6rem 0;">'
       +'<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">'
       +'<input type="checkbox" class="prg-sug" data-i="'+i+'" checked style="width:17px;height:17px;accent-color:var(--accent);">'
       +'<span style="flex:1;"><strong>'+escapeHtml(s.nombre)+'</strong>'+(s.diaIdx>=0?(' <span class="text-xs text-muted">('+DAY_NAMES[s.diaIdx]+')</span>'):'')+'</span>'
-      +'<span class="text-xs text-muted">logró '+s.logrado+'kg'+(s.rpe!=null?(" @RPE "+s.rpe):"")+'</span></label>'
-      +'<div style="display:flex;align-items:center;gap:.5rem;margin-top:.35rem;padding-left:1.65rem;flex-wrap:wrap;">'
-      +flecha+' <span class="text-xs text-muted">objetivo</span> '
-      +'<input type="number" step="0.5" class="prg-tgt" data-i="'+i+'" value="'+s.sugerido+'" style="width:88px;"><span class="text-xs text-muted">kg</span>'
-      +'<span class="text-xs text-muted" style="margin-left:auto;">'+escapeHtml(s.motivo)+'</span></div></div>';
+      +'<span class="text-xs text-muted">'+escapeHtml(logroTxt)+'</span></label>'
+      +'<div style="display:flex;align-items:flex-end;gap:.7rem;margin-top:.4rem;padding-left:1.65rem;flex-wrap:wrap;">'
+      +'<div><span style="'+_tag+'">'+fW+' Peso (kg)</span><input type="number" step="0.5" inputmode="decimal" class="prg-tgt" data-i="'+i+'" value="'+escapeAttr(s.sugPeso)+'" style="width:84px;"></div>'
+      +'<div><span style="'+_tag+'">'+fR+' Reps</span><input type="text" inputmode="numeric" class="prg-reps" data-i="'+i+'" value="'+escapeAttr(s.sugReps)+'" placeholder="'+escapeAttr(s.curReps||"—")+'" style="width:70px;"></div>'
+      +'<div><span style="'+_tag+'">Series</span><input type="text" inputmode="numeric" class="prg-sets" data-i="'+i+'" value="'+escapeAttr(s.sugSets)+'" placeholder="'+escapeAttr(s.curSets||"—")+'" style="width:64px;"></div>'
+      +'<span class="text-xs text-muted" style="margin-left:auto;flex:1 1 140px;text-align:right;min-width:120px;">'+escapeHtml(s.motivo)+'</span></div></div>';
   });
   body+='</div>';
   openModal({ title:"🎯 Objetivos próxima semana · "+(c.name||""), large:true, bodyHtml:body, footer:[
@@ -12631,25 +12735,38 @@ function _progApplyTargets(){
   if(!_progReview) return;
   var r=_progGetRoutine(_progReview.routineId);
   if(!r || !r.days){ toast("No encuentro la rutina","error"); closeModal(); return; }
-  var checks=document.querySelectorAll(".prg-sug"), tgts=document.querySelectorAll(".prg-tgt"), val={};
-  for(var t=0;t<tgts.length;t++) val[tgts[t].getAttribute("data-i")]=parseFloat(tgts[t].value);
-  var updated=0;
+  var checks=document.querySelectorAll(".prg-sug");
+  function readMap(sel){ var m={}, els=document.querySelectorAll(sel); for(var t=0;t<els.length;t++) m[els[t].getAttribute("data-i")]=els[t].value; return m; }
+  var vPeso=readMap(".prg-tgt"), vReps=readMap(".prg-reps"), vSets=readMap(".prg-sets");
+  function same(a,b){ return String(a==null?"":a).trim()===String(b==null?"":b).trim(); }
+  var updated=0, campos=0;
   for(var k=0;k<checks.length;k++){
     if(!checks[k].checked) continue;
-    var i=checks[k].getAttribute("data-i"), s=_progReview.items[i], nuevo=val[i];
-    if(s==null || isNaN(nuevo) || nuevo<=0) continue;
+    var i=checks[k].getAttribute("data-i"), s=_progReview.items[i];
+    if(s==null) continue;
     for(var di=0;di<r.days.length;di++){
       if(s.diaIdx>=0 && di!==s.diaIdx) continue;   // respeta el día si viene indicado
       var day=r.days[di]; if(!day||!day.exercises) continue;
       for(var ei=0;ei<day.exercises.length;ei++){
         var rx=day.exercises[ei], def=getExercise(rx.exerciseId);
-        if(def && _prgNorm(def.name)===_prgNorm(s.nombre)){ rx.weight=String(nuevo); updated++; }
+        if(!(def && _prgNorm(def.name)===_prgNorm(s.nombre))) continue;
+        var touched=false;
+        // Peso: solo si es número válido (>0) y distinto al actual
+        var np=String(vPeso[i]==null?"":vPeso[i]).trim(), npf=parseFloat(np.replace(",","."));
+        if(np!=="" && !isNaN(npf) && npf>0 && !same(np, rx.weight)){ rx.weight=np; touched=true; campos++; }
+        // Reps: cualquier texto no vacío distinto al actual
+        var nr=String(vReps[i]==null?"":vReps[i]).trim();
+        if(nr!=="" && !same(nr, rx.reps)){ rx.reps=nr; touched=true; campos++; }
+        // Series: cualquier texto no vacío distinto al actual
+        var ns=String(vSets[i]==null?"":vSets[i]).trim();
+        if(ns!=="" && !same(ns, rx.sets)){ rx.sets=ns; touched=true; campos++; }
+        if(touched) updated++;
       }
     }
   }
-  if(updated) r.updatedAt=Date.now();
+  if(campos) r.updatedAt=Date.now();
   saveState(); closeModal();
-  toast(updated+" carga"+(updated===1?"":"s")+" actualizada"+(updated===1?"":"s")+" en "+(r.name||"la rutina"),"success");
+  toast(campos?(updated+" ejercicio"+(updated===1?"":"s")+" · "+campos+" campo"+(campos===1?"":"s")+" actualizado"+(campos===1?"":"s")+" en "+(r.name||"la rutina")):"Sin cambios: la rutina quedó igual","success");
   if(document.querySelector(".view.active")&&document.querySelector(".view.active").id==="view-routines") renderRoutines();
 }
 
