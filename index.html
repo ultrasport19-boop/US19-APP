@@ -3914,6 +3914,7 @@ function renderDayPanel(){
   html += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">';
   html += '<span class="badge teal">⏱ '+fmtDuration(dur)+'</span>';
   html += '<button class="btn btn-secondary btn-sm" onclick="addExerciseToDay()">+ Ejercicio</button>';
+  if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="copyDayTo()" title="Copiar los ejercicios de este día a otro día">⧉ Copiar día</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="clearDay()">Vaciar día</button>';
   html += '</div></div>';
 
@@ -3950,6 +3951,7 @@ function exerciseRowHtml(ex, idx){
       + '<button class="btn btn-ghost btn-sm" onclick="changeExercise('+idx+')" title="Cambiar ejercicio">↻</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="moveExercise('+idx+',-1)" title="Subir">↑</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="moveExercise('+idx+',1)" title="Bajar">↓</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="duplicateExercise('+idx+')" title="Duplicar">⎘</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="removeExercise('+idx+')" title="Eliminar">×</button>'
     + '</div>'
     + '</div>'
@@ -4013,6 +4015,61 @@ function clearDay(){
   _builderRoutine.days[_builderActiveDay].exercises = [];
   renderDayPanel();
   updateDayTabBadge();
+}
+
+/* Duplica un ejercicio (con sus series/reps/peso/descanso) justo debajo. */
+function duplicateExercise(idx){
+  var arr = _builderRoutine.days[_builderActiveDay].exercises;
+  if (!arr[idx]) return;
+  arr.splice(idx+1, 0, JSON.parse(JSON.stringify(arr[idx])));
+  renderDayPanel();
+  updateDayTabBadge();
+}
+
+/* Copia todos los ejercicios del día activo a uno o varios días (reemplazar o agregar). */
+function copyDayTo(){
+  var srcIdx = _builderActiveDay;
+  var src = _builderRoutine.days[srcIdx];
+  if (!src || !src.exercises || !src.exercises.length){ toast("Este día no tiene ejercicios para copiar","warn"); return; }
+  var body = '<p class="text-sm text-muted" style="margin-bottom:.6rem;">Copiar los <strong>'+src.exercises.length+'</strong> ejercicios de <strong>'+DAY_NAMES[srcIdx]+'</strong> a:</p>';
+  body += '<div style="display:flex;flex-direction:column;gap:.35rem;margin-bottom:.7rem;">';
+  for (var i=0;i<7;i++){
+    if (i===srcIdx) continue;
+    var d = _builderRoutine.days[i], cnt = (d&&d.exercises)?d.exercises.length:0;
+    body += '<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">'
+      + '<input type="checkbox" class="cpy-day" value="'+i+'" style="width:16px;height:16px;accent-color:var(--accent);">'
+      + '<span>'+DAY_NAMES[i]+' <span class="text-xs text-muted">('+(cnt?cnt+' ej.':'vacío')+')</span></span></label>';
+  }
+  body += '</div>';
+  body += '<div style="display:flex;gap:1.2rem;flex-wrap:wrap;font-size:.85rem;">'
+    + '<label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;"><input type="radio" name="cpy-mode" value="replace" checked> Reemplazar</label>'
+    + '<label style="display:flex;align-items:center;gap:.35rem;cursor:pointer;"><input type="radio" name="cpy-mode" value="append"> Agregar al final</label>'
+    + '</div>';
+  openModal({ title:"Copiar día · "+DAY_NAMES[srcIdx], bodyHtml:body, footer:[
+    { label:"Cancelar", cls:"btn-ghost" },
+    { label:"Copiar", cls:"btn-primary", onClick:function(){ _doCopyDay(srcIdx); } }
+  ]});
+}
+function _doCopyDay(srcIdx){
+  var checks = document.querySelectorAll(".cpy-day:checked");
+  if (!checks.length){ toast("Elige al menos un día destino","warn"); return; }
+  var modeEl = document.querySelector('input[name="cpy-mode"]:checked');
+  var mode = modeEl ? modeEl.value : "replace";
+  var src = _builderRoutine.days[srcIdx];
+  var copiedTo = 0;
+  for (var k=0;k<checks.length;k++){
+    var ti = parseInt(checks[k].value,10);
+    var dst = _builderRoutine.days[ti];
+    if (!dst){ dst = { day:ti+1, exercises:[] }; _builderRoutine.days[ti] = dst; }
+    if (!Array.isArray(dst.exercises)) dst.exercises = [];
+    var copies = src.exercises.map(function(e){ return JSON.parse(JSON.stringify(e)); });
+    dst.exercises = (mode==="append") ? dst.exercises.concat(copies) : copies;
+    copiedTo++;
+  }
+  closeModal();
+  renderDayPanel();
+  updateDayTabBadge();
+  toast("Copiado a "+copiedTo+" día"+(copiedTo===1?"":"s"),"success");
 }
 
 function updateDayTabBadge(){
@@ -9871,7 +9928,12 @@ window.globalSearch = function(q){
   if (!box) return;
   if (q.length < 2){ box.style.display="none"; box.innerHTML=""; return; }
   var res = [];
-  state.clients.forEach(function(c){ if ((c.name||"").toLowerCase().indexOf(q)>=0) res.push(gsClientItem(c)); });
+  var qDigits = q.replace(/\D/g,"");
+  state.clients.forEach(function(c){
+    var nameHit = (c.name||"").toLowerCase().indexOf(q)>=0;
+    var phoneHit = qDigits.length>=3 && (c.phone||"").replace(/\D/g,"").indexOf(qDigits)>=0;
+    if (nameHit || phoneHit) res.push(gsClientItem(c));
+  });
   state.routines.forEach(function(r){ if ((r.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoRoutine(\''+r.id+'\')"><span class="badge muted">Rutina</span> '+escapeHtml(r.name||"Sin nombre")+'</div>'); });
   state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoExercise(\''+e.id+'\')"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
   res = res.slice(0,12);
@@ -13132,10 +13194,20 @@ window.changeExercise = changeExercise;
 window.moveExercise = moveExercise;
 window.removeExercise = removeExercise;
 window.clearDay = clearDay;
+window.duplicateExercise = duplicateExercise;
+window.copyDayTo = copyDayTo;
 window.openClientProgressShare = openClientProgressShare;
 window.showView = showView;
 
 window.ultrasport19 = { state: state, settings: settings, version: 1 };
+
+/* Atajo de teclado: ⌘/Ctrl + K enfoca la búsqueda global. */
+document.addEventListener("keydown", function(e){
+  if ((e.ctrlKey || e.metaKey) && (e.key==="k" || e.key==="K")){
+    var inp = document.getElementById("gsearch-input");
+    if (inp && inp.offsetParent !== null){ e.preventDefault(); inp.focus(); inp.select(); }
+  }
+});
 
 init();
 
