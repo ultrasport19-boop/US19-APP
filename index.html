@@ -3202,6 +3202,12 @@ document.addEventListener("keydown", function(e){
 });
 
 function showView(name){
+  // Aviso de cambios sin guardar al salir del editor de rutinas por las pestañas
+  var _cur = document.querySelector(".view.active");
+  if (_cur && _cur.id === "view-builder" && name !== "builder" && _builderIsDirty()){
+    if (!window.confirm("Tienes cambios sin guardar en esta rutina.\n\n¿Salir sin guardar? Usa «Guardar» dentro del editor para conservarlos.")) return;
+    _builderSnapshot = null;   // el usuario aceptó descartar los cambios
+  }
   var views = document.querySelectorAll(".view");
   for (var i=0;i<views.length;i++) views[i].classList.remove("active");
   var v = document.getElementById("view-" + name);
@@ -3510,6 +3516,8 @@ function clientCardHtml(c){
       var lastPain = (c.painLog && c.painLog.length) ? c.painLog[c.painLog.length-1] : null;
       if (lastPain && !((c.alta&&c.alta.fecha))) rcBadges += '<span class="badge muted"><span class="rc-sem '+semaforoClass(Math.max(lastPain.durante||0,lastPain.despues||0))+'"></span>Dolor '+Math.max(lastPain.durante||0,lastPain.despues||0)+'/10</span>';
     }
+    var _adv = phaseAdvanceReady(c);
+    if (_adv) rcBadges += '<span class="badge green" title="Últimas sesiones sin dolor (≤3/10): valora avanzar de fase">✅ Listo para Fase '+(_adv.nextPhase+1)+'</span>';
     if (copy){
       var cp = (typeof copy.currentPhase === "number") ? copy.currentPhase : 0;
       var focus = (copy.phases[cp] && copy.phases[cp].focus) ? copy.phases[cp].focus.split("·")[0].trim() : "";
@@ -3517,6 +3525,7 @@ function clientCardHtml(c){
         + '<span class="badge muted">Fase '+(cp+1)+'/4'+(focus?' · '+escapeHtml(focus):'')+'</span>'
         + rcBadges;
       actionsExtra = (rehabClinicoOn() ? '<button class="btn btn-primary btn-sm" onclick="openPanelClinico(\''+c.id+'\')" title="Ficha, evaluación, dolor y reevaluación">🩺 Clínico</button>' : '')
+        + (_adv ? '<button class="btn btn-primary btn-sm" onclick="advanceClientPhase(\''+c.id+'\')" title="Avanzar a la siguiente fase (sugerido por dolor bajo — confírmalo con tu evaluación)">⏭ Avanzar a Fase '+(_adv.nextPhase+1)+'</button>' : '')
         + '<button class="btn btn-secondary btn-sm" onclick="openPhaseShareModal(\''+copy.id+'\','+cp+')" title="Compartir la fase actual">📤 Fase '+(cp+1)+'</button>'
         + '<button class="btn btn-secondary btn-sm" onclick="openClientProtocol(\''+c.id+'\')">Abrir protocolo</button>';
     } else {
@@ -3766,6 +3775,10 @@ function deleteRoutine(id){
 var _builderRoutine = null; // working copy
 var _builderActiveDay = 0;
 var _builderIsNew = false;
+var _builderSnapshot = null; // JSON de referencia para detectar cambios sin guardar
+function _builderIsDirty(){
+  return !!(_builderRoutine && _builderSnapshot != null && JSON.stringify(_builderRoutine) !== _builderSnapshot);
+}
 
 function openRoutineBuilder(id, presetClientId){
   if (id){
@@ -3779,6 +3792,7 @@ function openRoutineBuilder(id, presetClientId){
     _builderIsNew = true;
   }
   _builderActiveDay = 0;
+  _builderSnapshot = JSON.stringify(_builderRoutine);   // referencia inicial (sin cambios)
   var tabs = document.querySelectorAll(".tab-btn");
   for (var i=0;i<tabs.length;i++) tabs[i].classList.remove("active");
   showView("builder");
@@ -4230,6 +4244,7 @@ function saveBuilder(){
     else state.routines.push(_builderRoutine);
   }
   saveState();
+  _builderSnapshot = JSON.stringify(_builderRoutine);   // guardado → sin cambios pendientes
   toast("Rutina guardada", "success");
 }
 
@@ -4895,6 +4910,9 @@ function renderLibrary(){
     html += '<option value="'+escapeAttr(cv)+'"'+(_libFilter.muscle===cv?" selected":"")+'>'+escapeHtml(CONTR_TYPES[c1])+'</option>';
   }
   html += '</optgroup>';
+  html += '<optgroup label="📷 Material visual">';
+  html += '<option value="nogif"'+(_libFilter.muscle==="nogif"?" selected":"")+'>Sin GIF / vídeo</option>';
+  html += '</optgroup>';
   html += '</select>';
   html += '</div>';
 
@@ -4917,12 +4935,24 @@ function renderLibraryGrid(){
   if (!grid) return;
   var q = (_libFilter.search||"").trim().toLowerCase();
   var muscle = _libFilter.muscle;
+  // Uso por ejercicio: nº de rutinas distintas que lo incluyen
+  var _exUsage = {};
+  state.routines.forEach(function(r){
+    var seen = {};
+    (r.days||[]).forEach(function(d){
+      (d.exercises||[]).forEach(function(x){
+        if (x.exerciseId && !seen[x.exerciseId]){ seen[x.exerciseId] = true; _exUsage[x.exerciseId] = (_exUsage[x.exerciseId]||0) + 1; }
+      });
+    });
+  });
+  function _hasMedia(e){ return !!(e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0)); }
   var filtered = state.exercises.filter(function(e){
     if (muscle){
       if (muscle === "terap:"){ if (!e.terap) return false; }
       else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
       else if (muscle === "contr:"){ if (!e.contr) return false; }
       else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
+      else if (muscle === "nogif"){ if (_hasMedia(e)) return false; }
       else if (e.muscle !== muscle) return false;
     }
     if (q){
@@ -4956,6 +4986,7 @@ function renderLibraryGrid(){
           + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
           + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
           + (heavy?'<span class="badge warn" title="GIF pesado, solo local">⚠ local</span>':'')
+          + (_exUsage[e.id]?'<span class="badge teal" title="Rutinas que incluyen este ejercicio">📋 en '+_exUsage[e.id]+' rutina'+(_exUsage[e.id]===1?'':'s')+'</span>':'')
         + '</div>'
         + (e.desc?'<p class="text-xs text-muted" style="line-height:1.4;">'+escapeHtml(e.desc)+'</p>':'')
         + '<div class="ex-acts">'
@@ -5327,9 +5358,40 @@ function shortenUrl(longUrl, prefix){
   return Promise.resolve({ url: longUrl, method:"long" });
 }
 
+/* Revisa una rutina antes de compartirla: bloquea si está vacía, avisa de huecos. */
+function routineShareIssues(r){
+  var total=0, noReps=0, noSets=0;
+  (r.days||[]).forEach(function(d){
+    (d.exercises||[]).forEach(function(x){
+      total++;
+      if (!String(x.reps||"").trim()) noReps++;
+      if (!String(x.sets||"").trim()) noSets++;
+    });
+  });
+  var warnings=[];
+  if (!r.clientId) warnings.push("La rutina no tiene un cliente asignado.");
+  if (noSets) warnings.push(noSets+" ejercicio"+(noSets===1?"":"s")+" sin series definidas.");
+  if (noReps) warnings.push(noReps+" ejercicio"+(noReps===1?"":"s")+" sin reps definidas.");
+  return { blocker: total===0 ? "La rutina no tiene ejercicios en ningún día." : null, warnings: warnings, total: total };
+}
 function openShareModal(routineId, fromBuilder){
   var r = getRoutine(routineId);
   if (!r){ toast("Rutina no encontrada","error"); return; }
+  var _issues = routineShareIssues(r);
+  if (_issues.blocker){
+    openModal({
+      title: "No se puede compartir aún",
+      bodyHtml: '<p>'+escapeHtml(_issues.blocker)+'</p><p class="text-sm text-muted" style="margin-top:.5rem;">Agrega al menos un ejercicio antes de enviar la rutina a tu cliente.</p>',
+      footer: [
+        { label:"Cerrar", cls:"btn-ghost" },
+        { label:"Editar rutina", cls:"btn-primary", onClick: function(){ closeModal(); openRoutineBuilder(r.id); } }
+      ]
+    });
+    return;
+  }
+  var _warnBanner = _issues.warnings.length
+    ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ Avisos antes de compartir:<ul style="margin:.35rem 0 0 1.1rem;padding:0;">'+_issues.warnings.map(function(w){ return '<li>'+escapeHtml(w)+'</li>'; }).join('')+'</ul></div></div>'
+    : '';
   var data = buildShareData(r);
   var encoded = encodeShareData(data);
   var baseUrl = getAppBaseUrl();
@@ -5338,7 +5400,8 @@ function openShareModal(routineId, fromBuilder){
   var hasGitHub = !!getGitHubConfig();
 
   var bodyHtml =
-    (data.skippedHeavy ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ '+data.skippedHeavy+' GIF subido(s) como archivo no se incluirán en el link compartido. El cliente verá el ejercicio sin imagen.</div></div>' : '')
+    _warnBanner
+    + (data.skippedHeavy ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ '+data.skippedHeavy+' GIF subido(s) como archivo no se incluirán en el link compartido. El cliente verá el ejercicio sin imagen.</div></div>' : '')
     + '<div id="share-status" class="text-sm text-muted" style="margin-bottom:.5rem;text-align:center;">'
       + (hasGitHub ? '☁ Subiendo a GitHub para link corto...' : 'Modo link largo (sin GitHub configurado)')
     + '</div>'
@@ -8162,6 +8225,38 @@ function setClientCurrentPhase(copyId, idx){
 }
 window.setClientCurrentPhase = setClientCurrentPhase;
 
+/* Sugerencia (apoyo, NO diagnóstico): ¿el cliente rehab está listo para avanzar de fase?
+   Criterio: módulo clínico activo, con protocolo, sin alta ni banderas rojas, no en la
+   última fase, y sus últimas 2 sesiones de dolor en verde (≤3/10). */
+function phaseAdvanceReady(c){
+  if (!rehabClinicoOn()) return null;
+  if (getClientType(c) !== "rehab" || !c.rehabProtocolId) return null;
+  if (c.alta && c.alta.fecha) return null;
+  if (c.redFlags && c.redFlags.blocked) return null;
+  var copy = getProtocol(c.rehabProtocolId); if (!copy) return null;
+  var cp = (typeof copy.currentPhase === "number") ? copy.currentPhase : 0;
+  if (cp >= 3) return null;
+  var pains = Array.isArray(c.painLog) ? c.painLog : [];
+  if (pains.length < 2) return null;
+  var lastN = pains.slice(-2);
+  var allGreen = lastN.every(function(p){ return Math.max(p.durante||0, p.despues||0) <= 3; });
+  if (!allGreen) return null;
+  return { currentPhase: cp, nextPhase: cp+1 };
+}
+window.advanceClientPhase = function(clientId){
+  var c = getClient(clientId); if (!c || !c.rehabProtocolId) return;
+  var copy = getProtocol(c.rehabProtocolId); if (!copy) return;
+  var cp = (typeof copy.currentPhase === "number") ? copy.currentPhase : 0;
+  if (cp >= 3){ toast("Ya está en la última fase","warn"); return; }
+  var next = cp + 1;
+  if (!confirm("¿Avanzar a Fase "+(next+1)+" el protocolo de "+(c.name||"este cliente")+"?\n\nApóyate siempre en tu evaluación clínica presencial: esta sugerencia solo considera el dolor registrado.")) return;
+  setClientCurrentPhase(copy.id, next);   // guarda y re-renderiza rehab
+  var active = document.querySelector(".view.active");
+  if (active && active.id === "view-dashboard") renderDashboard();
+  else if (active && active.id === "view-clients") renderClients();
+  toast("Protocolo avanzado a Fase "+(next+1),"success");
+};
+
 window.clearPhase = clearPhase;
 
 /* ===== EVIDENCIA CIENTÍFICA / REFERENCIAS ===== */
@@ -9294,6 +9389,12 @@ function buildPriorityTodayHtml(){
     if (dr!==null && dr<=3){
       var rTxt = dr<0 ? "reevaluación vencida hace "+(-dr)+" d" : (dr===0?"reevaluación hoy":"reevaluación en "+dr+" d");
       items.push({ sev:(dr<0?150+(-dr):100-dr), icon:"🔁", cls:(dr<0?"danger":"warn"), txt:nombre+" · "+rTxt, act:abrir });
+    }
+    // Rehab: listo para avanzar de fase (oportunidad, no urgencia)
+    var adv = phaseAdvanceReady(c);
+    if (adv){
+      items.push({ sev:50, icon:"✅", cls:"muted", txt:nombre+" · listo para avanzar a Fase "+(adv.nextPhase+1),
+        act:'<button class="btn btn-primary btn-sm" onclick="advanceClientPhase(\''+c.id+'\')" title="Sugerido por dolor bajo — confírmalo con tu evaluación">⏭ Avanzar</button>' });
     }
   });
   items.sort(function(a,b){ return b.sev-a.sev; });
@@ -13200,6 +13301,12 @@ window.openClientProgressShare = openClientProgressShare;
 window.showView = showView;
 
 window.ultrasport19 = { state: state, settings: settings, version: 1 };
+
+/* Aviso del navegador al recargar/cerrar con cambios sin guardar en el editor de rutinas. */
+window.addEventListener("beforeunload", function(e){
+  var _cur = document.querySelector(".view.active");
+  if (_cur && _cur.id === "view-builder" && _builderIsDirty()){ e.preventDefault(); e.returnValue = ""; }
+});
 
 /* Atajo de teclado: ⌘/Ctrl + K enfoca la búsqueda global. */
 document.addEventListener("keydown", function(e){
