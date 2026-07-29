@@ -564,6 +564,22 @@ img{max-width:100%;display:block;}
 #rest-timer-float .rt-label{font-size:.68rem;letter-spacing:.12em;color:var(--muted,#888);text-transform:uppercase;}
 #rest-timer-float button{margin-top:.45rem;}
 #rest-timer-float.rt-done .rt-time{color:var(--success,#2fbf71);font-size:1.3rem;}
+#rest-timer-float .rt-bar{height:5px;border-radius:3px;background:var(--surface-2);margin:.5rem 0 .1rem;overflow:hidden;}
+#rest-timer-float .rt-bar i{display:block;height:100%;width:100%;background:var(--accent);transition:width 1s linear;}
+#rest-timer-float .rt-controls{display:flex;gap:.3rem;justify-content:center;margin-top:.5rem;flex-wrap:wrap;}
+#rest-timer-float .rt-controls button{margin-top:0;}
+#rest-timer-float.rt-ending{border-color:var(--warn,#f5a623);}
+#rest-timer-float.rt-ending .rt-time{color:var(--warn,#f5a623);}
+#rest-timer-float.rt-ending .rt-bar i{background:var(--warn,#f5a623);}
+.prio-card{border-left:3px solid var(--accent);}
+.prio-row:last-child{border-bottom:none !important;}
+.dash-panels{margin-top:1rem;}
+.dash-panels-toggle{display:flex;align-items:center;gap:.5rem;width:100%;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:.6rem .9rem;color:var(--muted);font-weight:700;font-size:.82rem;cursor:pointer;text-transform:uppercase;letter-spacing:.05em;}
+.dash-panels-toggle:hover{border-color:var(--accent);color:var(--text);}
+.dash-panels .dp-chevron{transition:transform .2s;display:inline-block;font-size:.8rem;}
+.dash-panels.open .dp-chevron{transform:rotate(90deg);}
+.dash-panels-body{display:none;}
+.dash-panels.open .dash-panels-body{display:block;}
 .week-notes{margin-bottom:1rem;border:1px solid var(--border);border-radius:var(--radius-lg,12px);padding:.6rem .9rem;background:var(--surface-1);}
 .week-notes summary{cursor:pointer;font-weight:700;font-size:.9rem;}
 .week-notes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:.55rem;margin-top:.7rem;}
@@ -3249,16 +3265,18 @@ function renderDashboard(){
   html += statCard("Esta semana", thisWeek, "iniciadas");
   html += '</div>';
 
+  html += buildPriorityTodayHtml();
   html += buildAgendaHtml();
-  html += buildCalendlyDashboardHtml();
-  html += buildNotionSyncHtml();
-  html += buildBackupBannerHtml();
-  html += buildIncomeHtml();
-  html += buildClientDatesAlertsHtml();
-  html += buildAlertsHtml();
-  html += buildClinicalInboxHtml();
-  html += buildRutHygieneHtml();
-  html += buildReactivationHtml();
+  // Paneles secundarios agrupados en un bloque colapsable (recuerda tu preferencia)
+  var _dashSec = buildCalendlyDashboardHtml()+buildNotionSyncHtml()+buildBackupBannerHtml()+buildIncomeHtml()
+    +buildClientDatesAlertsHtml()+buildAlertsHtml()+buildClinicalInboxHtml()+buildRutHygieneHtml()+buildReactivationHtml();
+  if (_dashSec.trim()){
+    var _dashOpen = settings.dashPanelsOpen !== false;   // por defecto abierto
+    html += '<div class="dash-panels'+(_dashOpen?' open':'')+'" id="dash-panels">'
+      + '<button class="dash-panels-toggle" onclick="toggleDashPanels()"><span class="dp-chevron">▸</span> <span>Paneles y avisos</span></button>'
+      + '<div class="dash-panels-body">'+_dashSec+'</div>'
+      + '</div>';
+  }
 
   html += '<div class="section-head" style="margin-top:1.5rem;"><h2 class="section-title">RUTINAS <span class="accent">/ RECIENTES</span></h2>';
   if (state.routines.length>3) html += '<button class="btn btn-ghost btn-sm" onclick="showView(\'routines\')">Ver todas →</button>';
@@ -3343,19 +3361,29 @@ function renderClients(){
   var notionCount = 0;
   for (var nn=0;nn<state.clients.length;nn++) if (state.clients[nn].notionId) notionCount++;
 
+  // Mapa de clientes con rutina + conteos para los filtros rápidos
+  var _hasRoutine = {};
+  state.routines.forEach(function(r){ if (r.clientId) _hasRoutine[r.clientId] = true; });
+  function _cliHasPlan(c){ return getClientType(c)==="rehab" ? !!c.rehabProtocolId : !!_hasRoutine[c.id]; }
+  function _cliPlanVencido(c){ var dp = daysUntil(c.planEndDate); return dp!==null && dp<0; }
+  var noRoutineCount = 0, expiredCount = 0;
+  state.clients.forEach(function(c){
+    if (getClientType(c)!=="rehab" && !_hasRoutine[c.id]) noRoutineCount++;
+    if (_cliPlanVencido(c)) expiredCount++;
+  });
+
   // Filter bar
   html += '<div class="cat-bar">';
   html += '<span class="cat-pill'+(_clientFilter===""?" active":"")+'" onclick="filterClients(\'\')">Todos<span class="cat-count">'+state.clients.length+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="gym"?" active":"")+'" onclick="filterClients(\'gym\')"><span class="cat-icon">🏋️</span>Gimnasio<span class="cat-count">'+typeCounts.gym+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="rehab"?" active":"")+'" onclick="filterClients(\'rehab\')"><span class="cat-icon">🩹</span>Rehabilitación<span class="cat-count">'+typeCounts.rehab+'</span></span>';
   if (notionCount) html += '<span class="cat-pill'+(_clientFilter==="notion"?" active":"")+'" onclick="filterClients(\'notion\')"><span class="cat-icon">🟢</span>Activos Notion<span class="cat-count">'+notionCount+'</span></span>';
+  if (noRoutineCount) html += '<span class="cat-pill'+(_clientFilter==="noroutine"?" active":"")+'" onclick="filterClients(\'noroutine\')"><span class="cat-icon">🚫</span>Sin rutina<span class="cat-count">'+noRoutineCount+'</span></span>';
+  if (expiredCount) html += '<span class="cat-pill'+(_clientFilter==="expired"?" active":"")+'" onclick="filterClients(\'expired\')"><span class="cat-icon">💳</span>Plan vencido<span class="cat-count">'+expiredCount+'</span></span>';
   html += '</div>';
 
   // Orden: clientes CON plan primero (gym = tiene rutina; rehab = tiene protocolo),
   // luego alfabético. Así se llega rápido a Resumen/Seguimiento/Progresiones de los activos.
-  var _hasRoutine = {};
-  state.routines.forEach(function(r){ if (r.clientId) _hasRoutine[r.clientId] = true; });
-  function _cliHasPlan(c){ return getClientType(c)==="rehab" ? !!c.rehabProtocolId : !!_hasRoutine[c.id]; }
   var sorted = state.clients.slice().sort(function(a,b){
     var pa = _cliHasPlan(a)?0:1, pb = _cliHasPlan(b)?0:1;
     if (pa!==pb) return pa-pb;
@@ -3363,7 +3391,12 @@ function renderClients(){
   });
 
   if (_clientFilter){
-    var filtered = sorted.filter(function(c){ return _clientFilter==="notion" ? !!c.notionId : getClientType(c)===_clientFilter; });
+    var filtered = sorted.filter(function(c){
+      if (_clientFilter==="notion") return !!c.notionId;
+      if (_clientFilter==="noroutine") return getClientType(c)!=="rehab" && !_hasRoutine[c.id];
+      if (_clientFilter==="expired") return _cliPlanVencido(c);
+      return getClientType(c)===_clientFilter;
+    });
     if (!filtered.length) html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">Sin clientes en este grupo.</p>';
     else for (var i=0;i<filtered.length;i++) html += clientCardHtml(filtered[i]);
   } else {
@@ -3494,6 +3527,10 @@ function clientCardHtml(c){
   } else {
     var routinesCount = state.routines.filter(function(r){ return r.clientId === c.id; }).length;
     infoLine = '<span class="badge muted">'+routinesCount+' rutina'+(routinesCount===1?'':'s')+'</span>';
+    // Atajo directo para crear la primera rutina de un cliente que aún no tiene ninguna
+    if (routinesCount === 0){
+      actionsExtra = '<button class="btn btn-primary btn-sm" onclick="crearRutinaParaCliente(\''+c.id+'\')" title="Crear una rutina para este cliente">+ Rutina</button>';
+    }
   }
 
   return '<div class="card">'
@@ -3524,6 +3561,14 @@ function clientCardHtml(c){
 
 function filterClients(t){ _clientFilter = t; renderClients(); }
 window.filterClients = filterClients;
+
+/* Crea una rutina nueva ya asignada a este cliente y abre el builder. */
+window.crearRutinaParaCliente = function(clientId){
+  var c = getClient(clientId);
+  if (!c){ toast("Cliente no encontrado","error"); return; }
+  openRoutineBuilder(null, clientId);
+  toast("Nueva rutina para "+(c.name||"el cliente")+" — asígnale días y ejercicios","success");
+};
 
 function openClientForm(id){
   var client = id ? getClient(id) : null;
@@ -3722,7 +3767,7 @@ var _builderRoutine = null; // working copy
 var _builderActiveDay = 0;
 var _builderIsNew = false;
 
-function openRoutineBuilder(id){
+function openRoutineBuilder(id, presetClientId){
   if (id){
     var r = getRoutine(id);
     if (!r){ toast("Rutina no encontrada","error"); return; }
@@ -3730,6 +3775,7 @@ function openRoutineBuilder(id){
     _builderIsNew = false;
   } else {
     _builderRoutine = newEmptyRoutine();
+    if (presetClientId && getClient(presetClientId)) _builderRoutine.clientId = presetClientId;
     _builderIsNew = true;
   }
   _builderActiveDay = 0;
@@ -8330,6 +8376,9 @@ window.openDedupeModal = openDedupeModal;
 
 /* --- Temporizador de descanso --- */
 var _restTimerInterval = null;
+var _restRemaining = 0;
+var _restTotal = 0;
+var _restAudioCtx = null;
 function parseRestSeconds(s){
   if (!s) return 0;
   s = String(s).toLowerCase().trim();
@@ -8340,58 +8389,92 @@ function parseRestSeconds(s){
   if (s.indexOf("s")>=0) return Math.round(v);
   return v <= 10 ? Math.round(v*60) : Math.round(v);
 }
+/* Un solo AudioContext, "calentado" dentro del gesto del usuario (iOS bloquea el
+   audio creado tarde). Se reutiliza para el tic-tac y el beep final. */
+function _restEnsureAudio(){
+  try {
+    var Ctx = window.AudioContext||window.webkitAudioContext;
+    if (!Ctx) return null;
+    if (!_restAudioCtx) _restAudioCtx = new Ctx();
+    if (_restAudioCtx.state==="suspended" && _restAudioCtx.resume) _restAudioCtx.resume();
+    return _restAudioCtx;
+  } catch(e){ return null; }
+}
+function restBeep(freq, dur, vol){
+  var ctx = _restEnsureAudio(); if (!ctx) return;
+  try {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = freq||880; g.gain.value = (vol==null?.25:vol);
+    o.start();
+    setTimeout(function(){ try { o.stop(); } catch(e){} }, dur||600);
+  } catch(e){}
+}
+function _restRenderFloat(){
+  var sec = _restRemaining<0?0:_restRemaining;
+  var mm = Math.floor(sec/60), ss = sec%60;
+  var t = document.getElementById("rt-time");
+  if (t) t.textContent = mm+":"+(ss<10?"0":"")+ss;
+  var bar = document.getElementById("rt-bar-fill");
+  if (bar){ var pct = _restTotal>0 ? Math.max(0,Math.min(100,(sec/_restTotal)*100)) : 0; bar.style.width = pct+"%"; }
+  var el = document.getElementById("rest-timer-float");
+  if (el) el.classList.toggle("rt-ending", sec>0 && sec<=3);
+}
 window.startRestTimer = function(restStr){
   var secs = parseRestSeconds(restStr);
   if (!secs){ toast("Descanso no reconocido: "+restStr,"warn"); return; }
+  _restEnsureAudio();                       // calienta el audio dentro del gesto del usuario
   window.stopRestTimer(false);
   var el = document.getElementById("rest-timer-float");
   if (!el){
     el = document.createElement("div");
     el.id = "rest-timer-float";
-    el.innerHTML = '<div class="rt-label">Descanso</div><div class="rt-time" id="rt-time"></div><button class="btn btn-ghost btn-sm" onclick="stopRestTimer(true)">✕ Cerrar</button>';
+    el.innerHTML = '<div class="rt-label">Descanso</div>'
+      + '<div class="rt-time" id="rt-time"></div>'
+      + '<div class="rt-bar"><i id="rt-bar-fill"></i></div>'
+      + '<div class="rt-controls">'
+      +   '<button class="btn btn-ghost btn-sm" onclick="adjustRest(-15)" title="Restar 15 s">−15</button>'
+      +   '<button class="btn btn-ghost btn-sm" onclick="adjustRest(15)" title="Sumar 15 s">+15</button>'
+      +   '<button class="btn btn-secondary btn-sm" onclick="skipRest()" title="Saltar el descanso">Saltar ⏭</button>'
+      + '</div>';
     document.body.appendChild(el);
   }
   el.classList.remove("rt-done");
+  el.classList.remove("rt-ending");
   el.style.display = "block";
-  var remaining = secs;
-  function renderRt(sec){
-    if (sec<0) sec=0;
-    var mm = Math.floor(sec/60), ss = sec%60;
-    var t = document.getElementById("rt-time");
-    if (t) t.textContent = mm+":"+(ss<10?"0":"")+ss;
-  }
-  renderRt(remaining);
+  _restTotal = secs;
+  _restRemaining = secs;
+  _restRenderFloat();
   _restTimerInterval = setInterval(function(){
-    remaining--;
-    renderRt(remaining);
-    if (remaining<=0){
+    _restRemaining--;
+    _restRenderFloat();
+    if (_restRemaining>0 && _restRemaining<=3) restBeep(660, 120, .18);   // tic-tac final
+    if (_restRemaining<=0){
       clearInterval(_restTimerInterval); _restTimerInterval=null;
+      el.classList.remove("rt-ending");
       el.classList.add("rt-done");
       var t = document.getElementById("rt-time");
       if (t) t.textContent = "¡LISTO!";
-      restBeep();
+      var bar = document.getElementById("rt-bar-fill"); if (bar) bar.style.width = "0%";
+      restBeep(880, 500, .3);
       if (navigator.vibrate) navigator.vibrate([200,100,200]);
       setTimeout(function(){ if (el && !_restTimerInterval) el.style.display="none"; }, 4000);
     }
   }, 1000);
 };
+/* Suma/resta segundos en caliente (solo mientras corre el descanso). */
+window.adjustRest = function(delta){
+  if (!_restTimerInterval) return;
+  _restRemaining = Math.max(1, _restRemaining + delta);
+  if (_restRemaining > _restTotal) _restTotal = _restRemaining;   // que la barra no exceda 100%
+  _restRenderFloat();
+};
+window.skipRest = function(){ window.stopRestTimer(true); };
 window.stopRestTimer = function(hide){
   if (_restTimerInterval){ clearInterval(_restTimerInterval); _restTimerInterval=null; }
   var el = document.getElementById("rest-timer-float");
   if (el && hide) el.style.display = "none";
 };
-function restBeep(){
-  try {
-    var Ctx = window.AudioContext||window.webkitAudioContext;
-    if (!Ctx) return;
-    var ctx = new Ctx();
-    var o = ctx.createOscillator(), g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.frequency.value = 880; g.gain.value = .25;
-    o.start();
-    setTimeout(function(){ try { o.stop(); ctx.close(); } catch(e){} }, 600);
-  } catch(e){}
-}
 
 /* --- Historial de sesiones + progresión (vista cliente) --- */
 function loadSessionHistory(){
@@ -9046,6 +9129,44 @@ function getProgressionSuggestion(exId){
   } catch(e){ return null; }
 }
 
+/* Última sesión GUARDADA que contiene este ejercicio con datos (peso o reps). */
+function _lpLastSession(exId){
+  try{
+    var hist = loadSessionHistory();
+    for (var i=hist.length-1; i>=0; i--){
+      var pes = hist[i].perEx||[];
+      for (var j=0;j<pes.length;j++){
+        if (pes[j].exId===exId && ((pes[j].top>0) || (pes[j].reps>0))) return { date: hist[i].date, pe: pes[j] };
+      }
+    }
+  }catch(e){}
+  return null;
+}
+/* Rellena los sets VACÍOS del ejercicio actual con lo hecho la última sesión (no sobrescribe). */
+window.lpRepeatLast = function(){
+  if (!_clientShareData) return;
+  var r = _clientShareData.routine;
+  var rowEx = r.days[_lpDay].exercises[_lpIdx];
+  if (!rowEx) return;
+  var last = _lpLastSession(rowEx.exerciseId);
+  if (!last){ toast("No hay una sesión anterior guardada para este ejercicio","warn"); return; }
+  var pe = last.pe;
+  var perSet = (pe.sets>0 && pe.reps>0) ? Math.round(pe.reps/pe.sets) : null;
+  var wStr = pe.top>0 ? String(pe.top) : "";
+  var setsCount = parseInt(rowEx.sets,10)||1;
+  var progress = loadProgress();
+  var filled = 0;
+  for (var s=0;s<setsCount;s++){
+    var key = _lpDay+":"+_lpIdx+":"+s;
+    if (!progress[key]) progress[key] = {};
+    if (wStr && !progress[key].weight){ progress[key].weight = wStr; filled++; }
+    if (perSet!=null && !progress[key].reps){ progress[key].reps = String(perSet); filled++; }
+  }
+  saveProgress(progress);
+  renderLivePlayer();
+  toast(filled ? ("Cargado de la sesión "+(last.date||"anterior")) : "Los sets ya tenían datos — no sobrescribí nada", filled?"success":"warn");
+};
+
 function daysUntil(dateStr){
   if (!dateStr) return null;
   var t = new Date(dateStr+"T00:00:00").getTime();
@@ -9090,6 +9211,62 @@ function buildClientDatesAlertsHtml(){
 function _rutMissing(){
   return state.clients.filter(function(c){ return !(c.rut && String(c.rut).trim()); });
 }
+/* "Prioridad de hoy": destila las señales urgentes y accionables en una sola lista
+   (red flags clínicas, planes vencidos/por vencer, reevaluaciones), ordenadas por urgencia. */
+function buildPriorityTodayHtml(){
+  if (!state.clients.length) return "";
+  var items = [];
+  state.clients.forEach(function(c){
+    var type = getClientType(c);
+    var nombre = escapeHtml(c.name || "Cliente");
+    var phone = (c.phone||"").replace(/[^\d+]/g,"");
+    var abrir = '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\''+c.id+'\')">Abrir</button>';
+    var wa = phone ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="https://wa.me/'+escapeAttr(phone.replace(/^\+/,""))+'">WhatsApp</a>' : abrir;
+    // Red flag clínico (rehab): lo más urgente
+    if (type==="rehab" && c.redFlags && c.redFlags.blocked){
+      items.push({ sev:1000, icon:"🚩", cls:"danger", txt:nombre+" · derivar a médico", act:abrir });
+    }
+    // Plan por vencer / vencido
+    var dp = daysUntil(c.planEndDate);
+    if (dp!==null && dp<=5){
+      var vTxt = dp<0 ? "plan vencido hace "+(-dp)+" d" : (dp===0?"plan vence hoy":"plan vence en "+dp+" d");
+      items.push({ sev:(dp<0?300+(-dp):200-dp), icon:"💳", cls:(dp<0?"danger":"warn"), txt:nombre+" · "+vTxt, act:wa });
+    }
+    // Reevaluación próxima / vencida
+    var dr = daysUntil(c.reevalDate);
+    if (dr!==null && dr<=3){
+      var rTxt = dr<0 ? "reevaluación vencida hace "+(-dr)+" d" : (dr===0?"reevaluación hoy":"reevaluación en "+dr+" d");
+      items.push({ sev:(dr<0?150+(-dr):100-dr), icon:"🔁", cls:(dr<0?"danger":"warn"), txt:nombre+" · "+rTxt, act:abrir });
+    }
+  });
+  items.sort(function(a,b){ return b.sev-a.sev; });
+  var total = items.length, top = items.slice(0,6);
+  var html = '<div class="card prio-card" style="margin-top:1rem;"><div class="card-main">';
+  html += '<div class="card-title">🎯 Prioridad de hoy'+(total>top.length?' <span class="text-xs text-muted">('+top.length+' de '+total+')</span>':'')+'</div>';
+  if (!total){
+    html += '<p class="text-sm text-muted" style="margin-top:.4rem;">Sin pendientes urgentes hoy 🎉</p>';
+  } else {
+    html += '<div style="margin-top:.5rem;display:flex;flex-direction:column;gap:.35rem;">';
+    top.forEach(function(it){
+      var color = it.cls==="danger"?"var(--danger)":(it.cls==="warn"?"var(--warn)":"var(--muted)");
+      html += '<div class="prio-row" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;padding:.3rem 0;border-bottom:1px solid var(--border);">'
+        + '<span style="font-size:1rem;">'+it.icon+'</span>'
+        + '<span style="flex:1;min-width:150px;color:'+color+';font-size:.9rem;font-weight:600;">'+it.txt+'</span>'
+        + it.act
+      + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div></div>';
+  return html;
+}
+window.toggleDashPanels = function(){
+  var isOpen = settings.dashPanelsOpen !== false;
+  settings.dashPanelsOpen = !isOpen;
+  saveSettings();
+  var el = document.getElementById("dash-panels");
+  if (el) el.classList.toggle("open", settings.dashPanelsOpen);
+};
 function buildRutHygieneHtml(){
   var miss = _rutMissing();
   if (!miss.length) return "";
@@ -9296,6 +9473,13 @@ function renderLivePlayer(){
     +'</div>';
   if (def && def.gif && /^https?:\/\//.test(def.gif)){
     html += '<div class="lp-gif"><img src="'+escapeAttr(def.gif)+'" alt="" onerror="this.parentNode.style.display=\'none\'"></div>';
+  }
+  var _lpLast = _lpLastSession(rowEx.exerciseId);
+  if (_lpLast){
+    var _lpLp = _lpLast.pe;
+    var _lpPerSet = (_lpLp.sets>0 && _lpLp.reps>0) ? Math.round(_lpLp.reps/_lpLp.sets) : null;
+    var _lpTxt = (_lpLp.top>0?_lpLp.top+'kg':'') + (_lpPerSet?((_lpLp.top>0?' × ':'')+_lpPerSet+' reps'):'');
+    html += '<button class="btn btn-secondary btn-sm" style="margin:.1rem 0 .55rem;" onclick="lpRepeatLast()" title="Rellena los sets vacíos con lo que hiciste la última sesión guardada">↩ Repetir semana pasada'+(_lpTxt?' ('+_lpTxt+')':'')+'</button>';
   }
   html += '<table class="ex-sets-table lp-table"><thead><tr><th>Set</th><th>Reps</th><th>Peso</th><th>RPE</th><th>EVA</th><th>✓</th></tr></thead><tbody>';
   for (var s=0;s<setsCount;s++){
