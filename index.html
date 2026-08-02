@@ -13282,9 +13282,10 @@ function progApplyFromModal(){
     if(!hasW && !hasR) return;
     var diaIdx=_progDayIdx(pe.dia);
     var cur=(r?_progFindPrescription(r, pe.nombre, diaIdx):null)||{};
-    var sug=_progSuggestProgression(best, cur);
+    var avgRpe=_prgAvgRpe(pe.series), repsMin=_prgMinReps(pe.series);
+    var sug=_progSuggestProgression(best, cur, { rpe:avgRpe, repsDone:repsMin });
     sugerencias.push({ nombre:pe.nombre, dia:pe.dia||"", diaIdx:diaIdx,
-      logrado:(hasW?best.peso_kg:null), repsLog:best.reps, rpe:best.rpe,
+      logrado:(hasW?best.peso_kg:null), repsLog:best.reps, rpe:avgRpe, repsMin:repsMin,
       curWeight:(cur.weight!=null?String(cur.weight):""), curReps:(cur.reps!=null?String(cur.reps):""), curSets:(cur.sets!=null?String(cur.sets):""),
       sugPeso:sug.sugPeso, sugReps:sug.sugReps, sugSets:sug.sugSets, motivo:sug.motivo });
   });
@@ -13302,59 +13303,112 @@ function _progDayIdx(nombre){
   for(var i=0;i<DAY_NAMES.length;i++){ var dn=_prgNorm(DAY_NAMES[i]); if(dn===n || dn.indexOf(n)===0 || n.indexOf(dn)===0) return i; }
   return -1;
 }
-/* Constantes de doble progresión (esquema de hipertrofia por defecto).
-   Ajusta estos dos números si trabajas otro rango objetivo de reps. */
-var PROG_REP_CEIL = 12;   // al alcanzar estas reps → progresar subiendo el peso
-var PROG_REP_RESET = 8;   // reps a las que se reinicia tras subir el peso
+/* Al subir la carga, el piso del rango de reps queda en este % del tope (15 → 12). */
+var PROG_REP_RESET_RATIO = 0.8;
 function _prgToInt(v){ var n=parseInt(String(v==null?"":v).replace(",","."),10); return isNaN(n)?null:n; }
 function _prgRepsIsPlainInt(s){ return /^\d+$/.test(String(s==null?"":s).trim()); }
+
+/* RPE representativo del ejercicio = PROMEDIO de todas las series con RPE.
+   Antes se tomaba el RPE de una sola serie (la primera), que casi siempre es el más
+   bajo porque la fatiga aún no acumula; eso hacía que la progresión sugiriera subir
+   peso en todos los ejercicios ignorando la tendencia al alza (ej. 4·6·9·10). */
+function _prgAvgRpe(series){
+  var sum=0, n=0;
+  (series||[]).forEach(function(s){
+    if(!s) return;
+    var v=parseFloat(s.rpe);
+    if(!isNaN(v)){ sum+=v; n++; }
+  });
+  return n ? Math.round(sum/n*10)/10 : null;
+}
+/* Reps realmente logradas = la MENOR de las series realizadas. Doble progresión
+   clásica: la carga sube solo cuando TODAS las series llegan al tope de reps. */
+function _prgMinReps(series){
+  var min=null;
+  (series||[]).forEach(function(s){
+    if(!s || s.reps==null || !(s.reps>0)) return;
+    if(min==null || s.reps<min) min=s.reps;
+  });
+  return min;
+}
+/* Rango objetivo de reps leído desde la prescripción del ejercicio:
+     "15"    → {reset:12, ceil:15}   (el tope es lo prescrito; el piso, el 80%)
+     "12-15" → {reset:12, ceil:15}
+   Devuelve null si las reps no son numéricas (tiempo, "al fallo", etc.). */
+function _prgRepRange(reps){
+  var s=String(reps==null?"":reps).trim();
+  var m=s.match(/^(\d+)\s*(?:-|–|a|\/)\s*(\d+)$/i);
+  if(m){
+    var a=parseInt(m[1],10), b=parseInt(m[2],10);
+    if(a>0 && b>0) return { reset:Math.min(a,b), ceil:Math.max(a,b) };
+  }
+  if(/^\d+$/.test(s)){
+    var c=parseInt(s,10);
+    if(c>0) return { reset:Math.max(1,Math.round(c*PROG_REP_RESET_RATIO)), ceil:c };
+  }
+  return null;
+}
 /* Sugerencia de objetivo semanal (autorregulación por RPE) con DOBLE PROGRESIÓN.
-   best = mejor set logrado {peso_kg, reps, rpe}; cur = prescripción actual de la
-   rutina {sets, reps, weight} (strings). Devuelve {sugPeso, sugReps, sugSets, motivo}.
-   Criterio: con RPE cómodo (≤7) sube primero las reps manteniendo el peso; al llegar
-   al tope de reps sube el peso y reinicia las reps. Con RPE alto mantiene o baja carga.
+   best = set de referencia de carga {peso_kg, reps}; cur = prescripción actual de la
+   rutina {sets, reps, weight} (strings); ctx = {rpe, repsDone} calculado sobre TODAS
+   las series (rpe = promedio, repsDone = la serie más baja).
+   Devuelve {sugPeso, sugReps, sugSets, motivo}.
+   Criterio: la carga sube solo si se cumplió el tope de reps prescrito Y el RPE
+   promedio lo permite. Si no se alcanzó el objetivo de reps, se mantiene la carga.
+   Con RPE promedio alto (≥9) mantiene, y en 10 descarga.
    Las series se precargan con lo actual (se ajustan a mano). */
-function _progSuggestProgression(best, cur){
-  cur = cur || {};
-  var rpe = best.rpe;
+function _progSuggestProgression(best, cur, ctx){
+  cur = cur || {}; ctx = ctx || {};
+  var rpe = (ctx.rpe!=null) ? ctx.rpe : best.rpe;          // promedio de las series
   var w = (best.peso_kg!=null && best.peso_kg>0) ? best.peso_kg : null;
   var curWeight = cur.weight!=null?String(cur.weight):"";
   var curReps   = cur.reps!=null?String(cur.reps):"";
   var curSets   = cur.sets!=null?String(cur.sets):"";
-  var repsNum   = _prgRepsIsPlainInt(curReps) ? _prgToInt(curReps) : null;
+  var range = _prgRepRange(curReps);                        // {reset, ceil} o null
+  var repsDone = (ctx.repsDone!=null) ? ctx.repsDone : best.reps;
+  var hitTarget = !!(range && repsDone!=null && repsDone>=range.ceil);
+  var rpeTxt = (rpe==null) ? "sin RPE" : ("RPE prom "+rpe);
+  var faltan = range ? ("mín "+(repsDone!=null?repsDone:"?")+"/"+range.ceil+" reps") : "";
   var out = { sugPeso: (w!=null?w:curWeight), sugReps: curReps, sugSets: curSets, motivo: "" };
   function wT(inc){ var t=Math.round((w+inc)*2)/2; return (t<=0)?w:t; }
 
   // --- Ejercicio sin carga (peso corporal / banda sin kg): progresa solo reps ---
   if(w==null){
     out.sugPeso = curWeight;
-    if(rpe!=null && rpe<=7 && repsNum!=null){ var ri=(rpe<=6)?2:1; out.sugReps=String(repsNum+ri); out.motivo="RPE "+rpe+" (cómodo, sin carga): +"+ri+" rep"; }
-    else if(rpe!=null && rpe>=9){ out.motivo="RPE "+rpe+" (alto): mantener"; }
-    else out.motivo = (rpe==null?"sin RPE":"RPE "+rpe)+": mantener";
-    return out;
+    if(rpe==null){ out.motivo="sin RPE: mantener"; return out; }
+    if(rpe>=9){ out.motivo=rpeTxt+" (alto): mantener"; return out; }
+    if(range && !hitTarget){ out.motivo=rpeTxt+": "+faltan+" → mantener objetivo"; return out; }
+    if(rpe<=7 && range){
+      var ri=(rpe<=6)?2:1;
+      out.sugReps=String(range.ceil+ri);
+      out.motivo=rpeTxt+" + objetivo cumplido: +"+ri+" rep";
+      return out;
+    }
+    out.motivo=rpeTxt+": mantener"; return out;
   }
 
   // --- Sin RPE: conservador (igual que antes) ---
   if(rpe==null){ out.sugPeso=wT(2.5); out.motivo="sin RPE: +2.5 kg conservador"; return out; }
-  // --- RPE alto: mantener o descargar (igual que antes) ---
-  if(rpe>=10){ out.sugPeso=wT(-2.5); out.motivo="RPE "+rpe+" (máximo): bajar 2.5 kg"; return out; }
-  if(rpe>=9){  out.sugPeso=wT(0);    out.motivo="RPE "+rpe+" (alto): mantener carga"; return out; }
-  if(rpe>=8){  out.sugPeso=wT(2.5);  out.motivo="RPE "+rpe+": +2.5 kg (lento)"; return out; }
+  // --- RPE promedio alto: mantener o descargar ---
+  if(rpe>=10){ out.sugPeso=wT(-2.5); out.motivo=rpeTxt+" (máximo): bajar 2.5 kg"; return out; }
+  if(rpe>=9){  out.sugPeso=wT(0);    out.motivo=rpeTxt+" (alto): mantener carga"; return out; }
 
-  // --- RPE cómodo (≤7): DOBLE PROGRESIÓN ---
-  var repInc = (rpe<=6)?2:1;              // muy fácil = +2 reps, cómodo = +1 rep
-  if(repsNum!=null && repsNum>=PROG_REP_RESET && repsNum<PROG_REP_CEIL){
-    var newReps=Math.min(repsNum+repInc, PROG_REP_CEIL);
-    out.sugReps=String(newReps); out.sugPeso=wT(0);
-    out.motivo="RPE "+rpe+" (cómodo): +"+(newReps-repsNum)+" rep, mantén "+wT(0)+"kg";
-  } else if(repsNum!=null && repsNum>=PROG_REP_CEIL){
-    var incW=(rpe<=6)?5:2.5;
-    out.sugPeso=wT(incW); out.sugReps=String(PROG_REP_RESET);
-    out.motivo="RPE "+rpe+" + reps al tope ("+repsNum+"): +"+incW+" kg y reinicia a "+PROG_REP_RESET+" reps";
+  // --- No alcanzó el tope de reps: se mantiene la carga hasta completarlo ---
+  if(range && !hitTarget){
+    out.sugPeso=wT(0); out.sugReps=curReps;
+    out.motivo=rpeTxt+": "+faltan+" → mantener carga hasta completar";
+    return out;
+  }
+
+  // --- Objetivo de reps cumplido: sube carga según el RPE promedio ---
+  if(rpe>=8){ out.sugPeso=wT(2.5); out.motivo=rpeTxt+(range?(" + "+range.ceil+" reps cumplidas"):"")+": +2.5 kg (lento)"; return out; }
+  var incW=(rpe<=6)?5:2.5;
+  out.sugPeso=wT(incW);
+  if(range){
+    out.sugReps=range.reset+"-"+range.ceil;   // conserva el tope para las próximas semanas
+    out.motivo=rpeTxt+" + "+range.ceil+" reps cumplidas: +"+incW+" kg y reinicia a "+range.reset+"-"+range.ceil+" reps";
   } else {
-    // reps no numéricas (tiempo/rango) o esquema de fuerza (<8 reps): progresa con peso
-    var incW2=(rpe<=6)?5:2.5;
-    out.sugPeso=wT(incW2); out.motivo="RPE "+rpe+" (fácil): +"+incW2+" kg";
+    out.motivo=rpeTxt+" (fácil): +"+incW+" kg";
   }
   return out;
 }
@@ -13375,7 +13429,7 @@ function _progFindPrescription(r, nombre, diaIdx){
 var _progReview=null;
 function _progOpenReview(c, r, sugerencias){
   _progReview={ clientId:c.id, routineId:r.id, items:sugerencias };
-  var body='<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Objetivos sugeridos para la próxima semana (doble progresión según el RPE logrado). Ajusta el <strong>peso</strong>, las <strong>reps</strong> y las <strong>series</strong>, o desmarca los que no quieras. Solo se escribirán en <strong>'+escapeHtml(r.name||"la rutina")+'</strong> los campos que cambies, respetando el día.</p>'
+  var body='<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">Objetivos sugeridos para la próxima semana (doble progresión según el <strong>RPE promedio de todas las series</strong>; la carga sube solo si se cumplió el tope de reps). Ajusta el <strong>peso</strong>, las <strong>reps</strong> y las <strong>series</strong>, o desmarca los que no quieras. Solo se escribirán en <strong>'+escapeHtml(r.name||"la rutina")+'</strong> los campos que cambies, respetando el día.</p>'
     + '<div style="max-height:52vh;overflow-y:auto;padding-right:.3rem;">';
   var _tag='font-size:.6rem;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;font-weight:700;display:block;margin-bottom:.12rem;';
   function _flecha(a,b){ if(a==null||b==null||isNaN(a)||isNaN(b)||a===b) return '<span class="text-muted" style="font-weight:700;">=</span>'; return a>b?'<span style="color:var(--success);font-weight:700;">▲</span>':'<span style="color:var(--danger);font-weight:700;">▼</span>'; }
@@ -13384,7 +13438,7 @@ function _progOpenReview(c, r, sugerencias){
     var fW=_flecha(parseFloat(s.sugPeso), baseW);
     var fR=_flecha(_prgToInt(s.sugReps), _prgToInt(s.curReps));
     var logro=[]; if(s.repsLog!=null) logro.push(s.repsLog+" rep"); if(s.logrado!=null) logro.push(s.logrado+"kg");
-    var logroTxt=(logro.length?"logró "+logro.join(" × "):"")+(s.rpe!=null?(" @RPE "+s.rpe):"");
+    var logroTxt=(logro.length?"logró "+logro.join(" × "):"")+(s.rpe!=null?(" @RPE prom "+s.rpe):"");
     body+='<div style="border-bottom:1px solid var(--border);padding:.6rem 0;">'
       +'<label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;">'
       +'<input type="checkbox" class="prg-sug" data-i="'+i+'" checked style="width:17px;height:17px;accent-color:var(--accent);">'
