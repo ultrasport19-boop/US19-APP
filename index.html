@@ -11535,6 +11535,49 @@ var INF_PROMPT = [
 "Reemplaza los null por los valores reales. Deja null SOLO lo que no puedas leer. Devuelve SOLO el JSON, sin explicaciones ni markdown."
 ].join("\n");
 
+/* Lectura inversa: convierte un INFORME ya generado por esta app (PDF de
+   "Informe de composición corporal") de vuelta a JSON, para reutilizar sus
+   evaluaciones sin volver a pasar las capturas de Fitdays una por una. */
+var INFORME_IMPORT_PROMPT = [
+"Actúa como un sistema de extracción de datos (OCR + parser estructurado) para un INFORME DE COMPOSICIÓN CORPORAL de Ultra-Sport 19 (el PDF que genera su app). Te adjuntaré el PDF completo o sus capturas. Devuélveme UN ÚNICO JSON estricto, sin texto adicional, sin markdown, sin backticks.",
+"",
+"CÓMO ES EL DOCUMENTO:",
+'- Encabezado: "ULTRA-SPORT 19", "Informe de composición corporal · Bioimpedanciometría", nombre del cliente, RUT, género, edad, estatura, y un folio con formato "INF-AAAA-NNN".',
+'- Trae DOS fechas de evaluación: una INICIAL y una ACTUAL, más el período en días.',
+'- CLAVE: las tablas tienen las columnas "Parámetro" (o "Índice / Marcador" o "Zona") | "Inicial" | "Actual" | "Δ". La columna Inicial y la columna Actual son DOS EVALUACIONES DISTINTAS: debes devolver una entrada por cada columna, no una sola.',
+'- Secciones: Resumen, Indicadores clave, Composición corporal, Índices, Circunferencias, Segmentario, Observaciones, Metas e Indicaciones del profesional.',
+'- Puede traer un gráfico o tabla de evolución con MÁS fechas (mediciones intermedias): inclúyelas también.',
+"",
+"MAPEO DE RÓTULOS VISIBLES → CLAVES JSON (usa exactamente estas claves):",
+'- "Peso Corporal"→peso_kg · "Grasa Corporal"→grasa_kg · "Grasa Corporal %"→grasa_pct · "Masa Muscular"→musculo_kg · "Masa Muscular %"→musculo_pct · "Músc. Esquelético"→masa_esqueletica_kg · "Proteína"→proteina_kg · "Agua Corporal"→agua_kg · "Agua Corporal %"→agua_pct · "Peso sin Grasa"→peso_sin_grasa_kg',
+'- "IMC"→imc · "Grasa Visceral"→grasa_visceral_grado · "Tasa Metab. Basal"/"TMB"→tmb_kcal · "Grasa Subcutánea"→grasa_subcutanea_pct · "Puntuación Corporal"→puntuacion_corporal · "Edad Corporal"→edad_corporal_anios · "SMI"→smi · "WHR"→whr · "WHtR"→whtr',
+'- Circunferencias (cm): "Cuello"→cuello · "Hombro"→hombro · "Pecho"→pecho · "Cintura"→cintura · "Cadera"→cadera · "Brazo izquierdo"→brazo_izq · "Brazo derecho"→brazo_der · "Muslo izquierdo"→muslo_izq · "Muslo derecho"→muslo_der · "Pantorrilla izq."→pantorrilla_izq · "Pantorrilla der."→pantorrilla_der',
+'- Segmentario de músculo (kg): brazo_izq, brazo_der, tronco, pierna_izq, pierna_der.',
+"",
+"REGLAS:",
+'1) IGNORA la columna "Δ" (delta): es un valor derivado, la app lo recalcula. Si la usas, corrompes los datos.',
+'2) Quita unidades: "62,4 kg"→62.4, "18,3 %"→18.3, "1.520 kcal"→1520, "grado 7"→7. Comas decimales → puntos. Miles con punto ("1.520") → 1520.',
+'3) Fechas a YYYY-MM-DD. Si la fecha viene como "06/06/2026" es DD/MM/AAAA → "2026-06-06".',
+'4) Un guion "—", "N/D" o celda vacía = null. NUNCA inventes ni interpoles valores.',
+'5) NO copies texto de Resumen/Observaciones a los campos numéricos. Esos textos los regenera la app.',
+'6) Si el documento NO es un informe de composición corporal de Ultra-Sport 19, responde: {"error":"documento_no_reconocido","detalle":"explicación corta"}',
+"",
+"DEVUÉLVEME EXACTAMENTE ESTA ESTRUCTURA:",
+'{ "fuente":"us19_informe", "folio":null,',
+'  "cliente":{ "nombre":null,"rut":null,"genero":null,"edad":null,"estatura_cm":null },',
+'  "periodo_dias":null, "indicaciones":null,',
+'  "metas":{ "peso_kg":null,"grasa_pct":null,"musculo_kg":null },',
+'  "evaluaciones":[',
+'    { "fecha":"YYYY-MM-DD", "rol":"inicial",',
+'      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"whtr":null,"puntuacion_corporal":null },',
+'      "segmentario_musculo":{ "brazo_izq":{"kg":null},"brazo_der":{"kg":null},"tronco":{"kg":null},"pierna_izq":{"kg":null},"pierna_der":{"kg":null} },',
+'      "circunferencias_cm":{ "cuello":null,"hombro":null,"pecho":null,"cintura":null,"cadera":null,"brazo_izq":null,"brazo_der":null,"muslo_izq":null,"muslo_der":null,"pantorrilla_izq":null,"pantorrilla_der":null } },',
+'    { "fecha":"YYYY-MM-DD", "rol":"actual", "bioimpedancia":{}, "segmentario_musculo":{}, "circunferencias_cm":{} }',
+'  ] }',
+"",
+'La segunda entrada ("actual") debe traer los MISMOS campos que la primera, con los valores de la columna "Actual". Añade entradas con "rol":"intermedia" por cada fecha extra que encuentres. Devuelve SOLO el JSON.'
+].join("\n");
+
 var _infClientes = null;
 var _infState = { clientId:"", nombre:"", rut:"", estatura:"", ev1raw:"", ev2raw:"", payload:null, reportHtml:"" };
 
@@ -13042,6 +13085,256 @@ function infOptsRender(){
 }
 /* ===INF_OPTS_END=== */
 
+/* ============================================================
+   INF_IMPORT — reutilizar informes YA CREADOS como fuente de datos,
+   para no volver a pasar las capturas de Fitdays una por una.
+   Tres vías, de mayor a menor fidelidad:
+     1) Historial de la app (c.informes[])      → exacto
+     2) JSON exportado (_fmt us19-report-v1)    → exacto
+     3) PDF del informe leído por IA            → valores tal como se imprimieron
+   Todas terminan en el MISMO formato que ya consume infGenerar(),
+   así que el generador, las advertencias y los deltas no cambian.
+   ============================================================ */
+
+/* Envuelve UNA evaluación en el formato estándar que valida infValidate(). */
+function infEvalToText(ev, cli){
+  cli = cli || {};
+  return JSON.stringify({
+    fuente: "us19_informe",
+    cliente: {
+      nombre: cli.nombre || null,
+      genero: cli.genero || null,
+      edad: (cli.edad != null && cli.edad !== "") ? cli.edad : null,
+      estatura_cm: (cli.estatura_cm != null && cli.estatura_cm !== "") ? cli.estatura_cm : null
+    },
+    evaluaciones: [{
+      fecha: ev.fecha,
+      bioimpedancia: ev.bioimpedancia || {},
+      segmentario_musculo: ev.segmentario_musculo || {},
+      circunferencias_cm: ev.circunferencias_cm || {}
+    }]
+  }, null, 2);
+}
+
+/* Normaliza cualquiera de los formatos de entrada a {ok, origen, meta, evals[]}. */
+function infImportFromObject(d){
+  if (!d || typeof d !== "object") return { ok:false, error:"No es un objeto JSON." };
+  if (d.error) return { ok:false, error:"La IA no reconoció el documento (" + (d.detalle || d.error) + ")." };
+
+  var out = { ok:true, origen:"", meta:{}, evals:[] };
+
+  /* A) JSON exportado por esta misma app: sin pérdida. */
+  if (d._fmt === "us19-report-v1"){
+    out.origen = "JSON exportado por la app · datos exactos";
+    out.meta = { folio:d.folio || "", cliente:d.cliente || {}, metas:d.metas || null,
+                 indicaciones:d.indicaciones || "", opts:d.opts || null, fotos:d.fotos || null };
+    var textos = [];
+    if (d.eval1) textos.push(d.eval1);
+    (d.extraEvals || []).forEach(function(t){ if (t) textos.push(t); });
+    if (d.eval2) textos.push(d.eval2);
+    textos.forEach(function(t){
+      var raw = (typeof t === "string") ? t : JSON.stringify(t);
+      var p = infParseExtraction(raw);
+      if (p.ok) out.evals.push({ fecha:p.data.evaluaciones[0].fecha, jsonText:raw, data:p.data });
+    });
+    if (!out.evals.length) return { ok:false, error:"El archivo no traía evaluaciones válidas." };
+    return out;
+  }
+
+  /* B) Informe leído por IA, o C) extracción Fitdays con varias evaluaciones. */
+  if (Array.isArray(d.evaluaciones) && d.evaluaciones.length){
+    out.origen = (d.fuente === "us19_informe")
+      ? "PDF del informe leído por IA · valores redondeados como se imprimieron"
+      : "Extracción de Fitdays";
+    out.meta = { folio:d.folio || "", cliente:d.cliente || {}, metas:d.metas || null,
+                 indicaciones:d.indicaciones || "" };
+    d.evaluaciones.forEach(function(ev){
+      if (!ev || !ev.fecha) return;
+      var txt = infEvalToText(ev, d.cliente || {});
+      var p = infParseExtraction(txt);
+      if (p.ok) out.evals.push({ fecha:ev.fecha, rol:ev.rol || "", jsonText:txt, data:p.data });
+    });
+    if (!out.evals.length) return { ok:false, error:'No encontré evaluaciones con fecha válida (YYYY-MM-DD).' };
+    return out;
+  }
+
+  return { ok:false, error:'Formato no reconocido. Esperaba un informe exportado o un JSON con "evaluaciones".' };
+}
+
+function infImportNormalize(text){
+  var clean = String(text || "").trim();
+  var fence = clean.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) clean = fence[1].trim();
+  if (!clean) return { ok:false, error:"No pegaste ningún JSON." };
+  var d;
+  try { d = JSON.parse(clean); } catch (e){ return { ok:false, error:"JSON inválido: " + e.message }; }
+  return infImportFromObject(d);
+}
+
+/* Reconstruye desde un informe guardado en el historial del cliente. */
+function infHistToNorm(p){
+  var cli = p.cliente || {}, evs = [];
+  function push(ev){
+    if (!ev || !ev.fecha) return;
+    var t = infEvalToText(ev, cli), q = infParseExtraction(t);
+    if (q.ok) evs.push({ fecha:ev.fecha, jsonText:t, data:q.data });
+  }
+  push(p.ev1);
+  (p.historial || []).forEach(push);
+  push(p.ev2);
+  if (!evs.length) return { ok:false, error:"Ese informe guardado no tiene evaluaciones legibles." };
+  return { ok:true, origen:"Historial de la app · datos exactos",
+           meta:{ folio:p.folio || "", cliente:cli, metas:p.metas || null,
+                  indicaciones:p.indicaciones || "", opts:p.opts || null, fotos:p.fotos || null },
+           evals:evs };
+}
+
+/* Aplica al formulario. modo: "completo" reproduce el informe; "base" deja la
+   última medición como INICIAL de una comparación nueva. */
+function infImportApply(norm, modo){
+  var seen = {}, evs = [];
+  norm.evals.slice().sort(function(a, b){
+    return a.fecha < b.fecha ? -1 : (a.fecha > b.fecha ? 1 : 0);
+  }).forEach(function(e){
+    if (seen[e.fecha]) return;
+    seen[e.fecha] = 1; evs.push(e);
+  });
+  if (!evs.length) return { ok:false, error:"No hay evaluaciones para cargar." };
+
+  var m = norm.meta || {}, cli = m.cliente || {}, resumen;
+
+  if (modo === "base"){
+    _infState.ev1raw = evs[evs.length - 1].jsonText;
+    _infState.ev2raw = "";
+    _infOpts.extraEvals = [];
+    _infOpts.folio = "";
+    resumen = "Cargada la medición del " + evs[evs.length - 1].fecha + " como <b>evaluación inicial</b>. "
+            + "Pega ahora la evaluación actual (Fitdays) y genera la comparativa.";
+  } else {
+    _infState.ev1raw = evs[0].jsonText;
+    _infState.ev2raw = evs.length > 1 ? evs[evs.length - 1].jsonText : "";
+    _infOpts.extraEvals = (evs.length > 2 ? evs.slice(1, evs.length - 1) : []).map(function(e){
+      return { jsonText:e.jsonText, data:e.data };
+    });
+    if (m.folio) _infOpts.folio = m.folio;
+    if (m.metas) _infOpts.metas = Object.assign({}, _infOpts.metas, m.metas);
+    if (m.indicaciones) _infOpts.indicaciones = m.indicaciones;
+    if (m.opts) _infOpts.opts = Object.assign({}, _infOpts.opts, m.opts);
+    if (m.fotos) _infOpts.fotos = m.fotos;
+    resumen = evs.length > 1
+      ? ("Cargadas <b>" + evs.length + " evaluaciones</b>: inicial " + evs[0].fecha
+         + ", actual " + evs[evs.length - 1].fecha
+         + (evs.length > 2 ? (" y " + (evs.length - 2) + " intermedia(s)") : "") + ".")
+      : ("Cargada <b>1 evaluación</b> (" + evs[0].fecha + ") como inicial. Falta la actual.");
+  }
+
+  if (cli.nombre && !_infState.nombre) _infState.nombre = cli.nombre;
+  if (cli.rut && !_infState.rut) _infState.rut = cli.rut;
+  if (cli.estatura_cm && !_infState.estatura) _infState.estatura = cli.estatura_cm;
+
+  var t1 = document.getElementById("inf-ev1"); if (t1) t1.value = _infState.ev1raw;
+  var t2 = document.getElementById("inf-ev2"); if (t2) t2.value = _infState.ev2raw;
+  var ind = document.getElementById("inf-opt-indicaciones");
+  if (ind && _infOpts.indicaciones) ind.value = _infOpts.indicaciones;
+  infOptsExtrasRender(); infOptsPaintFolio(); infOptsRefreshWarnings();
+
+  return { ok:true, resumen:resumen, n:evs.length };
+}
+
+window.infCopyImportPrompt = function(){
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(INFORME_IMPORT_PROMPT).then(
+      function(){ toast("Prompt de lectura de informes copiado ✓", "success"); },
+      function(){ toast("No se pudo copiar", "error"); });
+  } else { toast("Copia manual: revisa la consola", "warn"); console.log(INFORME_IMPORT_PROMPT); }
+};
+
+function infImportMsg(html, tipo){
+  var el = document.getElementById("inf-imp-msg"); if (!el) return;
+  var c = tipo === "err" ? "var(--danger)" : (tipo === "ok" ? "var(--success)" : "var(--muted)");
+  el.innerHTML = '<span style="color:' + c + ';">' + html + "</span>";
+}
+
+window.infImportRun = function(modo){
+  var ta = document.getElementById("inf-imp-json");
+  var norm = infImportNormalize(ta ? ta.value : "");
+  if (!norm.ok) return infImportMsg("✗ " + escapeHtml(norm.error), "err");
+  var r = infImportApply(norm, modo);
+  if (!r.ok) return infImportMsg("✗ " + escapeHtml(r.error), "err");
+  infImportMsg("✓ " + r.resumen + "<br><span class='text-xs'>Origen: " + escapeHtml(norm.origen) + "</span>", "ok");
+  toast("Informe cargado ✓", "success");
+};
+
+window.infImportFile = function(input){
+  var f = input && input.files && input.files[0];
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function(){
+    var ta = document.getElementById("inf-imp-json");
+    if (ta) ta.value = rd.result;
+    infImportMsg("Archivo <b>" + escapeHtml(f.name) + "</b> cargado. Elige cómo usarlo.", "info");
+  };
+  rd.onerror = function(){ infImportMsg("✗ No se pudo leer el archivo.", "err"); };
+  rd.readAsText(f);
+  input.value = "";
+};
+
+/* Informes guardados en la app, de todos los clientes, más recientes primero. */
+function infHistList(){
+  var rows = [];
+  (state.clients || []).forEach(function(c){
+    (c.informes || []).forEach(function(inf, ii){
+      if (!inf || !inf.payload) return;
+      rows.push({ cid:c.id, ii:ii, cliente:c.name || "—", fecha:inf.fecha || "",
+                  folio:inf.payload.folio || "" });
+    });
+  });
+  rows.sort(function(a, b){ return a.fecha < b.fecha ? 1 : (a.fecha > b.fecha ? -1 : 0); });
+  return rows;
+}
+
+var _infHistRows = null; /* lista congelada mientras el modal está abierto */
+
+window.infHistPick = function(){
+  var rows = infHistList();
+  if (!rows.length){
+    return toast("Aún no hay informes guardados en el historial", "warn");
+  }
+  _infHistRows = rows;
+  var opts = rows.map(function(r, i){
+    return '<option value="' + i + '">' + escapeHtml(r.cliente) + " · " + escapeHtml(r.fecha || "sin fecha")
+         + (r.folio ? (" · " + escapeHtml(r.folio)) : "") + "</option>";
+  }).join("");
+  var body = '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.7rem;">'
+    + "Estos informes ya están guardados en la app: se cargan <b>exactos</b>, sin IA y sin volver a pegar capturas."
+    + '</p><div class="form-row"><label class="form-label">Informe guardado</label>'
+    + '<select id="inf-hist-sel">' + opts + "</select></div>"
+    + '<div id="inf-hist-msg" class="text-xs" style="min-height:1.1em;"></div>';
+  openModal({ title:"🗂 Cargar desde el historial", large:false, bodyHtml:body, footer:[
+    { label:"Cancelar", cls:"btn-ghost" },
+    { label:"Usar como base →", cls:"btn-secondary", onClick:function(){ infHistUse("base"); } },
+    { label:"Cargar completo", cls:"btn-primary", onClick:function(){ infHistUse("completo"); } }
+  ]});
+};
+
+function infHistUse(modo){
+  var sel = document.getElementById("inf-hist-sel"); if (!sel) return;
+  var rows = _infHistRows || infHistList(), r = rows[parseInt(sel.value, 10)];
+  if (!r) return toast("No pude identificar el informe elegido", "error");
+  var c = null, i;
+  for (i = 0; i < state.clients.length; i++) if (state.clients[i].id === r.cid) { c = state.clients[i]; break; }
+  var inf = c && c.informes && c.informes[r.ii];
+  if (!inf || !inf.payload) return toast("No pude leer ese informe", "error");
+  var norm = infHistToNorm(inf.payload);
+  if (!norm.ok) return toast(norm.error, "error");
+  var res = infImportApply(norm, modo);
+  if (!res.ok) return toast(res.error, "error");
+  _infHistRows = null;
+  closeModal();
+  infImportMsg("✓ " + res.resumen + "<br><span class='text-xs'>Origen: " + escapeHtml(norm.origen) + "</span>", "ok");
+  toast("Informe cargado desde el historial ✓", "success");
+}
+
 function renderInformes(){
   var html = '<div class="section-head"><h1 class="section-title">INFORMES <span class="accent">/ BIOIMPEDANCIA</span></h1></div>';
   html += '<div class="card"><div class="card-main"><div class="card-title">1 · Cliente</div>'
@@ -13051,6 +13344,23 @@ function renderInformes(){
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">2 · Extraer datos de Fitdays</div>'
     + '<p class="text-xs text-muted" style="line-height:1.5;">Sube tus capturas de Fitdays a una IA (Claude/ChatGPT) con este prompt y pega el JSON que devuelve. Una evaluación por captura.</p>'
     + '<button class="btn btn-secondary btn-sm" onclick="infCopyPrompt()">📋 Copiar prompt de extracción</button></div></div>';
+  html += '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">2b · Reutilizar un informe ya creado</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;">Para no volver a pasar las capturas de Fitdays una por una. <b>Cargar completo</b> reproduce el informe tal cual; <b>Usar como base</b> toma su última medición como <i>evaluación inicial</i> de una comparativa nueva.</p>'
+    + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin:.5rem 0;">'
+    +   '<button class="btn btn-primary btn-sm" onclick="infHistPick()">🗂 Desde el historial</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'inf-imp-file\').click()">📁 Subir JSON exportado</button>'
+    +   '<input type="file" id="inf-imp-file" accept=".json,application/json" style="display:none;" onchange="infImportFile(this)">'
+    +   '<button class="btn btn-secondary btn-sm" onclick="infCopyImportPrompt()">📋 Prompt para leer el PDF</button>'
+    + '</div>'
+    + '<div class="form-row"><label class="form-label">JSON del informe (exportado, o el que devuelve la IA al leer el PDF)</label>'
+    +   '<textarea id="inf-imp-json" style="min-height:80px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;_fmt&quot;:&quot;us19-report-v1&quot;, … }  ó  { &quot;fuente&quot;:&quot;us19_informe&quot;, &quot;evaluaciones&quot;:[ … ] }"></textarea></div>'
+    + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
+    +   '<button class="btn btn-primary btn-sm" onclick="infImportRun(\'completo\')">Cargar completo</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="infImportRun(\'base\')">Usar como base →</button>'
+    + '</div>'
+    + '<div id="inf-imp-msg" class="text-xs" style="min-height:1.1em;margin-top:.4rem;"></div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;margin-top:.4rem;">El historial y el JSON exportado son <b>exactos</b>. Leer el PDF con IA recupera los valores <b>como se imprimieron</b> (redondeados a 1 decimal): úsalo solo si ya no tienes el JSON ni el informe guardado.</p>'
+    + '</div></div>';
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3 · Evaluaciones (pega el JSON)</div>'
     + '<div class="form-row"><label class="form-label">Evaluación inicial</label><textarea id="inf-ev1" style="min-height:80px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;evaluaciones&quot;:[ … ] }">'+escapeHtml(_infState.ev1raw||"")+'</textarea></div>'
     + '<div class="form-row"><label class="form-label">Evaluación actual</label><textarea id="inf-ev2" style="min-height:80px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;evaluaciones&quot;:[ … ] }">'+escapeHtml(_infState.ev2raw||"")+'</textarea></div>'
