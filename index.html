@@ -40,10 +40,70 @@
   --font-display:'Bebas Neue', sans-serif;
   --font-body:'Manrope', system-ui, -apple-system, sans-serif;
   --font-mono:'JetBrains Mono', ui-monospace, monospace;
+  /* Ancho del "shell": header, pestañas y contenido comparten estos valores,
+     así nunca se desalinean entre sí. Antes estaban fijos en 1400px y dejaban
+     520px muertos en una pantalla de 1920. */
+  --shell-max:1920px;
+  --shell-pad:1.25rem;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{background:var(--bg);color:var(--text);font-family:var(--font-body);line-height:1.5;-webkit-font-smoothing:antialiased;}
-body{min-height:100vh;min-height:100svh;}
+body{min-height:100vh;min-height:100svh;overscroll-behavior-y:none;}
+
+/* ---------- Acabado visual y accesibilidad ---------- */
+
+/* El manifiesto declara viewport-fit=cover, así que en iPhone hay que respetar
+   el notch y la barra inferior o el contenido se mete debajo. */
+@supports (padding:max(0px,env(safe-area-inset-left))){
+  .app-header,.tab-bar,.main{
+    padding-left:max(var(--shell-pad),env(safe-area-inset-left));
+    padding-right:max(var(--shell-pad),env(safe-area-inset-right));
+  }
+  /* La barra de acciones pegada abajo quedaría bajo la barra de gestos del iPhone. */
+  .client-action-bar{padding-bottom:max(.85rem,env(safe-area-inset-bottom));}
+}
+
+/* Foco visible para teclado, sin el halo permanente del click. */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius-sm);}
+button:focus:not(:focus-visible),a:focus:not(:focus-visible){outline:none;}
+
+/* Cifras alineadas en columna: imprescindible en una app con tanta tabla de
+   dinero y horas. Sin esto los números "bailan" al cambiar de fila. */
+table td,table th,.stat-value,.num,.money,input[inputmode="numeric"],input[type="number"]{font-variant-numeric:tabular-nums;}
+
+/* Cabecera de tabla fija al hacer scroll en tablas largas (Horas, detalle).
+   Se ancla justo bajo el bloque header+pestañas, cuyo alto publica el JS en
+   --app-top-h; si no está disponible, cae a 0 y sigue funcionando. */
+table thead th{position:sticky;top:var(--app-top-h,0px);background:var(--surface-2);z-index:1;}
+.modal table thead th{top:0;} /* dentro de un modal no hay header que esquivar */
+
+/* Barras de scroll discretas y coherentes con el tema oscuro. */
+*{scrollbar-width:thin;scrollbar-color:var(--surface-3) transparent;}
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:99px;border:2px solid var(--bg);}
+::-webkit-scrollbar-thumb:hover{background:var(--border);}
+::selection{background:rgba(168,209,57,.3);color:var(--text);}
+
+/* Cualquier contenido ancho (tablas) hace scroll dentro de su caja, nunca
+   empujando la página entera. */
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;}
+}
+
+/* Dedos, no ratón: los botones pequeños quedaban en 28px y son difíciles de
+   acertar. 40px es el mínimo cómodo. */
+@media (pointer:coarse){
+  .btn,.icon-btn,.tab-btn{min-height:44px;}
+  .btn-sm{min-height:40px;padding-left:.8rem;padding-right:.8rem;}
+  select,input,textarea{min-height:44px;}
+}
+
+/* Pantallas grandes: más aire lateral para que no quede pegado al borde. */
+@media (min-width:1600px){ :root{ --shell-pad:2rem; } }
+@media (min-width:2200px){ :root{ --shell-pad:3rem; } }
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
 input,select,textarea{font-family:inherit;color:inherit;background:var(--surface-3);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.55rem .7rem;font-size:.9rem;outline:none;width:100%;transition:border-color .15s;}
 input:focus,select:focus,textarea:focus{border-color:var(--accent);}
@@ -56,8 +116,12 @@ img{max-width:100%;display:block;}
 ::-webkit-scrollbar-thumb:hover{background:var(--border);}
 
 /* ============ HEADER ============ */
-.app-header{background:linear-gradient(180deg,var(--surface-2),var(--surface-1));border-bottom:1px solid var(--border);padding:1rem 1.25rem;position:sticky;top:0;z-index:50;}
-.header-inner{display:flex;align-items:center;gap:1rem;max-width:1400px;margin:0 auto;}
+/* Header + pestañas viajan como UN solo bloque sticky: así no hay offsets
+   fijos que se desalineen cuando el header cambia de alto (antes el nav se
+   anclaba a 97px mientras el header medía 185px en móvil y se solapaban). */
+.app-top{position:sticky;top:0;z-index:50;}
+.app-header{background:linear-gradient(180deg,var(--surface-2),var(--surface-1));border-bottom:1px solid var(--border);padding:1rem var(--shell-pad);}
+.header-inner{display:flex;align-items:center;gap:1rem;max-width:var(--shell-max);margin:0 auto;}
 .logo{width:64px;height:64px;flex:0 0 64px;border-radius:var(--radius);background:var(--surface-3);padding:4px;}
 .logo img{width:100%;height:100%;object-fit:contain;border-radius:6px;}
 .brand{flex:1;min-width:0;}
@@ -69,14 +133,15 @@ img{max-width:100%;display:block;}
 .icon-btn:hover{background:var(--surface-2);border-color:var(--accent);}
 
 /* ============ TABS ============ */
-.tab-bar{background:var(--surface-1);border-bottom:1px solid var(--border);padding:0 1.25rem;position:sticky;top:97px;z-index:40;overflow-x:auto;-webkit-overflow-scrolling:touch;}
-.tab-bar-inner{display:flex;gap:.25rem;max-width:1400px;margin:0 auto;}
+.tab-bar{background:var(--surface-1);border-bottom:1px solid var(--border);padding:0 var(--shell-pad);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{height:0;}
+.tab-bar-inner{display:flex;gap:.25rem;max-width:var(--shell-max);margin:0 auto;}
 .tab-btn{padding:.85rem 1.1rem;color:var(--muted);font-weight:600;font-size:.85rem;letter-spacing:.05em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-color:var(--accent);}
 
 /* ============ MAIN ============ */
-.main{max-width:1400px;margin:0 auto;padding:1.5rem 1.25rem 4rem;}
+.main{max-width:var(--shell-max);margin:0 auto;padding:1.5rem var(--shell-pad) calc(4rem + env(safe-area-inset-bottom));}
 .view{display:none;}
 .view.active{display:block;}
 .section-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap;}
@@ -289,17 +354,25 @@ img{max-width:100%;display:block;}
 
 /* ============ RESPONSIVE ============ */
 @media (max-width:680px){
-  .brand-title{font-size:1.6rem;}
-  .brand-tag{font-size:.6rem;}
-  .logo{width:52px;height:52px;flex:0 0 52px;}
+  .brand-title{font-size:1.3rem;}
+  .brand-tag{font-size:.58rem;}
+  .logo{width:44px;height:44px;flex:0 0 44px;}
   .icon-btn{width:38px;height:38px;font-size:1rem;}
-  .tab-bar{top:84px;}
+  /* El buscador y el badge se comían la fila y dejaban a .brand en 0px de ancho:
+     el título se apilaba letra por letra en vertical y el header llegaba a 185px.
+     En dos filas el texto respira y el bloque baja a ~120px. */
+  .header-inner{flex-wrap:wrap;row-gap:.55rem;gap:.7rem;}
+  .brand{flex:1 1 0;min-width:0;overflow:hidden;}
+  .brand-title,.brand-tag{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .header-actions{flex:1 1 100%;order:3;}
+  .gsearch-wrap{flex:1 1 auto;}
+  .gsearch-input{width:100%;}
   .tab-btn{padding:.7rem .75rem;font-size:.78rem;}
   .stat-value{font-size:2rem;}
   .exercise-row .ex-fields{grid-template-columns:repeat(2,1fr);}
   .form-grid.cols-2{grid-template-columns:1fr;}
   .share-grid{grid-template-columns:1fr;}
-  .main{padding:1rem 1rem 4rem;}
+  :root{ --shell-pad:1rem; }
   .modal{max-height:95vh;}
   .client-hero{flex-direction:column;text-align:center;}
 }
@@ -327,6 +400,7 @@ img{max-width:100%;display:block;}
 .ex-gif-block .gif-placeholder{padding:2rem;color:var(--muted);font-size:2.5rem;text-align:center;}
 .badge.terap{background:rgba(226,28,37,.16);color:#ff8a8f;border:1px solid rgba(226,28,37,.45);}
 .badge.contr{background:rgba(58,134,255,.16);color:#7db2ff;border:1px solid rgba(58,134,255,.45);}
+.badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
 .ex-gif-expand{position:absolute;bottom:.4rem;right:.4rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:.2rem .45rem;font-size:.7rem;cursor:pointer;}
 
 .ex-tips{padding:.75rem 1.1rem;border-bottom:1px solid var(--border);background:rgba(168,209,57,.04);}
@@ -504,6 +578,7 @@ img{max-width:100%;display:block;}
 
 <div id="preview-banner" class="preview-banner hidden"></div>
 
+<div class="app-top" id="app-top">
 <header class="app-header" id="trainer-header">
   <div class="header-inner">
     <div class="logo"><img id="header-logo" alt="Ultra-Sport 19"></div>
@@ -531,6 +606,7 @@ img{max-width:100%;display:block;}
     <button class="tab-btn" data-tab="informes">Informes</button>
   </div>
 </nav>
+</div>
 
 <main class="main" id="main">
   <section class="view active" id="view-dashboard"></section>
@@ -2859,7 +2935,7 @@ function getCategoryBadge(catId){var c=getCategoryById(catId);if(!c)return'';ret
 
 var SEED_DATA = {"clients":[{"name":"Amanda Isidora","phone":"","email":"","goal":"Tendinopatia de la pata de ganso","notes":"","id":"8pbllen1","createdAt":1778888616182},{"name":"Marcia Nuñez","phone":"+56 9 4949 0001","email":"","goal":"Bajar de peso","notes":"","id":"f4vxwf2y","createdAt":1779101504557},{"name":"Daniela Vasquez","phone":"+56 9 6451 8099","email":"","goal":"Bajar de peso - Ganar confianza - Trotar 15 minutos","notes":"Objetivo: bajar a 70 kg, ganar confianza postop y llegar a 15 min de trote continuo. Aeróbico al inicio para activar y progresar cardio. RIR 3, sin dolor durante la ejecución. Detener ante cualquier signo de alarma (dolor punzante, mareo, fatiga inusual). Sumar 7.000-8.000 pasos diarios fuera de la sesión. Proteína 1.6 g/kg/día. Reevaluar cada 2 semanas.","id":"un55p8ps","createdAt":1779102425967},{"name":"Paula Urrutia","phone":"+56 9 7790 3239","email":"","goal":"Hipertrofia Gluteos","notes":"Notas: Lunes/Miércoles/Viernes en el gimnasio con foco glúteo (3 frecuencias/semana). Martes/Jueves/Sábado en casa con trabajo simple de brazos (mancuernas livianas, botellas o peso corporal). RIR 1-2 en gym, RIR 2-3 en casa. Doble progresión. Excéntrica 2-3s. Proteína 1.8-2.2 g/kg/día. Descarga en semana 5 (-1 serie, RIR 3). Domingo descanso activo (caminata 30-45 min).","id":"1yv9duxs","createdAt":1779103207425},{"name":"Sergio Castillo","phone":"+56 9 7189 6990","email":"","goal":"","notes":"","id":"as4tktv5","createdAt":1779558207147},{"name":"Javier Caceres","phone":"+56 9 9121 0262","email":"","goal":"","notes":"","id":"r7qcurhs","createdAt":1780153235483},{"name":"Javiera Celis","phone":"+56 9 4974 9300","email":"","goal":"","notes":"","id":"aslnpeh2","createdAt":1780153341399}],"routines":[{"id":"fpg4nfkj","name":"Full Body 4 días (Fuerza + Hipertrofia)","clientId":"","weeks":6,"startDate":"","notes":"Basado en evidencia de fuerza/hipertrofia: prioriza multiarticulares, 10–20 series/semana por grupo muscular (aprox), 1–3 RIR (cerca del fallo sin llegar), progresión semanal (sube 1–2 reps o +2,5–5% carga si completas el rango). Descansos 2–3min en compuestos y 60–90s en accesorios. Alterna 2 patrones de sentadilla/hinge/upper push/pull para repartir fatiga. Calentamiento 5–8 min Bicicleta estática + 1–2 series de aproximación por ejercicio grande.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"4-6","weight":"","rest":"3min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"5-8","weight":"","rest":"3min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"10-15","weight":"","rest":"90s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"30-60","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"wk6hv8q7","sets":"4","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"4vq5o72k","sets":"3","reps":"5-8","weight":"","rest":"3min","notes":""},{"exerciseId":"lwb6140n","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"8-12","weight":"","rest":"90s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"30-60","weight":"","rest":"60s","notes":""}]},{"day":3,"exercises":[]},{"day":4,"exercises":[{"exerciseId":"93669dei","sets":"4","reps":"8-12","weight":"","rest":"3min","notes":""},{"exerciseId":"j47nas4p","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"fkevh8gb","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"3zrynnlg","sets":"3","reps":"10-15","weight":"","rest":"90s","notes":""},{"exerciseId":"m9rv2jkb","sets":"3","reps":"30-45","weight":"","rest":"45s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"3-5","weight":"","rest":"3min","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"AMRAP","weight":"","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"3","reps":"AMRAP","weight":"","rest":"3min","notes":""},{"exerciseId":"wgn1b96d","sets":"3","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"n0tvqg49","sets":"3","reps":"12-20","weight":"","rest":"60s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778888132491,"updatedAt":1778888135538,"category":"cuerpo_completo"},{"id":"s75ckkbn","name":"Fase 1","clientId":"8pbllen1","weeks":2,"startDate":"","notes":"Tareas para la casa los días sábado y domingo. Evitar actividades que compriman o estiren el tendón.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"3zrynnlg","sets":"3","reps":"60s","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90s","weight":"","rest":"60s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"15","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"3zrynnlg","sets":"4","reps":"12","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"60s","weight":"","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"30","weight":"","rest":"30s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"3zrynnlg","sets":"3","reps":"12","weight":"","rest":"45s","notes":""},{"exerciseId":"5bu9lyvc","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"12","weight":"","rest":"60s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"","rest":"","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"12","weight":"","rest":"60s","notes":""}]},{"day":7,"exercises":[{"exerciseId":"cjv20vqf","sets":"1","reps":"20min","weight":"","rest":"","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""}]}],"createdAt":1778888563516,"updatedAt":1779557103600,"category":"rehabilitacion"},{"id":"dkvimj4m","name":"Full Body 4D (Fuerza + Hipertrofia)","clientId":"as4tktv5","weeks":6,"startDate":"","notes":"Full body 4 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: cuando completes todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"10","weight":"80 ","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"53.2","rest":"2min","notes":""},{"exerciseId":"9j6py7e7","sets":"3","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"51,6","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"3","reps":"15","weight":"8 kg ","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45","weight":"Corporal ","rest":"45s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"10","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"30 kg","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"8","weight":"15","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"10","rest":"90s","notes":""}]},{"day":3,"exercises":[]},{"day":4,"exercises":[{"exerciseId":"skwox951","sets":"4","reps":"10","weight":"10 ","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"20 ","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"nhvza9n8","sets":"3","reps":"15","weight":"15","rest":"60s","notes":""},{"exerciseId":"n0tvqg49","sets":"3","reps":"60 s","weight":"","rest":"60s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"50 kg ","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"8","weight":"53.2 ","rest":"2min","notes":""},{"exerciseId":"fkevh8gb","sets":"4","reps":"10","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"3hu5a1nd","sets":"4","reps":"12","weight":"","rest":"90s","notes":""},{"exerciseId":"yj5uc0jk","sets":"4","reps":"12","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"pjdpwp7g","sets":"4","reps":"12","weight":"20 ","rest":"90s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778889140988,"updatedAt":1781271239976,"category":"cuerpo_completo"},{"id":"tf80sgk1","name":"Full Body 3D (Fuerza + Hipertrofia)","clientId":"aslnpeh2","weeks":6,"startDate":"","notes":"Full body 3 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: si completas todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"6","weight":"40","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"10","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"10","rest":"2min","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"30","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"4","reps":"15","weight":"2.5","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"30","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"10","rest":"120","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"15","weight":"18","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"20","rest":"120","notes":""},{"exerciseId":"3hu5a1nd","sets":"2","reps":"15","weight":"6","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"2","reps":"15","weight":"2.5","rest":"90s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"orcsx8fh","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"5","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"08pukekq","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"40","rest":"2min","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778889282641,"updatedAt":1780153520145,"category":"cuerpo_completo"},{"id":"rhwin7so","name":"Rutina: MP (6AM)","clientId":"f4vxwf2y","weeks":4,"startDate":"","notes":"Enfoque en técnica y adherencia. RIR 3. Subir carga cuando complete el tope de reps con técnica intacta. Pasar a rutina intermedia tras 4 semanas.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"20","weight":"","rest":"0","notes":""},{"exerciseId":"grgwwddk","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"12-15","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"20","weight":"","rest":"20s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"cjv20vqf","sets":"1","reps":"12","weight":"","rest":"0","notes":""},{"exerciseId":"td9k3mnw","sets":"2","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"6anuy8t2","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"4by853es","sets":"4","reps":"12-15","weight":"","rest":"45s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"20","weight":"","rest":"0","notes":""},{"exerciseId":"6anuy8t2","sets":"3","reps":"10-12","weight":"","rest":"75s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"8-10","weight":"","rest":"60s","notes":""},{"exerciseId":"fkevh8gb","sets":"3","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"3","reps":"12","weight":"","rest":"75s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"10-12","weight":"","rest":"45s","notes":""},{"exerciseId":"0aezgpey","sets":"3","reps":"12","weight":"","rest":"45s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1779101520515,"updatedAt":1779101866170,"category":"mixta"},{"id":"juz7d66m","name":"Rutina: Daniela.V","clientId":"un55p8ps","weeks":4,"startDate":"","notes":"Objetivo: bajar a 70 kg, ganar confianza postop y llegar a 15 min de trote continuo. Aeróbico de 25 min al inicio (bicicleta o caminadora). RIR 3, sin dolor durante la ejecución. Detener ante cualquier signo de alarma (dolor punzante, mareo, fatiga inusual). Sumar 7.000-8.000 pasos diarios fuera de la sesión. Proteína 1.6 g/kg/día. Reevaluar cada 2 semanas.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"25","weight":"V: 6.3","rest":"","notes":""},{"exerciseId":"nhzm75zl","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"60 s","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"6anuy8t2","sets":"3","reps":"15","weight":"","rest":"90s","notes":""},{"exerciseId":"fkevh8gb","sets":"4","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"60 s","weight":"Peso corporal ","rest":"45s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"V: 6.5 km/h","rest":"0","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"60s","weight":"Peso corporal ","rest":"45s","notes":""},{"exerciseId":"hsqs24tn","sets":"3","reps":"60 s","weight":"","rest":"45s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"6.7 km/h","rest":"1min","notes":""},{"exerciseId":"hxuhtdyy","sets":"3","reps":"10 ","weight":"5 kg (Mancuernas)","rest":"30s","notes":""},{"exerciseId":"skwox951","sets":"3","reps":"8","weight":"","rest":"75s","notes":""},{"exerciseId":"fmh626bt","sets":"3","reps":"15","weight":"Peso corporal","rest":"60s","notes":""},{"exerciseId":"lwb6140n","sets":"3","reps":"10","weight":"40 libras","rest":"60s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"60 s","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"b006joyr","sets":"3","reps":"60 s","weight":"Peso corporal","rest":"45s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1779102431106,"updatedAt":1780914275560,"category":"rehabilitacion"},{"id":"b4pwfs8x","name":"Hipertrofia glúteos + brazos en casa - 3 días gym","clientId":"1yv9duxs","weeks":6,"startDate":"","notes":"Lunes/Miércoles/Viernes en el gimnasio con foco glúteo (3 frecuencias/semana). Martes/Jueves/Sábado en casa con trabajo simple de brazos (mancuernas livianas, botellas o peso corporal). RIR 1-2 en gym, RIR 2-3 en casa. Doble progresión. Excéntrica 2-3s. Proteína 1.8-2.2 g/kg/día. Descarga en semana 5 (-1 serie, RIR 3). Domingo descanso activo (caminata 30-45 min).","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"wgn1b96d","sets":"4","reps":"8","weight":"55 ","rest":"150s","notes":""},{"exerciseId":"skwox951","sets":"4","reps":"12","weight":"10 kg","rest":"90s","notes":""},{"exerciseId":"6anuy8t2","sets":"4","reps":"12","weight":"20 kg","rest":"90s","notes":""},{"exerciseId":"u2yh462j","sets":"3","reps":"60s","weight":"Step","rest":"60s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"25 ","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"45s","weight":"Peso corporal ","rest":"30s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"arrer2i4","sets":"3","reps":"25","weight":"Peso corporal ","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"20","weight":"8","rest":"60s","notes":""},{"exerciseId":"yj5uc0jk","sets":"3","reps":"15","weight":"8","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"10","weight":"8 kg","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"90 s ","weight":"Peso corporal ","rest":"30s","notes":""}]},{"day":3,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"12 ","weight":"38 kg aprox","rest":"150s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"56.4","rest":"120s","notes":""},{"exerciseId":"62fy9y5f","sets":"3","reps":"12","weight":"10 kg ","rest":"90s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90 s","weight":"Peso corporal ","rest":"30s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"60 s","weight":"Step ","rest":"30s","notes":""}]},{"day":4,"exercises":[{"exerciseId":"z7ibmpe8","sets":"3","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"8-10","weight":"","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"yj5uc0jk","sets":"3","reps":"12","weight":"","rest":"45s","notes":""},{"exerciseId":"b006joyr","sets":"3","reps":"10","weight":"","rest":"45s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"6anuy8t2","sets":"4","reps":"12","weight":"20 ","rest":"120s","notes":""},{"exerciseId":"b55fv8zg","sets":"4","reps":"20","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"skwox951","sets":"3","reps":"12","weight":"10 ","rest":"90s","notes":""},{"exerciseId":"fmh626bt","sets":"3","reps":"20","weight":"Peso corporal ","rest":"60s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"60 s ","weight":"Peso corporal ","rest":"45s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"yj5uc0jk","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"60","weight":"","rest":"30s","notes":""}]},{"day":7,"exercises":[]}],"createdAt":1779103393448,"updatedAt":1780913706002,"category":"mixta"},{"id":"edylfxnq","name":"Fase 2 - Recuperación de fuerza y control motor","clientId":"8pbllen1","weeks":3,"startDate":"2026-05-25","notes":"Tendinopatía semimembranoso distal. Énfasis excéntrico y control motor. Progresar carga si no hay dolor durante ni después del ejercicio.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"ut20qveb","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"13.2 aprox","rest":"90s","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"15","weight":"","rest":"90s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90s","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"15","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"ztvorhsp","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"5bu9lyvc","sets":"4","reps":"12","weight":"13.2","rest":"90s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"20","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"fmh626bt","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"10 kg","rest":"90s","notes":""},{"exerciseId":"skwox951","sets":"4","reps":"12","weight":"S/n peso ","rest":"60s","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"20","weight":"Banda elastica","rest":"60s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"r9h8tscr","sets":"","reps":"25 min ","weight":"","rest":"","notes":""}]},{"day":7,"exercises":[{"exerciseId":"rmaa1t01","sets":"1","reps":"25 min","weight":"","rest":"25min","notes":""}]}],"createdAt":1779557598833,"updatedAt":1779558052661,"category":"rehabilitacion"},{"id":"lo1g3slk","name":"Full Body 3D (Fuerza + Hipertrofia)","clientId":"r7qcurhs","weeks":6,"startDate":"","notes":"Full body 3 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: si completas todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"6","weight":"60","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"30","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"33.2","rest":"2min","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"40","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"4","reps":"15","weight":"11","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"32","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"20","rest":"120","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"15","weight":"27.2","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"10","rest":"120","notes":""},{"exerciseId":"3hu5a1nd","sets":"2","reps":"15","weight":"10","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"2","reps":"15","weight":"6","rest":"90s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"orcsx8fh","sets":"4","reps":"10","weight":"15","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"6","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"40","rest":"2min","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1780153564651,"updatedAt":1781173977508,"category":"cuerpo_completo"}],"exercises":[{"id":"apmakjrm","name":"Press de banca con barra","muscle":"Pecho","equipment":"Barra","desc":"Acostado en banco plano, baja la barra al pecho controlado y empuja hacia arriba.","gif":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2IeeZS4HvXUvKMQ7ll9rMHT2ZwljqFEaP3w&s"},{"id":"j47nas4p","name":"Press inclinado con mancuernas","muscle":"Pecho","equipment":"Mancuernas","desc":"Banco a 30-45°. Empuja desde los hombros sin chocar las mancuernas arriba.","gif":"https://fitcron.com/wp-content/uploads/2021/03/03241301-Dumbbell-Incline-Palm-in-Press_Chest_720.gif"},{"id":"kvl7qkct","name":"Aperturas con mancuernas","muscle":"Pecho","equipment":"Mancuernas","desc":"Brazos ligeramente flexionados, abre y cierra describiendo un arco.","gif":"https://fitcron.com/wp-content/uploads/2021/03/03081301-Dumbbell-Fly_Chest-FIX_720.gif"},{"id":"arrer2i4","name":"Flexiones de pecho","muscle":"Pecho","equipment":"Peso corporal","desc":"Cuerpo alineado, codos a 45°, baja hasta casi tocar el suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06621301-Push-up-m_Chest-FIX_720.gif"},{"id":"9j6py7e7","name":"Dominadas pronas","muscle":"Espalda","equipment":"Peso corporal","desc":"Agarre prono, sube llevando el pecho a la barra y baja controlado.","gif":"https://wefit.es/library/exercises/pull-ups-dominada.gif"},{"id":"abrquzoz","name":"Remo con barra","muscle":"Espalda","equipment":"Barra","desc":"Tronco inclinado 45°, lleva la barra al abdomen sin balanceos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00271301-Barbell-Bent-Over-Row_Back-FIX_720.gif"},{"id":"fkevh8gb","name":"Remo con mancuerna a una mano","muscle":"Espalda","equipment":"Mancuernas","desc":"Apoyado en banco, lleva la mancuerna al costado del torso.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02921301-Dumbbell-Bent-over-Row_back_Back_720.gif"},{"id":"lwb6140n","name":"Jalón al pecho","muscle":"Espalda","equipment":"Polea","desc":"Sentado, jala la barra al pecho contrayendo dorsales.","gif":"https://static.wixstatic.com/media/c94d75_33fa8ffcfe94421586595b5f05e83c64~mv2.gif"},{"id":"4vq5o72k","name":"Press militar con barra","muscle":"Hombro","equipment":"Barra","desc":"De pie, empuja la barra desde el pecho hasta extender brazos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/11651301-Barbell-Standing-Military-Press-without-rack_Shoulders_720.gif"},{"id":"bg58mqok","name":"Elevaciones laterales","muscle":"Hombro","equipment":"Mancuernas","desc":"Eleva las mancuernas hasta la altura de los hombros.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03341301-Dumbbell-Lateral-Raise_shoulder-AFIX_720.gif"},{"id":"6o2epqfj","name":"Pájaros (rear delts)","muscle":"Hombro","equipment":"Mancuernas","desc":"Inclinado, abre los brazos llevando los codos arriba y atrás.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03801301-Dumbbell-Rear-Lateral-Raise_Shoulders_720.gif"},{"id":"z7ibmpe8","name":"Curl con barra","muscle":"Brazo","equipment":"Barra","desc":"Codos pegados al cuerpo, sube la barra contrayendo bíceps.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00311301-Barbell-Curl_Upper-Arms_720.gif"},{"id":"3hu5a1nd","name":"Curl alterno con mancuernas","muscle":"Brazo","equipment":"Mancuernas","desc":"Alterna brazos, gira la muñeca al subir.","gif":"https://eresfitness.com/wp-content/uploads/2019/05/Curl-de-biceps.gif"},{"id":"yj5uc0jk","name":"Curl martillo","muscle":"Brazo","equipment":"Mancuernas","desc":"Agarre neutro, sube manteniendo las palmas enfrentadas.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02981301-Dumbbell-Cross-Body-Hammer-Curl_Forearms_720.gif"},{"id":"sxzjwrbp","name":"Press francés","muscle":"Brazo","equipment":"Barra","desc":"Acostado, baja la barra detrás de la cabeza flexionando codos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03521301-Dumbbell-Neutral-Grip-Bench-Press_Upper-Arms_720.gif"},{"id":"pjdpwp7g","name":"Extensión de tríceps en polea","muscle":"Brazo","equipment":"Polea","desc":"Codos pegados, extiende los antebrazos hacia abajo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02411301-Cable-Triceps-Pushdown-V-bar-attachment_Upper-Arms_720.gif"},{"id":"t8md0zrf","name":"Fondos en paralelas","muscle":"Brazo","equipment":"Peso corporal","desc":"Cuerpo vertical, baja con codos atrás y empuja al subir.","gif":"https://fitcron.com/wp-content/uploads/2021/03/02511301-Chest-Dip_Chest_720.gif"},{"id":"5bu9lyvc","name":"Sentadilla con barra","muscle":"Pierna","equipment":"Barra","desc":"Barra en trapecios, baja hasta paralelo y sube.","gif":"https://fitcron.com/wp-content/uploads/2021/04/15141301-Barbell-Quarter-Squat_Thighs_720.gif"},{"id":"6anuy8t2","name":"Sentadilla goblet","muscle":"Pierna","equipment":"Mancuernas","desc":"Sostén la mancuerna al pecho, baja con torso erguido.","gif":"https://enfaf.com/wp-content/uploads/2026/04/sentadilla-globet.gif"},{"id":"vn9ikcin","name":"Peso muerto","muscle":"Pierna","equipment":"Barra","desc":"Espalda neutra, levanta la barra empujando el suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00851301-Barbell-Romanian-Deadlift_Hips_720.gif"},{"id":"wk6hv8q7","name":"Peso muerto rumano","muscle":"Pierna","equipment":"Barra","desc":"Piernas semi-rígidas, baja la barra cerca del cuerpo.","gif":"https://i.pinimg.com/originals/d3/de/df/d3dedf6446a3d12e1774eec7b7b6c9e3.gif"},{"id":"1harazo5","name":"Zancadas con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"Da un paso largo y baja la rodilla trasera al suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03361301-Dumbbell-Lunge_Hips_720.gif"},{"id":"93669dei","name":"Prensa de piernas","muscle":"Pierna","equipment":"Máquina","desc":"Empuja la plataforma sin bloquear rodillas al final.","gif":"https://fitcron.com/wp-content/uploads/2021/04/15751301-Sled-45%C2%B0-Narrow-Stance-Leg-Press_Thighs_720.gif"},{"id":"unv9izrr","name":"Extensión de cuádriceps","muscle":"Pierna","equipment":"Máquina","desc":"Sentado, extiende rodillas contrayendo cuádriceps.","gif":"https://fitcron.com/wp-content/uploads/2021/04/05851301-Lever-Leg-Extension_Thighs_720.gif"},{"id":"3zrynnlg","name":"Curl femoral acostado","muscle":"Pierna","equipment":"Máquina","desc":"Boca abajo, lleva los talones hacia los glúteos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/05861301-Lever-Lying-Leg-Curl_Thighs_720.gif"},{"id":"wgn1b96d","name":"Hip thrust","muscle":"Glúteo","equipment":"Barra","desc":"Apoya espalda en banco, sube cadera contrayendo glúteos.","gif":"https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Hip-Thrust.gif"},{"id":"pt3896zx","name":"Patada de glúteo en polea","muscle":"Glúteo","equipment":"Polea","desc":"Lleva la pierna hacia atrás extendiendo cadera.","gif":"https://www.thingys.com.ar/gymapps/tutorial/gluteos_polea.gif"},{"id":"skwox951","name":"Sentadilla búlgara","muscle":"Glúteo","equipment":"Mancuernas","desc":"Pie trasero en banco, baja la rodilla delantera.","gif":"https://i.pinimg.com/originals/bb/a3/78/bba3784f1f2920245df7ae6934c365a9.gif"},{"id":"4by853es","name":"Elevación de talón de pie","muscle":"Pierna","equipment":"Máquina","desc":"Sube y baja en puntas de pie.","gif":"https://api.smartworkout.app/asset/image/01f86161-5bb5-4bec-bad0-13e96076fd37"},{"id":"539c9hof","name":"Plancha frontal","muscle":"Core","equipment":"Peso corporal","desc":"Mantén el cuerpo recto en apoyo de antebrazos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/04631301-Front-Plank_waist-FIX_720.gif"},{"id":"2zu9nagb","name":"Plancha lateral","muscle":"Core","equipment":"Peso corporal","desc":"Apoyo lateral en codo, cadera elevada.","gif":"https://fitcron.com/wp-content/uploads/2021/04/07151301-Side-Plank-m_Waist_720.gif"},{"id":"0aezgpey","name":"Crunch abdominal  cruzado","muscle":"Core","equipment":"Peso corporal","desc":"Acostado, levanta los hombros contrayendo el abdomen.","gif":"https://fitcron.com/wp-content/uploads/2024/05/00031301-air-bike-m_waist_FIX_720.gif"},{"id":"kxvpu5vh","name":"Crunch en polea","muscle":"Core","equipment":"Polea","desc":"De rodillas, lleva los codos hacia las rodillas.","gif":"https://fitcron.com/wp-content/uploads/2021/04/01751301-Cable-Kneeling-Crunch_Waist-FIX_720.gif"},{"id":"n0tvqg49","name":"Russian twist","muscle":"Core","equipment":"Peso corporal","desc":"Sentado, gira el torso de un lado a otro.","gif":"https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUycThvdHRnanJrY215ZG56M3l2bG9vaXVyZHJ0NXZuemxmbHQyc3l3ZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/cpKD9u3S25xYL8tcbr/giphy.gif"},{"id":"m9rv2jkb","name":"Mountain climbers","muscle":"Core","equipment":"Peso corporal","desc":"En plancha, lleva las rodillas al pecho alternando.","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/484.gif"},{"id":"nnuit1dn","name":"Ab wheel rollout","muscle":"Core","equipment":"Rueda","desc":"De rodillas, rueda hacia adelante manteniendo core firme.","gif":"https://fitcron.com/wp-content/uploads/2024/05/08571301-Wheel-Rollout_Waist-FIX_720.gif"},{"id":"rtxdv082","name":"Caminadora ��� caminata","muscle":"Cardio","equipment":"Caminadora","desc":"Caminata enérgica, mantén postura erguida.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06841301-Run-equipment_Cardio_720.gif"},{"id":"r9h8tscr","name":"Caminadora — trote","muscle":"Cardio","equipment":"Caminadora","desc":"Trote suave a moderado.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06841301-Run-equipment_Cardio_720.gif"},{"id":"cjv20vqf","name":"Bicicleta estática","muscle":"Cardio","equipment":"Máquina","desc":"Mantén cadencia constante, ajusta resistencia.","gif":"https://fitcron.com/wp-content/uploads/2021/03/22791301-Stationary-Bike-Run-version-4_Cardio_720.gif"},{"id":"ajj535t4","name":"Elíptica","muscle":"Cardio","equipment":"Máquina","desc":"Movimiento fluido, usa los brazos.","gif":""},{"id":"dygeqvil","name":"Burpees","muscle":"Cardio","equipment":"Peso corporal","desc":"Cuclilla, plancha, flexión, salto.","gif":"https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUycndhaWZoM3VqMXd6cW5sMm16ZzUwNHRiNmpqZWl5bzN4bmlvaDQ0dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l4pT6Obikzs5gxWSI/giphy.gif"},{"id":"seg69eps","name":"Saltar la cuerda","muscle":"Cardio","equipment":"Peso corporal","desc":"Saltos cortos, mueve solo las muñecas.","gif":"https://fitcron.com/wp-content/uploads/2021/03/36761301-Skip-Jump-Rope-male_Cardio_720.gif"},{"id":"grgwwddk","name":"Sentadillas al aire","muscle":"Pierna","equipment":"Peso corporal","desc":"Baja con torso erguido, talones en el suelo.","gif":"https://media.tenor.com/hhzvx7eFir4AAAAM/1.gif"},{"id":"nhzm75zl","name":"Puente de glúteos","muscle":"Glúteo","equipment":"Peso corporal","desc":"Tendido, sube cadera apretando glúteos.","gif":"https://doriangym.es/wp-content/uploads/2022/10/puente-de-gluteos-dorian-gym.gif"},{"id":"40rddltx","name":"Superman","muscle":"Espalda","equipment":"Peso corporal","desc":"Boca abajo, eleva brazos y piernas a la vez.","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/94.gif"},{"id":"fx43j725","name":"Movilidad de cadera 90/90","muscle":"Movilidad","equipment":"Peso corporal","desc":"Rotaciones de cadera sentado en posición 90/90.","gif":"https://i.redd.it/ik1jxulb417e1.gif"},{"id":"ljav0z1w","name":"Estiramiento de isquios","muscle":"Movilidad","equipment":"Peso corporal","desc":"Pierna estirada, inclina el torso hacia adelante.","gif":"https://evalufit.com/wp-content/uploads/2024/02/Romanian-Dead-Lift-Evalufit.gif"},{"id":"htaz3g2v","name":"Elevación de piernas colgado","muscle":"Core","equipment":"Peso corporal","desc":"Colgado de barra, sube las rodillas al pecho.","gif":"https://fitcron.com/wp-content/uploads/2021/04/17641301-Hanging-Leg-Hip-Raise_Waist_720.gif"},{"id":"nhvza9n8","name":"Face pull","muscle":"Hombro","equipment":"Polea","desc":"Cuerda a la cara, codos altos, abre los brazos.","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/05/Face-pull.gif"},{"id":"48uwkm0n","name":"Encogimientos (shrugs)","muscle":"Espalda","equipment":"Mancuernas","desc":"Eleva los hombros hacia las orejas y baja.","gif":"https://fitcron.com/wp-content/uploads/2021/04/04061301-Dumbbell-Shrug_Back-FIX_720.gif"},{"id":"7lhgd7fh","name":"Clamshell con banda","muscle":"","equipment":"","desc":"","gif":"https://media.post.rvohealth.io/wp-content/uploads/2015/11/Clamshell-exercise-with-a-resistance-band.gif"},{"id":"td9k3mnw","name":"Bisagra de cadera con palo (RDL técnico)","muscle":"","equipment":"","desc":"","gif":"https://www.sportlife.es/uploads/s1/14/04/49/49/bisagra-de-cadera-con-pica.jpeg"},{"id":"rv060aky","name":"Abducción de cadera de pie con banda","muscle":"","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/c94d75_df299999d6e841dbbca071c3fd576aeb~mv2.gif"},{"id":"ftrj4vta","name":"Isométrico semitendinoso 3","muscle":"","equipment":"","desc":"","gif":""},{"id":"35yv2xhc","name":"Caminata lateral con banda","muscle":"","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/c94d75_4d38b29515754575a6d1868a140a5c89~mv2.gif"},{"name":"Puente glúteo unipodal","muscle":"Glúteo","equipment":"Peso corporal","desc":"","gif":"https://static.wixstatic.com/media/c94d75_0c29504633494d29a610ccc979695020~mv2.gif","id":"fmh626bt"},{"name":"Monster walks con banda","muscle":"Pierna","equipment":"Peso corporal","desc":"","gif":"https://gymvisual.com/img/p/3/7/2/5/6/37256.gif","id":"4qhffffu"},{"name":"Step-down","muscle":"Glúteo","equipment":"Peso corporal","desc":"","gif":"https://post.healthline.com/wp-content/uploads/2019/01/Step-Downs.gif","id":"mtnjp3ta"},{"name":"Wall sit","muscle":"Pierna","equipment":"","desc":"","gif":"https://blog.ocoach.app/wp-content/uploads/2023/03/Wall-sit-gif_2.gif","id":"ob9nm3qk"},{"name":"Terminal Knee Extension (TKE) con banda","muscle":"Pierna","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/11c3fa_6afad4bc2b9c49029e1014799f9215d6~mv2.gif","id":"rsfxf5wb"},{"name":"Spanish squat","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.makeagif.com/media/8-22-2024/eGRw5v.gif","id":"41vimswj"},{"name":"Sentadilla isométrica en pared con pelota","muscle":"Pierna","equipment":"","desc":"https://i.ytimg.com/vi/TsKV-aEueyU/sddefault.jpg","gif":"","id":"ze7q9sbc"},{"name":"Copenhagen plank","muscle":"Pierna","equipment":"","desc":"","gif":"https://www.strengthlog.com/wp-content/uploads/2025/06/copenhagen-plank.gif","id":"qviagj5a"},{"name":"Elevación de talón sentado","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/bf/fa/48/bffa48da913d708f61e7a8425aa12b0b.gif","id":"zgujntmk"},{"name":"Tibialis raises","muscle":"","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-26-2023/M1f_Yb.gif","id":"wpgx854z"},{"name":"Inversión/Eversión con banda","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.makeagif.com/media/7-10-2024/WToT-Z.gif","id":"pv9jlxbs"},{"name":"Balance unipodal con bosu","muscle":"Pierna","equipment":"","desc":"","gif":"https://gymvisual.com/img/p/3/5/7/4/5/35745.gif","id":"9gygvdhn"},{"name":"Short foot","muscle":"Pierna","equipment":"","desc":"","gif":"https://cdn.shopify.com/s/files/1/1402/4425/files/Short_foot_1024x1024.gif?v=1618891237","id":"0hivtlvp"},{"name":"Dead bug","muscle":"Core","equipment":"","desc":"","gif":"https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUybWF0bm0yMGhzOHUxdmpnNXlyY29odHNsZnB4N2dhZW11MmI1aDd0ZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/aIyZ9Ra6pyo5ZOHQsm/200.gif","id":"b006joyr"},{"name":"Bird dog","muscle":"Core","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/07/Bird-Dog.gif","id":"hsqs24tn"},{"name":"Pallof press (anti-rotación)","muscle":"Core","equipment":"","desc":"","gif":"https://gym-animations.com/wp-content/uploads/2025/12/Pallof-Press-GIF.png","id":"h6esb0xx"},{"name":"Farmer carry","muscle":"Movilidad","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/02/Farmers-walk_Cardio.gif","id":"b7n6bs4h"},{"name":"Side plank con abducción","muscle":"Core","equipment":"","desc":"","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/1358.gif","id":"d7u8n5d0"},{"name":"Rotación externa con banda (codo pegado)","muscle":"Hombro","equipment":"","desc":"","gif":"https://d5sbbf6usl3xq.cloudfront.net/mountain_pose_elbow_bent_arm_external_rotation_resistance_band__tadasana_nata_kehuni_hasta_external_rotation_resistance_band_yoga.png","id":"2dy5u26q"},{"name":"Rotación interna con banda","muscle":"Hombro","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-19-2017/_4n5Cp.gif","id":"o7r7h267"},{"name":"Scaption","muscle":"Espalda","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/c6/b8/66/c6b866afd4c0c451b1e5f2126766761b.gif","id":"vo5gy7md"},{"name":"Wall slides","muscle":"Espalda","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2021/02/wall-slide.gif","id":"s1sdq5m2"},{"name":"Serratus punch","muscle":"Espalda","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-28-2023/I9RiDP.gif","id":"d94kiush"},{"name":"Y-T-W (prono o con banda ligera)","muscle":"Espalda","equipment":"","desc":"","gif":"https://cdn.shopify.com/s/files/1/0958/4764/files/ytw.gif?v=1495186236","id":"b1xj4g9g"},{"name":"Remo con banda","muscle":"Espalda","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/38961301-Band-seated-row-male_Back_720.gif","id":"3oej23qo"},{"name":"Movilidad dorsiflexión tobillo","muscle":"Movilidad","equipment":"","desc":"","gif":"https://www.hsnstore.com/blog/wp-content/uploads/2015/11/tendiopatia-rotuliana.jpg","id":"lymhn1zl"},{"name":"Open book (rotación torácica)","muscle":"Movilidad","equipment":"","desc":"","gif":"https://gymvisual.com/img/p/2/3/7/6/4/23764.gif","id":"p9vi84pn"},{"name":"Cat-camel","muscle":"Movilidad","equipment":"","desc":"","gif":"https://media.tenor.com/-wXXHLdS4nYAAAAM/workout-working-out.gif","id":"sy4b18f2"},{"name":"Isométrico cuádriceps (extensión rodilla contra toalla)","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/2g_ITkl-mJM/hq720.jpg?sqp=-oaymwE7CK4FEIIDSFryq4qpAy0IARUAAAAAGAElAADIQj0AgKJD8AEB-AG-B4AC0AWKAgwIABABGGUgWyg-MA8=&rs=AOn4CLD61zzbAaxeDCLBaoM2RGmV_bUBHw","id":"awh44p0o"},{"name":"Isométrico de gemelos (de pie, banda)","muscle":"Pierna","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/15051301-Band-Calf-Raise-Version-3_Calves_720.gif","id":"1ftf1txw"},{"name":"Isométrico aductores","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/T-Ben-ppf6w/mqdefault.jpg","id":"65v26rww"},{"name":"Isométrico glúteo medio","muscle":"Glúteo","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/0mY05s8Kh28/hqdefault.jpg","id":"wb7efzat"},{"id":"ut20qveb","name":"Nordic hamstring","muscle":"","equipment":"","desc":"","gif":""},{"id":"ztvorhsp","name":"Nordic hamstring","muscle":"","equipment":"","desc":"","gif":""},{"id":"rmaa1t01","name":"Trotadora min","muscle":"","equipment":"","desc":"","gif":""},{"name":"Press militar con mancuernas","muscle":"Hombro","equipment":"Mancuernas","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/04261301-Dumbbell-Standing-Overhead-Press_shoulder_720.gif","id":"hxuhtdyy"},{"name":"Step - up","muscle":"Pierna","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/03/37651301-Jump-Step-Up-male_Cardio_720.gif","id":"62fy9y5f"},{"name":"Patada glutea con banda elastica","muscle":"Glúteo","equipment":"","desc":"","gif":"https://api.smartworkout.app/asset/image/37ea06cc-aaf7-427c-ae6c-f05ea231c9a9","id":"b55fv8zg"},{"name":"Dominada australiana","muscle":"Espalda","equipment":"Máquina","desc":"","gif":"https://api.smartworkout.app/asset/image/8b7f387c-9518-48a7-8395-016dd135db47","id":"08pukekq"},{"name":"Bulgaras","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/f1/b6/16/f1b616965d2583544602ffc922e99e5a.gif","id":"orcsx8fh"},{"name":"Inclinaciones laterales de cuello","muscle":"Movilidad","equipment":"","desc":"","gif":"https://api.smartworkout.app/asset/image/a987a61f-b0cf-42f0-bf61-1280cd45a0ab","id":"saahbvfj"},{"name":"Rotacion cervical","muscle":"Movilidad","equipment":"","desc":"","gif":"https://i0.wp.com/post.healthline.com/wp-content/uploads/2022/02/400x400_Neck_Exercises_for_Arthritis_Neck_Rotation.gif?w=1155&h=840","id":"00t41cts"},{"name":"Abducciones laterales con banda elastica (almeja)","muscle":"Glúteo","equipment":"","desc":"","gif":"https://media.glamour.mx/photos/6764a30df95045324a924854/master/w_1600%2Cc_limit/Amanda-banded-clamshell.gif","id":"u2yh462j"}]};
 
-var state = { clients: [], routines: [], exercises: [], protocols: [] };
+var state = { clients: [], routines: [], exercises: [], protocols: [], horasExtra: [] };
 var settings = { baseUrl: DEFAULT_BASE_URL, githubToken: "", githubRepo: "ultrasport19-boop/APP-RUTINAS11", githubBranch: "main", bitlyToken: "", bitlyDomain: "", syncEnabled: false, calendlyToken: "", calendlyUserUri: "", notionSyncEnabled: false, encEnabled: false, dashApiUrl: "", costoFijo: 500000, horasEntrenador: "Eric", horasValorHora: 3000, horasInicio: 16, horasTermino: 22, horasDias: "1,2,3,4,5", horasCapacidad: 8, horasFactorBruto: 1, horasApiUrl: "" };
 
 var SEED_VERSION = 20260612;
@@ -2925,12 +3001,14 @@ function loadState(){
       state.exercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
       state.protocols = Array.isArray(parsed.protocols) ? parsed.protocols : [];
       state.trash = Array.isArray(parsed.trash) ? parsed.trash : [];
+      state.horasExtra = Array.isArray(parsed.horasExtra) ? parsed.horasExtra : [];
     } else {
       state.clients = SEED_DATA.clients || [];
       state.routines = SEED_DATA.routines || [];
       state.exercises = SEED_DATA.exercises || [];
       state.protocols = SEED_DATA.protocols || [];
       state.trash = [];
+      state.horasExtra = [];
       try { localStorage.setItem(APP_KEY + "_seedver", String(SEED_VERSION)); } catch(e){}
       saveState();
     }
@@ -2961,6 +3039,7 @@ function loadState(){
     state.exercises = SEED_DATA.exercises || [];
     state.protocols = SEED_DATA.protocols || [];
     state.trash = [];
+    state.horasExtra = [];
     try { applyTerapDefaults(); applyContrDefaults(); } catch(e2){}
   }
 }
@@ -4120,6 +4199,206 @@ function updateDayTabBadge(){
   }
 }
 
+/* ============================================================
+   MUS — músculo específico por ejercicio.
+   El catálogo solo trae un grupo grueso ("Pierna", "Espalda"…) y los
+   nombres están en inglés. Aquí se deriva la musculatura concreta
+   (primaria + secundarias) con reglas sobre el nombre, para poder
+   filtrar y buscar por nombre anatómico en español.
+   - Orden de reglas: de lo más específico a lo más general.
+   - Si un ejercicio queda mal clasificado, se puede fijar a mano en
+     la ficha del ejercicio (campo "Músculo específico"): eso se guarda
+     en e.mus y manda sobre las reglas.
+   ============================================================ */
+var MUS_REGIONS = [
+  ["Tren inferior", ["Cuádriceps","Isquiotibiales","Glúteo mayor","Glúteo medio","Aductores","Gastrocnemio","Sóleo","Tibial anterior","Piriforme"]],
+  ["Espalda",       ["Dorsal ancho","Romboides","Trapecio superior","Trapecio medio","Erectores espinales"]],
+  ["Core",          ["Recto abdominal","Oblicuos","Transverso del abdomen"]],
+  ["Hombro y pecho",["Deltoides anterior","Deltoides medio","Deltoides posterior","Rotadores del hombro","Pectoral mayor","Pectoral clavicular","Pectoral inferior"]],
+  ["Brazo y antebrazo", ["Bíceps braquial","Braquial anterior","Braquiorradial","Tríceps braquial","Flexores de muñeca","Extensores de muñeca","Pronadores/supinadores","Flexores de los dedos"]],
+  ["Otros",         ["Musculatura cervical","Cardiovascular"]]
+];
+
+/* [patrón, grupo exigido o null, primario, secundarios] */
+var MUS_RULES = [
+  [/seated .*calf|calf .*seated/, null, "Sóleo", ["Gastrocnemio"]],
+  [/donkey calf|standing .*calf|calf raise|calves|calf press/, null, "Gastrocnemio", ["Sóleo"]],
+  [/toe raise|dorsiflex/, null, "Tibial anterior", []],
+  [/ankle circle|ankle rock|ankle mobil/, null, "Tibial anterior", ["Gastrocnemio"]],
+  [/farmer|suitcase carry/, null, "Trapecio superior", ["Flexores de los dedos"]],
+  [/abduct|clamshell|clam shell|outer hip|side lying leg raise/, null, "Glúteo medio", ["Glúteo mayor"]],
+  [/adduct|groin|butterfly|side split squat|frog|inner thigh/, null, "Aductores", ["Cuádriceps"]],
+  [/hip thrust|glute bridge|\bbridge\b|hip extension|kickback|glute march|hip lift/, null, "Glúteo mayor", ["Isquiotibiales"]],
+  [/piriformis|figure four|\bhip circle|hip rotation/, null, "Piriforme", ["Glúteo medio"]],
+  [/leg curl|hamstring|\bham\b|femoral|inverse leg|glute ham|nordic/, null, "Isquiotibiales", ["Glúteo mayor"]],
+  [/good morning|romanian|stiff leg|straight leg deadlift|single leg deadlift/, null, "Isquiotibiales", ["Glúteo mayor","Erectores espinales"]],
+  [/leg extension|sissy|quads|\bquad\b/, null, "Cuádriceps", []],
+  [/hack squat|leg press|front squat|overhead squat|\bsquat\b|squad/, null, "Cuádriceps", ["Glúteo mayor"]],
+  [/lunge|step ?-?up|split squat|bulgarian/, null, "Cuádriceps", ["Glúteo mayor"]],
+  [/shrug/, null, "Trapecio superior", ["Romboides"]],
+  [/hyperextension|back extension|superman|lower back/, null, "Erectores espinales", ["Glúteo mayor"]],
+  [/deadlift/, null, "Glúteo mayor", ["Isquiotibiales","Erectores espinales"]],
+  [/pulldown|pull-?up|chin-?up|pullover|\blat /, null, "Dorsal ancho", ["Romboides","Bíceps braquial"]],
+  [/scapul|face pull/, null, "Romboides", ["Trapecio medio"]],
+  [/upright row/, null, "Deltoides medio", ["Trapecio superior"]],
+  [/\brow\b|rowing/, "Espalda", "Romboides", ["Dorsal ancho","Trapecio medio"]],
+  [/rear delt|rear lateral|reverse fly|rear fly|bent over lateral/, null, "Deltoides posterior", ["Romboides"]],
+  [/lateral raise|side raise/, null, "Deltoides medio", ["Trapecio superior"]],
+  [/front raise/, null, "Deltoides anterior", ["Pectoral mayor"]],
+  [/military|overhead press|shoulder press|arnold|push press/, null, "Deltoides anterior", ["Deltoides medio","Tríceps braquial"]],
+  [/external rotation|internal rotation|rotator|cuban|\brotation\b/, null, "Rotadores del hombro", ["Deltoides posterior"]],
+  [/incline .*(press|fly|push)/, null, "Pectoral clavicular", ["Deltoides anterior","Tríceps braquial"]],
+  [/decline .*(press|fly|push)/, null, "Pectoral inferior", ["Tríceps braquial"]],
+  [/\bfly\b|flyes|pec deck/, "Pecho", "Pectoral mayor", ["Deltoides anterior"]],
+  [/bench press|chest press|push-?up|\bdip\b/, "Pecho", "Pectoral mayor", ["Tríceps braquial","Deltoides anterior"]],
+  [/reverse wrist|wrist extension/, null, "Extensores de muñeca", ["Braquiorradial"]],
+  [/wrist curl|wrist flex/, null, "Flexores de muñeca", ["Braquiorradial"]],
+  [/pronation|supination/, null, "Pronadores/supinadores", ["Braquiorradial"]],
+  [/finger/, null, "Flexores de los dedos", ["Flexores de muñeca"]],
+  [/hammer curl|reverse curl/, null, "Braquiorradial", ["Bíceps braquial"]],
+  [/concentration curl|preacher|biceps|\bcurl\b/, "Bíceps", "Bíceps braquial", ["Braquial anterior"]],
+  [/skull|pushdown|push down|kick ?back|triceps|close grip|\bdip\b|overhead extension|french/, null, "Tríceps braquial", []],
+  [/russian twist|\btwist\b|oblique|side bend|windshield|side plank|woodchop/, null, "Oblicuos", ["Recto abdominal"]],
+  [/\bplank\b|hollow|vacuum|bird dog|dead bug/, null, "Transverso del abdomen", ["Recto abdominal"]],
+  [/crunch|sit-?up|situp|leg raise|knee raise|hanging|jackknife|\bv-?up\b|toe touch|roll ?out/, "Core", "Recto abdominal", ["Transverso del abdomen"]],
+  [/neck/, null, "Musculatura cervical", []]
+];
+
+/* Cuando ninguna regla acierta, se usa el grupo. Cubre los dos vocabularios que
+   convive la app: el del catálogo importado (Bíceps, Hombros, Pantorrilla…) y el
+   de los ejercicios creados a mano (Brazo, Hombro, Movilidad…). */
+var MUS_FALLBACK = {
+  /* catálogo */
+  "Bíceps":["Bíceps braquial",["Braquial anterior"]], "Tríceps":["Tríceps braquial",[]],
+  "Pecho":["Pectoral mayor",["Tríceps braquial"]], "Espalda":["Dorsal ancho",["Romboides"]],
+  "Hombros":["Deltoides medio",["Deltoides anterior"]], "Core":["Recto abdominal",["Transverso del abdomen"]],
+  "Glúteo":["Glúteo mayor",["Isquiotibiales"]], "Isquiotibiales":["Isquiotibiales",["Glúteo mayor"]],
+  "Pantorrilla":["Gastrocnemio",["Sóleo"]], "Pierna":["Cuádriceps",["Glúteo mayor"]],
+  "Antebrazo":["Flexores de muñeca",["Braquiorradial"]], "Trapecio":["Trapecio superior",["Romboides"]],
+  "Cuello":["Musculatura cervical",[]], "Cardio":["Cardiovascular",[]],
+  /* creados a mano / seed */
+  "Hombro":["Deltoides medio",["Deltoides anterior"]], "Brazo":["Bíceps braquial",["Tríceps braquial"]],
+  "Movilidad":["",[]]
+};
+
+/* Sinónimos para el buscador: escribir "gemelos", "isquios" o "manguito" encuentra. */
+var MUS_SYN = {
+  "Cuádriceps":"cuadriceps cuadris quad quads recto femoral vasto crural muslo anterior",
+  "Isquiotibiales":"isquiotibiales isquios isquio femoral hamstring biceps femoral semitendinoso muslo posterior",
+  "Glúteo mayor":"gluteo mayor gluteos glute cadera extension",
+  "Glúteo medio":"gluteo medio abductor abductores cadera",
+  "Aductores":"aductor aductores adductor ingle muslo interno",
+  "Gastrocnemio":"gastrocnemio gastrocnemios gemelos gemelo pantorrilla calf triceps sural",
+  "Sóleo":"soleo pantorrilla calf triceps sural",
+  "Tibial anterior":"tibial tibiales anterior dorsiflexion dorsiflexor canilla",
+  "Piriforme":"piriforme piramidal cadera rotador",
+  "Dorsal ancho":"dorsal dorsales ancho lat lats latissimus espalda jalon",
+  "Romboides":"romboides romboide trapecio medio escapula retraccion espalda remo",
+  "Trapecio superior":"trapecio superior trapecios encogimiento",
+  "Trapecio medio":"trapecio medio escapula",
+  "Erectores espinales":"erectores espinales lumbar lumbares paravertebral extensores espalda baja",
+  "Recto abdominal":"recto abdominal abdominales abdomen abdominal core",
+  "Oblicuos":"oblicuo oblicuos cintura rotacion tronco",
+  "Transverso del abdomen":"transverso abdomen core estabilizacion plancha faja",
+  "Deltoides anterior":"deltoides anterior delto hombro hombros",
+  "Deltoides medio":"deltoides medio lateral delto hombro hombros",
+  "Deltoides posterior":"deltoides posterior delto hombro hombros",
+  "Rotadores del hombro":"rotadores manguito rotador supraespinoso infraespinoso hombro",
+  "Pectoral mayor":"pectoral pectorales pecho pec",
+  "Pectoral clavicular":"pectoral clavicular superior pecho superior",
+  "Pectoral inferior":"pectoral inferior pecho inferior",
+  "Bíceps braquial":"biceps bicep braquial brazo",
+  "Braquial anterior":"braquial anterior brazo",
+  "Braquiorradial":"braquiorradial supinador largo antebrazo",
+  "Tríceps braquial":"triceps tricep brazo",
+  "Flexores de muñeca":"flexores muñeca antebrazo agarre",
+  "Extensores de muñeca":"extensores muñeca antebrazo epicondilo",
+  "Pronadores/supinadores":"pronador supinador pronacion supinacion antebrazo",
+  "Flexores de los dedos":"dedos agarre grip prension antebrazo",
+  "Musculatura cervical":"cervical cervicales cuello",
+  "Cardiovascular":"cardio aerobico cardiovascular"
+};
+
+/* Minúsculas, sin tildes, y todo lo que no sea letra/número pasa a espacio:
+   así "pull-up" → "pull up" y cada término queda como palabra suelta. */
+function musNorm(s){
+  return String(s == null ? "" : s).toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9ñ]+/g, " ").trim();
+}
+
+/* Coincide si la consulta empieza una palabra del texto.
+   Es lo que evita que "tibial" encuentre "isquio-TIBIALes" (86 falsos positivos),
+   sin perder que "isquios", "gluteo" o "up" (de "pull up") sigan encontrando. */
+function musHit(hay, q){
+  if (!q) return true;
+  return (" " + hay).indexOf(" " + q) >= 0;
+}
+
+/* Caché fuera de los objetos: así no se persiste ni se sincroniza basura.
+   La clasificación solo depende del nombre y del grupo, así que esa es la clave. */
+var _musCache = {};
+
+/* Devuelve {prim, sec[]}. e.mus (elegido a mano) manda sobre las reglas. */
+function musOf(e){
+  if (!e) return { prim:"", sec:[] };
+  if (e.mus) return { prim:e.mus, sec:[] };
+  var key = (e.name || "") + "|" + (e.muscle || "");
+  if (_musCache[key]) return _musCache[key];
+  var n = musNorm(e.name), out = null, i;
+  for (i = 0; i < MUS_RULES.length; i++){
+    var r = MUS_RULES[i];
+    if (r[1] && e.muscle !== r[1]) continue;
+    if (r[0].test(n)){ out = { prim:r[2], sec:r[3].slice() }; break; }
+  }
+  if (!out){
+    var fb = MUS_FALLBACK[e.muscle];
+    out = fb ? { prim:fb[0], sec:fb[1].slice() } : { prim:e.muscle || "", sec:[] };
+  }
+  _musCache[key] = out;
+  return out;
+}
+
+/* Coincide con el músculo pedido, sea primario o secundario. */
+function musMatch(e, nombre){
+  var m = musOf(e);
+  if (m.prim === nombre) return true;
+  for (var i = 0; i < m.sec.length; i++) if (m.sec[i] === nombre) return true;
+  return false;
+}
+
+/* Texto que se añade al buscador para que "gemelos" o "isquios" encuentren. */
+function musHay(e){
+  var m = musOf(e), t = m.prim + " " + m.sec.join(" ") + " " + (MUS_SYN[m.prim] || "");
+  for (var i = 0; i < m.sec.length; i++) t += " " + (MUS_SYN[m.sec[i]] || "");
+  return musNorm(t);
+}
+
+/* <optgroup> con los músculos específicos, para los dos selectores. */
+function musOptionsHtml(sel){
+  var h = "", i, j;
+  for (i = 0; i < MUS_REGIONS.length; i++){
+    h += '<optgroup label="🫀 ' + escapeHtml(MUS_REGIONS[i][0]) + '">';
+    var list = MUS_REGIONS[i][1];
+    for (j = 0; j < list.length; j++){
+      var v = "mus:" + list[j];
+      h += '<option value="' + escapeAttr(v) + '"' + (sel === v ? " selected" : "") + ">"
+         + escapeHtml(list[j]) + "</option>";
+    }
+    h += "</optgroup>";
+  }
+  return h;
+}
+
+/* Badge del músculo específico (primario resaltado, secundarios atenuados). */
+function musBadges(e){
+  var m = musOf(e);
+  if (!m.prim) return "";
+  var h = '<span class="badge mus">🫀 ' + escapeHtml(m.prim) + "</span>";
+  if (m.sec.length) h += '<span class="badge muted" title="Musculatura secundaria">+ ' + escapeHtml(m.sec.join(", ")) + "</span>";
+  return h;
+}
+
 function openExercisePicker(onPick){
   var muscleSet = {};
   state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; });
@@ -4129,7 +4408,10 @@ function openExercisePicker(onPick){
     '<div class="lib-toolbar" style="margin-bottom:.6rem;">'
     + '<input type="text" id="ep-search" placeholder="Buscar ejercicio...">'
     + '<select id="ep-muscle"><option value="">Todos los grupos</option>'
+    + '<optgroup label="Grupo general">'
     + muscles.map(function(m){ return '<option value="'+escapeAttr(m)+'">'+escapeHtml(m)+'</option>'; }).join("")
+    + '</optgroup>'
+    + musOptionsHtml("")
     + '<optgroup label="🩺 Terapéuticos (rehab)">'
     + '<option value="terap:">Terapéuticos — todos</option>'
     + TERAP_ZONES.map(function(z){ return '<option value="terap:'+escapeAttr(z)+'">Terapéutico — '+escapeHtml(z)+'</option>'; }).join("")
@@ -4158,11 +4440,12 @@ function openExercisePicker(onPick){
             else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
             else if (muscle === "contr:"){ if (!e.contr) return false; }
             else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
+            else if (muscle.indexOf("mus:") === 0){ if (!musMatch(e, muscle.slice(4))) return false; }
             else if (e.muscle !== muscle) return false;
           }
           if (q){
-            var hay = (e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")).toLowerCase();
-            if (hay.indexOf(q) < 0) return false;
+            var hay = musNorm(e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
+            if (!musHit(hay, musNorm(q))) return false;
           }
           return true;
         }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
@@ -4180,6 +4463,7 @@ function openExercisePicker(onPick){
             + '<button class="card-main" data-id="'+escapeAttr(e.id)+'" style="flex:1;cursor:pointer;text-align:left;background:none;border:none;padding:.55rem .75rem;color:inherit;font:inherit;">'
             + '<div class="card-title" style="font-size:.95rem;">'+escapeHtml(e.name)+'</div>'
             + '<div class="card-sub">'
+              + musBadges(e)
               + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
               + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
               + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
@@ -4903,10 +5187,13 @@ function renderLibrary(){
   html += '<div class="lib-toolbar">';
   html += '<input type="text" id="lib-search" placeholder="Buscar..." value="'+escapeAttr(_libFilter.search)+'">';
   html += '<select id="lib-muscle"><option value="">Todos los grupos</option>';
+  html += '<optgroup label="Grupo general">';
   for (var i=0;i<muscles.length;i++){
     var m = muscles[i];
     html += '<option value="'+escapeAttr(m)+'"'+(_libFilter.muscle===m?" selected":"")+'>'+escapeHtml(m)+'</option>';
   }
+  html += '</optgroup>';
+  html += musOptionsHtml(_libFilter.muscle);
   html += '<optgroup label="🩺 Terapéuticos (rehab)">';
   html += '<option value="terap:"'+(_libFilter.muscle==="terap:"?" selected":"")+'>Terapéuticos — todos</option>';
   for (var t=0;t<TERAP_ZONES.length;t++){
@@ -4964,11 +5251,12 @@ function renderLibraryGrid(){
       else if (muscle === "contr:"){ if (!e.contr) return false; }
       else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
       else if (muscle === "nogif"){ if (_hasMedia(e)) return false; }
+      else if (muscle.indexOf("mus:") === 0){ if (!musMatch(e, muscle.slice(4))) return false; }
       else if (e.muscle !== muscle) return false;
     }
     if (q){
-      var hay = (e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")).toLowerCase();
-      if (hay.indexOf(q) < 0) return false;
+      var hay = musNorm(e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
+      if (!musHit(hay, musNorm(q))) return false;
     }
     return true;
   }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
@@ -4992,6 +5280,7 @@ function renderLibraryGrid(){
       + '<div class="ex-body">'
         + '<h4>'+escapeHtml(e.name||"Sin nombre")+'</h4>'
         + '<div class="ex-meta">'
+          + musBadges(e)
           + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
           + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
           + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
@@ -5027,6 +5316,22 @@ function openExerciseForm(id){
     muscleHtml += '<option value="'+escapeAttr(e.muscle)+'" selected>'+escapeHtml(e.muscle)+'</option>';
   }
   muscleHtml += '</select>';
+
+  /* Músculo específico: vacío = lo deduce la app por el nombre.
+     Se consulta sin e.mus para que la etiqueta muestre lo que detectarían
+     las reglas, no el valor ya fijado a mano. */
+  var musAuto = musOf({ name:e.name, muscle:e.muscle });
+  var musHtml = '<select id="ef-mus">';
+  musHtml += '<option value=""'+(e.mus?"":" selected")+'>— Automático'+(musAuto.prim?(": "+musAuto.prim):"")+' —</option>';
+  for (var mr=0; mr<MUS_REGIONS.length; mr++){
+    musHtml += '<optgroup label="'+escapeAttr(MUS_REGIONS[mr][0])+'">';
+    var mlist = MUS_REGIONS[mr][1];
+    for (var mi=0; mi<mlist.length; mi++){
+      musHtml += '<option value="'+escapeAttr(mlist[mi])+'"'+(e.mus===mlist[mi]?" selected":"")+'>'+escapeHtml(mlist[mi])+'</option>';
+    }
+    musHtml += '</optgroup>';
+  }
+  musHtml += '</select>';
 
   var equipHtml = '<select id="ef-equip">';
   equipHtml += '<option value="">— Equipamiento —</option>';
@@ -5066,6 +5371,10 @@ function openExerciseForm(id){
         + formField("Grupo muscular", muscleHtml)
         + formField("Equipamiento", equipHtml)
       + '</div>'
+      + formField("Músculo específico",
+          musHtml
+          + '<div class="field-hint">Se deduce del nombre del ejercicio. Elige uno solo si quieres corregirlo: queda fijo y manda sobre la detección automática.</div>'
+        )
       + '<div class="form-grid cols-2">'
         + formField("Categoría terapéutica (rehab)", terapHtml)
         + formField("Tipo de contracción", contrHtml)
@@ -5087,6 +5396,7 @@ function openExerciseForm(id){
         var data = {
           name: name,
           muscle: document.getElementById("ef-muscle").value,
+          mus: document.getElementById("ef-mus").value,
           equipment: document.getElementById("ef-equip").value,
           terap: document.getElementById("ef-terap").value,
           contr: document.getElementById("ef-contr").value,
@@ -6298,7 +6608,7 @@ function openSettings(){
   bodyHtml += formField("Personal Access Token", '<input type="password" id="set-cal-token" value="'+escapeAttr(settings.calendlyToken)+'" placeholder="eyJraW..." autocomplete="new-password">');
   bodyHtml += '<hr style="border:none;border-top:1px solid var(--border);margin:1.2rem 0;">';
   bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">⏱ Horas del entrenador</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">La pestaña <strong>Horas</strong> cruza esta configuración con las citas reales de Calendly para calcular costo, ocupación y costo por cliente. Ciclo de pago: del 15 al 14, se paga el 15.</p>';
+  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">La pestaña <strong>Horas</strong> cruza esta configuración con las citas reales de Calendly para calcular costo, ocupación y costo por cliente. Ciclo de pago: <strong>del 16 al 15</strong> del mes siguiente (ambos incluidos); se le paga el 15. Las horas extra se registran desde la pestaña Horas.</p>';
   bodyHtml += formField("Entrenador", '<input type="text" id="set-hr-entrenador" value="'+escapeAttr(settings.horasEntrenador||"")+'" placeholder="Eric">');
   bodyHtml += formField("Valor hora líquido (CLP)", '<input type="number" id="set-hr-valor" value="'+escapeAttr(String(settings.horasValorHora||3000))+'">');
   bodyHtml += formField("Hora de inicio (0-23)", '<input type="number" id="set-hr-ini" value="'+escapeAttr(String(settings.horasInicio||16))+'">');
@@ -6525,6 +6835,7 @@ function exportBackup(){
     routines: state.routines,
     exercises: state.exercises,
     protocols: state.protocols || [],
+    horasExtra: state.horasExtra || [],
     reports: (typeof loadReports === "function" ? loadReports() : []),
     settings: settings,
     dashboard: (function(){ try { return localStorage.getItem("us19_dashboard_v5"); } catch(e){ return null; } })()
@@ -6561,6 +6872,7 @@ function importBackup(file){
       if (Array.isArray(data.routines)) state.routines = data.routines;
       if (Array.isArray(data.exercises)) state.exercises = data.exercises;
       if (Array.isArray(data.protocols)) state.protocols = data.protocols;
+      if (Array.isArray(data.horasExtra)) state.horasExtra = data.horasExtra;
       if (Array.isArray(data.reports) && typeof saveReports === "function") { try { saveReports(data.reports); } catch(e){} }
       if (data.settings && typeof data.settings === "object") { try { Object.keys(data.settings).forEach(function(k){ settings[k] = data.settings[k]; }); if (typeof saveSettings === "function") saveSettings(); } catch(e){} }
       if (typeof data.dashboard === "string" && data.dashboard) { try { localStorage.setItem("us19_dashboard_v5", data.dashboard); } catch(e){} }
@@ -8975,7 +9287,7 @@ function calendlyRefresh(){
 /* ============ END CALENDLY ============ */
 /* ============ CONTROL DE HORAS DEL ENTRENADOR (ocupación → costo) ============ */
 /* Calcula turnos, costo y ocupación cruzando la configuración del turno con las
-   citas reales de Calendly. Ciclo de pago del 15 al 14. */
+   citas reales de Calendly. Ciclo de pago del 16 al 15, más horas extra puntuales. */
 
 var _horasRef = null;        // fecha de referencia del ciclo mostrado
 var _horasData = null;       // último cálculo
@@ -9000,13 +9312,14 @@ function horasISO(d){ return d.getFullYear() + "-" + horasPad(d.getMonth()+1) + 
 function horasMoney(n){ return "$" + Math.round(Number(n)||0).toLocaleString("es-CL"); }
 var HORAS_DOW = ["dom","lun","mar","mié","jue","vie","sáb"];
 
-/* Ciclo de pago: del 15 de un mes al 14 del siguiente. Se paga el 15. */
+/* Ciclo de pago: del 16 de un mes al 15 del siguiente, ambos incluidos.
+   El día 15 es el último día trabajado del ciclo Y el día en que se le paga. */
 function horasCiclo(ref){
   var d = ref ? new Date(ref) : new Date();
   var y = d.getFullYear(), m = d.getMonth(), ini, fin;
-  if (d.getDate() >= 15){ ini = new Date(y, m, 15); fin = new Date(y, m+1, 14); }
-  else { ini = new Date(y, m-1, 15); fin = new Date(y, m, 14); }
-  var pago = new Date(fin.getFullYear(), fin.getMonth(), 15);
+  if (d.getDate() >= 16){ ini = new Date(y, m, 16); fin = new Date(y, m+1, 15); }
+  else { ini = new Date(y, m-1, 16); fin = new Date(y, m, 15); }
+  var pago = new Date(fin.getFullYear(), fin.getMonth(), fin.getDate());
   return {
     ini: ini, fin: fin, pago: pago,
     etiqueta: fin.getFullYear() + "-" + horasPad(fin.getMonth()+1),
@@ -9048,58 +9361,185 @@ function calendlyFetchRange(from, to){
   });
 }
 
-/* Construye los turnos del ciclo y les asigna las citas que caen dentro de la franja. */
+/* ---- Horas extra puntuales: se registran con fecha, así caen solas en el
+   ciclo correcto y quedan auditables. Se pagan al mismo valor/hora. ---- */
+function horasExtraAll(){
+  if (!Array.isArray(state.horasExtra)) state.horasExtra = [];
+  return state.horasExtra;
+}
+function horasExtraList(ciclo){
+  var a = horasISO(ciclo.ini), b = horasISO(ciclo.fin);
+  return horasExtraAll().filter(function(x){
+    return x && x.fecha && x.fecha >= a && x.fecha <= b;
+  }).sort(function(p, q){ return p.fecha < q.fecha ? -1 : (p.fecha > q.fecha ? 1 : 0); });
+}
+
+/* Construye los turnos del ciclo, les asigna las citas de la franja y suma las
+   horas extra registradas. El día en curso se prorratea por horas ya cumplidas. */
 function horasComputar(events, ciclo){
   var c = horasCfg(), h = horasPorTurno();
-  var hoyISO = horasISO(new Date());
+  var ahora = new Date();
+  var hoyISO = horasISO(ahora);
+  var hAhora = ahora.getHours() + ahora.getMinutes() / 60;
   var dias = {}, orden = [];
+
+  function nuevoDia(cur, esTurno){
+    var k = horasISO(cur);
+    dias[k] = {
+      fecha: k, dow: HORAS_DOW[cur.getDay()], esTurno: !!esTurno,
+      horas: esTurno ? h : 0,
+      costo: esTurno ? h * c.valorHora : 0,
+      capacidad: esTurno ? h * c.capacidad : 0,
+      horasExtra: 0, costoExtra: 0, motivos: [],
+      sesiones: 0, clientes: 0,
+      horasHechas: 0, horasExtraHechas: 0, costoDevengado: 0,
+      completo: false, pasado: false
+    };
+    orden.push(k);
+    return dias[k];
+  }
 
   var cur = new Date(ciclo.ini);
   while (cur <= ciclo.fin){
-    if (c.dias.indexOf(cur.getDay()) >= 0){
-      var k = horasISO(cur);
-      dias[k] = {
-        fecha: k, dow: HORAS_DOW[cur.getDay()],
-        horas: h, costo: h * c.valorHora, capacidad: h * c.capacidad,
-        sesiones: 0, clientes: 0, pasado: (k <= hoyISO)
-      };
-      orden.push(k);
-    }
+    if (c.dias.indexOf(cur.getDay()) >= 0) nuevoDia(cur, true);
     cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
   }
+
+  /* Las horas extra pueden caer en días sin turno (un sábado, una mañana):
+     en ese caso se crea la fila para que queden visibles y pagadas. */
+  var extras = horasExtraList(ciclo);
+  extras.forEach(function(x){
+    var d = dias[x.fecha];
+    if (!d){
+      var p = String(x.fecha).split("-");
+      d = nuevoDia(new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])), false);
+    }
+    var hx = Number(x.horas) || 0;
+    d.horasExtra += hx;
+    d.costoExtra += hx * c.valorHora;
+    if (x.motivo) d.motivos.push(x.motivo);
+  });
+  orden.sort();
 
   var fueraFranja = 0, fueraDia = 0;
   (events || []).forEach(function(ev){
     var st = new Date(ev.start_time);
     var k = horasISO(st);
     var n = (ev.invitees_counter && (ev.invitees_counter.active || 0)) || 0;
-    if (!dias[k]){ fueraDia += n; return; }
-    var hh = st.getHours() + st.getMinutes()/60;
+    var d = dias[k];
+    if (!d || !d.esTurno){ fueraDia += n; return; }
+    var hh = st.getHours() + st.getMinutes() / 60;
     if (hh < c.inicio || hh >= c.termino){ fueraFranja += n; return; }
-    dias[k].sesiones += 1;
-    dias[k].clientes += n;
+    d.sesiones += 1;
+    d.clientes += n;
+  });
+
+  /* Devengado: los días cerrados cuentan completos; el día en curso solo las
+     horas ya cumplidas de la franja. La ocupación solo mira turnos CERRADOS,
+     porque un turno a medias tiene citas agendadas para más tarde y falsearía
+     el porcentaje. */
+  orden.forEach(function(k){
+    var d = dias[k];
+    if (k < hoyISO){
+      d.pasado = true; d.horasHechas = d.horas; d.completo = d.esTurno;
+    } else if (k === hoyISO){
+      d.pasado = true;
+      d.horasHechas = d.esTurno ? Math.min(d.horas, Math.max(0, hAhora - c.inicio)) : 0;
+      d.horasHechas = Math.round(d.horasHechas * 100) / 100;
+      d.completo = d.esTurno && hAhora >= c.termino;
+    }
+    d.horasExtraHechas = (k <= hoyISO) ? d.horasExtra : 0;
+    d.costoDevengado = (d.horasHechas + d.horasExtraHechas) * c.valorHora;
+    d.horasTotal = d.horas + d.horasExtra;
+    d.costoTotal = d.costo + d.costoExtra;
   });
 
   var lista = orden.map(function(k){ return dias[k]; });
   var T = { horas:0, costo:0, clientes:0, capacidad:0, sesiones:0,
-            horasPasadas:0, costoDevengado:0, clientesPasados:0, capacidadPasada:0 };
+            horasPasadas:0, costoDevengado:0, clientesPasados:0, capacidadPasada:0,
+            horasExtra:0, costoExtra:0, diasExtra:0, turnosCerrados:0 };
   lista.forEach(function(d){
     T.horas += d.horas; T.costo += d.costo; T.clientes += d.clientes;
     T.capacidad += d.capacidad; T.sesiones += d.sesiones;
-    if (d.pasado){
-      T.horasPasadas += d.horas; T.costoDevengado += d.costo;
-      T.clientesPasados += d.clientes; T.capacidadPasada += d.capacidad;
+    T.horasExtra += d.horasExtra; T.costoExtra += d.costoExtra;
+    if (d.horasExtra > 0) T.diasExtra += 1;
+    T.horasPasadas += d.horasHechas + d.horasExtraHechas;
+    T.costoDevengado += d.costoDevengado;
+    if (d.completo){
+      T.turnosCerrados += 1;
+      T.clientesPasados += d.clientes;
+      T.capacidadPasada += d.capacidad;
     }
   });
+  T.horasPasadas = Math.round(T.horasPasadas * 100) / 100;
+  T.horasTotal = T.horas + T.horasExtra;
+  T.costoTotal = T.costo + T.costoExtra;
   T.ocupacion = T.capacidadPasada ? (T.clientesPasados / T.capacidadPasada) : 0;
   T.costoPorCliente = T.clientesPasados ? (T.costoDevengado / T.clientesPasados) : 0;
-  T.costoBruto = T.costo * c.factorBruto;
+  T.costoBruto = T.costoTotal * c.factorBruto;
   T.fueraFranja = fueraFranja;
   T.fueraDia = fueraDia;
-  T.turnos = lista.length;
+  T.turnos = lista.filter(function(d){ return d.esTurno; }).length;
 
-  return { ciclo: ciclo, cfg: c, dias: lista, total: T };
+  return { ciclo: ciclo, cfg: c, dias: lista, extras: extras, total: T };
 }
+
+/* ---- Alta / baja de horas extra ---- */
+window.horasExtraAdd = function(){
+  var c = horasCfg(), ciclo = horasCiclo(_horasRef);
+  var hoy = horasISO(new Date());
+  var def = (hoy >= horasISO(ciclo.ini) && hoy <= horasISO(ciclo.fin)) ? hoy : horasISO(ciclo.fin);
+  var body = ''
+    + '<p class="text-xs text-muted" style="line-height:1.5;margin-bottom:.7rem;">Horas fuera del turno fijo (' + horasPad(c.inicio) + ':00–' + horasPad(c.termino)
+    + ':00) que le pediste a ' + escapeHtml(c.entrenador) + '. Se pagan a <strong>' + horasMoney(c.valorHora)
+    + '/hora</strong> y se suman al ciclo por su fecha.</p>'
+    + '<div class="form-grid cols-2">'
+    +   formField("Fecha *", '<input type="date" id="hx-fecha" value="' + escapeAttr(def) + '" min="' + escapeAttr(horasISO(ciclo.ini)) + '" max="' + escapeAttr(horasISO(ciclo.fin)) + '">')
+    +   formField("Horas *", '<input type="number" id="hx-horas" value="1" min="0.25" max="12" step="0.25">')
+    + '</div>'
+    + formField("Motivo", '<input type="text" id="hx-motivo" placeholder="Ej: cubrió la mañana, clase extra del sábado">')
+    + '<div id="hx-msg" class="text-xs" style="min-height:1.1em;"></div>';
+  openModal({ title:"➕ Hora extra", bodyHtml:body, footer:[
+    { label:"Cancelar", cls:"btn-ghost" },
+    { label:"Agregar", cls:"btn-primary", onClick:function(){
+        var f = (document.getElementById("hx-fecha")||{}).value || "";
+        var hs = Number((document.getElementById("hx-horas")||{}).value || 0);
+        var mo = ((document.getElementById("hx-motivo")||{}).value || "").trim();
+        var msg = document.getElementById("hx-msg");
+        function fail(t){ if (msg) msg.innerHTML = '<span style="color:var(--danger);">✗ ' + escapeHtml(t) + '</span>'; }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) return fail("Elige una fecha válida.");
+        if (!(hs > 0)) return fail("Las horas deben ser mayores que 0.");
+        if (hs > 12) return fail("¿12 horas extra? Revisa el dato.");
+        var ci = horasCiclo(new Date(Number(f.slice(0,4)), Number(f.slice(5,7))-1, Number(f.slice(8,10))));
+        horasExtraAll().push({ id: genId(), fecha: f, horas: hs, motivo: mo, creadoEl: new Date().toISOString() });
+        saveState();
+        closeModal();
+        _horasData = null;
+        if (ci.etiqueta !== ciclo.etiqueta){
+          _horasRef = new Date(ci.ini.getFullYear(), ci.ini.getMonth(), 20);
+          toast("Hora extra guardada en el ciclo " + ci.etiqueta, "success");
+        } else {
+          toast("Hora extra guardada ✓", "success");
+        }
+        renderHoras();
+      }}
+  ]});
+};
+
+window.horasExtraDel = function(id){
+  var a = horasExtraAll();
+  for (var i = 0; i < a.length; i++){
+    if (a[i].id === id){
+      if (!confirm("¿Quitar esta hora extra de " + a[i].horas + " h del " + a[i].fecha + "?")) return;
+      a.splice(i, 1);
+      saveState();
+      _horasData = null;
+      renderHoras();
+      toast("Hora extra eliminada", "success");
+      return;
+    }
+  }
+};
 
 function horasSemaforo(pct){
   if (pct >= 0.60) return { color: "var(--success)", txt: "Turno rentable" };
@@ -9171,9 +9611,11 @@ function horasPintar(D){
   }
 
   html += '<div class="stat-grid">';
-  html += statCard("Costo del ciclo", horasMoney(T.costo), T.turnos + " turnos · " + T.horas + " h");
+  html += statCard("Costo del ciclo", horasMoney(T.costoTotal),
+    T.turnos + " turnos · " + T.horas + " h" + (T.horasExtra ? (" + " + T.horasExtra + " h extra") : ""));
   html += statCard("Devengado a hoy", horasMoney(T.costoDevengado), T.horasPasadas + " h trabajadas");
-  html += statCard("Ocupación real", Math.round(T.ocupacion*100) + "%", T.clientesPasados + " de " + T.capacidadPasada + " cupos");
+  html += statCard("Ocupación real", Math.round(T.ocupacion*100) + "%",
+    T.clientesPasados + " de " + T.capacidadPasada + " cupos · " + T.turnosCerrados + " turnos cerrados");
   html += statCard("Costo por cliente", T.costoPorCliente ? horasMoney(T.costoPorCliente) : "—", sem.txt);
   html += '</div>';
 
@@ -9198,39 +9640,78 @@ function horasPintar(D){
   }
   html += '</div></div>';
 
+  /* ---- Horas extra del ciclo ---- */
+  html += '<div class="card" style="margin:1rem 0;"><div class="card-main">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;">';
+  html += '<div class="card-title" style="margin:0;">Horas extra · ' + (T.horasExtra || 0) + ' h · ' + horasMoney(T.costoExtra || 0) + '</div>';
+  html += '<button class="btn btn-secondary btn-sm" onclick="horasExtraAdd()">➕ Añadir hora extra</button>';
+  html += '</div>';
+  if (!D.extras || !D.extras.length){
+    html += '<div class="card-sub" style="margin-top:.5rem;">Sin horas extra en este ciclo. Se pagan a ' + horasMoney(c.valorHora) + '/hora y se suman por su fecha.</div>';
+  } else {
+    html += '<div style="overflow-x:auto;margin-top:.6rem;"><table style="width:100%;border-collapse:collapse;font-size:.85rem;">';
+    html += '<thead><tr style="text-align:left;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;">'
+         + '<th style="padding:.4rem .6rem;">Fecha</th><th style="padding:.4rem .6rem;text-align:right;">Horas</th>'
+         + '<th style="padding:.4rem .6rem;text-align:right;">Monto</th><th style="padding:.4rem .6rem;">Motivo</th>'
+         + '<th style="padding:.4rem .6rem;"></th></tr></thead><tbody>';
+    D.extras.forEach(function(x){
+      html += '<tr style="border-top:1px solid var(--border);">'
+           + '<td style="padding:.4rem .6rem;font-family:var(--font-mono);">' + escapeHtml(x.fecha) + '</td>'
+           + '<td style="padding:.4rem .6rem;text-align:right;font-weight:700;">' + (Number(x.horas)||0) + '</td>'
+           + '<td style="padding:.4rem .6rem;text-align:right;">' + horasMoney((Number(x.horas)||0) * c.valorHora) + '</td>'
+           + '<td style="padding:.4rem .6rem;color:var(--muted);">' + escapeHtml(x.motivo || "—") + '</td>'
+           + '<td style="padding:.4rem .6rem;text-align:right;"><button class="btn btn-ghost btn-sm" onclick="horasExtraDel(\'' + escapeAttr(x.id) + '\')">✕</button></td>'
+           + '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div></div>';
+
   html += '<div class="section-head" style="margin-top:1.25rem;"><h2 class="section-title">DETALLE <span class="accent">/ POR TURNO</span></h2></div>';
   html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:.85rem;">';
   html += '<thead><tr style="text-align:left;color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;">'
        + '<th style="padding:.5rem .6rem;">Fecha</th><th style="padding:.5rem .6rem;">Día</th>'
-       + '<th style="padding:.5rem .6rem;text-align:right;">Horas</th><th style="padding:.5rem .6rem;text-align:right;">Costo</th>'
+       + '<th style="padding:.5rem .6rem;text-align:right;">Turno</th><th style="padding:.5rem .6rem;text-align:right;">Extra</th>'
+       + '<th style="padding:.5rem .6rem;text-align:right;">Costo</th>'
        + '<th style="padding:.5rem .6rem;text-align:right;">Sesiones</th><th style="padding:.5rem .6rem;text-align:right;">Clientes</th>'
        + '<th style="padding:.5rem .6rem;text-align:right;">Ocupación</th><th style="padding:.5rem .6rem;text-align:right;">$/cliente</th></tr></thead><tbody>';
   D.dias.forEach(function(d){
     var pct = d.capacidad ? d.clientes / d.capacidad : 0;
-    var s = horasSemaforo(d.pasado ? pct : -1);
+    var s = horasSemaforo(d.completo ? pct : -1);
     html += '<tr style="border-top:1px solid var(--border);' + (d.pasado ? '' : 'opacity:.45;') + '">';
     html += '<td style="padding:.5rem .6rem;font-family:var(--font-mono);">' + d.fecha + '</td>';
-    html += '<td style="padding:.5rem .6rem;">' + d.dow + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;">' + d.horas + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;">' + horasMoney(d.costo) + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;">' + d.sesiones + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;font-weight:700;">' + d.clientes + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;color:' + s.color + ';font-weight:700;">' + (d.pasado ? Math.round(pct*100) + "%" : "—") + '</td>';
-    html += '<td style="padding:.5rem .6rem;text-align:right;">' + (d.pasado && d.clientes ? horasMoney(d.costo/d.clientes) : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;">' + d.dow + (d.esTurno ? '' : ' <span class="badge muted" title="Día sin turno fijo">extra</span>') + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;">' + (d.esTurno ? d.horas : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;' + (d.horasExtra ? 'color:var(--accent);font-weight:700;' : 'color:var(--muted);') + '"'
+         + (d.motivos && d.motivos.length ? ' title="' + escapeAttr(d.motivos.join(" · ")) + '"' : '') + '>'
+         + (d.horasExtra ? ("+" + d.horasExtra) : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;">' + horasMoney(d.costoTotal) + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;">' + (d.esTurno ? d.sesiones : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;font-weight:700;">' + (d.esTurno ? d.clientes : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;color:' + s.color + ';font-weight:700;">' + (d.completo ? Math.round(pct*100) + "%" : "—") + '</td>';
+    html += '<td style="padding:.5rem .6rem;text-align:right;">' + (d.completo && d.clientes ? horasMoney(d.costo/d.clientes) : "—") + '</td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
+  html += '<p class="text-xs text-muted" style="margin-top:.5rem;line-height:1.5;">La ocupación solo cuenta <strong>turnos ya cerrados</strong>: un turno en curso tiene citas agendadas para más tarde y falsearía el porcentaje. El devengado sí prorratea las horas ya cumplidas de hoy.</p>';
 
   b.innerHTML = html;
 }
 
 function horasExportCsv(){
   if (!_horasData){ toast("Primero calcula el ciclo", "error"); return; }
-  var rows = [["Fecha","Dia","Horas","ValorHora","Costo","Sesiones","Clientes","Capacidad","Ocupacion"]];
+  var rows = [["Fecha","Dia","EsTurno","HorasTurno","HorasExtra","MotivoExtra","ValorHora","Costo","Devengado","Sesiones","Clientes","Capacidad","Ocupacion","TurnoCerrado"]];
   _horasData.dias.forEach(function(d){
-    rows.push([d.fecha, d.dow, d.horas, _horasData.cfg.valorHora, d.costo, d.sesiones, d.clientes, d.capacidad,
-      (d.capacidad ? Math.round(d.clientes/d.capacidad*100) : 0) + "%"]);
+    rows.push([d.fecha, d.dow, d.esTurno ? "si" : "no", d.horas, d.horasExtra,
+      (d.motivos || []).join(" / "), _horasData.cfg.valorHora, d.costoTotal, d.costoDevengado,
+      d.sesiones, d.clientes, d.capacidad,
+      (d.completo && d.capacidad ? Math.round(d.clientes/d.capacidad*100) : 0) + "%",
+      d.completo ? "si" : "no"]);
   });
+  var _T = _horasData.total;
+  rows.push([]);
+  rows.push(["TOTAL", "", "", _T.horas, _T.horasExtra, "", _horasData.cfg.valorHora, _T.costoTotal, _T.costoDevengado,
+    _T.sesiones, _T.clientesPasados, _T.capacidadPasada, Math.round(_T.ocupacion*100) + "%", _T.turnosCerrados]);
   var csv = rows.map(function(r){ return r.join(";"); }).join("\n");
   var blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
   var a = document.createElement("a");
@@ -9250,7 +9731,8 @@ function horasSyncNotion(){
     ciclo: { etiqueta: _horasData.ciclo.etiqueta, inicio: horasISO(_horasData.ciclo.ini), fin: horasISO(_horasData.ciclo.fin), pago: horasISO(_horasData.ciclo.pago) },
     cfg: _horasData.cfg,
     total: _horasData.total,
-    dias: _horasData.dias
+    dias: _horasData.dias,
+    extras: _horasData.extras || []
   };
   toast("⏳ Enviando a Notion...", "info");
   fetch(settings.horasApiUrl, {
@@ -13886,6 +14368,31 @@ window.progDelete = function(clientId, progId){
   else { toast("Progresión eliminada","success"); if(typeof renderClients==="function") renderClients(); }
 };
 
+/* Publica el alto real del bloque header+pestañas en --app-top-h, para que las
+   cabeceras de tabla se peguen justo debajo y no se esconda detrás. Se mide, no
+   se adivina: así sigue bien si el header cambia de alto o se gira el teléfono. */
+function medirAppTop(){
+  var t = document.getElementById("app-top");
+  if (!t) return;
+  var h = Math.round(t.getBoundingClientRect().height);
+  document.documentElement.style.setProperty("--app-top-h", h + "px");
+}
+function observarAppTop(){
+  medirAppTop();
+  /* Disparadores deterministas: cubren los casos reales sin depender de APIs
+     de ciclo de render. Las tipografías se cargan después y cambian el alto. */
+  window.addEventListener("resize", medirAppTop);
+  window.addEventListener("orientationchange", medirAppTop);
+  window.addEventListener("load", medirAppTop);
+  try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(medirAppTop); } catch (e) {}
+  /* Extra en navegadores reales: reacciona a cualquier cambio de alto del header. */
+  try {
+    if (typeof ResizeObserver === "function"){
+      new ResizeObserver(medirAppTop).observe(document.getElementById("app-top"));
+    }
+  } catch (e) {}
+}
+
 function init(){
   loadSettings();
   if (typeof encRestoreFromCache === "function") encRestoreFromCache();
@@ -14005,6 +14512,7 @@ document.addEventListener("keydown", function(e){
 });
 
 init();
+observarAppTop();
 
 
 /* ============ CATALOGO US19 (GIFs en US19-APP/videos vía jsDelivr) ============ */
