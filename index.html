@@ -3102,6 +3102,30 @@ function escapeHtml(s){
 
 function escapeAttr(s){ return escapeHtml(s); }
 
+/* ===== Media del ejercicio: GIF/imagen o vídeo MP4 =====
+   En listados se pinta siempre una imagen: una cuadrícula con cientos de
+   vídeos reproduciéndose a la vez bloquea el navegador. El vídeo solo se
+   reproduce al ampliar un ejercicio concreto.
+   El póster se deduce del propio archivo: mismo nombre con extensión .jpg. */
+function isVideoUrl(u){ return /\.(mp4|webm|mov)(\?|#|$)/i.test(u || ""); }
+function posterUrl(u){ return String(u || "").replace(/\.(mp4|webm|mov)(?=(\?|#|$))/i, ".jpg"); }
+
+/* Miniatura estática. Guarda la URL real en data-media para que el visor
+   ampliado sepa que detrás de este póster hay un vídeo. */
+function mediaThumb(url, attrs){
+  var esVideo = isVideoUrl(url);
+  return '<img src="' + escapeAttr(esVideo ? posterUrl(url) : url) + '"'
+       + (esVideo ? ' data-media="' + escapeAttr(url) + '"' : '')
+       + ' ' + (attrs || "") + '>';
+}
+
+/* Reproductor: <video> si el media es vídeo, imagen en cualquier otro caso. */
+function mediaPlayer(url, attrs){
+  if (!isVideoUrl(url)) return '<img src="' + escapeAttr(url) + '" ' + (attrs || "") + '>';
+  return '<video src="' + escapeAttr(url) + '" poster="' + escapeAttr(posterUrl(url)) + '"'
+       + ' autoplay loop muted playsinline controls preload="metadata" ' + (attrs || "") + '></video>';
+}
+
 function maskToken(s){
   if (!s) return "";
   return "~" + btoa(s.split("").reverse().join(""));
@@ -4456,7 +4480,7 @@ function openExercisePicker(onPick){
         list.innerHTML = filtered.map(function(e){
           var hasGif = e.gif && /^https?:\/\//.test(e.gif);
           var thumb = hasGif
-            ? '<img src="'+escapeAttr(e.gif)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'🏋️\'">'
+            ? mediaThumb(e.gif, 'alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'🏋️\'"')
             : '<span style="font-size:1.5rem;">🏋️</span>';
           return '<div class="card" style="margin:0;display:flex;align-items:stretch;width:100%;background:var(--surface-2);overflow:hidden;">'
             + '<div class="ep-thumb" data-prev="'+escapeAttr(e.id)+'" title="Ver vista previa" style="flex:0 0 84px;min-height:70px;background:#000;display:flex;align-items:center;justify-content:center;cursor:zoom-in;overflow:hidden;">'+thumb+'</div>'
@@ -4508,7 +4532,7 @@ function showExercisePreview(exId){
   ov.id = "ex-preview-overlay";
   ov.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:1rem;cursor:zoom-out;";
   var media = (e.gif && /^https?:\/\//.test(e.gif))
-    ? '<img src="'+escapeAttr(e.gif)+'" alt="" style="max-height:62vh;max-width:92vw;border-radius:10px;background:#000;" onerror="this.outerHTML=\'<div style=&quot;font-size:4rem;padding:2rem;&quot;>🏋️</div>\'">'
+    ? mediaPlayer(e.gif, 'alt="" style="max-height:62vh;max-width:92vw;border-radius:10px;background:#000;" onerror="this.outerHTML=\'<div style=&quot;font-size:4rem;padding:2rem;&quot;>🏋️</div>\'"')
     : '<div style="font-size:4rem;padding:2rem;">🏋️</div>';
   ov.innerHTML = '<div style="max-width:560px;width:100%;text-align:center;">'
     + media
@@ -5273,7 +5297,7 @@ function renderLibraryGrid(){
     var hasGif = e.gif && /^https?:\/\//.test(e.gif);
     var heavy = e.gif && e.gif.indexOf("data:") === 0;
     var thumb = hasGif
-      ? '<img src="'+escapeAttr(e.gif)+'" alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏋️\'">'
+      ? mediaThumb(e.gif, 'alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏋️\'"')
       : (heavy ? '<span title="GIF subido (solo local)">📦</span>' : '🏋️');
     html += '<div class="ex-card">'
       + '<div class="ex-thumb">'+thumb+'</div>'
@@ -5382,7 +5406,7 @@ function openExerciseForm(id){
       + formField("Descripción", '<textarea id="ef-desc" placeholder="Cómo ejecutar el ejercicio">'+escapeHtml(e.desc||"")+'</textarea>')
       + formField("URL del GIF / imagen",
           '<input type="url" id="ef-gif" value="'+escapeAttr(e.gif||"")+'" placeholder="https://media.giphy.com/...">'
-          +'<div class="field-hint">Solo URLs públicas (Giphy, Tenor, ImgBB). Los archivos subidos solo son visibles localmente y no se comparten.</div>'
+          +'<div class="field-hint">Solo URLs públicas (Giphy, Tenor, ImgBB). Admite GIF, imagen y vídeo .mp4: el vídeo se reproduce al ampliar el ejercicio. Los archivos subidos solo son visibles localmente y no se comparten.</div>'
         ),
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
@@ -6059,7 +6083,7 @@ function buildExerciseBlock(shareData, r, di, ei, progress){
 
   if (def && def.gif && /^https?:\/\//.test(def.gif)){
     html += '<div class="ex-gif-block" onclick="expandGif(this)">'
-      +'<img src="'+escapeAttr(def.gif)+'" alt="'+escapeHtml(name)+'" loading="lazy" onerror="this.parentNode.style.display=\'none\'">'
+      +mediaThumb(def.gif, 'alt="'+escapeHtml(name)+'" loading="lazy" onerror="this.parentNode.style.display=\'none\'"')
       +'<button class="ex-gif-expand" tabindex="-1">⤢ Ampliar</button>'
       +'</div>';
   }
@@ -6268,8 +6292,12 @@ function updateSummaryChecklist(progress){
 window.expandGif = function(el){
   var img = el.querySelector("img");
   if (!img) return;
+  /* data-media lleva la URL del vídeo cuando la miniatura es solo su póster */
+  var url = img.getAttribute("data-media") || img.src;
   openModal({ title:"Vista del movimiento",
-    bodyHtml:'<div style="text-align:center;background:#000;padding:1rem;border-radius:8px;"><img src="'+escapeAttr(img.src)+'" style="max-height:70vh;max-width:100%;border-radius:6px;"></div>',
+    bodyHtml:'<div style="text-align:center;background:#000;padding:1rem;border-radius:8px;">'
+      + mediaPlayer(url, 'style="max-height:70vh;max-width:100%;border-radius:6px;"')
+      + '</div>',
     footer:[{label:"Cerrar",cls:"btn-primary"}]
   });
 };
@@ -7886,7 +7914,7 @@ function phaseExerciseRowHtml(ex, idx){
   var sub = def ? ((def.muscle||"") + (def.equipment ? " · " + def.equipment : "")) : "";
   var hasGif = def && def.gif && /^https?:\/\//.test(def.gif);
   var thumb = hasGif
-    ? '<img src="'+escapeAttr(def.gif)+'" alt="" loading="lazy" style="width:46px;height:46px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'">'
+    ? mediaThumb(def.gif, 'alt="" loading="lazy" style="width:46px;height:46px;object-fit:cover;border-radius:8px;flex-shrink:0;" onerror="this.style.display=\'none\'"')
     : '';
   return '<div class="exercise-row">'
     + '<div class="ex-top">'
@@ -10436,7 +10464,7 @@ function renderLivePlayer(){
     +(parseRestSeconds(rowEx.rest)>0?'<button class="rest-chip" onclick="startRestTimer(\''+escapeAttr(String(rowEx.rest).replace(/['"\\]/g,""))+'\')">⏱ '+escapeHtml(rowEx.rest)+'</button>':'')
     +'</div>';
   if (def && def.gif && /^https?:\/\//.test(def.gif)){
-    html += '<div class="lp-gif"><img src="'+escapeAttr(def.gif)+'" alt="" onerror="this.parentNode.style.display=\'none\'"></div>';
+    html += '<div class="lp-gif">'+mediaThumb(def.gif, 'alt="" onerror="this.parentNode.style.display=\'none\'"')+'</div>';
   }
   var _lpLast = _lpLastSession(rowEx.exerciseId);
   if (_lpLast){
