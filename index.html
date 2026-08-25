@@ -14585,15 +14585,18 @@ function _cus19Ready(data){
   var st = document.getElementById("cus19-status");
   var gp = document.getElementById("cus19-groups");
   if (!st || !gp) return;
-  var idx = {};
-  state.exercises.forEach(function(e){ idx[(e.name||"").toLowerCase()] = e; });
+  var porId = {}, porNombre = {};
+  state.exercises.forEach(function(e){
+    if (e.id) porId[e.id] = e;
+    porNombre[(e.name||"").toLowerCase()] = e;
+  });
   var grupos = {};
   _cus19Data.forEach(function(e){
     var g = e.muscle || "Otro";
     if (!grupos[g]) grupos[g] = { nuevos:0, reparar:0 };
-    var ex = idx[(e.name||"").toLowerCase()];
+    var ex = (e.id && porId[e.id]) || porNombre[(e.name||"").toLowerCase()];
     if (!ex) grupos[g].nuevos++;
-    else if (ex.gif !== e.gif) grupos[g].reparar++;
+    else if (ex.gif !== e.gif || ex.name !== e.name) grupos[g].reparar++;
   });
   var nuevos = 0, reparar = 0;
   Object.keys(grupos).forEach(function(k){ nuevos+=grupos[k].nuevos; reparar+=grupos[k].reparar; });
@@ -14613,16 +14616,22 @@ function _cus19Import(){
   if (!_cus19Data){ toast("Catálogo no cargado aún","warning"); return; }
   var sel = {};
   document.querySelectorAll(".cus19-g").forEach(function(b){ if (b.checked) sel[b.value]=true; });
-  var idx = {};
-  state.exercises.forEach(function(e){ idx[(e.name||"").toLowerCase()] = e; });
+  /* Se empareja primero por id y solo después por nombre: si un ejercicio del
+     catálogo cambia de nombre, hay que actualizarlo, no crear un duplicado. */
+  var porId = {}, porNombre = {};
+  state.exercises.forEach(function(e){
+    if (e.id) porId[e.id] = e;
+    porNombre[(e.name||"").toLowerCase()] = e;
+  });
   var added = 0, fixed = 0;
   _cus19Data.forEach(function(e){
     if (!sel[e.muscle || "Otro"]) return;
     var key = (e.name||"").toLowerCase();
-    var ex = idx[key];
+    var ex = (e.id && porId[e.id]) || porNombre[key];
     if (ex){
       // reparar/actualizar existente
       var changed = false;
+      if (e.name && ex.name !== e.name){ ex.name = e.name; changed = true; }
       if (e.gif && ex.gif !== e.gif){ ex.gif = e.gif; changed = true; }
       if (e.desc && !ex.desc){ ex.desc = e.desc; changed = true; }
       if (e.muscle && !ex.muscle){ ex.muscle = e.muscle; changed = true; }
@@ -14638,7 +14647,8 @@ function _cus19Import(){
         gif: e.gif || ""
       };
       state.exercises.push(nuevo);
-      idx[key] = nuevo;
+      porNombre[key] = nuevo;
+      porId[nuevo.id] = nuevo;
       added++;
     }
   });
