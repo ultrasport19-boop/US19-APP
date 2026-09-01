@@ -604,6 +604,7 @@ img{max-width:100%;display:block;}
     <button class="tab-btn" data-tab="finanzas">Finanzas</button>
     <button class="tab-btn" data-tab="horas">Horas</button>
     <button class="tab-btn" data-tab="informes">Informes</button>
+    <button class="tab-btn" data-tab="rendimiento">Rendimiento</button>
   </div>
 </nav>
 </div>
@@ -617,6 +618,7 @@ img{max-width:100%;display:block;}
   <section class="view" id="view-finanzas"></section>
   <section class="view" id="view-horas"></section>
   <section class="view" id="view-informes"></section>
+  <section class="view" id="view-rendimiento"></section>
   <section class="view" id="view-builder"></section>
   <section class="view" id="view-client"></section>
   <section class="view" id="view-report"></section>
@@ -3337,6 +3339,7 @@ function showView(name){
   else if (name==="finanzas") renderBolsillo();
   else if (name==="horas") renderHoras();
   else if (name==="informes") renderInformes();
+  else if (name==="rendimiento") renderRendimiento();
 }
 
 function showTrainerUI(){
@@ -13245,6 +13248,22 @@ function infReporteDoc(p){
     indicaciones: p.indicaciones || ""
   };
   var inner = infV2BuildReport(payload, p.obs, bD, p.cD || {});
+  /* Anexo de rendimiento neuromuscular (si hay uno en cola desde la pestaña Rendimiento) */
+  if (typeof _rndAttach !== "undefined" && _rndAttach && _rndAttach.metrics) {
+    try {
+      /* El anexo hereda folio, sello, licencia y marca de agua del informe principal,
+         para que ambas piezas se lean como un solo documento. */
+      var _rOpts = Object.assign({}, (typeof _rndOpts !== "undefined" ? _rndOpts : {}), {
+        indicaciones: _rndAttach.indicaciones,
+        folio: p.folio,
+        borrador: !!(p.opts && p.opts.borrador),
+        sello: !!(p.opts && p.opts.sello),
+        consent: !!(p.opts && p.opts.consent),
+        licencia: (p.opts && p.opts.licencia) || ''
+      });
+      inner += rndAnexoHTML(_rndAttach.metrics, { nombre: payload.cliente.nombre }, _rOpts);
+    } catch (e) { console.warn("Anexo de rendimiento omitido:", e); }
+  }
   var css = INF_V2_CSS.split("@media print").join("@media all")
     + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
     + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;}"
@@ -14753,6 +14772,871 @@ function _cus19Import(){
     hideButton();
   });
 })();
+
+/* ============================================================
+   RENDIMIENTO — evaluación neuromuscular del deportista.
+   Módulo hermano de INFORMES (bioimpedancia): mismo patrón
+   (prompt de extracción → JSON estricto → análisis → informe
+   imprimible → historial del cliente), pero mide FUNCIÓN
+   (velocidad de reacción, agilidad, simetría) en vez de
+   ESTRUCTURA (composición corporal).
+
+   Fuente actual: capturas de BlazePod (actividad Random y
+   similares). El modelo de datos es genérico a propósito:
+   nuevas baterías (CMJ, sprint 10/20 m, dinamometría,
+   Y-Balance, T-test) entran como otra "prueba" sin rehacer nada.
+
+   Aislado: usa _rndState y reutiliza escapeHtml/toast/saveState/
+   getClient/infFetchClientes/INF_V2_CSS de la app.
+   ============================================================ */
+
+var RND_PROMPT = [
+"Necesito que actúes como un sistema de extracción de datos (OCR + parser estructurado) para resultados de BlazePod. Te voy a adjuntar 1 o varias capturas de pantalla de la app BlazePod y debes devolverme UN ÚNICO JSON estricto, sin texto adicional, sin markdown, sin backticks.",
+"",
+"QUÉ TRAE CADA CAPTURA (tarjeta de resultado de BlazePod):",
+'- Arriba a la izquierda: "BLAZEPOD ACTIVITY" y debajo el NOMBRE DE LA ACTIVIDAD en mayúsculas (ej. "RANDOM", "SPEED", "REACTION", "CHASE THE LIGHT").',
+'- Bajo el nombre, la DURACIÓN en formato MM:SS:CC (minutos:segundos:centésimas). Ejemplo: "01:00:00" son 60 segundos, NO una hora.',
+'- Abajo a la izquierda: el NOMBRE DE USUARIO del jugador (ej. "Darv19").',
+'- Abajo: un número grande bajo el rótulo "Hits" (toques válidos) y otro bajo "AVG ... Reaction" (tiempo medio de reacción EN MILISEGUNDOS).',
+'- Puede aparecer también "BEST"/"Best Reaction", "WORST", "Accuracy"/"Precisión" (%), "Misses"/"Fallos", o el número de pods. Si no están, deja null.',
+"",
+"INSTRUCCIONES:",
+'1) duracion_str = el texto tal cual ("01:00:00"). duracion_seg = minutos*60 + segundos leídos como MM:SS:CC. "01:00:00" -> 60. "02:30:00" -> 150.',
+'2) Los tiempos de reacción van en MILISEGUNDOS enteros (1032, no 1,032 ni 1.032 s).',
+'3) Fechas a YYYY-MM-DD. Si la captura no muestra fecha, deja "fecha": null (se completa después en la app).',
+'4) Comas decimales a puntos. Quita unidades ("846 ms" -> 846, "92 %" -> 92).',
+'5) LADO EVALUADO: si te lo indico en el mensaje (ej. "esta es la pierna derecha") usa exactamente "derecho" o "izquierdo". Si la captura no lo dice y yo no lo digo, deja "lado": null.',
+'6) SEGMENTO: "pierna", "brazo", "mano", "pie" o "cuerpo_completo" si se puede deducir; si no, null.',
+'7) Una entrada del array por CADA captura. NO fusiones capturas distintas.',
+'8) Valor ilegible -> null. NUNCA inventes ni estimes un número.',
+"",
+"DEVUÉLVEME EXACTAMENTE ESTA ESTRUCTURA (JSON estricto, sin markdown):",
+'{ "fuente":"blazepod",',
+'  "atleta":{ "usuario":null, "nombre":null },',
+'  "sesiones":[',
+'    { "fecha":null, "actividad":null, "duracion_str":null, "duracion_seg":null,',
+'      "lado":null, "segmento":null,',
+'      "hits":null, "fallos":null, "precision_pct":null, "pods":null,',
+'      "reaccion_ms_prom":null, "reaccion_ms_mejor":null, "reaccion_ms_peor":null,',
+'      "notas":null }',
+'  ] }',
+"",
+"Reemplaza los null por los valores reales. Deja null SOLO lo que no puedas leer. Devuelve SOLO el JSON, sin explicaciones ni markdown."
+].join("\n");
+
+var _rndState = { clientId:"", nombre:"", rut:"", phone:"", raw:"", data:null, metrics:null, reportHtml:"", dominante:"derecho", notas:"" };
+
+/* ---------- utilidades ---------- */
+function rndNum(v){ if(v==null||v==="") return null; var n=Number(String(v).replace(",",".").replace(/[^0-9.\-]/g,"")); return isNaN(n)?null:n; }
+function rndFdate(iso){ if(!iso) return "—"; var z=String(iso).split("-"); return z.length===3?(z[2]+"/"+z[1]+"/"+z[0]):iso; }
+function rndLadoTxt(l){ return l==="izquierdo"?"Izquierdo":(l==="derecho"?"Derecho":(l==="bilateral"?"Bilateral":"Sin lado")); }
+
+/* "01:00:00" (MM:SS:CC) o "1:00" a segundos. */
+function rndDurSeg(str){
+  if(!str) return null;
+  var p=String(str).trim().split(":").map(function(x){ return parseInt(x,10); });
+  if(p.some(isNaN)) return null;
+  if(p.length>=2) return p[0]*60+p[1];   // MM:SS[:CC]
+  if(p.length===1) return p[0];
+  return null;
+}
+
+/* Normaliza una sesión cruda del JSON de la IA. */
+function rndNormSesion(s){
+  var lado=(s.lado||"").toString().toLowerCase();
+  if(/izq|left/.test(lado)) lado="izquierdo";
+  else if(/der|right/.test(lado)) lado="derecho";
+  else if(/bilat|ambos|both/.test(lado)) lado="bilateral";
+  else lado=null;
+  var dur = rndNum(s.duracion_seg);
+  if(dur==null) dur = rndDurSeg(s.duracion_str||s.duracion);
+  return {
+    fecha: s.fecha||null,
+    actividad: s.actividad||null,
+    duracion_str: s.duracion_str||s.duracion||null,
+    duracion_seg: dur,
+    lado: lado,
+    segmento: s.segmento||null,
+    hits: rndNum(s.hits),
+    fallos: rndNum(s.fallos),
+    precision_pct: rndNum(s.precision_pct),
+    pods: rndNum(s.pods),
+    reaccion_ms_prom: rndNum(s.reaccion_ms_prom),
+    reaccion_ms_mejor: rndNum(s.reaccion_ms_mejor),
+    reaccion_ms_peor: rndNum(s.reaccion_ms_peor),
+    notas: s.notas||null
+  };
+}
+
+/* Derivados por sesión: toques por minuto y ritmo (ms entre toques). */
+function rndDerivados(s){
+  var o={ hits_min:null, ritmo_ms:null };
+  if(s.hits!=null && s.duracion_seg){
+    o.hits_min = +(s.hits/(s.duracion_seg/60)).toFixed(1);
+    o.ritmo_ms = Math.round(s.duracion_seg*1000/s.hits);
+  }
+  return o;
+}
+
+/* Asimetría entre dos valores. mejorEsMayor = true para hits, false para ms. */
+function rndAsim(izq, der, mejorEsMayor){
+  if(izq==null||der==null||!izq||!der) return null;
+  var alto=Math.max(izq,der), bajo=Math.min(izq,der);
+  var pct=(alto-bajo)/alto*100;
+  var mejorLado = mejorEsMayor ? (der>izq?"derecho":"izquierdo") : (der<izq?"derecho":"izquierdo");
+  var nivel = pct<10 ? "ok" : (pct<15 ? "vigilar" : "deficit");
+  return { pct:+pct.toFixed(1), lsi:+(bajo/alto*100).toFixed(1), mejorLado:mejorLado,
+           deficitLado:(mejorLado==="derecho"?"izquierdo":"derecho"), nivel:nivel };
+}
+function rndNivelTxt(n){ return n==="ok"?"Simetría adecuada":(n==="vigilar"?"A vigilar":"Déficit relevante"); }
+function rndNivelColor(n){ return n==="ok"?"#15803d":(n==="vigilar"?"#b45309":"#dc2626"); }
+
+/* Motor de análisis: agrupa por lado, calcula asimetría y evolución. */
+function rndMetrics(data, dominante){
+  var ses=(data.sesiones||[]).map(rndNormSesion).filter(function(s){ return s.hits!=null || s.reaccion_ms_prom!=null; });
+  ses.forEach(function(s){ var d=rndDerivados(s); s.hits_min=d.hits_min; s.ritmo_ms=d.ritmo_ms; });
+  ses.sort(function(a,b){ return String(a.fecha||"")<String(b.fecha||"")?-1:1; });
+
+  var porLado={ izquierdo:[], derecho:[], bilateral:[], sinlado:[] };
+  ses.forEach(function(s){ porLado[s.lado||"sinlado"].push(s); });
+
+  function ultima(arr){ return arr.length?arr[arr.length-1]:null; }
+  var uI=ultima(porLado.izquierdo), uD=ultima(porLado.derecho);
+
+  var asimetria=null;
+  if(uI&&uD){
+    asimetria={
+      fecha:(uD.fecha||uI.fecha||null),
+      hits: rndAsim(uI.hits, uD.hits, true),
+      reaccion: rndAsim(uI.reaccion_ms_prom, uD.reaccion_ms_prom, false),
+      ritmo: rndAsim(uI.hits_min, uD.hits_min, true),
+      izq:uI, der:uD, dominante:dominante||"derecho"
+    };
+  }
+
+  function evo(arr){
+    if(arr.length<2) return null;
+    var a=arr[0], b=arr[arr.length-1];
+    /* Sin dos fechas distintas no hay evolución: serían mediciones del mismo día
+       (típicamente izquierda vs derecha), y eso ya lo cubre el bloque de simetría. */
+    if(!a.fecha || !b.fecha || a.fecha===b.fecha) return null;
+    return {
+      ini:a, act:b,
+      dias:(a.fecha&&b.fecha)?Math.round((new Date(b.fecha)-new Date(a.fecha))/86400000):null,
+      d_hits:(a.hits!=null&&b.hits!=null)?(b.hits-a.hits):null,
+      d_reaccion:(a.reaccion_ms_prom!=null&&b.reaccion_ms_prom!=null)?(b.reaccion_ms_prom-a.reaccion_ms_prom):null
+    };
+  }
+  var evolucion={ izquierdo:evo(porLado.izquierdo), derecho:evo(porLado.derecho), global:null };
+  /* La evolución "global" solo tiene sentido cuando no hay series por lado:
+     mezclar izquierda y derecha en una misma serie compara cosas distintas. */
+  if(!evolucion.izquierdo && !evolucion.derecho) evolucion.global=evo(ses);
+
+  var reacs=ses.map(function(s){ return s.reaccion_ms_prom; }).filter(function(v){ return v!=null; });
+  var hitsA=ses.map(function(s){ return s.hits; }).filter(function(v){ return v!=null; });
+  var resumen={
+    n: ses.length,
+    fecha_ini:(ses[0]||{}).fecha||null,
+    fecha_act:(ses[ses.length-1]||{}).fecha||null,
+    reaccion_mejor: reacs.length?Math.min.apply(null,reacs):null,
+    reaccion_prom: reacs.length?Math.round(reacs.reduce(function(a,b){return a+b;},0)/reacs.length):null,
+    hits_max: hitsA.length?Math.max.apply(null,hitsA):null,
+    actividad:(ses[0]||{}).actividad||null,
+    usuario:(data.atleta&&data.atleta.usuario)||null
+  };
+  return { sesiones:ses, porLado:porLado, asimetria:asimetria, evolucion:evolucion, resumen:resumen, dominante:dominante||"derecho" };
+}
+
+/* Peor asimetría del bloque (la que manda la lectura). */
+function rndPeorAsim(a){
+  if(!a) return null;
+  var c=[a.reaccion,a.hits].filter(Boolean);
+  if(!c.length) return null;
+  return c.sort(function(x,y){ return y.pct-x.pct; })[0];
+}
+
+/* Lectura en lenguaje clínico (se imprime en el informe). */
+function rndNarrativa(m){
+  var p=[], r=m.resumen, a=m.asimetria;
+  if(r.reaccion_prom!=null){
+    p.push("El tiempo medio de reacción del bloque evaluado fue de <b>"+r.reaccion_prom+" ms</b>"
+      +((r.reaccion_mejor!=null&&r.reaccion_mejor!==r.reaccion_prom)?", con una mejor sesión de <b>"+r.reaccion_mejor+" ms</b>":"")+".");
+  }
+  if(a){
+    if(a.reaccion){
+      var q=a.reaccion;
+      p.push("En la comparación entre extremidades, el lado <b>"+rndLadoTxt(q.mejorLado).toLowerCase()+"</b> reacciona más rápido que el "
+        +rndLadoTxt(q.deficitLado).toLowerCase()+" (<b>"+Math.min(a.izq.reaccion_ms_prom,a.der.reaccion_ms_prom)+" ms</b> vs <b>"
+        +Math.max(a.izq.reaccion_ms_prom,a.der.reaccion_ms_prom)+" ms</b>): asimetría de <b>"+q.pct.toFixed(1)+"%</b> (LSI "+q.lsi.toFixed(0)+"%).");
+    }
+    if(a.hits){
+      var qh=a.hits;
+      p.push("En volumen de toques, el lado "+rndLadoTxt(qh.mejorLado).toLowerCase()+" registró <b>"+Math.max(a.izq.hits,a.der.hits)
+        +"</b> frente a <b>"+Math.min(a.izq.hits,a.der.hits)+"</b> del contralateral (asimetría <b>"+qh.pct.toFixed(1)+"%</b>).");
+    }
+    var peor=rndPeorAsim(a);
+    if(peor){
+      if(peor.deficitLado===a.dominante){
+        p.push("El déficit se ubica en el lado declarado como <b>dominante</b>, hallazgo poco habitual: conviene descartar fatiga acumulada, dolor o una limitación específica de ese segmento antes de atribuirlo al aprendizaje motor.");
+      } else {
+        p.push("El déficit se ubica en el lado <b>no dominante</b>, patrón esperable por la mayor exposición y control motor del lado hábil; se considera relevante cuando supera el 10–15%.");
+      }
+      if(peor.nivel==="deficit") p.push("Con una asimetría por sobre el <b>15%</b>, se sugiere trabajo unilateral dirigido al lado deficitario y reevaluación con el mismo protocolo en 4–6 semanas.");
+      else if(peor.nivel==="vigilar") p.push("La asimetría se ubica en la <b>zona de vigilancia (10–15%)</b>: conviene incorporar trabajo unilateral compensatorio y controlar su evolución.");
+      else p.push("La diferencia entre extremidades se encuentra <b>dentro del rango habitual (menos de 10%)</b>.");
+    }
+  }
+  var series=[["izquierdo",m.evolucion.izquierdo],["derecho",m.evolucion.derecho]].filter(function(x){ return x[1]; });
+  if(!series.length && m.evolucion.global) series=[["",m.evolucion.global]];
+  series.forEach(function(x){
+    var e=x[1]; if(e.d_reaccion==null) return;
+    p.push("En el lado "+(x[0]?rndLadoTxt(x[0]).toLowerCase():"evaluado")+", respecto de la primera medición del período"
+      +(e.dias?" ("+e.dias+" días)":"")+", el tiempo de reacción "
+      +(e.d_reaccion<0?"<b>mejoró</b> en "+Math.abs(e.d_reaccion)+" ms":(e.d_reaccion>0?"<b>empeoró</b> en "+e.d_reaccion+" ms":"se mantuvo sin cambios"))
+      +(e.d_hits!=null&&e.d_hits!==0?" y los toques "+(e.d_hits>0?"subieron":"bajaron")+" en "+Math.abs(e.d_hits):"")+".");
+  });
+  return p;
+}
+
+/* ---------- OPCIONES DEL INFORME DE RENDIMIENTO ---------- */
+var _rndOpts = { folio:"", sello:true, borrador:false, bn:false, consent:true, glosario:true, licencia:"", proxSem:"6", firmaEval:null, firmaCli:null };
+
+/* ---------- GRÁFICOS SVG ---------- */
+/* Medidor semicircular de asimetría con las tres zonas de decisión. */
+function rndGaugeSVG(pct, nivel){
+  if(pct==null) return '';
+  var max=30, v=Math.max(0,Math.min(max,pct));
+  var W=210, H=118, cx=105, cy=100, R=76, r=52;
+  function pt(val,rad){ var ang=Math.PI*(1-val/max); return [cx+rad*Math.cos(ang), cy-rad*Math.sin(ang)]; }
+  function arc(a,b,color){
+    var p1=pt(a,R), p2=pt(b,R), p3=pt(b,r), p4=pt(a,r);
+    return '<path d="M'+p1[0].toFixed(1)+','+p1[1].toFixed(1)
+      +' A'+R+','+R+' 0 0 1 '+p2[0].toFixed(1)+','+p2[1].toFixed(1)
+      +' L'+p3[0].toFixed(1)+','+p3[1].toFixed(1)
+      +' A'+r+','+r+' 0 0 0 '+p4[0].toFixed(1)+','+p4[1].toFixed(1)
+      +' Z" fill="'+color+'"/>';
+  }
+  var n=pt(v,R+3), base1=pt(v-1.6,r-9), base2=pt(v+1.6,r-9);
+  var col=rndNivelColor(nivel);
+  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + arc(0,10,'#15803d') + arc(10,15,'#d97706') + arc(15,max,'#b91c1c')
+    + '<polygon points="'+n[0].toFixed(1)+','+n[1].toFixed(1)+' '+base1[0].toFixed(1)+','+base1[1].toFixed(1)+' '+base2[0].toFixed(1)+','+base2[1].toFixed(1)+'" fill="#14241c"/>'
+    + '<circle cx="'+cx+'" cy="'+cy+'" r="5" fill="#14241c"/>'
+    + '<text x="'+cx+'" y="'+(cy-14)+'" text-anchor="middle" font-family="Inter,sans-serif" font-size="21" font-weight="800" fill="'+col+'">'+v.toFixed(1)+'%</text>'
+    + '<text x="'+(cx-R-1)+'" y="'+(cy+13)+'" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#7c8a83">0%</text>'
+    + '<text x="'+cx+'" y="'+(cy+13)+'" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#7c8a83">15%</text>'
+    + '<text x="'+(cx+R+1)+'" y="'+(cy+13)+'" text-anchor="middle" font-family="Inter,sans-serif" font-size="7.5" fill="#7c8a83">30%</text>'
+    + '</svg>';
+}
+
+/* Barras comparativas izquierda / derecha (una métrica). */
+function rndBarsSVG(titulo, unidad, izq, der, mejorEsMayor){
+  if(izq==null||der==null) return '';
+  var W=210, H=104, x0=34, w=150, maxv=Math.max(izq,der)||1;
+  function bw(v){ return Math.max(3, v/maxv*w); }
+  var mejorIzq = mejorEsMayor ? (izq>=der) : (izq<=der);
+  var cI = mejorIzq?'#0e5132':'#94a3b8', cD = mejorIzq?'#94a3b8':'#0e5132';
+  return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + '<text x="0" y="12" font-family="Inter,sans-serif" font-size="9" font-weight="700" fill="#0e5132">'+titulo+'</text>'
+    + '<text x="'+W+'" y="12" text-anchor="end" font-family="Inter,sans-serif" font-size="7.5" fill="#7c8a83">'+unidad+'</text>'
+    + '<text x="0" y="42" font-family="Inter,sans-serif" font-size="8" fill="#46544c">Izq</text>'
+    + '<rect x="'+x0+'" y="32" width="'+bw(izq).toFixed(1)+'" height="14" rx="2.5" fill="'+cI+'"/>'
+    + '<text x="'+(x0+bw(izq)+4).toFixed(1)+'" y="42.5" font-family="Inter,sans-serif" font-size="8.5" font-weight="700" fill="#14241c">'+izq+'</text>'
+    + '<text x="0" y="70" font-family="Inter,sans-serif" font-size="8" fill="#46544c">Der</text>'
+    + '<rect x="'+x0+'" y="60" width="'+bw(der).toFixed(1)+'" height="14" rx="2.5" fill="'+cD+'"/>'
+    + '<text x="'+(x0+bw(der)+4).toFixed(1)+'" y="70.5" font-family="Inter,sans-serif" font-size="8.5" font-weight="700" fill="#14241c">'+der+'</text>'
+    + '<line x1="'+x0+'" y1="84" x2="'+(x0+w)+'" y2="84" stroke="#e6ece9" stroke-width="1"/>'
+    + '<text x="'+x0+'" y="96" font-family="Inter,sans-serif" font-size="7" fill="#7c8a83">'
+      + (mejorEsMayor?'más alto es mejor':'más bajo es mejor')+'</text>'
+    + '</svg>';
+}
+
+/* Línea de evolución por lado (3+ fechas). */
+function rndTrendSVG(titulo, unidad, serie, dec){
+  var pts=serie.filter(function(p){ return p.v!=null && p.f; });
+  if(pts.length<3) return '';
+  var w=215,h=96,px=16,py=18;
+  var vmin=Math.min.apply(null,pts.map(function(p){return p.v;}));
+  var vmax=Math.max.apply(null,pts.map(function(p){return p.v;}));
+  var rng=(vmax-vmin)||1;
+  var X=function(i){ return px+i*((w-2*px)/(pts.length-1)); };
+  var Y=function(v){ return (h-py)-((v-vmin)/rng)*(h-2*py); };
+  var path=pts.map(function(p,i){ return (i?'L':'M')+X(i).toFixed(1)+','+Y(p.v).toFixed(1); }).join(' ');
+  var dots=pts.map(function(p,i){ return '<circle cx="'+X(i).toFixed(1)+'" cy="'+Y(p.v).toFixed(1)+'" r="2.4" fill="'+(i===pts.length-1?'#15803d':'#94a3b8')+'"/>'; }).join('');
+  return '<div class="pr-spark"><div class="pr-spark-t">'+titulo+' <span>'+unidad+'</span></div>'
+    + '<svg viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'
+    + '<path d="'+path+'" fill="none" stroke="#0e5132" stroke-width="1.8"/>'+dots
+    + '<text x="'+px+'" y="'+(h-3)+'" font-size="7" fill="#7c8a83">'+String(pts[0].f).slice(5)+'</text>'
+    + '<text x="'+(w-px)+'" y="'+(h-3)+'" font-size="7" fill="#7c8a83" text-anchor="end">'+String(pts[pts.length-1].f).slice(5)+'</text>'
+    + '<text x="'+X(0).toFixed(1)+'" y="'+(Y(pts[0].v)-5).toFixed(1)+'" font-size="7.5" fill="#46544c" text-anchor="middle">'+pts[0].v.toFixed(dec||0)+'</text>'
+    + '<text x="'+X(pts.length-1).toFixed(1)+'" y="'+(Y(pts[pts.length-1].v)-5).toFixed(1)+'" font-size="8" font-weight="700" fill="#15803d" text-anchor="middle">'+pts[pts.length-1].v.toFixed(dec||0)+'</text>'
+    + '</svg></div>';
+}
+
+/* ---------- BLOQUES DEL INFORME (clases pr-* del informe V2) ---------- */
+function rndReportBlocks(m, cli, opts){
+  opts=opts||{};
+  var r=m.resumen, a=m.asimetria;
+  var esc=(typeof escapeHtml==="function")?escapeHtml:function(x){return String(x);};
+
+  function kpi(cls,bar,val,unit,foot){
+    return '<div class="pr-kpi '+cls+'"><div class="pr-kbar">'+bar+'</div><div class="pr-kbody">'
+      +'<div class="pr-kval">'+val+'</div><div class="pr-kunit">'+unit+'</div>'
+      +(foot?'<div class="pr-kdelta">'+foot+'</div>':'')+'</div></div>';
+  }
+  var peor=rndPeorAsim(a);
+  var kpis='<div class="pr-kpis">'
+    + kpi('neut','Reacción media',(r.reaccion_prom!=null?r.reaccion_prom:'—'),'ms',(r.n===1?'1 sesión':r.n+' sesiones'))
+    + kpi('good','Mejor reacción',(r.reaccion_mejor!=null?r.reaccion_mejor:'—'),'ms','marca del período')
+    + kpi('neut','Toques máx.',(r.hits_max!=null?r.hits_max:'—'),'hits',(r.actividad?esc(r.actividad):'—'))
+    + kpi(peor?(peor.nivel==='ok'?'good':(peor.nivel==='vigilar'?'neut':'bad')):'neut','Asimetría',(peor?peor.pct.toFixed(1):'—'),'%',peor?rndNivelTxt(peor.nivel):'requiere ambos lados')
+    + '</div>';
+
+  var filas=m.sesiones.map(function(s){
+    return '<tr><td class="lbl">'+rndFdate(s.fecha)+'</td>'
+      +'<td class="num">'+(s.actividad?esc(s.actividad):'—')+'</td>'
+      +'<td class="num">'+rndLadoTxt(s.lado)+'</td>'
+      +'<td class="num">'+(s.duracion_seg!=null?s.duracion_seg+' s':'—')+'</td>'
+      +'<td class="num">'+(s.hits!=null?s.hits:'—')+'</td>'
+      +'<td class="num">'+(s.hits_min!=null?s.hits_min.toFixed(1):'—')+'</td>'
+      +'<td class="num">'+(s.reaccion_ms_prom!=null?s.reaccion_ms_prom:'—')+'</td></tr>';
+  }).join('');
+  var tabla='<div class="pr-sec"><div class="pr-letter">M</div><div class="pr-secttl"><h2>Mediciones registradas</h2>'
+    +'<p>Detalle de cada sesión del bloque · hits/min derivado de la duración</p></div></div>'
+    +'<table class="pr-tbl"><thead><tr><th>Fecha</th><th class="num">Actividad</th><th class="num">Lado</th>'
+    +'<th class="num">Duración</th><th class="num">Hits</th><th class="num">Hits/min</th><th class="num">Reacción (ms)</th></tr></thead>'
+    +'<tbody>'+filas+'</tbody></table>';
+
+  function segRowR(nombre,izq,der,unidad,q,dec){
+    if(izq==null||der==null||!q) return '';
+    var maxv=Math.max(izq,der)||1;
+    var bar=function(v,side){ return '<div class="pr-segbar"><span>'+side+'</span><div class="pr-segtrack"><div class="pr-segfill" style="width:'
+      +(v/maxv*100).toFixed(0)+'%"></div></div><b>'+Number(v).toFixed(dec||0)+'</b></div>'; };
+    return '<div class="pr-segrow"><div class="pr-segname">'+nombre+' <span>'+unidad+'</span></div>'
+      +'<div class="pr-segbars">'+bar(izq,'Izq')+bar(der,'Der')+'</div>'
+      +'<div class="pr-segasym" style="color:'+rndNivelColor(q.nivel)+'">'+q.pct.toFixed(1)+'%<span>'
+      +(q.nivel==='ok'?'OK':(q.nivel==='vigilar'?'Revisar':'Alta'))+'</span></div></div>';
+  }
+
+  var asimBlock='', gaugeBlock='';
+  if(a){
+    var rows=segRowR('Toques (hits)',a.izq.hits,a.der.hits,'n',a.hits,0)
+      + segRowR('Tiempo de reacción',a.izq.reaccion_ms_prom,a.der.reaccion_ms_prom,'ms',a.reaccion,0)
+      + ((a.izq.duracion_seg!==a.der.duracion_seg)   /* con la misma duración, hits/min repite la fila de hits */
+          ? segRowR('Ritmo de toque',a.izq.hits_min,a.der.hits_min,'hits/min',a.ritmo,1) : '');
+    if(rows){
+      asimBlock='<div class="pr-sec"><div class="pr-letter">S</div><div class="pr-secttl"><h2>Simetría entre extremidades</h2>'
+        +'<p>Lado dominante declarado: '+rndLadoTxt(a.dominante).toLowerCase()+' · barras proporcionales al mejor lado</p></div></div>'
+        +'<div class="pr-seg">'+rows+'</div>'
+        +'<div class="pr-legend"><span class="pr-lg"><span class="pr-dot good"></span>&lt;10% habitual</span>'
+        +'<span class="pr-lg"><span class="pr-dot" style="background:#d97706"></span>10–15% vigilancia</span>'
+        +'<span class="pr-lg"><span class="pr-dot bad"></span>&gt;15% déficit relevante</span>'
+        +'<span class="pr-lg-note">criterio LSI de retorno deportivo</span></div>'
+        +'<div class="pr-refnote">En tiempo de reacción, un valor menor es mejor. Carácter descriptivo: no constituye diagnóstico clínico.</div>';
+    }
+    if(peor){
+      gaugeBlock='<div class="pr-sec"><div class="pr-letter">A</div><div class="pr-secttl"><h2>Índice de asimetría</h2>'
+        +'<p>Peor de las métricas comparables · umbrales de decisión</p></div></div>'
+        +'<div class="pr-gauge-wrap">'
+        +  '<div class="pr-gauge">'+rndGaugeSVG(peor.pct,peor.nivel)
+        +    '<div class="pr-gauge-cap"><b style="color:'+rndNivelColor(peor.nivel)+'">'+rndNivelTxt(peor.nivel)+'</b><br>'
+        +    'LSI '+peor.lsi.toFixed(0)+'% · déficit en lado '+rndLadoTxt(peor.deficitLado).toLowerCase()+'</div></div>'
+        +  '<div class="pr-gcharts">'
+        +    (a.reaccion?'<div class="pr-gchart">'+rndBarsSVG('Tiempo de reacción','ms',a.izq.reaccion_ms_prom,a.der.reaccion_ms_prom,false)+'</div>':'')
+        +    (a.hits?'<div class="pr-gchart">'+rndBarsSVG('Toques válidos','hits',a.izq.hits,a.der.hits,true)+'</div>':'')
+        +  '</div></div>';
+    }
+  }
+
+  var evoBlock='';
+  var evs=[['Izquierdo',m.evolucion.izquierdo],['Derecho',m.evolucion.derecho]].filter(function(x){ return x[1]; });
+  if(!evs.length && m.evolucion.global) evs=[['Global',m.evolucion.global]];
+  if(evs.length){
+    var er=evs.map(function(x){
+      var e=x[1], dr=e.d_reaccion, dh=e.d_hits;
+      var cls=function(v,mejorNeg){ if(v==null||v===0) return 'eq'; return mejorNeg?(v<0?'good':'bad'):(v>0?'good':'bad'); };
+      return '<tr><td class="lbl">'+x[0]+'</td>'
+        +'<td class="num">'+rndFdate(e.ini.fecha)+' → '+rndFdate(e.act.fecha)+'</td>'
+        +'<td class="num">'+(e.ini.reaccion_ms_prom!=null?e.ini.reaccion_ms_prom:'—')+' → '+(e.act.reaccion_ms_prom!=null?e.act.reaccion_ms_prom:'—')+'</td>'
+        +'<td class="num delta '+cls(dr,true)+'">'+(dr==null?'—':((dr>0?'+':'')+dr+' ms'))+'</td>'
+        +'<td class="num">'+(e.ini.hits!=null?e.ini.hits:'—')+' → '+(e.act.hits!=null?e.act.hits:'—')+'</td>'
+        +'<td class="num delta '+cls(dh,false)+'">'+(dh==null?'—':((dh>0?'+':'')+dh))+'</td></tr>';
+    }).join('');
+    /* Tendencia gráfica cuando hay 3+ fechas por lado */
+    var sparks=['izquierdo','derecho'].map(function(l){
+      var arr=m.porLado[l]||[];
+      return rndTrendSVG('Reacción · '+rndLadoTxt(l).toLowerCase(),'ms',
+        arr.map(function(s){ return {v:s.reaccion_ms_prom,f:s.fecha}; }),0);
+    }).filter(Boolean).join('');
+    evoBlock='<div class="pr-sec"><div class="pr-letter">E</div><div class="pr-secttl"><h2>Evolución del período</h2>'
+      +'<p>Primera vs. última medición registrada por lado</p></div></div>'
+      +(sparks?'<div class="pr-sparks">'+sparks+'</div>':'')
+      +'<table class="pr-tbl"><thead><tr><th>Lado</th><th class="num">Período</th><th class="num">Reacción (ms)</th>'
+      +'<th class="num">Δ</th><th class="num">Hits</th><th class="num">Δ</th></tr></thead><tbody>'+er+'</tbody></table>';
+  }
+
+  var narr=rndNarrativa(m);
+  var narrBlock = narr.length
+    ? '<div class="pr-sec"><div class="pr-letter">L</div><div class="pr-secttl"><h2>Lectura de los resultados</h2>'
+      +'<p>Interpretación del evaluador sobre los datos registrados</p></div></div>'
+      +'<div class="pr-narr">'+narr.map(function(t){ return '<p style="margin-bottom:4px">'+t+'</p>'; }).join('')+'</div>'
+    : '';
+
+  var indic=(opts.indicaciones||'').trim();
+  var indicBlock = indic
+    ? '<div class="pr-sec"><div class="pr-letter">✎</div><div class="pr-secttl"><h2>Indicaciones del profesional</h2>'
+      +'<p>Plan sugerido a partir de esta evaluación</p></div></div>'
+      +'<div class="pr-indic"><p>'+esc(indic).replace(/\n/g,'<br>')+'</p></div>'
+    : '';
+
+  var idbar='<div class="pr-idbar" style="grid-template-columns:2fr 1.2fr .8fr 1fr 1.4fr;">'
+    +'<div><span class="lbl">Evaluado</span><span class="val">'+esc(cli.nombre||'—')+'</span></div>'
+    +'<div><span class="lbl">Usuario BlazePod</span><span class="val">'+esc(r.usuario||'—')+'</span></div>'
+    +'<div><span class="lbl">Sesiones</span><span class="val">'+r.n+'</span></div>'
+    +'<div><span class="lbl">Dominancia</span><span class="val">'+rndLadoTxt(m.dominante)+'</span></div>'
+    +'<div><span class="lbl">Período</span><span class="val">'+rndFdate(r.fecha_ini)+' → '+rndFdate(r.fecha_act)+'</span></div></div>';
+
+  var head='<div class="pr-sec"><div class="pr-letter">R</div><div class="pr-secttl">'
+    +'<h2>Rendimiento neuromuscular · velocidad de reacción y agilidad</h2>'
+    +'<p>Protocolo BlazePod'+(r.actividad?' · actividad '+esc(r.actividad):'')+' · registro instrumentado</p></div></div>';
+
+  var nota='<div class="pr-note"><b>Sobre la interpretación.</b> Estas mediciones no cuentan con valores normativos poblacionales validados para este '
+    +'dispositivo y protocolo: la referencia es <b>el propio evaluado</b>. Su valor está en la comparación entre extremidades (simetría) y en la '
+    +'evolución medida con el mismo montaje: igual número de pods, distancia, altura, duración y consigna. Un cambio de setup invalida la comparación. '
+    +'Documento de seguimiento del entrenamiento; no constituye diagnóstico ni reemplaza una evaluación clínica presencial.</div>';
+
+  var glosario='<div class="pr-sec"><div class="pr-letter">ℹ</div><div class="pr-secttl"><h2>Cómo leer este informe</h2>'
+    +'<p>Glosario de los términos empleados</p></div></div>'
+    +'<div class="pr-glos">'
+    +'<p><b>Tiempo de reacción (ms).</b> Milisegundos entre que el pod se enciende y lo apagas. Incluye el procesamiento del estímulo y el desplazamiento hasta el pod: es reacción <i>y</i> agilidad, no solo reflejo. Menos es mejor.</p>'
+    +'<p><b>Hits.</b> Toques válidos en la duración de la actividad. Con el mismo montaje, más hits significa más ciclos completados.</p>'
+    +'<p><b>Hits/min.</b> Toques normalizados por minuto. Permite comparar sesiones de distinta duración.</p>'
+    +'<p><b>Asimetría (%).</b> Diferencia entre extremidades respecto del mejor lado. Bajo 10% se considera habitual; entre 10 y 15% conviene vigilar; sobre 15% se interpreta como déficit relevante.</p>'
+    +'<p><b>LSI (Limb Symmetry Index).</b> El lado más débil expresado como porcentaje del más fuerte. Un LSI de 90% o más es el criterio de uso extendido para autorizar retorno deportivo.</p>'
+    +'<p><b>Lado dominante.</b> La extremidad hábil declarada. Un déficit en el lado no dominante es esperable; en el dominante obliga a investigar fatiga, dolor o limitación específica.</p>'
+    +'</div>';
+
+  return { head:head, idbar:idbar, kpis:kpis, tabla:tabla, gaugeBlock:gaugeBlock, asimBlock:asimBlock,
+           evoBlock:evoBlock, narrBlock:narrBlock, indicBlock:indicBlock, nota:nota, glosario:glosario };
+}
+
+/* CSS propio del anexo/informe de rendimiento (medidor y mini-gráficos). */
+var RND_CSS = "\n@media all{"
+  + ".pr-gauge-wrap{display:flex;gap:5mm;align-items:stretch;margin:2mm 0 3mm;page-break-inside:avoid;break-inside:avoid;}"
+  + ".pr-gauge{flex:0 0 48mm;border:0.3mm solid #e6ece9;border-radius:2mm;padding:2.5mm;background:#fbfdfc;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".pr-gauge-cap{font-size:7.5pt;color:#46544c;line-height:1.4;margin-top:1mm;}"
+  + ".pr-gcharts{flex:1;display:flex;gap:4mm;}"
+  + ".pr-gchart{flex:1;border:0.3mm solid #e6ece9;border-radius:2mm;padding:2.5mm 3mm;background:#fff;}"
+  + "}";
+
+/* Membrete reutilizable (portada, encabezado corrido, pie y firmas). */
+function rndChrome(cli, m, opts){
+  var esc=(typeof escapeHtml==="function")?escapeHtml:function(x){return String(x);};
+  opts=opts||{};
+  var hoy=new Date();
+  var hoyFmt=String(hoy.getDate()).padStart(2,'0')+'/'+String(hoy.getMonth()+1).padStart(2,'0')+'/'+hoy.getFullYear();
+  var folio=opts.folio||'—';
+  var per=rndFdate(m.resumen.fecha_ini)+' → '+rndFdate(m.resumen.fecha_act);
+
+  var cover='<div class="pr-cover">'
+    +'<div class="pr-cover-logo">'+USPORT_LOGO_SVG+'</div>'
+    +'<div class="pr-cover-id">'
+    +'<div class="pr-cover-brand">ULTRA-SPORT 19</div>'
+    +'<div class="pr-cover-tag">Despierta tu instinto · Rendimiento · Velocidad · Resistencia</div>'
+    +'<div class="pr-cover-title">Informe de rendimiento neuromuscular · Velocidad de reacción y agilidad</div></div>'
+    +'<div class="pr-cover-meta"><div class="pr-conf">Confidencial</div>'
+    +'<div class="pr-cm-row"><span>Folio</span><b>'+esc(folio)+'</b></div>'
+    +'<div class="pr-cm-row"><span>Emisión</span><b>'+hoyFmt+'</b></div>'
+    +'<div class="pr-cm-row"><span>Período</span><b>'+per+'</b></div></div></div>';
+
+  var hdr='<div class="pr-pagehdr">'
+    +'<div class="pr-logo">'+USPORT_LOGO_SVG+'</div>'
+    +'<div class="pr-ttl"><h1>INFORME DE RENDIMIENTO — NEUROMUSCULAR</h1>'
+    +'<p>Ultra-Sport 19 · Diego Valenzuela, Interno de Kinesiología, U. de Talca · Pencahue, Maule</p></div>'
+    +'<div class="pr-pg">'+esc(cli.nombre||'')+'<br><span style="color:#94a3b8;font-weight:400;">'+per+'</span></div></div>';
+
+  var foot='<div class="pr-pagefoot">'
+    +'<span class="pr-ft-l">Ultra-Sport 19 · '+esc(folio)+' · Confidencial</span>'
+    +'<span class="pr-ft-c">+56 9 2924 4042 · @ultrasport_19 · Pencahue, Maule, Chile</span>'
+    +'<span class="pr-ft-r"><span class="pr-pageno"></span></span></div>';
+
+  var wm = opts.borrador ? '<div class="pr-watermark">BORRADOR</div>' : '';
+
+  var stamp = opts.sello
+    ? '<div class="pr-stamp"><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">'
+      +'<circle cx="50" cy="50" r="47" fill="none" stroke="#0e5132" stroke-width="2.5"/>'
+      +'<circle cx="50" cy="50" r="39" fill="none" stroke="#0e5132" stroke-width="1"/>'
+      +'<text x="50" y="45" text-anchor="middle" font-family="Inter,sans-serif" font-size="9.5" font-weight="800" fill="#0e5132">ULTRA-SPORT 19</text>'
+      +'<text x="50" y="57" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" letter-spacing="1" fill="#0e5132">KINESIOLOGIA</text>'
+      +'<line x1="26" y1="63" x2="74" y2="63" stroke="#0e5132" stroke-width="0.8"/>'
+      +'<text x="50" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.5" fill="#0e5132">PENCAHUE - MAULE</text></svg></div>'
+    : '';
+
+  var licLine = (opts.licencia||'').trim() ? '<div class="pr-slic">Reg. N.º '+esc(opts.licencia.trim())+'</div>' : '';
+  var consentLine = opts.consent
+    ? '<div class="pr-consent">El evaluado autoriza el registro y tratamiento de sus mediciones de rendimiento con fines exclusivos de seguimiento deportivo.</div>' : '';
+  var sigE = opts.firmaEval ? '<img class="pr-sigimg" src="'+opts.firmaEval+'">' : '';
+  var sigC = opts.firmaCli  ? '<img class="pr-sigimg" src="'+opts.firmaCli+'">'  : '';
+
+  var proxTxt='';
+  var pn=parseInt(opts.proxSem||'',10);
+  if(pn>0 && m.resumen.fecha_act){
+    var pf=new Date(m.resumen.fecha_act+'T12:00:00'); pf.setDate(pf.getDate()+pn*7);
+    proxTxt='Sugerida a partir del '+String(pf.getDate()).padStart(2,'0')+'/'+String(pf.getMonth()+1).padStart(2,'0')+'/'+pf.getFullYear()+' ('+pn+' semanas)<br>';
+  }
+
+  var firmas='<div class="pr-sec"><div class="pr-letter">F</div><div class="pr-secttl"><h2>Firmas y validación</h2>'
+    +'<p>Conformidad con los resultados presentados en el informe</p></div></div>'
+    +'<div class="pr-signs pr-signs-page">'
+    +'<div class="pr-sign evaluator">'+stamp
+    +'<div class="pr-sttl">Evaluador responsable</div><div class="pr-sbody">'
+    +'<div class="pr-slogo">'+USPORT_LOGO_SVG+'</div>'
+    +'<div class="pr-sname">Diego Valenzuela</div>'
+    +'<div class="pr-srole">Interno de Kinesiología<br>Universidad de Talca</div>'
+    + licLine
+    +'<div class="pr-sline"></div><div class="pr-sigspace">'+sigE+'</div>'
+    +'<div class="pr-sorg">Ultra-Sport 19 · Pencahue, Maule</div>'
+    +'<div class="pr-sdate">Emisión: '+hoyFmt+'</div></div></div>'
+    +'<div class="pr-sign client"><div class="pr-sttl">Deportista evaluado</div><div class="pr-sbody">'
+    +'<div class="pr-shint">Firma en señal de conformidad<br>con los resultados presentados.</div>'
+    +'<div class="pr-sline"></div><div class="pr-sigspace">'+sigC+'</div>'
+    +'<div><div class="pr-sname">'+esc(cli.nombre||'—')+'</div>'
+    +'<div class="pr-smeta">'+(m.resumen.usuario?('BlazePod: '+esc(m.resumen.usuario)+' · '):'')
+      +(m.resumen.n===1?'1 sesión':m.resumen.n+' sesiones')+'</div>'
+    +'<div class="pr-seval">Fecha de evaluación: '+rndFdate(m.resumen.fecha_act)+'</div>'
+    + consentLine +'</div></div></div>'
+    +'<div class="pr-qrband"><img class="pr-qr" src="'+USPORT_QR_CALENDLY+'" alt="Agenda en Calendly">'
+    +'<div class="pr-qr-cap"><b>Agenda tu próxima evaluación</b><br>'+proxTxt
+    +'Escanea el código QR o visita calendly.com/ultrasport19/entrenamiento</div></div></div>';
+
+  return { cover:cover, hdr:hdr, foot:foot, wm:wm, firmas:firmas, folio:folio, hoyFmt:hoyFmt };
+}
+
+/* Páginas de anexo para el informe de bioimpedancia. */
+function rndAnexoHTML(m, cli, opts){
+  var b=rndReportBlocks(m, cli, opts);
+  var ch=rndChrome(cli, m, opts||{});
+  var hdr='<div class="pr-pagehdr"><div class="pr-logo">'+USPORT_LOGO_SVG+'</div>'
+    +'<div class="pr-ttl"><h1>ANEXO · RENDIMIENTO NEUROMUSCULAR</h1>'
+    +'<p>Ultra-Sport 19 · Velocidad de reacción y agilidad · Protocolo BlazePod</p></div>'
+    +'<div class="pr-pg">'+((typeof escapeHtml==="function")?escapeHtml(cli.nombre||''):(cli.nombre||''))
+    +'<br><span style="color:#94a3b8;font-weight:400;">'+rndFdate(m.resumen.fecha_act)+'</span></div></div>';
+  return '<sty'+'le>'+RND_CSS+'</sty'+'le>'
+    + '<div class="pr-page">'+ch.wm+hdr+'<div class="pr-content">'
+      + b.head + b.idbar + b.kpis + b.gaugeBlock + b.asimBlock
+      + '</div>'+ch.foot+'</div>'
+    + '<div class="pr-page">'+ch.wm+hdr+'<div class="pr-content">'
+      + b.tabla + b.narrBlock + b.evoBlock + b.indicBlock + b.nota
+      + '</div>'+ch.foot+'</div>';
+}
+
+/* Documento independiente (informe de rendimiento por sí solo). */
+function rndReporteDoc(m, cli, opts){
+  opts=opts||{};
+  var b=rndReportBlocks(m, cli, opts);
+  var ch=rndChrome(cli, m, opts);
+
+  var inner=''
+    + '<div class="pr-page">'+ch.wm+ch.cover+'<div class="pr-content">'
+      + b.idbar + b.head + b.kpis + b.gaugeBlock + b.asimBlock
+      + '</div>'+ch.foot+'</div>'
+    + '<div class="pr-page">'+ch.wm+ch.hdr+'<div class="pr-content">'
+      + b.tabla + b.narrBlock + b.evoBlock
+      + '</div>'+ch.foot+'</div>'
+    + '<div class="pr-page">'+ch.wm+ch.hdr+'<div class="pr-content">'
+      + b.indicBlock + b.nota + (opts.glosario!==false ? b.glosario : '') + ch.firmas
+      + '</div>'+ch.foot+'</div>';
+
+  var bn = opts.bn
+    ? '<sty'+'le>#printableReport{-webkit-filter:grayscale(1);filter:grayscale(1);}'
+      +'#printableReport .pr-sign.evaluator .pr-sbody{background:#fff !important;color:#14241c !important;}'
+      +'#printableReport .pr-kbar{background:#e2e8f0 !important;color:#14241c !important;}'
+      +'#printableReport .pr-letter{background:#334e68 !important;}</sty'+'le>'
+    : '';
+
+  var css = INF_V2_CSS.split("@media print").join("@media all") + RND_CSS
+    + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
+    + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;position:relative;}"
+    + ' .pr-pageno::after{content:"—";}'
+    + " @media print{ body{background:#fff !important;padding:0 !important;} .pr-page{box-shadow:none !important;} }";
+  var fontLink='<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">';
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    +'<meta name="viewport" content="width=device-width, initial-scale=1"><title>Informe de rendimiento US19</title>'
+    + fontLink + '<style>'+css+'</style></head><body><div id="printableReport">'+bn+inner+'</div></body></html>';
+}
+
+/* ---------- UI ---------- */
+function renderRendimiento(){
+  var html='<div class="section-head"><h1 class="section-title">RENDIMIENTO <span class="accent">/ EVALUACIÓN DEPORTIVA</span></h1></div>';
+  html+='<div class="card"><div class="card-main"><div class="card-title">1 · Deportista</div>'
+    +'<div class="form-row"><label class="form-label">Elige el cliente</label><select id="rnd-cliente"><option value="">— cargando… —</option></select></div>'
+    +'<div class="form-row"><label class="form-label">Lado dominante (pierna/brazo hábil)</label>'
+    +'<select id="rnd-dominante"><option value="derecho">Derecho</option><option value="izquierdo">Izquierdo</option></select></div>'
+    +'<span id="rnd-cli-src" class="text-xs text-muted"></span></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">2 · Extraer datos de BlazePod</div>'
+    +'<p class="text-xs text-muted" style="line-height:1.5;">Sube tus capturas de BlazePod a una IA (Claude/ChatGPT) con este prompt y pega el JSON que devuelve. '
+    +'<b>Dile a la IA qué lado corresponde a cada captura</b> (ej. «la primera es pierna izquierda, la segunda derecha») — es lo que habilita el análisis de simetría.</p>'
+    +'<button class="btn btn-secondary btn-sm" onclick="rndCopyPrompt()">📋 Copiar prompt de extracción</button></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3 · Sesiones (pega el JSON)</div>'
+    +'<div class="form-row"><textarea id="rnd-json" style="min-height:120px;font-family:var(--font-mono);font-size:.72rem;" '
+    +'placeholder="{ &quot;fuente&quot;:&quot;blazepod&quot;, &quot;sesiones&quot;:[ … ] }">'+escapeHtml(_rndState.raw||"")+'</textarea></div>'
+    +'<button class="btn btn-primary" onclick="rndAnalizar()">Analizar sesiones</button> '
+    +'<button class="btn btn-ghost btn-sm" onclick="rndDemo()">Cargar ejemplo</button> <span id="rnd-msg" class="text-xs"></span>'
+    +'<div id="rnd-editor" style="margin-top:.8rem;"></div></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">4 · Análisis</div>'
+    +'<div id="rnd-analisis"><p class="text-xs text-muted">Pega el JSON y pulsa «Analizar sesiones».</p></div></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">5 · Presentación del informe</div>'
+    +'<div class="iop-grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">'
+    +  '<div>'
+    +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-sello"> Mostrar sello profesional</label>'
+    +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-glosario"> Incluir glosario «Cómo leer este informe»</label>'
+    +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-consent"> Línea de consentimiento de datos</label>'
+    +  '</div>'
+    +  '<div>'
+    +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-borrador"> Marcar como BORRADOR</label>'
+    +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-bn"> Impresión económica (B/N)</label>'
+    +    '<div style="display:flex;gap:.4rem;align-items:center;margin-top:4px;">'
+    +      '<span class="text-xs text-muted">N.º registro</span><input id="rnd-opt-licencia" type="text" placeholder="(al titularte)" style="flex:1;font-size:.75rem;">'
+    +    '</div>'
+    +  '</div>'
+    + '</div>'
+    +'<div style="display:flex;gap:.4rem;align-items:center;margin-top:.5rem;">'
+    +  '<span class="text-xs text-muted">Próx. reevaluación</span>'
+    +  '<select id="rnd-opt-proxsem"><option value="">Sin sugerencia</option><option value="4">En 4 semanas</option>'
+    +  '<option value="6">En 6 semanas</option><option value="8">En 8 semanas</option><option value="12">En 12 semanas</option></select>'
+    +'</div></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">6 · Informe</div>'
+    +'<div class="form-row"><label class="form-label">Indicaciones del profesional (opcional)</label>'
+    +'<textarea id="rnd-indic" rows="3" placeholder="Ej. Trabajo unilateral de pierna izquierda 2×/semana (pliometría reactiva y cambios de dirección). Reevaluar con el mismo montaje en 6 semanas.">'
+    +escapeHtml(_rndState.notas||"")+'</textarea></div>'
+    +'<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
+    +'<button class="btn btn-primary btn-sm" onclick="rndGenerar()">📄 Generar informe de rendimiento</button>'
+    +'<button class="btn btn-secondary btn-sm" onclick="rndAdjuntar()">📎 Adjuntar al informe de bioimpedancia</button>'
+    +'<button class="btn btn-secondary btn-sm" onclick="rndGuardar()">💾 Guardar en historial</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="rndExport()">⬇ Exportar JSON</button></div>'
+    +'<p class="text-xs text-muted" style="margin-top:.5rem;line-height:1.5;">«Adjuntar» deja esta evaluación en cola: el siguiente informe que generes en '
+    +'<b>Informes</b> incluirá el anexo de rendimiento al final, con el mismo folio y la misma firma.</p>'
+    +'<div id="rnd-attach-state" class="text-xs" style="margin-top:.3rem;"></div></div></div>';
+
+  html+='<div id="rnd-report-wrap" style="margin-top:1rem;"></div>';
+  document.getElementById("view-rendimiento").innerHTML=html;
+
+  var dom=document.getElementById("rnd-dominante");
+  dom.value=_rndState.dominante||"derecho";
+  dom.addEventListener("change", function(){ _rndState.dominante=this.value; if(_rndState.data) rndRecalc(); });
+  var ind=document.getElementById("rnd-indic");
+  ind.addEventListener("input", function(){ _rndState.notas=this.value; });
+
+  function bindChk(id,key){ var el=document.getElementById(id); if(!el) return;
+    el.checked=!!_rndOpts[key]; el.addEventListener("change", function(){ _rndOpts[key]=el.checked; }); }
+  bindChk("rnd-opt-sello","sello"); bindChk("rnd-opt-glosario","glosario");
+  bindChk("rnd-opt-consent","consent"); bindChk("rnd-opt-borrador","borrador"); bindChk("rnd-opt-bn","bn");
+  var $lic=document.getElementById("rnd-opt-licencia");
+  if($lic){ $lic.value=_rndOpts.licencia||""; $lic.addEventListener("input", function(){ _rndOpts.licencia=$lic.value.trim(); }); }
+  var $px=document.getElementById("rnd-opt-proxsem");
+  if($px){ $px.value=_rndOpts.proxSem||""; $px.addEventListener("change", function(){ _rndOpts.proxSem=$px.value; }); }
+
+  rndPaintAttach();
+
+  infFetchClientes(function(list, src){
+    var sel=document.getElementById("rnd-cliente"); if(!sel) return;
+    var o='<option value="">— elige un deportista —</option>';
+    list.forEach(function(c){
+      var extra=(c.plan?(" · "+escapeHtml(c.plan)):"");
+      o+='<option value="'+escapeAttr(String(c.id))+'"'+(_rndState.clientId===String(c.id)?" selected":"")+'>'+escapeHtml(c.nombre)+extra+'</option>';
+    });
+    sel.innerHTML=o;
+    var srcEl=document.getElementById("rnd-cli-src");
+    if(srcEl) srcEl.textContent = src==="notion" ? ("· "+list.length+" clientes desde Notion") : ("· "+list.length+" clientes de la app");
+    sel.addEventListener("change", function(){
+      _rndState.clientId=this.value;
+      for(var i=0;i<list.length;i++){
+        if(String(list[i].id)===this.value){ _rndState.nombre=list[i].nombre; _rndState.rut=list[i].rut||""; _rndState.phone=list[i].phone||""; break; }
+      }
+    });
+  });
+  if(_rndState.metrics){ rndEditorRender(); rndPintarAnalisis(); }
+}
+
+window.rndCopyPrompt=function(){
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(RND_PROMPT).then(function(){ toast("Prompt copiado ✓","success"); }, function(){ toast("No se pudo copiar","error"); });
+  } else { toast("Copia manual: revisa la consola","warn"); console.log(RND_PROMPT); }
+};
+
+window.rndDemo=function(){
+  var hoy=new Date().toISOString().slice(0,10);
+  var d={ fuente:"blazepod", atleta:{usuario:"Darv19",nombre:null}, sesiones:[
+    { fecha:hoy, actividad:"Random", duracion_str:"01:00:00", duracion_seg:60, lado:"izquierdo", segmento:"pierna", hits:44, reaccion_ms_prom:1032 },
+    { fecha:hoy, actividad:"Random", duracion_str:"01:00:00", duracion_seg:60, lado:"derecho",   segmento:"pierna", hits:53, reaccion_ms_prom:846  }
+  ]};
+  document.getElementById("rnd-json").value=JSON.stringify(d,null,2);
+  rndAnalizar();
+};
+
+window.rndAnalizar=function(){
+  var t=(document.getElementById("rnd-json")||{}).value||"";
+  _rndState.raw=t;
+  var msg=document.getElementById("rnd-msg");
+  function fail(m){ if(msg) msg.innerHTML='<span style="color:var(--danger);">✗ '+escapeHtml(m)+'</span>'; }
+  var d; try{ d=JSON.parse(t); }catch(e){ return fail("El JSON no es válido."); }
+  if(!d||!Array.isArray(d.sesiones)||!d.sesiones.length) return fail("Falta el array «sesiones».");
+  var dom=(document.getElementById("rnd-dominante")||{}).value||_rndState.dominante||"derecho";
+  _rndState.dominante=dom;
+  _rndState.data=d;
+  _rndState.metrics=rndMetrics(d,dom);
+  if(!_rndState.metrics.sesiones.length) return fail("Ninguna sesión trae hits ni tiempo de reacción.");
+  if(msg) msg.innerHTML='<span style="color:var(--success);">✓ '+_rndState.metrics.sesiones.length+' sesión(es) analizadas</span>';
+  rndEditorRender();
+  rndPintarAnalisis();
+};
+
+/* Editor rápido: completar fecha, lado y duración si la captura no los traía. */
+function rndEditorRender(){
+  var box=document.getElementById("rnd-editor"); if(!box||!_rndState.metrics) return;
+  var rows=_rndState.metrics.sesiones.map(function(s,i){
+    return '<tr><td style="padding:.25rem .4rem;">'+(i+1)+'</td>'
+      +'<td style="padding:.25rem .4rem;"><input type="date" data-rnd-f="'+i+'" value="'+(s.fecha||'')+'" style="font-size:.72rem;"></td>'
+      +'<td style="padding:.25rem .4rem;"><select data-rnd-l="'+i+'" style="font-size:.72rem;">'
+        +['','izquierdo','derecho','bilateral'].map(function(v){
+            return '<option value="'+v+'"'+(String(s.lado||'')===v?' selected':'')+'>'+(v?rndLadoTxt(v):'—')+'</option>';
+          }).join('')
+      +'</select></td>'
+      +'<td style="padding:.25rem .4rem;"><input type="number" data-rnd-d="'+i+'" value="'+(s.duracion_seg!=null?s.duracion_seg:'')+'" style="width:70px;font-size:.72rem;"> s</td>'
+      +'<td style="padding:.25rem .4rem;text-align:right;">'+(s.hits!=null?s.hits:'—')+' hits</td>'
+      +'<td style="padding:.25rem .4rem;text-align:right;">'+(s.reaccion_ms_prom!=null?(s.reaccion_ms_prom+' ms'):'—')+'</td></tr>';
+  }).join('');
+  box.innerHTML='<p class="text-xs text-muted" style="margin-bottom:.3rem;">Completa fecha y lado si la captura no los traía '
+    +'(el lado es lo que habilita el análisis de simetría):</p>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:.75rem;"><tbody>'+rows+'</tbody></table>';
+  box.querySelectorAll('[data-rnd-f]').forEach(function(el){
+    el.addEventListener('change', function(){ _rndState.data.sesiones[+el.getAttribute('data-rnd-f')].fecha=el.value||null; rndRecalc(); });
+  });
+  box.querySelectorAll('[data-rnd-l]').forEach(function(el){
+    el.addEventListener('change', function(){ _rndState.data.sesiones[+el.getAttribute('data-rnd-l')].lado=el.value||null; rndRecalc(); });
+  });
+  box.querySelectorAll('[data-rnd-d]').forEach(function(el){
+    el.addEventListener('change', function(){ _rndState.data.sesiones[+el.getAttribute('data-rnd-d')].duracion_seg=el.value?Number(el.value):null; rndRecalc(); });
+  });
+}
+function rndRecalc(){
+  if(!_rndState.data) return;
+  _rndState.metrics=rndMetrics(_rndState.data,_rndState.dominante);
+  var ta=document.getElementById("rnd-json");
+  if(ta){ ta.value=JSON.stringify(_rndState.data,null,2); _rndState.raw=ta.value; }
+  rndEditorRender();
+  rndPintarAnalisis();
+}
+
+function rndPintarAnalisis(){
+  var cont=document.getElementById("rnd-analisis"); if(!cont) return;
+  var m=_rndState.metrics; if(!m) return;
+  var r=m.resumen, a=m.asimetria;
+  function box(t,v,u,color){
+    return '<div style="flex:1;min-width:110px;border:1px solid var(--border);border-radius:8px;padding:.6rem;text-align:center;">'
+      +'<div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.05em;">'+t+'</div>'
+      +'<div style="font-size:1.5rem;font-weight:700;'+(color?('color:'+color+';'):'')+'">'+v+'</div>'
+      +'<div class="text-xs text-muted">'+u+'</div></div>';
+  }
+  var h='<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;">'
+    + box('Reacción media', r.reaccion_prom!=null?r.reaccion_prom:'—','ms')
+    + box('Mejor reacción', r.reaccion_mejor!=null?r.reaccion_mejor:'—','ms')
+    + box('Toques máx.', r.hits_max!=null?r.hits_max:'—','hits')
+    + box('Sesiones', r.n,'registros')
+    + '</div>';
+  if(a){
+    var q=rndPeorAsim(a);
+    h+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;">'
+      + (a.reaccion?box('Asimetría reacción', a.reaccion.pct.toFixed(1),'% · LSI '+a.reaccion.lsi.toFixed(0)+'%', rndNivelColor(a.reaccion.nivel)):'')
+      + (a.hits?box('Asimetría hits', a.hits.pct.toFixed(1),'% · LSI '+a.hits.lsi.toFixed(0)+'%', rndNivelColor(a.hits.nivel)):'')
+      + (q?box('Lectura', rndNivelTxt(q.nivel),'déficit: '+rndLadoTxt(q.deficitLado).toLowerCase(), rndNivelColor(q.nivel)):'')
+      + '</div>';
+  } else {
+    h+='<p class="text-xs" style="color:#b45309;">Marca el <b>lado</b> de al menos una sesión izquierda y una derecha para obtener el análisis de simetría.</p>';
+  }
+  h+='<ul class="text-xs" style="line-height:1.6;padding-left:1.1rem;margin-top:.4rem;">'
+    + rndNarrativa(m).map(function(t){ return '<li>'+t+'</li>'; }).join('') + '</ul>';
+  cont.innerHTML=h;
+}
+
+window.rndGenerar=function(){
+  if(!_rndState.metrics){ toast("Analiza las sesiones primero","warn"); return; }
+  var cli={ nombre:_rndState.nombre||"", rut:_rndState.rut||"" };
+  /* El folio se asigna una vez y se conserva mientras dure la evaluación:
+     reimprimir no debe generar un documento con otro número. */
+  if(!_rndOpts.folio) _rndOpts.folio=(typeof infNextFolio==="function"?infNextFolio():"");
+  var opts=Object.assign({}, _rndOpts, { indicaciones:(document.getElementById("rnd-indic")||{}).value||"" });
+  _rndState.reportHtml=rndReporteDoc(_rndState.metrics, cli, opts);
+  var wrap=document.getElementById("rnd-report-wrap");
+  wrap.innerHTML='<div class="card"><div class="card-main"><div class="card-title">Informe generado</div>'
+    +'<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;">'
+    +'<button class="btn btn-primary btn-sm" onclick="rndPrint()">🖨 Imprimir / Guardar PDF</button></div>'
+    +'<iframe id="rnd-frame" style="width:100%;height:640px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe></div></div>';
+  var fr=document.getElementById("rnd-frame"); if(fr) fr.srcdoc=_rndState.reportHtml;
+};
+window.rndPrint=function(){
+  var fr=document.getElementById("rnd-frame");
+  if(fr&&fr.contentWindow){ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ toast("No se pudo imprimir","error"); } }
+};
+
+/* Cola de anexo: la consume infReporteDoc() al generar el informe de bioimpedancia. */
+var _rndAttach = null;
+function rndPaintAttach(){
+  var el=document.getElementById("rnd-attach-state"); if(!el) return;
+  el.innerHTML = _rndAttach
+    ? '<span style="color:var(--success);">✓ Anexo en cola ('+_rndAttach.metrics.sesiones.length+' sesiones) — se añadirá al próximo informe. '
+      +'<a href="#" onclick="rndQuitarAnexo();return false;">Quitar</a></span>'
+    : '<span class="text-muted">Sin anexo en cola.</span>';
+}
+window.rndAdjuntar=function(){
+  if(!_rndState.metrics){ toast("Analiza las sesiones primero","warn"); return; }
+  _rndAttach={ metrics:_rndState.metrics, indicaciones:(document.getElementById("rnd-indic")||{}).value||"" };
+  rndPaintAttach();
+  toast("Anexo listo: genera el informe en «Informes» ✓","success");
+};
+window.rndQuitarAnexo=function(){ _rndAttach=null; rndPaintAttach(); toast("Anexo quitado","info"); };
+
+window.rndGuardar=function(){
+  if(!_rndState.metrics){ toast("Analiza las sesiones primero","warn"); return; }
+  var c=(typeof getClient==="function")?getClient(_rndState.clientId):null;
+  if(!c){
+    var nom=(_rndState.nombre||"").trim().toLowerCase();
+    for(var i=0;i<state.clients.length;i++){
+      if(nom&&state.clients[i].name&&state.clients[i].name.toLowerCase()===nom){ c=state.clients[i]; break; }
+    }
+  }
+  if(!c){ toast("Ese deportista no está en la app local. Créalo en Clientes para guardar su historial.","warn"); return; }
+  if(!Array.isArray(c.rendimiento)) c.rendimiento=[];
+  c.rendimiento.push({
+    id:genId(),
+    fecha:_rndState.metrics.resumen.fecha_act||new Date().toISOString().slice(0,10),
+    generadoEl:new Date().toISOString(),
+    dominante:_rndState.dominante,
+    data:_rndState.data,
+    resumen:_rndState.metrics.resumen,
+    asimetria:_rndState.metrics.asimetria?{ hits:_rndState.metrics.asimetria.hits, reaccion:_rndState.metrics.asimetria.reaccion }:null,
+    indicaciones:(document.getElementById("rnd-indic")||{}).value||""
+  });
+  saveState();
+  toast("Evaluación de rendimiento guardada en "+c.name+" ✓","success");
+};
+
+window.rndExport=function(){
+  if(!_rndState.data){ toast("No hay datos que exportar","warn"); return; }
+  var out={ _fmt:"us19-rendimiento-v1",
+    cliente:{ nombre:_rndState.nombre, rut:_rndState.rut },
+    dominante:_rndState.dominante, data:_rndState.data,
+    indicaciones:(document.getElementById("rnd-indic")||{}).value||"" };
+  var fecha=(_rndState.metrics&&_rndState.metrics.resumen.fecha_act)||new Date().toISOString().slice(0,10);
+  infDownloadBlob('US19_rendimiento_'+infSlugName(_rndState.nombre)+'_'+fecha+'.json', JSON.stringify(out,null,2), 'application/json');
+};
+/* ===RENDIMIENTO_END=== */
+
 </script>
 </body>
 </html>
