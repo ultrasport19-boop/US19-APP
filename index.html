@@ -3375,6 +3375,7 @@ function renderDashboard(){
   }).slice(0, 6);
 
   var html = '';
+  html += u19PanelOperativoHTML();
   html += '<div class="section-head">';
   html += '<h1 class="section-title">PANEL <span class="accent">/ INICIO</span></h1>';
   html += '<button class="btn btn-primary" onclick="openRoutineBuilder()">+ Nueva Rutina</button>';
@@ -3677,6 +3678,8 @@ function clientCardHtml(c){
       + actionsExtra
       + '<button class="btn btn-ghost btn-sm" onclick="openClientTracking(\''+c.id+'\')" title="Medidas corporales y evaluaciones">📏 Seguimiento</button>'
       + ((c.progressions && c.progressions.length) ? '<button class="btn btn-ghost btn-sm" onclick="openProgressHistory(\''+c.id+'\')" title="Progresiones importadas (cargas, reps, RPE)">📈 Progresiones ('+c.progressions.length+')</button>' : '')
+      + ((c.rendimiento && c.rendimiento.length) ? '<button class="btn btn-ghost btn-sm" onclick="u19HistorialRendimiento(\''+c.id+'\')" title="Evaluaciones de velocidad de reaccion y simetria">⚡ Rendimiento ('+c.rendimiento.length+')</button>' : '')
+      + '<button class="btn btn-ghost btn-sm" onclick="u19ExportarCliente(\''+c.id+'\')" title="Descargar todos sus datos (JSON)">⬇</button>'
       + (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\''+c.id+'\')" title="Enviar resumen semanal por WhatsApp">📊 Resumen</button>' : '')
       + waBtn
       + '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\''+c.id+'\')">Editar</button>'
@@ -5193,7 +5196,7 @@ function createFromExerciseImport(){
   renderLibrary();
 }
 
-var _libFilter = { search:"", muscle:"" };
+var _libFilter = { search:"", muscle:"", equipment:"" };
 
 function renderLibrary(){
   var muscleSet = {};
@@ -5239,6 +5242,13 @@ function renderLibrary(){
   html += '<option value="nogif"'+(_libFilter.muscle==="nogif"?" selected":"")+'>Sin GIF / vídeo</option>';
   html += '</optgroup>';
   html += '</select>';
+  var _eqs = {}; state.exercises.forEach(function(e){ if(e.equipment) _eqs[e.equipment]=(_eqs[e.equipment]||0)+1; });
+  var _eqList = Object.keys(_eqs).sort();
+  html += '<select id="lib-equip"><option value="">Todo el material</option>';
+  for (var q1=0;q1<_eqList.length;q1++){
+    html += '<option value="'+escapeAttr(_eqList[q1])+'"'+(_libFilter.equipment===_eqList[q1]?" selected":"")+'>'+escapeHtml(_eqList[q1])+' ('+_eqs[_eqList[q1]]+')</option>';
+  }
+  html += '</select>';
   html += '</div>';
 
   html += '<div id="lib-grid"></div>';
@@ -5252,6 +5262,10 @@ function renderLibrary(){
     _libFilter.muscle = this.value;
     renderLibraryGrid();
   });
+  document.getElementById("lib-equip").addEventListener("change", function(){
+    _libFilter.equipment = this.value;
+    renderLibraryGrid();
+  });
   renderLibraryGrid();
 }
 
@@ -5260,6 +5274,7 @@ function renderLibraryGrid(){
   if (!grid) return;
   var q = (_libFilter.search||"").trim().toLowerCase();
   var muscle = _libFilter.muscle;
+  var equip = _libFilter.equipment || "";
   // Uso por ejercicio: nº de rutinas distintas que lo incluyen
   var _exUsage = {};
   state.routines.forEach(function(r){
@@ -5272,6 +5287,7 @@ function renderLibraryGrid(){
   });
   function _hasMedia(e){ return !!(e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0)); }
   var filtered = state.exercises.filter(function(e){
+    if (equip && e.equipment !== equip) return false;
     if (muscle){
       if (muscle === "terap:"){ if (!e.terap) return false; }
       else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
@@ -5317,6 +5333,7 @@ function renderLibraryGrid(){
         + '</div>'
         + (e.desc?'<p class="text-xs text-muted" style="line-height:1.4;">'+escapeHtml(e.desc)+'</p>':'')
         + '<div class="ex-acts">'
+          + '<button class="btn btn-ghost btn-sm" onclick="u19Sustitutos(\''+e.id+'\')" title="Alternativas del mismo grupo muscular">⇄ Sustitutos</button>'
           + '<button class="btn btn-secondary btn-sm" onclick="openExerciseForm(\''+e.id+'\')">Editar</button>'
           + '<button class="btn btn-ghost btn-sm" onclick="deleteExercise(\''+e.id+'\')" title="Eliminar">🗑</button>'
         + '</div>'
@@ -6538,6 +6555,7 @@ window.openClientProgressShare = function openClientProgressShare(){
 
 function showProgressReport(data){
   storeReceivedReport(data);
+  _u19UltimoReporte = data;   // el detalle serie a serie, para poder persistirlo
   hideTrainerUI();
   showView("report");
   var r = data.routine;
@@ -6555,6 +6573,7 @@ function showProgressReport(data){
   html += '<div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">';
   html += '<button class="btn btn-ghost" onclick="returnToTrainer()">← Volver al panel</button>';
   html += '<button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>';
+  html += '<button class="btn btn-primary" id="u19-btn-guardar-prog" onclick="u19GuardarProgresionRecibida()" title="Guarda reps, peso, RPE y EVA de cada serie en el historial del cliente">💾 Guardar en el historial</button>';
   html += '</div>';
 
   html += '<div class="progress-summary"><div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">';
@@ -11508,8 +11527,33 @@ window.openPainSession = openPainSession;
 /* ---------- Alta terapéutica (con cross-sell a entrenamiento) ---------- */
 function darAltaClinica(clientId){
   var c = getClient(clientId); if (!c) return;
-  var crit = prompt("Criterios de alta cumplidos (queda en el registro):", "Dolor EVA ≤2, fuerza ≥90% vs lado sano, tests negativos, retorno funcional completo.");
-  if (crit === null) return;
+  /* El criterio "fuerza >=90% vs lado sano" ahora se contrasta con el LSI
+     realmente medido en Rendimiento, en vez de escribirlo a ciegas. */
+  var lsiBox = (typeof u19CriterioAltaHTML === "function") ? u19CriterioAltaHTML(clientId) : "";
+  openModal({
+    title: "Alta terapéutica · " + (c.name || ""),
+    bodyHtml: lsiBox
+      + '<div class="form-row" style="margin-top:.6rem;"><label class="form-label">Criterios de alta cumplidos (queda en el registro)</label>'
+      + '<textarea id="u19-alta-crit" rows="4">Dolor EVA ≤2, fuerza ≥90% vs lado sano, tests negativos, retorno funcional completo.</textarea></div>',
+    bodyMount: function(body){
+      var d = (typeof u19UltimoLSI === "function") ? u19UltimoLSI(c) : null;
+      var ta = body.querySelector("#u19-alta-crit");
+      if (d && ta) ta.value = ta.value.replace("fuerza ≥90% vs lado sano",
+        "simetría LSI " + d.lsi.toFixed(0) + "% medida el " + rndFdate(d.fecha));
+    },
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Registrar alta", cls:"btn-primary", onClick: function(){
+          var el = document.getElementById("u19-alta-crit");
+          var crit = el ? el.value : "";
+          closeModal();
+          _u19FinalizarAlta(c, crit);
+        } }
+    ]
+  });
+}
+function _u19FinalizarAlta(c, crit){
+  var clientId = c.id;
   c.alta = { fecha: new Date().toISOString().slice(0,10), criterios: crit };
   saveState(); closeModal(); renderClients();
   toast("✔ Alta terapéutica registrada","success");
@@ -13259,7 +13303,9 @@ function infReporteDoc(p){
         borrador: !!(p.opts && p.opts.borrador),
         sello: !!(p.opts && p.opts.sello),
         consent: !!(p.opts && p.opts.consent),
-        licencia: (p.opts && p.opts.licencia) || ''
+        licencia: (p.opts && p.opts.licencia) || '',
+        setupTxt: (typeof rndSetupTxt === "function") ? rndSetupTxt(_rndSetup) : '',
+        evalBio: p.ev2                       // habilita el cruce estructura-funcion
       });
       inner += rndAnexoHTML(_rndAttach.metrics, { nombre: payload.cliente.nombre }, _rOpts);
     } catch (e) { console.warn("Anexo de rendimiento omitido:", e); }
@@ -13890,6 +13936,7 @@ function renderInformes(){
     + '<div id="inf-imp-msg" class="text-xs" style="min-height:1.1em;margin-top:.4rem;"></div>'
     + '<p class="text-xs text-muted" style="line-height:1.5;margin-top:.4rem;">El historial y el JSON exportado son <b>exactos</b>. Leer el PDF con IA recupera los valores <b>como se imprimieron</b> (redondeados a 1 decimal): úsalo solo si ya no tienes el JSON ni el informe guardado.</p>'
     + '</div></div>';
+  html += u19IntakeCardHTML('inf');
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3 · Evaluaciones (pega el JSON)</div>'
     + '<div class="form-row"><label class="form-label">Evaluación inicial</label><textarea id="inf-ev1" style="min-height:80px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;evaluaciones&quot;:[ … ] }">'+escapeHtml(_infState.ev1raw||"")+'</textarea></div>'
     + '<div class="form-row"><label class="form-label">Evaluación actual</label><textarea id="inf-ev2" style="min-height:80px;font-family:var(--font-mono);font-size:.72rem;" placeholder="{ &quot;evaluaciones&quot;:[ … ] }">'+escapeHtml(_infState.ev2raw||"")+'</textarea></div>'
@@ -15216,8 +15263,21 @@ function rndReportBlocks(m, cli, opts){
     +'<p><b>Lado dominante.</b> La extremidad hábil declarada. Un déficit en el lado no dominante es esperable; en el dominante obliga a investigar fatiga, dolor o limitación específica.</p>'
     +'</div>';
 
+  var wq = (typeof rndSanityWarnings === "function") ? rndSanityWarnings(m) : [];
+  var calidadBlock = wq.length
+    ? '<div class="pr-note" style="border-left-color:#b45309;"><b>Advertencias de calidad de la medicion.</b><ul style="margin:.5mm 0 0;padding-left:4mm;">'
+      + wq.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul></div>'
+    : '';
+  var setupBlock = (opts.setupTxt)
+    ? '<div class="pr-refnote"><b>Montaje de la prueba:</b> ' + esc(opts.setupTxt) + '.'
+      + (opts.setupDiff ? ' <span style="color:#b91c1c;">Cambio respecto de la evaluacion previa: ' + esc(opts.setupDiff) + ' — los resultados no son comparables con ella.</span>' : '')
+      + '</div>'
+    : '';
+  var cruceBlock = (typeof u19CruceHTML === "function") ? u19CruceHTML(opts.evalBio, m) : '';
+
   return { head:head, idbar:idbar, kpis:kpis, tabla:tabla, gaugeBlock:gaugeBlock, asimBlock:asimBlock,
-           evoBlock:evoBlock, narrBlock:narrBlock, indicBlock:indicBlock, nota:nota, glosario:glosario };
+           evoBlock:evoBlock, narrBlock:narrBlock, indicBlock:indicBlock, nota:nota, glosario:glosario,
+           calidadBlock:calidadBlock, setupBlock:setupBlock, cruceBlock:cruceBlock };
 }
 
 /* CSS propio del anexo/informe de rendimiento (medidor y mini-gráficos). */
@@ -15323,10 +15383,10 @@ function rndAnexoHTML(m, cli, opts){
     +'<br><span style="color:#94a3b8;font-weight:400;">'+rndFdate(m.resumen.fecha_act)+'</span></div></div>';
   return '<sty'+'le>'+RND_CSS+'</sty'+'le>'
     + '<div class="pr-page">'+ch.wm+hdr+'<div class="pr-content">'
-      + b.head + b.idbar + b.kpis + b.gaugeBlock + b.asimBlock
+      + b.head + b.idbar + b.kpis + b.gaugeBlock + b.asimBlock + b.setupBlock + b.calidadBlock
       + '</div>'+ch.foot+'</div>'
     + '<div class="pr-page">'+ch.wm+hdr+'<div class="pr-content">'
-      + b.tabla + b.narrBlock + b.evoBlock + b.indicBlock + b.nota
+      + b.tabla + b.narrBlock + b.cruceBlock + b.evoBlock + b.indicBlock + b.nota
       + '</div>'+ch.foot+'</div>';
 }
 
@@ -15338,10 +15398,10 @@ function rndReporteDoc(m, cli, opts){
 
   var inner=''
     + '<div class="pr-page">'+ch.wm+ch.cover+'<div class="pr-content">'
-      + b.idbar + b.head + b.kpis + b.gaugeBlock + b.asimBlock
+      + b.idbar + b.head + b.kpis + b.gaugeBlock + b.asimBlock + b.setupBlock + b.calidadBlock
       + '</div>'+ch.foot+'</div>'
     + '<div class="pr-page">'+ch.wm+ch.hdr+'<div class="pr-content">'
-      + b.tabla + b.narrBlock + b.evoBlock
+      + b.tabla + b.narrBlock + b.cruceBlock + b.evoBlock
       + '</div>'+ch.foot+'</div>'
     + '<div class="pr-page">'+ch.wm+ch.hdr+'<div class="pr-content">'
       + b.indicBlock + b.nota + (opts.glosario!==false ? b.glosario : '') + ch.firmas
@@ -15379,12 +15439,22 @@ function renderRendimiento(){
     +'<b>Dile a la IA qué lado corresponde a cada captura</b> (ej. «la primera es pierna izquierda, la segunda derecha») — es lo que habilita el análisis de simetría.</p>'
     +'<button class="btn btn-secondary btn-sm" onclick="rndCopyPrompt()">📋 Copiar prompt de extracción</button></div></div>';
 
+  html+=u19IntakeCardHTML('rnd');
   html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3 · Sesiones (pega el JSON)</div>'
     +'<div class="form-row"><textarea id="rnd-json" style="min-height:120px;font-family:var(--font-mono);font-size:.72rem;" '
     +'placeholder="{ &quot;fuente&quot;:&quot;blazepod&quot;, &quot;sesiones&quot;:[ … ] }">'+escapeHtml(_rndState.raw||"")+'</textarea></div>'
     +'<button class="btn btn-primary" onclick="rndAnalizar()">Analizar sesiones</button> '
     +'<button class="btn btn-ghost btn-sm" onclick="rndDemo()">Cargar ejemplo</button> <span id="rnd-msg" class="text-xs"></span>'
     +'<div id="rnd-editor" style="margin-top:.8rem;"></div></div></div>';
+
+  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3b · Montaje de la prueba</div>'
+    +'<p class="text-xs text-muted" style="line-height:1.5;">Comparar dos fechas solo vale si el montaje es el mismo. Anotándolo aquí, la app te avisa si cambió respecto de la evaluación anterior.</p>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.5rem;margin-top:.5rem;">'
+    +  '<div><label class="form-label">Nº de pods</label><input id="rnd-su-pods" type="number" min="1" placeholder="4"></div>'
+    +  '<div><label class="form-label">Distancia (cm)</label><input id="rnd-su-dist" type="number" placeholder="150"></div>'
+    +  '<div><label class="form-label">Altura</label><input id="rnd-su-alt" type="text" placeholder="suelo / 60 cm"></div>'
+    +  '<div><label class="form-label">Consigna</label><input id="rnd-su-cons" type="text" placeholder="pie derecho, sin salto"></div>'
+    +'</div><div id="rnd-su-diff" class="text-xs" style="margin-top:.5rem;"></div></div></div>';
 
   html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">4 · Análisis</div>'
     +'<div id="rnd-analisis"><p class="text-xs text-muted">Pega el JSON y pulsa «Analizar sesiones».</p></div></div></div>';
@@ -15418,7 +15488,9 @@ function renderRendimiento(){
     +'<button class="btn btn-primary btn-sm" onclick="rndGenerar()">📄 Generar informe de rendimiento</button>'
     +'<button class="btn btn-secondary btn-sm" onclick="rndAdjuntar()">📎 Adjuntar al informe de bioimpedancia</button>'
     +'<button class="btn btn-secondary btn-sm" onclick="rndGuardar()">💾 Guardar en historial</button>'
-    +'<button class="btn btn-ghost btn-sm" onclick="rndExport()">⬇ Exportar JSON</button></div>'
+    +'<button class="btn btn-ghost btn-sm" onclick="rndExport()">⬇ Exportar JSON</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="rndRollover()" title="Deja la última medición de cada lado como línea base y limpia el resto">⟳ Nueva reevaluación</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="rndWaLink()">💬 Enviar por WhatsApp</button></div>'
     +'<p class="text-xs text-muted" style="margin-top:.5rem;line-height:1.5;">«Adjuntar» deja esta evaluación en cola: el siguiente informe que generes en '
     +'<b>Informes</b> incluirá el anexo de rendimiento al final, con el mismo folio y la misma firma.</p>'
     +'<div id="rnd-attach-state" class="text-xs" style="margin-top:.3rem;"></div></div></div>';
@@ -15441,6 +15513,12 @@ function renderRendimiento(){
   var $px=document.getElementById("rnd-opt-proxsem");
   if($px){ $px.value=_rndOpts.proxSem||""; $px.addEventListener("change", function(){ _rndOpts.proxSem=$px.value; }); }
 
+  function bindSu(id,key){ var el=document.getElementById(id); if(!el) return;
+    el.value=_rndSetup[key]||""; el.addEventListener("input", function(){ _rndSetup[key]=el.value.trim(); rndPintarSetupDiff(); }); }
+  bindSu("rnd-su-pods","pods"); bindSu("rnd-su-dist","distancia_cm");
+  bindSu("rnd-su-alt","altura"); bindSu("rnd-su-cons","consigna");
+  rndPintarSetupDiff();
+
   rndPaintAttach();
 
   infFetchClientes(function(list, src){
@@ -15458,6 +15536,7 @@ function renderRendimiento(){
       for(var i=0;i<list.length;i++){
         if(String(list[i].id)===this.value){ _rndState.nombre=list[i].nombre; _rndState.rut=list[i].rut||""; _rndState.phone=list[i].phone||""; break; }
       }
+      rndPintarSetupDiff();   // el aviso de montaje depende del cliente elegido
     });
   });
   if(_rndState.metrics){ rndEditorRender(); rndPintarAnalisis(); }
@@ -15561,7 +15640,9 @@ function rndPintarAnalisis(){
   }
   h+='<ul class="text-xs" style="line-height:1.6;padding-left:1.1rem;margin-top:.4rem;">'
     + rndNarrativa(m).map(function(t){ return '<li>'+t+'</li>'; }).join('') + '</ul>';
+  h+='<div id="rnd-calidad"></div>';
   cont.innerHTML=h;
+  rndPintarCalidad();
 }
 
 window.rndGenerar=function(){
@@ -15570,7 +15651,14 @@ window.rndGenerar=function(){
   /* El folio se asigna una vez y se conserva mientras dure la evaluación:
      reimprimir no debe generar un documento con otro número. */
   if(!_rndOpts.folio) _rndOpts.folio=(typeof infNextFolio==="function"?infNextFolio():"");
-  var opts=Object.assign({}, _rndOpts, { indicaciones:(document.getElementById("rnd-indic")||{}).value||"" });
+  var _cli=(typeof getClient==="function")?getClient(_rndState.clientId):null;
+  var _sd=rndSetupDiff(_cli,_rndSetup);
+  var opts=Object.assign({}, _rndOpts, {
+    indicaciones:(document.getElementById("rnd-indic")||{}).value||"",
+    setupTxt:rndSetupTxt(_rndSetup),
+    setupDiff:_sd?_sd.difs.join(" · "):"",
+    evalBio:_infState.payload?_infState.payload.ev2:null   // para el cruce estructura-funcion
+  });
   _rndState.reportHtml=rndReporteDoc(_rndState.metrics, cli, opts);
   var wrap=document.getElementById("rnd-report-wrap");
   wrap.innerHTML='<div class="card"><div class="card-main"><div class="card-title">Informe generado</div>'
@@ -15617,6 +15705,7 @@ window.rndGuardar=function(){
     fecha:_rndState.metrics.resumen.fecha_act||new Date().toISOString().slice(0,10),
     generadoEl:new Date().toISOString(),
     dominante:_rndState.dominante,
+    setup:Object.assign({}, _rndSetup),
     data:_rndState.data,
     resumen:_rndState.metrics.resumen,
     asimetria:_rndState.metrics.asimetria?{ hits:_rndState.metrics.asimetria.hits, reaccion:_rndState.metrics.asimetria.reaccion }:null,
@@ -15636,6 +15725,803 @@ window.rndExport=function(){
   infDownloadBlob('US19_rendimiento_'+infSlugName(_rndState.nombre)+'_'+fecha+'.json', JSON.stringify(out,null,2), 'application/json');
 };
 /* ===RENDIMIENTO_END=== */
+
+
+/* ============================================================
+   CAPTURA UNIFICADA — un solo prompt para todas las fotos.
+   Mandas a la IA, en un mismo mensaje, las capturas de Fitdays
+   (composición y/o circunferencias) y las de BlazePod. La IA
+   clasifica cada imagen sola y devuelve UN JSON con las dos
+   partes. La app lo reparte a Informes y a Rendimiento.
+
+   Deliberadamente NO se le pide a la IA que adivine qué pierna
+   es cuál: no hay forma de saberlo mirando la captura. Devuelve
+   las sesiones numeradas en el orden en que las mandaste y la
+   app te pregunta después, mostrándote hits y ms para que las
+   reconozcas.
+   ============================================================ */
+
+var US19_PROMPT_UNI = [
+"Actúa como un sistema de extracción de datos (OCR + parser estructurado) para evaluaciones de Ultra-Sport 19. Te voy a adjuntar VARIAS capturas de pantalla en un mismo mensaje, de tipos distintos y mezcladas. Debes clasificar cada una y devolverme UN ÚNICO JSON estricto, sin texto adicional, sin markdown, sin backticks.",
+"",
+"PASO 1 — CLASIFICA CADA IMAGEN. Hay tres tipos posibles:",
+'· TIPO A — Fitdays, composición corporal: fondo claro, tabla con kg/% y evaluación, encabezado (ID, Género, Edad, Alto), análisis segmentario de grasa y músculo, puntuación corporal, grasa visceral, TMB, SMI, edad corporal, WHR.',
+'· TIPO B — Fitdays, detalles: lista de circunferencias en cm (Cuello, Hombro, Pecho, Cintura, Cadera, L/R Brazo, Antebrazo, Muslo, Pantorrilla).',
+'· TIPO C — BlazePod: fondo azul oscuro, arriba "BLAZEPOD ACTIVITY" y el nombre de la actividad en mayúsculas, una duración tipo "01:00:00", el nombre de usuario del jugador, y abajo dos números grandes bajo los rótulos "Hits" y "AVG ... Reaction".',
+'Si una imagen no encaja en ninguno, ignórala y anótala en "descartadas".',
+"",
+"PASO 2 — EXTRAE SEGÚN EL TIPO.",
+"",
+"TIPO A y B (van a \"evaluaciones\"):",
+'· Lee todos los valores con su unidad, 1 decimal. Normaliza L/I→izquierdo, R/D→derecho.',
+'· Hombre→Masculino, Mujer→Femenino.',
+'· Si mandas A y B de la MISMA fecha, fusiónalas en UNA sola evaluación.',
+'· Capturas de fechas distintas = entradas distintas, ordenadas de más antigua a más reciente.',
+"",
+"TIPO C (van a \"rendimiento.sesiones\"):",
+'· La duración viene como MM:SS:CC (minutos:segundos:centésimas). "01:00:00" son 60 segundos, NO una hora. duracion_seg = minutos*60 + segundos.',
+'· Los tiempos de reacción, en MILISEGUNDOS enteros (1032, no 1,032 ni 1.032 s).',
+'· "orden" = la posición de esa captura entre las imágenes que te mandé (1, 2, 3...). Es lo que me permite reconocerla después: NO lo omitas.',
+'· "lado": déjalo SIEMPRE en null. NO adivines qué pierna o brazo es: no se puede saber mirando la captura, yo se lo indico a mi aplicación después.',
+'· Si la captura muestra BEST/WORST/Accuracy/Misses o el número de pods, inclúyelos; si no, null.',
+"",
+"REGLAS GENERALES:",
+'1) Fechas a YYYY-MM-DD. Si una captura no muestra fecha, deja null (no la inventes).',
+'2) Comas decimales a puntos. Quita unidades: "62,4 kg"→62.4, "846 ms"→846, "1.520 kcal"→1520, "grado 7"→7.',
+'3) Valor ilegible → null. NUNCA inventes ni estimes un número.',
+'4) Si no hay ninguna captura de un tipo, deja su array VACÍO (no lo elimines).',
+"",
+"DEVUÉLVEME EXACTAMENTE ESTA ESTRUCTURA (JSON estricto, sin markdown):",
+'{ "fuente":"us19_unificado",',
+'  "descartadas":[],',
+'  "cliente":{ "nombre":null, "genero":null, "edad":null, "estatura_cm":null },',
+'  "evaluaciones":[',
+'    { "fecha":"YYYY-MM-DD",',
+'      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"puntuacion_corporal":null },',
+'      "segmentario_musculo":{ "brazo_izq":{"kg":null},"brazo_der":{"kg":null},"tronco":{"kg":null},"pierna_izq":{"kg":null},"pierna_der":{"kg":null} },',
+'      "circunferencias_cm":{ "cuello":null,"hombro":null,"pecho":null,"cintura":null,"cadera":null,"brazo_izq":null,"brazo_der":null,"muslo_izq":null,"muslo_der":null,"pantorrilla_izq":null,"pantorrilla_der":null } }',
+'  ],',
+'  "rendimiento":{ "atleta":{ "usuario":null },',
+'    "sesiones":[',
+'      { "orden":1, "fecha":null, "actividad":null, "duracion_str":null, "duracion_seg":null,',
+'        "lado":null, "segmento":null, "hits":null, "fallos":null, "precision_pct":null, "pods":null,',
+'        "reaccion_ms_prom":null, "reaccion_ms_mejor":null, "reaccion_ms_peor":null, "notas":null }',
+'    ] }',
+'}',
+"",
+"Reemplaza los null por los valores reales. Deja null SOLO lo que no puedas leer. Devuelve SOLO el JSON, sin explicaciones ni markdown."
+].join("\n");
+
+window.u19CopyPromptUni = function(){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(US19_PROMPT_UNI).then(
+      function(){ toast("Prompt unificado copiado ✓","success"); },
+      function(){ toast("No se pudo copiar","error"); });
+  } else { toast("Copia manual: revisa la consola","warn"); console.log(US19_PROMPT_UNI); }
+};
+
+/* Tarjeta de captura unificada, compartida por Informes y Rendimiento. */
+function u19IntakeCardHTML(idSuf){
+  return '<div class="card" style="margin-top:1rem;border-left:3px solid var(--accent,#e21c25);"><div class="card-main">'
+    + '<div class="card-title">⚡ Captura unificada — todas las fotos de una vez</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;">Manda a la IA, <b>en un mismo mensaje</b>, las capturas de Fitdays y las de BlazePod mezcladas. '
+    + 'Ella clasifica cada una sola y devuelve un único JSON. Pégalo aquí y se reparte a Informes y a Rendimiento. '
+    + 'Después la app te pregunta qué sesión de BlazePod es la pierna izquierda y cuál la derecha.</p>'
+    + '<button class="btn btn-secondary btn-sm" onclick="u19CopyPromptUni()">📋 Copiar prompt unificado</button>'
+    + '<div class="form-row" style="margin-top:.6rem;"><textarea id="u19-uni-json-' + idSuf + '" '
+    +   'style="min-height:90px;font-family:var(--font-mono);font-size:.72rem;" '
+    +   'placeholder="{ &quot;fuente&quot;:&quot;us19_unificado&quot;, &quot;evaluaciones&quot;:[ … ], &quot;rendimiento&quot;:{ … } }"></textarea></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="u19Repartir(\'' + idSuf + '\')">Repartir a Informes y Rendimiento</button>'
+    + '<div id="u19-uni-msg-' + idSuf + '" class="text-xs" style="min-height:1.1em;margin-top:.4rem;"></div>'
+    + '</div></div>';
+}
+
+/* Reparte el JSON unificado a los dos módulos. */
+window.u19Repartir = function(idSuf){
+  var ta = document.getElementById("u19-uni-json-" + idSuf);
+  var msg = document.getElementById("u19-uni-msg-" + idSuf);
+  function say(html, color){ if(msg) msg.innerHTML = '<span style="color:' + color + ';">' + html + '</span>'; }
+  function fail(m){ say('✗ ' + escapeHtml(m), 'var(--danger)'); }
+  if(!ta) return;
+  var d;
+  try { d = JSON.parse(ta.value || ""); } catch(e){ return fail("El JSON no es válido."); }
+  if(!d || typeof d !== "object") return fail("El JSON no tiene la forma esperada.");
+
+  var evals = Array.isArray(d.evaluaciones) ? d.evaluaciones.filter(function(e){ return e && e.fecha; }) : [];
+  var rnd   = (d.rendimiento && Array.isArray(d.rendimiento.sesiones)) ? d.rendimiento.sesiones : [];
+  if(!evals.length && !rnd.length) return fail("No trae ni evaluaciones de Fitdays ni sesiones de BlazePod.");
+
+  var hechos = [];
+
+  /* --- parte bioimpedancia --> Informes --- */
+  if(evals.length){
+    evals.sort(function(a,b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });
+    var cli = d.cliente || {};
+    var wrap = function(ev){ return JSON.stringify({ fuente:"fitdays", cliente:cli, evaluaciones:[ev] }, null, 2); };
+    if(evals.length === 1){
+      /* Una sola medición: es la ACTUAL. La inicial la traes del historial. */
+      _infState.ev2raw = wrap(evals[0]);
+      hechos.push("1 evaluación de Fitdays → <b>Informes</b> (como evaluación actual; carga la inicial desde el historial)");
+    } else {
+      _infState.ev1raw = wrap(evals[0]);
+      _infState.ev2raw = wrap(evals[evals.length - 1]);
+      hechos.push(evals.length + " evaluaciones de Fitdays → <b>Informes</b> (la más antigua como inicial, la más reciente como actual)");
+    }
+    if(cli.nombre && !_infState.nombre) _infState.nombre = cli.nombre;
+    /* Si estamos en la pestaña Informes, refleja los textareas al vuelo. */
+    var t1 = document.getElementById("inf-ev1"), t2 = document.getElementById("inf-ev2");
+    if(t1) t1.value = _infState.ev1raw || "";
+    if(t2) t2.value = _infState.ev2raw || "";
+  }
+
+  /* --- parte BlazePod --> Rendimiento --- */
+  if(rnd.length){
+    rnd.forEach(function(s, i){ if(s.orden == null) s.orden = i + 1; });
+    _rndState.data = { fuente:"blazepod", atleta:(d.rendimiento.atleta || {}), sesiones:rnd };
+    _rndState.raw  = JSON.stringify(_rndState.data, null, 2);
+    _rndState.metrics = rndMetrics(_rndState.data, _rndState.dominante);
+    if(d.cliente && d.cliente.nombre && !_rndState.nombre) _rndState.nombre = d.cliente.nombre;
+    var rta = document.getElementById("rnd-json");
+    if(rta) rta.value = _rndState.raw;
+    hechos.push(rnd.length + " sesión(es) de BlazePod → <b>Rendimiento</b>");
+  }
+
+  if(d.descartadas && d.descartadas.length){
+    hechos.push('<span style="color:#b45309;">' + d.descartadas.length + ' captura(s) no reconocida(s)</span>');
+  }
+  say("✓ " + hechos.join(" · "), "var(--success)");
+
+  /* Si hay sesiones sin lado, pregunta cuál es cuál antes de seguir. */
+  var faltan = rnd.filter(function(s){ return !s.lado; });
+  if(faltan.length) u19PreguntarLados(idSuf);
+  else if(rnd.length) u19TrasLados(idSuf);
+};
+
+/* Modal: ¿cuál captura es la izquierda y cuál la derecha? */
+function u19PreguntarLados(idSuf){
+  var ses = (_rndState.data && _rndState.data.sesiones) || [];
+  if(!ses.length) return;
+
+  function fila(s, i){
+    var ident = [];
+    if(s.actividad) ident.push(escapeHtml(s.actividad));
+    if(s.hits != null) ident.push('<b>' + s.hits + '</b> hits');
+    if(s.reaccion_ms_prom != null) ident.push('<b>' + s.reaccion_ms_prom + '</b> ms');
+    if(s.fecha) ident.push(rndFdate(s.fecha));
+    return '<div style="display:flex;align-items:center;gap:.6rem;padding:.55rem .2rem;border-bottom:1px solid var(--border);">'
+      + '<div style="flex:1;min-width:0;">'
+      +   '<div style="font-weight:600;font-size:.82rem;">Captura #' + (s.orden != null ? s.orden : (i + 1)) + '</div>'
+      +   '<div class="text-xs text-muted">' + ident.join(' · ') + '</div>'
+      + '</div>'
+      + '<select data-u19-lado="' + i + '" style="font-size:.8rem;">'
+      +   '<option value="">— elige —</option>'
+      +   '<option value="izquierdo"' + (s.lado === 'izquierdo' ? ' selected' : '') + '>Izquierda</option>'
+      +   '<option value="derecho"'   + (s.lado === 'derecho'   ? ' selected' : '') + '>Derecha</option>'
+      +   '<option value="bilateral"' + (s.lado === 'bilateral' ? ' selected' : '') + '>Bilateral</option>'
+      + '</select></div>';
+  }
+
+  /* Con exactamente dos sesiones sin lado, un atajo de un clic. */
+  var sinLado = [];
+  ses.forEach(function(s, i){ if(!s.lado) sinLado.push(i); });
+  var atajo = '';
+  if(sinLado.length === 2){
+    var a = ses[sinLado[0]], b = ses[sinLado[1]];
+    atajo = '<div style="background:var(--surface-2,#f4f7fb);border-radius:8px;padding:.6rem;margin-bottom:.8rem;">'
+      + '<div class="text-xs text-muted" style="margin-bottom:.4rem;">Atajo — son dos capturas, dime solo cuál es la primera:</div>'
+      + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;">'
+      + '<button class="btn btn-secondary btn-sm" data-u19-swap="izq">La #' + (a.orden || 1) + ' es <b>izquierda</b></button>'
+      + '<button class="btn btn-secondary btn-sm" data-u19-swap="der">La #' + (a.orden || 1) + ' es <b>derecha</b></button>'
+      + '</div>'
+      + '<div class="text-xs text-muted" style="margin-top:.4rem;">#' + (a.orden || 1) + ': ' + (a.hits != null ? a.hits + ' hits' : '—')
+      + (a.reaccion_ms_prom != null ? ' · ' + a.reaccion_ms_prom + ' ms' : '')
+      + '  ·  #' + (b.orden || 2) + ': ' + (b.hits != null ? b.hits + ' hits' : '—')
+      + (b.reaccion_ms_prom != null ? ' · ' + b.reaccion_ms_prom + ' ms' : '') + '</div></div>';
+  }
+
+  var dom = _rndState.dominante || "derecho";
+  openModal({
+    title: "¿Qué lado es cada captura?",
+    bodyHtml: '<p class="text-xs text-muted" style="line-height:1.5;margin-bottom:.8rem;">'
+      + 'BlazePod no guarda qué extremidad usaste, así que no hay forma de deducirlo de la imagen. '
+      + 'Identifícalas por los hits y los milisegundos.</p>'
+      + atajo
+      + '<div>' + ses.map(fila).join('') + '</div>'
+      + '<div class="form-row" style="margin-top:.9rem;"><label class="form-label">Lado dominante del deportista</label>'
+      + '<select id="u19-dom"><option value="derecho"' + (dom === 'derecho' ? ' selected' : '') + '>Derecho</option>'
+      + '<option value="izquierdo"' + (dom === 'izquierdo' ? ' selected' : '') + '>Izquierdo</option></select></div>',
+    bodyMount: function(body){
+      body.querySelectorAll('[data-u19-swap]').forEach(function(btn){
+        btn.addEventListener('click', function(){
+          var primeroIzq = btn.getAttribute('data-u19-swap') === 'izq';
+          ses[sinLado[0]].lado = primeroIzq ? 'izquierdo' : 'derecho';
+          ses[sinLado[1]].lado = primeroIzq ? 'derecho'   : 'izquierdo';
+          body.querySelectorAll('[data-u19-lado]').forEach(function(sel){
+            sel.value = ses[+sel.getAttribute('data-u19-lado')].lado || '';
+          });
+        });
+      });
+      body.querySelectorAll('[data-u19-lado]').forEach(function(sel){
+        sel.addEventListener('change', function(){ ses[+sel.getAttribute('data-u19-lado')].lado = sel.value || null; });
+      });
+    },
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost", onClick: closeModal },
+      { label:"Confirmar", cls:"btn-primary", onClick: function(){
+          var $d = document.getElementById("u19-dom");
+          if($d) _rndState.dominante = $d.value;
+          _rndState.raw = JSON.stringify(_rndState.data, null, 2);
+          _rndState.metrics = rndMetrics(_rndState.data, _rndState.dominante);
+          closeModal();
+          u19TrasLados(idSuf);
+        } }
+    ]
+  });
+}
+
+/* Tras asignar los lados: refresca lo que esté a la vista y avisa. */
+function u19TrasLados(idSuf){
+  var rta = document.getElementById("rnd-json");
+  if(rta) rta.value = _rndState.raw;
+  if(document.getElementById("rnd-analisis")){ rndEditorRender(); rndPintarAnalisis(); }
+  var d2 = document.getElementById("rnd-dominante");
+  if(d2) d2.value = _rndState.dominante;
+
+  var a = _rndState.metrics && _rndState.metrics.asimetria;
+  var peor = a ? rndPeorAsim(a) : null;
+  if(peor){
+    toast("Asimetría " + peor.pct.toFixed(1) + "% · " + rndNivelTxt(peor.nivel), peor.nivel === "ok" ? "success" : "warn");
+  } else {
+    toast("Lados asignados ✓", "success");
+  }
+  var msg = document.getElementById("u19-uni-msg-" + idSuf);
+  if(msg && !document.getElementById("rnd-analisis")){
+    msg.innerHTML += ' <a href="#" onclick="switchView(\'rendimiento\');return false;">Ver el análisis de rendimiento →</a>';
+  }
+}
+/* ===CAPTURA_UNIFICADA_END=== */
+
+
+/* ============================================================
+   MEJORAS US19 — bloque operativo.
+   Todo lo de aquí se apoya en datos que la app YA guardaba y
+   no estaba usando. Aislado en funciones nuevas (u19..., rnd...) para
+   no tocar la lógica existente.
+   ============================================================ */
+
+/* ------------------------------------------------------------
+   A · PROGRESIÓN COMPLETA DESDE EL LINK RECIBIDO
+   El cliente ya te manda el JSON exacto por "Enviar progreso".
+   storeReceivedReport() solo guardaba el resumen (pct/done/total)
+   y el detalle serie a serie se pintaba y se perdía; por eso
+   existía el rodeo de leer el PDF con IA. Esto lo persiste en
+   c.progressions[] con el MISMO formato que produce el
+   importador OCR, así que el resto de la app (revisión de
+   cargas, historial) funciona igual.
+   ------------------------------------------------------------ */
+function u19ProgresionDesdeReporte(data){
+  var r = data.routine || {};
+  var progress = data.progress || {};
+  var stats = data.stats || computeSessionStats(r, progress);
+  var ejercicios = [];
+  for (var di = 0; di < 7; di++){
+    var day = (r.days || [])[di];
+    if (!day || !day.exercises || !day.exercises.length) continue;
+    for (var ei = 0; ei < day.exercises.length; ei++){
+      var rowEx = day.exercises[ei];
+      var def = findExerciseInShare(data, rowEx.exerciseId);
+      var setsCount = parseInt(rowEx.sets, 10) || 1;
+      var series = [];
+      for (var s = 0; s < setsCount; s++){
+        var p = progress[di + ":" + ei + ":" + s] || {};
+        var num = function(v){ var n = Number(v); return (v === "" || v == null || isNaN(n)) ? null : n; };
+        series.push({
+          n: s + 1,
+          reps: num(p.reps),
+          peso_kg: num(p.weight),
+          rpe: num(p.rpe),
+          rir: null,
+          eva: num(p.eva),
+          estado: p.done ? "hecho" : ((p.reps || p.weight || p.rpe || p.eva) ? "parcial" : "pendiente")
+        });
+      }
+      ejercicios.push({
+        dia: DAY_NAMES[di],
+        nombre: def ? def.name : "Ejercicio",
+        plan: (rowEx.reps || "") + (rowEx.weight ? " · " + rowEx.weight + "kg" : "") || null,
+        series: series,
+        comentario: progress[di + ":" + ei + ":comment"] || null,
+        mejorSet: (typeof _prgBestSet === "function") ? _prgBestSet(series) : null
+      });
+    }
+  }
+  return {
+    id: genId(),
+    fecha: data.sessionDate || new Date().toISOString().slice(0, 10),
+    routineId: r.id || null,
+    rutinaNombre: r.name || null,
+    cumplimiento: stats ? stats.pct : null,
+    nota: data.sessionNotes || null,
+    ejercicios: ejercicios,
+    importadoEl: Date.now(),
+    origen: "link"          // lo distingue de las importadas por OCR
+  };
+}
+
+/* Busca al cliente del reporte por id, nombre o teléfono. */
+function u19ClienteDeReporte(data){
+  var dc = data.client || {};
+  if (dc.id){ var byId = getClient(dc.id); if (byId) return byId; }
+  var nom = (dc.name || "").trim().toLowerCase();
+  var tel = (dc.phone || "").replace(/[^0-9]/g, "").slice(-8);
+  for (var i = 0; i < state.clients.length; i++){
+    var c = state.clients[i];
+    if (nom && c.name && c.name.toLowerCase() === nom) return c;
+    if (tel && c.phone && c.phone.replace(/[^0-9]/g, "").slice(-8) === tel) return c;
+  }
+  return null;
+}
+
+window.u19GuardarProgresionRecibida = function(){
+  var data = _u19UltimoReporte;
+  if (!data){ toast("No hay un reporte abierto", "warn"); return; }
+  var c = u19ClienteDeReporte(data);
+  if (!c){ toast("No identifico al cliente de este reporte. Créalo en Clientes y vuelve a abrir el link.", "warn"); return; }
+  if (!Array.isArray(c.progressions)) c.progressions = [];
+  var nueva = u19ProgresionDesdeReporte(data);
+  /* Evita duplicar si abres el mismo link dos veces. */
+  var dup = c.progressions.some(function(p){
+    return p.fecha === nueva.fecha && p.routineId === nueva.routineId && p.cumplimiento === nueva.cumplimiento;
+  });
+  if (dup){ toast("Esta sesión ya estaba en el historial de " + c.name, "info"); return; }
+  c.progressions.push(nueva);
+  if (c.progressions.length > 120) c.progressions = c.progressions.slice(-120);
+  saveState();
+  var nSets = nueva.ejercicios.reduce(function(a, e){ return a + e.series.length; }, 0);
+  toast("Progresión guardada en " + c.name + " · " + nueva.ejercicios.length + " ejercicios, " + nSets + " series ✓", "success");
+  var btn = document.getElementById("u19-btn-guardar-prog");
+  if (btn){ btn.textContent = "✓ Guardada en el historial"; btn.disabled = true; }
+};
+
+var _u19UltimoReporte = null;
+
+/* ------------------------------------------------------------
+   B · RENDIMIENTO — calidad, montaje, historial y cruces
+   ------------------------------------------------------------ */
+
+/* B1 · Control de calidad de la sesión. */
+function rndSanityWarnings(m){
+  var w = [];
+  var ses = m.sesiones || [];
+  ses.forEach(function(s, i){
+    var et = "Captura #" + (s.orden != null ? s.orden : (i + 1));
+    if (s.reaccion_ms_prom != null && s.reaccion_ms_prom < 200)
+      w.push(et + ": reacción de " + s.reaccion_ms_prom + " ms. Por debajo de 200 ms no es reacción a un estímulo, es anticipación — el atleta se adelantó. Repetir la serie.");
+    if (s.reaccion_ms_prom != null && s.reaccion_ms_prom > 3000)
+      w.push(et + ": reacción de " + s.reaccion_ms_prom + " ms. Un valor tan alto sugiere un pod fuera de alcance o mal colocado.");
+    if (s.hits != null && s.duracion_seg && s.hits > s.duracion_seg * 5)
+      w.push(et + ": " + s.hits + " toques en " + s.duracion_seg + " s es fisiológicamente improbable. Revisa la lectura del OCR.");
+    if (s.duracion_seg == null)
+      w.push(et + ": sin duración. Sin ella no se puede calcular hits/min ni comparar con otras sesiones.");
+  });
+  var a = m.asimetria;
+  if (a && a.izq.duracion_seg !== a.der.duracion_seg){
+    w.push("Los dos lados se midieron con duraciones distintas (" + a.izq.duracion_seg + " s vs " + a.der.duracion_seg + " s). "
+      + "La asimetría de hits NO es comparable; usa la de tiempo de reacción, que sí lo es.");
+  }
+  return w;
+}
+
+/* B2 · Montaje de la prueba. Sin esto, comparar dos fechas no
+   significa nada: el informe lo advertía pero nadie lo registraba. */
+var _rndSetup = { pods:"", distancia_cm:"", altura:"", consigna:"" };
+
+function rndSetupTxt(su){
+  if (!su) return "";
+  var p = [];
+  if (su.pods) p.push(su.pods + " pods");
+  if (su.distancia_cm) p.push(su.distancia_cm + " cm");
+  if (su.altura) p.push("altura " + su.altura);
+  if (su.consigna) p.push(su.consigna);
+  return p.join(" · ");
+}
+/* Compara el montaje actual con el de la evaluación basal guardada. */
+function rndSetupDiff(c, actual){
+  if (!c || !Array.isArray(c.rendimiento) || !c.rendimiento.length) return null;
+  var prev = null;
+  for (var i = c.rendimiento.length - 1; i >= 0; i--){ if (c.rendimiento[i].setup){ prev = c.rendimiento[i]; break; } }
+  if (!prev) return null;
+  var difs = [];
+  [["pods","nº de pods"],["distancia_cm","distancia"],["altura","altura"],["consigna","consigna"]].forEach(function(k){
+    var a = String((prev.setup || {})[k[0]] || "").trim();
+    var b = String((actual || {})[k[0]] || "").trim();
+    if (a && b && a !== b) difs.push(k[1] + ": " + a + " → " + b);
+  });
+  if (!difs.length) return null;
+  return { fecha: prev.fecha, difs: difs };
+}
+
+/* B3 · Reevaluación en un clic + envío por WhatsApp. */
+window.rndRollover = function(){
+  if (!_rndState.metrics){ toast("Analiza las sesiones primero", "warn"); return; }
+  var ses = (_rndState.data.sesiones || []).slice();
+  if (!ses.length) return;
+  /* Conserva la última medición de cada lado como línea base y limpia el resto. */
+  var base = [];
+  ["izquierdo","derecho","bilateral"].forEach(function(l){
+    var delLado = ses.filter(function(s){ return s.lado === l; });
+    if (delLado.length) base.push(delLado[delLado.length - 1]);
+  });
+  if (!base.length) base = [ses[ses.length - 1]];
+  _rndState.data = { fuente:"blazepod", atleta:(_rndState.data.atleta || {}), sesiones:base };
+  _rndState.raw = JSON.stringify(_rndState.data, null, 2);
+  _rndState.metrics = rndMetrics(_rndState.data, _rndState.dominante);
+  _rndOpts.folio = "";                        // el informe nuevo lleva folio nuevo
+  var ta = document.getElementById("rnd-json"); if (ta) ta.value = _rndState.raw;
+  rndEditorRender(); rndPintarAnalisis();
+  toast("Base lista: pega ahora las capturas nuevas debajo de estas " + base.length, "success");
+};
+
+window.rndWaLink = function(){
+  var m = _rndState.metrics;
+  if (!m){ toast("Genera el informe primero", "warn"); return; }
+  var a = m.asimetria, peor = a ? rndPeorAsim(a) : null;
+  var t = "Hola " + (_rndState.nombre || "") + ", te comparto tu evaluación de rendimiento neuromuscular:\n\n";
+  if (m.resumen.reaccion_prom != null) t += "⚡ Reacción media: " + m.resumen.reaccion_prom + " ms\n";
+  if (m.resumen.reaccion_mejor != null) t += "🏅 Mejor marca: " + m.resumen.reaccion_mejor + " ms\n";
+  if (peor) t += "⚖ Simetría entre piernas: LSI " + peor.lsi.toFixed(0) + "% (" + rndNivelTxt(peor.nivel).toLowerCase() + ")\n";
+  t += "\nEl informe completo va adjunto. Cualquier duda me dices.\nUltra-Sport 19";
+  var tel = (_rndState.phone || "").replace(/[^0-9]/g, "");
+  var url = "https://wa.me/" + (tel ? (tel.length <= 9 ? "56" + tel : tel) : "") + "?text=" + encodeURIComponent(t);
+  window.open(url, "_blank", "noopener");
+};
+
+/* B4 · Historial de rendimiento del cliente (lo que se guardaba
+   en c.rendimiento[] y no se leía en ninguna pantalla). */
+window.u19HistorialRendimiento = function(clientId){
+  var c = getClient(clientId);
+  if (!c || !Array.isArray(c.rendimiento) || !c.rendimiento.length){
+    toast("Este cliente no tiene evaluaciones de rendimiento", "info"); return;
+  }
+  var evs = c.rendimiento.slice().sort(function(a, b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });
+  var serie = evs.map(function(e){
+    var lsi = null;
+    if (e.asimetria){
+      var cand = [e.asimetria.reaccion, e.asimetria.hits].filter(Boolean);
+      if (cand.length) lsi = Math.min.apply(null, cand.map(function(x){ return x.lsi; }));
+    }
+    return { fecha:e.fecha, lsi:lsi, reaccion:(e.resumen && e.resumen.reaccion_prom) || null };
+  });
+  var conLsi = serie.filter(function(p){ return p.lsi != null; });
+
+  var spark = "";
+  if (conLsi.length >= 2){
+    var w = 480, h = 130, px = 34, py = 20;
+    var vals = conLsi.map(function(p){ return p.lsi; });
+    var vmin = Math.min(70, Math.min.apply(null, vals)), vmax = 100;
+    var X = function(i){ return px + i * ((w - 2 * px) / (conLsi.length - 1)); };
+    var Y = function(v){ return (h - py) - ((v - vmin) / (vmax - vmin)) * (h - 2 * py); };
+    var y90 = Y(90);
+    spark = '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;background:var(--surface-2,#f4f7fb);border-radius:8px;">'
+      + '<line x1="' + px + '" y1="' + y90.toFixed(1) + '" x2="' + (w - px) + '" y2="' + y90.toFixed(1) + '" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4 3"/>'
+      + '<text x="' + (w - px + 3) + '" y="' + (y90 + 3).toFixed(1) + '" font-size="9" fill="#15803d">90%</text>'
+      + '<path d="' + conLsi.map(function(p, i){ return (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p.lsi).toFixed(1); }).join(' ') + '" fill="none" stroke="#0e5132" stroke-width="2"/>'
+      + conLsi.map(function(p, i){
+          return '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p.lsi).toFixed(1) + '" r="3.4" fill="' + (p.lsi >= 90 ? '#15803d' : (p.lsi >= 85 ? '#d97706' : '#b91c1c')) + '"/>'
+            + '<text x="' + X(i).toFixed(1) + '" y="' + (Y(p.lsi) - 8).toFixed(1) + '" font-size="9" text-anchor="middle" fill="#334155">' + p.lsi.toFixed(0) + '</text>'
+            + '<text x="' + X(i).toFixed(1) + '" y="' + (h - 5) + '" font-size="8" text-anchor="middle" fill="#94a3b8">' + String(p.fecha).slice(5) + '</text>';
+        }).join('')
+      + '</svg>';
+  }
+
+  var filas = evs.slice().reverse().map(function(e){
+    var lsiTxt = "—", col = "";
+    if (e.asimetria){
+      var cand = [e.asimetria.reaccion, e.asimetria.hits].filter(Boolean);
+      if (cand.length){
+        var peor = cand.sort(function(x, y){ return y.pct - x.pct; })[0];
+        lsiTxt = peor.lsi.toFixed(0) + "%";
+        col = "color:" + rndNivelColor(peor.nivel) + ";font-weight:700;";
+      }
+    }
+    return '<tr><td style="padding:.4rem .3rem;">' + rndFdate(e.fecha) + '</td>'
+      + '<td style="padding:.4rem .3rem;">' + ((e.resumen && e.resumen.reaccion_prom != null) ? e.resumen.reaccion_prom + ' ms' : '—') + '</td>'
+      + '<td style="padding:.4rem .3rem;' + col + '">' + lsiTxt + '</td>'
+      + '<td style="padding:.4rem .3rem;font-size:.7rem;color:var(--muted);">' + escapeHtml(rndSetupTxt(e.setup) || '— sin montaje —') + '</td></tr>';
+  }).join('');
+
+  openModal({
+    title: "Rendimiento · " + c.name, large: true,
+    bodyHtml: (spark ? '<div style="margin-bottom:.8rem;"><div class="text-xs text-muted" style="margin-bottom:.3rem;">Evolución del LSI · la línea verde es el umbral de 90% para retorno deportivo</div>' + spark + '</div>' : '')
+      + '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">'
+      + '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">'
+      + '<th style="padding:.3rem;">Fecha</th><th style="padding:.3rem;">Reacción</th><th style="padding:.3rem;">LSI</th><th style="padding:.3rem;">Montaje</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody></table>',
+    footer: [{ label:"Cerrar", cls:"btn-ghost" }]
+  });
+};
+
+/* Último LSI registrado del cliente — lo consume Protocolos. */
+function u19UltimoLSI(c){
+  if (!c || !Array.isArray(c.rendimiento) || !c.rendimiento.length) return null;
+  for (var i = c.rendimiento.length - 1; i >= 0; i--){
+    var e = c.rendimiento[i];
+    if (!e.asimetria) continue;
+    var cand = [e.asimetria.reaccion, e.asimetria.hits].filter(Boolean);
+    if (!cand.length) continue;
+    var peor = cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0];
+    return { lsi: peor.lsi, pct: peor.pct, nivel: peor.nivel, fecha: e.fecha, deficitLado: peor.deficitLado };
+  }
+  return null;
+}
+
+/* B6 · Bloque de criterio objetivo de alta, para Protocolos. */
+window.u19CriterioAltaHTML = function(clientId){
+  var c = getClient(clientId);
+  var d = u19UltimoLSI(c);
+  if (!d){
+    return '<div style="border:1px dashed var(--border);border-radius:8px;padding:.6rem;margin:.5rem 0;">'
+      + '<div class="text-xs text-muted">⚖ <b>Simetría medida:</b> sin datos. '
+      + 'Haz una evaluación en <a href="#" onclick="switchView(\'rendimiento\');return false;">Rendimiento</a> para respaldar el criterio «fuerza ≥90% vs lado sano» con una medición en vez de una estimación.</div></div>';
+  }
+  var cumple = d.lsi >= 90;
+  return '<div style="border:1px solid ' + (cumple ? 'rgba(21,128,61,.4)' : 'rgba(185,28,28,.4)')
+    + ';background:' + (cumple ? 'rgba(21,128,61,.07)' : 'rgba(185,28,28,.06)') + ';border-radius:8px;padding:.6rem;margin:.5rem 0;">'
+    + '<div style="font-weight:700;color:' + rndNivelColor(d.nivel) + ';">'
+    + (cumple ? '✓' : '✗') + ' Simetría medida: LSI ' + d.lsi.toFixed(0) + '%'
+    + (cumple ? ' — cumple el criterio de ≥90%' : ' — NO cumple el criterio de ≥90%') + '</div>'
+    + '<div class="text-xs text-muted" style="margin-top:.25rem;">Medido el ' + rndFdate(d.fecha)
+    + ' · asimetría ' + d.pct.toFixed(1) + '% · déficit en lado ' + rndLadoTxt(d.deficitLado).toLowerCase()
+    + ' · <a href="#" onclick="u19HistorialRendimiento(\'' + clientId + '\');return false;">ver historial</a></div></div>';
+};
+
+/* B5 · Cruce estructura ↔ función.
+   La bioimpedancia da músculo por pierna; BlazePod da reacción por
+   pierna. Comparar las dos asimetrías distingue un déficit de masa
+   de uno de control motor, que es la decisión de entrenamiento. */
+function u19CruceHTML(ev, m){
+  if (!ev || !m || !m.asimetria) return '';
+  var sm = ev.segmentario_musculo || {};
+  var gk = function(k){ return (sm[k] && sm[k].kg != null) ? Number(sm[k].kg) : null; };
+  var pi = gk('pierna_izq'), pd = gk('pierna_der');
+  if (pi == null || pd == null) return '';
+  var estr = rndAsim(pi, pd, true);
+  var func = m.asimetria.reaccion || m.asimetria.hits;
+  if (!estr || !func) return '';
+
+  var ratio = estr.pct > 0.5 ? (func.pct / estr.pct) : null;
+  var lectura;
+  if (ratio == null || estr.pct < 3){
+    lectura = 'La masa muscular está prácticamente equilibrada entre piernas (' + estr.pct.toFixed(1) + '%), '
+      + 'mientras la respuesta funcional difiere un ' + func.pct.toFixed(1) + '%. '
+      + '<b>El déficit no es de masa: es de control motor.</b> El trabajo indicado es neuromuscular '
+      + '(reactividad, cambios de dirección, propiocepción), no de hipertrofia.';
+  } else if (ratio >= 2){
+    lectura = 'La asimetría funcional (' + func.pct.toFixed(1) + '%) es <b>' + ratio.toFixed(1) + ' veces</b> la estructural ('
+      + estr.pct.toFixed(1) + '%). El músculo está mucho más simétrico que su uso: '
+      + '<b>predomina el componente de control motor sobre el de masa.</b> Priorizar trabajo neuromuscular unilateral.';
+  } else if (ratio <= 0.6){
+    lectura = 'La asimetría estructural (' + estr.pct.toFixed(1) + '%) supera a la funcional (' + func.pct.toFixed(1) + '%). '
+      + '<b>Hay una diferencia real de masa muscular</b> que la función todavía compensa. Indicado trabajo de fuerza e hipertrofia unilateral del lado deficitario.';
+  } else {
+    lectura = 'Las asimetrías estructural (' + estr.pct.toFixed(1) + '%) y funcional (' + func.pct.toFixed(1) + '%) son de magnitud comparable, '
+      + 'lo que sugiere un <b>déficit mixto</b>: conviene combinar fuerza unilateral con trabajo reactivo del lado más débil.';
+  }
+
+  return '<div class="pr-sec"><div class="pr-letter">X</div><div class="pr-secttl">'
+    + '<h2>Cruce estructura · función</h2><p>Masa muscular segmentaria (bioimpedancia) frente a respuesta neuromuscular (BlazePod)</p></div></div>'
+    + '<table class="pr-tbl"><thead><tr><th>Dimensión</th><th class="num">Izquierda</th><th class="num">Derecha</th>'
+    + '<th class="num">Asimetría</th></tr></thead><tbody>'
+    + '<tr><td class="lbl">Músculo de la pierna (kg)</td><td class="num">' + pi.toFixed(1) + '</td><td class="num">' + pd.toFixed(1) + '</td>'
+    + '<td class="num delta ' + (estr.pct < 10 ? 'good' : 'bad') + '">' + estr.pct.toFixed(1) + '%</td></tr>'
+    + '<tr><td class="lbl">' + (m.asimetria.reaccion ? 'Tiempo de reacción (ms)' : 'Toques (hits)') + '</td>'
+    + '<td class="num">' + (m.asimetria.reaccion ? m.asimetria.izq.reaccion_ms_prom : m.asimetria.izq.hits) + '</td>'
+    + '<td class="num">' + (m.asimetria.reaccion ? m.asimetria.der.reaccion_ms_prom : m.asimetria.der.hits) + '</td>'
+    + '<td class="num delta ' + (func.pct < 10 ? 'good' : 'bad') + '">' + func.pct.toFixed(1) + '%</td></tr>'
+    + '</tbody></table>'
+    + '<div class="pr-narr"><p>' + lectura + '</p></div>'
+    + '<div class="pr-refnote">La bioimpedancia segmentaria estima masa por segmento y tiene menor precisión que la de cuerpo completo: '
+    + 'lee esta comparación como orientación del tipo de trabajo a priorizar, no como una medida exacta.</div>';
+}
+
+/* ------------------------------------------------------------
+   C · PANEL OPERATIVO — qué toca hoy, con datos ya guardados.
+   ------------------------------------------------------------ */
+function u19DiasDesde(ts){
+  if (!ts) return null;
+  var t = (typeof ts === "number") ? ts : Date.parse(ts);
+  if (isNaN(t)) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+
+function u19PanelOperativoHTML(){
+  var hoyIdx = (new Date().getDay() + 6) % 7;          // 0 = lunes
+  var reports = [];
+  try { reports = loadReports() || []; } catch(e){}
+
+  /* Última señal de vida de cada cliente: reporte recibido o progresión guardada. */
+  var ultimo = {};
+  reports.forEach(function(r){
+    var k = r.clientId || (r.clientName || "").toLowerCase();
+    if (!k) return;
+    var t = r.sentAt || 0;
+    if (!ultimo[k] || t > ultimo[k]) ultimo[k] = t;
+  });
+
+  var hoyEntrenan = [], dormidos = [], reevals = [];
+  state.clients.forEach(function(c){
+    if (c.activo === false) return;
+    /* ¿Tiene rutina con algo programado para hoy? */
+    var rut = state.routines.filter(function(r){
+      return r.clientId === c.id && r.status !== "archived";
+    });
+    var entrenaHoy = rut.some(function(r){
+      var d = (r.days || [])[hoyIdx];
+      return d && d.exercises && d.exercises.length;
+    });
+    if (entrenaHoy) hoyEntrenan.push(c);
+
+    var t = ultimo[c.id] || ultimo[(c.name || "").toLowerCase()] || null;
+    var prog = (c.progressions && c.progressions.length) ? c.progressions[c.progressions.length - 1] : null;
+    if (prog && prog.importadoEl && (!t || prog.importadoEl > t)) t = prog.importadoEl;
+    var dias = u19DiasDesde(t);
+    if (rut.length && (dias == null || dias >= 10)) dormidos.push({ c:c, dias:dias });
+
+    if (c.reevalDate){
+      var dd = Math.floor((Date.parse(c.reevalDate) - Date.now()) / 86400000);
+      if (!isNaN(dd) && dd <= 7) reevals.push({ c:c, dias:dd });
+    }
+  });
+  dormidos.sort(function(a, b){ return (b.dias == null ? 9999 : b.dias) - (a.dias == null ? 9999 : a.dias); });
+  reevals.sort(function(a, b){ return a.dias - b.dias; });
+
+  function lista(arr, vacio, fn){
+    if (!arr.length) return '<div class="text-xs text-muted">' + vacio + '</div>';
+    return arr.slice(0, 6).map(fn).join('')
+      + (arr.length > 6 ? '<div class="text-xs text-muted" style="margin-top:.3rem;">y ' + (arr.length - 6) + ' más…</div>' : '');
+  }
+  var chip = function(c, extra, color){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--border);">'
+      + '<a href="#" onclick="openClientTracking(\'' + c.id + '\');return false;" style="font-size:.82rem;font-weight:600;text-decoration:none;">' + escapeHtml(c.name || '—') + '</a>'
+      + '<span class="text-xs" style="' + (color ? 'color:' + color + ';font-weight:600;' : 'color:var(--muted);') + '">' + extra + '</span></div>';
+  };
+
+  return '<div class="card" style="margin-bottom:1rem;border-left:3px solid var(--accent,#e21c25);"><div class="card-main">'
+    + '<div class="card-title">📌 Hoy — ' + DAY_NAMES[hoyIdx] + '</div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:.6rem;">'
+    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Entrenan hoy (' + hoyEntrenan.length + ')</div>'
+    +     lista(hoyEntrenan, 'Nadie tiene sesión programada hoy.', function(c){ return chip(c, 'sesión programada'); }) + '</div>'
+    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Sin señales (' + dormidos.length + ')</div>'
+    +     lista(dormidos, 'Todos con actividad reciente ✓', function(o){
+            return chip(o.c, o.dias == null ? 'nunca reportó' : 'hace ' + o.dias + ' días', o.dias == null || o.dias >= 21 ? '#b91c1c' : '#d97706'); }) + '</div>'
+    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Reevaluaciones (' + reevals.length + ')</div>'
+    +     lista(reevals, 'Ninguna en los próximos 7 días.', function(o){
+            return chip(o.c, o.dias < 0 ? 'vencida hace ' + Math.abs(o.dias) + ' d' : (o.dias === 0 ? 'hoy' : 'en ' + o.dias + ' d'), o.dias <= 0 ? '#b91c1c' : '#d97706'); }) + '</div>'
+    + '</div>'
+    + '<div class="text-xs text-muted" style="margin-top:.7rem;line-height:1.5;">«Sin señales» = con rutina activa y sin reporte de progreso ni progresión guardada en 10 días o más. Es el aviso temprano de abandono.</div>'
+    + '</div></div>';
+}
+
+/* ------------------------------------------------------------
+   D · BIBLIOTECA — sustituciones y filtro por material.
+   El catálogo trae muscle y equipment limpios en los 2.060
+   ejercicios, así que un sustituto es: mismo músculo, material
+   distinto (o peso corporal si hay lesión).
+   ------------------------------------------------------------ */
+window.u19Sustitutos = function(exId){
+  var base = null;
+  for (var i = 0; i < state.exercises.length; i++){ if (state.exercises[i].id === exId){ base = state.exercises[i]; break; } }
+  if (!base){ toast("Ejercicio no encontrado", "error"); return; }
+
+  var mismos = state.exercises.filter(function(e){
+    return e.id !== base.id && e.muscle === base.muscle;
+  });
+  var otroMaterial = mismos.filter(function(e){ return e.equipment !== base.equipment; });
+  var corporal = mismos.filter(function(e){ return e.equipment === "Peso corporal"; });
+  var mismoMaterial = mismos.filter(function(e){ return e.equipment === base.equipment; });
+
+  function grupo(titulo, subt, arr){
+    if (!arr.length) return '';
+    return '<div style="margin-bottom:.9rem;"><div style="font-weight:700;font-size:.85rem;">' + titulo + '</div>'
+      + '<div class="text-xs text-muted" style="margin-bottom:.3rem;">' + subt + '</div>'
+      + arr.slice(0, 8).map(function(e){
+          return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.28rem 0;border-bottom:1px solid var(--border);">'
+            + '<span style="font-size:.8rem;">' + escapeHtml(e.name) + '</span>'
+            + '<span class="text-xs text-muted">' + escapeHtml(e.equipment) + '</span></div>';
+        }).join('') + '</div>';
+  }
+
+  openModal({
+    title: "Sustitutos · " + base.name, large: true,
+    bodyHtml: '<div class="text-xs text-muted" style="margin-bottom:.8rem;">Mismo grupo muscular (<b>' + escapeHtml(base.muscle)
+      + '</b>). Úsalo cuando falte material, cuando haya una zona a proteger o para variar el estímulo sin cambiar el objetivo.</div>'
+      + grupo('Sin material', 'Peso corporal — la primera opción si hay dolor o carga que evitar', corporal)
+      + grupo('Otro material', 'Mismo músculo, implemento distinto', otroMaterial.filter(function(e){ return e.equipment !== "Peso corporal"; }))
+      + grupo('Mismo material', 'Variantes con ' + escapeHtml(base.equipment), mismoMaterial)
+      || '<p class="text-xs text-muted">No hay alternativas registradas para este grupo muscular.</p>',
+    footer: [{ label:"Cerrar", cls:"btn-ghost" }]
+  });
+};
+
+/* ------------------------------------------------------------
+   E · PORTABILIDAD — exportar y borrar los datos de un cliente.
+   Estás guardando datos de salud de terceros; que el titular
+   pueda llevárselos o pedir que los borres es lo mínimo.
+   ------------------------------------------------------------ */
+window.u19ExportarCliente = function(clientId){
+  var c = getClient(clientId);
+  if (!c){ toast("Cliente no encontrado", "error"); return; }
+  var rut = state.routines.filter(function(r){ return r.clientId === c.id; });
+  var out = {
+    _fmt: "us19-cliente-v1",
+    exportadoEl: new Date().toISOString(),
+    cliente: c,
+    rutinas: rut,
+    nota: "Copia íntegra de los datos que Ultra-Sport 19 tiene de este cliente."
+  };
+  infDownloadBlob("US19_datos_" + infSlugName(c.name) + "_" + new Date().toISOString().slice(0, 10) + ".json",
+    JSON.stringify(out, null, 2), "application/json");
+  toast("Datos de " + c.name + " exportados ✓", "success");
+};
+
+window.u19BorrarDatosCliente = function(clientId){
+  var c = getClient(clientId);
+  if (!c){ toast("Cliente no encontrado", "error"); return; }
+  var nInf = (c.informes || []).length, nRnd = (c.rendimiento || []).length, nPrg = (c.progressions || []).length;
+  var nRut = state.routines.filter(function(r){ return r.clientId === c.id; }).length;
+  openModal({
+    title: "Borrar los datos de " + c.name,
+    bodyHtml: '<p class="text-sm" style="line-height:1.6;">Se eliminará <b>de forma permanente</b> todo lo que la app guarda de esta persona:</p>'
+      + '<ul class="text-sm" style="line-height:1.7;padding-left:1.2rem;">'
+      + '<li>Su ficha de cliente</li>'
+      + '<li>' + nInf + ' informe(s) de composición corporal</li>'
+      + '<li>' + nRnd + ' evaluación(es) de rendimiento</li>'
+      + '<li>' + nPrg + ' progresión(es) de entrenamiento</li>'
+      + '<li>' + nRut + ' rutina(s) asignada(s)</li></ul>'
+      + '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">Esto no se puede deshacer. '
+      + 'Si el cliente pidió sus datos, <b>expórtalos antes</b>. Los reportes ya enviados por link siguen existiendo en el dispositivo de quien los abrió.</p>',
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Exportar primero", cls:"btn-secondary", onClick: function(){ u19ExportarCliente(clientId); } },
+      { label:"Borrar todo", cls:"btn-danger", onClick: function(){
+          state.routines = state.routines.filter(function(r){ return r.clientId !== c.id; });
+          state.clients = state.clients.filter(function(x){ return x.id !== c.id; });
+          saveState(); closeModal(); renderClients();
+          toast("Datos de " + c.name + " eliminados", "success");
+        } }
+    ]
+  });
+};
+
+/* Aviso visible si el montaje cambio respecto de la evaluacion anterior. */
+function rndPintarSetupDiff(){
+  var box=document.getElementById("rnd-su-diff"); if(!box) return;
+  var c=(typeof getClient==="function")?getClient(_rndState.clientId):null;
+  var d=rndSetupDiff(c,_rndSetup);
+  if(!d){
+    var t=rndSetupTxt(_rndSetup);
+    box.innerHTML = t
+      ? '<span style="color:var(--success);">✓ Montaje registrado: '+escapeHtml(t)+'</span>'
+      : '<span class="text-muted">Sin montaje registrado. Se puede generar el informe igual, pero la comparacion entre fechas pierde validez.</span>';
+    return;
+  }
+  box.innerHTML = '<span style="color:#b45309;">⚠ <b>El montaje cambio</b> respecto de la evaluacion del '
+    + rndFdate(d.fecha) + ': ' + escapeHtml(d.difs.join(" · "))
+    + '. Los resultados <b>no son comparables</b> con esa medicion.</span>';
+}
+
+/* Avisos de calidad, en pantalla. */
+function rndPintarCalidad(){
+  var box=document.getElementById("rnd-calidad"); if(!box||!_rndState.metrics) return;
+  var w=rndSanityWarnings(_rndState.metrics);
+  box.innerHTML = w.length
+    ? '<div style="border-left:3px solid #b45309;background:rgba(180,83,9,.08);border-radius:0 6px 6px 0;padding:.5rem .7rem;margin-top:.6rem;">'
+      + '<div style="font-weight:700;font-size:.78rem;color:#b45309;margin-bottom:.25rem;">⚠ Revisa estas mediciones</div>'
+      + '<ul class="text-xs" style="margin:0;padding-left:1.1rem;line-height:1.55;">'
+      + w.map(function(t){ return '<li>'+escapeHtml(t)+'</li>'; }).join('') + '</ul></div>'
+    : '';
+}
+/* ===MEJORAS_US19_END=== */
 
 </script>
 </body>
