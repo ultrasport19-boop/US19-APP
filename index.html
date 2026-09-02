@@ -135,7 +135,9 @@ img{max-width:100%;display:block;}
 /* ============ TABS ============ */
 .tab-bar{background:var(--surface-1);border-bottom:1px solid var(--border);padding:0 var(--shell-pad);overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
 .tab-bar::-webkit-scrollbar{height:0;}
-.tab-bar-inner{display:flex;gap:.25rem;max-width:var(--shell-max);margin:0 auto;}
+.tab-bar-inner{display:flex;gap:.25rem;max-width:var(--shell-max);margin:0 auto;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;}
+.tab-bar-inner::-webkit-scrollbar{display:none;}
+.tab-bar-inner .tab-btn{scroll-snap-align:start;flex:0 0 auto;}
 .tab-btn{padding:.85rem 1.1rem;color:var(--muted);font-weight:600;font-size:.85rem;letter-spacing:.05em;text-transform:uppercase;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s;}
 .tab-btn:hover{color:var(--text);}
 .tab-btn.active{color:var(--accent);border-color:var(--accent);}
@@ -619,6 +621,7 @@ img{max-width:100%;display:block;}
   <section class="view" id="view-horas"></section>
   <section class="view" id="view-informes"></section>
   <section class="view" id="view-rendimiento"></section>
+  <section class="view" id="view-ficha"></section>
   <section class="view" id="view-builder"></section>
   <section class="view" id="view-client"></section>
   <section class="view" id="view-report"></section>
@@ -687,6 +690,75 @@ img{max-width:100%;display:block;}
 .crit-list{margin-top:.6rem;background:rgba(0,0,0,.15);border:1px solid var(--border);border-radius:10px;padding:.6rem .8rem;}
 .crit-row{display:flex;gap:.55rem;align-items:flex-start;padding:.3rem 0;cursor:pointer;font-size:.85rem;}
 .crit-row input{width:18px;height:18px;accent-color:var(--accent);flex-shrink:0;margin-top:.1rem;}
+
+/* ---- Ficha del deportista ---- */
+.u-chips{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.45rem;}
+.u-chip{font-size:.68rem;font-weight:600;padding:.12rem .5rem;border-radius:999px;border:1px solid currentColor;opacity:.95;white-space:nowrap;}
+.u-fh{display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem;}
+.u-fh-id{flex:1;min-width:200px;}
+.u-fh-id h1{font-family:var(--font-display);font-size:1.9rem;letter-spacing:.03em;margin:.3rem 0 .15rem;line-height:1;}
+.u-fh-meta{font-size:.8rem;color:var(--muted);}
+.u-fh-act{display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;}
+.u-ftabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);margin-bottom:1.1rem;overflow-x:auto;}
+.u-ftab{background:none;border:none;border-bottom:2px solid transparent;color:var(--muted);font-size:.85rem;font-weight:600;
+  padding:.5rem .85rem;cursor:pointer;white-space:nowrap;}
+.u-ftab:hover{color:var(--text);}
+.u-ftab.on{color:var(--accent,#e21c25);border-bottom-color:var(--accent,#e21c25);}
+.u-ftab:focus-visible{outline:2px solid var(--accent,#e21c25);outline-offset:-2px;}
+.u-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;margin-bottom:1rem;}
+.u-tile{border:1px solid var(--border);border-radius:10px;padding:.7rem .8rem;}
+.u-tile-l{font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+.u-tile-v{font-size:1.35rem;font-weight:700;line-height:1.15;margin-top:.15rem;font-variant-numeric:tabular-nums;}
+.u-tile-s{font-size:.7rem;color:var(--muted);margin-top:.1rem;}
+.u-counts{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.5rem;margin-bottom:1.1rem;}
+.u-count{border:1px solid var(--border);border-radius:10px;padding:.55rem .6rem;background:none;color:inherit;cursor:pointer;text-align:left;}
+.u-count:hover{border-color:var(--accent,#e21c25);}
+.u-count:focus-visible{outline:2px solid var(--accent,#e21c25);outline-offset:2px;}
+.u-count b{display:block;font-size:1.15rem;font-variant-numeric:tabular-nums;}
+.u-count span{font-size:.68rem;color:var(--muted);line-height:1.25;display:block;}
+.u-bh{display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.u-tbl{width:100%;border-collapse:collapse;font-size:.8rem;}
+.u-tbl th{text-align:left;font-size:.66rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);
+  font-weight:700;padding:0 .6rem .35rem 0;border-bottom:1px solid var(--border);}
+.u-tbl td{padding:.4rem .6rem .4rem 0;border-bottom:1px solid var(--border);vertical-align:top;}
+.u-tbl tr:last-child td{border-bottom:none;}
+.u-kvs{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.4rem;}
+.u-kv2{display:flex;justify-content:space-between;gap:.5rem;font-size:.78rem;padding:.25rem 0;border-bottom:1px solid var(--border);}
+.u-kv2 span{color:var(--muted);text-transform:capitalize;}
+.u-tl-f2{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.7rem;}
+.u-tlc{background:none;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:.72rem;font-weight:600;padding:.2rem .6rem;cursor:pointer;}
+.u-tlc:hover{border-color:var(--accent,#e21c25);color:var(--text);}
+.u-tlc:focus-visible{outline:2px solid var(--accent,#e21c25);outline-offset:2px;}
+.u-tlc.on{background:var(--accent,#e21c25);border-color:var(--accent,#e21c25);color:#fff;}
+.u-tlc span{opacity:.7;font-variant-numeric:tabular-nums;}
+/* linea de tiempo */
+.u-tl{position:relative;padding-left:1.1rem;}
+.u-tl::before{content:"";position:absolute;left:.3rem;top:.4rem;bottom:.4rem;width:1px;background:var(--border);}
+.u-tl-i{position:relative;display:flex;gap:.7rem;padding:.45rem 0;align-items:baseline;}
+.u-tl-d{position:absolute;left:-1.1rem;top:.75rem;width:.5rem;height:.5rem;border-radius:50%;transform:translateX(.05rem);}
+.u-tl-f{font-size:.72rem;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;min-width:5.2rem;}
+.u-tl-c{flex:1;min-width:0;}
+.u-tl-k{display:block;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;}
+.u-tl-c b{font-size:.83rem;font-weight:600;display:block;}
+.u-tl-c span{font-size:.74rem;color:var(--muted);}
+@media (max-width:640px){
+  .u-fh-id h1{font-size:1.5rem;}
+  .u-tl-f{min-width:4.4rem;font-size:.68rem;}
+}
+.u-acc{margin-top:1rem;border:1px solid var(--border);border-radius:12px;background:var(--surface-2,rgba(255,255,255,.02));overflow:hidden;}
+.u-acc>summary{list-style:none;cursor:pointer;padding:.75rem 1rem;font-weight:600;font-size:.88rem;display:flex;align-items:baseline;gap:.5rem;flex-wrap:wrap;}
+.u-acc>summary::-webkit-details-marker{display:none;}
+.u-acc>summary::before{content:"\25B8";display:inline-block;transition:transform .15s ease;color:var(--accent,#e21c25);font-size:.8rem;}
+.u-acc[open]>summary::before{transform:rotate(90deg);}
+.u-acc>summary span{font-weight:400;font-size:.74rem;color:var(--muted);}
+.u-acc>summary:hover{background:rgba(255,255,255,.03);}
+.u-acc>summary:focus-visible{outline:2px solid var(--accent,#e21c25);outline-offset:-2px;}
+.u-acc-body{padding:0 1rem 1rem;}
+.u-acc-body>.card:first-child{margin-top:0 !important;}
+@media (prefers-reduced-motion:reduce){ .u-acc>summary::before{transition:none;} }
+.gs-head{padding:.4rem .8rem;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);}
+.lib-mas{display:flex;align-items:center;justify-content:center;gap:.75rem;padding:1rem 0 .5rem;}
+.lp-obj{background:rgba(14,81,50,.10);border-left:3px solid var(--success,#15803d);border-radius:0 6px 6px 0;padding:.4rem .6rem;margin:.1rem 0 .5rem;font-size:.78rem;line-height:1.4;}
 .gsearch-wrap{position:relative;}
 .gsearch-input{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;color:var(--text);font-size:.85rem;width:130px;}
 .gsearch-input:focus{width:190px;outline:none;border-color:var(--accent);}
@@ -3051,7 +3123,12 @@ function saveState(){
     localStorage.setItem(APP_KEY, JSON.stringify(state));
   } catch(e){
     console.error("saveState failed:", e);
-    toast("No se pudo guardar (cuota llena?)", "error");
+    /* Sin espacio, los cambios se pierden en silencio al recargar: hay que
+       decir que hacer, no solo que fallo. */
+    var lleno = e && (e.name === "QuotaExceededError" || e.code === 22 || /quota/i.test(String(e.message || "")));
+    toast(lleno
+      ? "Sin espacio en el navegador: los cambios NO se guardaron. Exporta una copia y borra datos de clientes antiguos."
+      : "No se pudo guardar: " + (e && e.message ? e.message : "error desconocido"), "error");
   }
   if (typeof scheduleSyncUpload === "function") scheduleSyncUpload();
 }
@@ -3329,7 +3406,13 @@ function showView(name){
   if (v) v.classList.add("active");
   var tabs = document.querySelectorAll(".tab-btn");
   for (var j=0;j<tabs.length;j++){
-    tabs[j].classList.toggle("active", tabs[j].getAttribute("data-tab")===name);
+    var esta = tabs[j].getAttribute("data-tab")===name;
+    tabs[j].classList.toggle("active", esta);
+    /* Con la barra desplazable, la pestana activa puede quedar fuera
+       de pantalla en un movil: se trae a la vista. */
+    if (esta && tabs[j].scrollIntoView){
+      try { tabs[j].scrollIntoView({ block:"nearest", inline:"nearest" }); } catch(e){}
+    }
   }
   if (name==="dashboard") renderDashboard();
   else if (name==="clients") renderClients();
@@ -3340,6 +3423,7 @@ function showView(name){
   else if (name==="horas") renderHoras();
   else if (name==="informes") renderInformes();
   else if (name==="rendimiento") renderRendimiento();
+  else if (name==="ficha") renderFicha();
 }
 
 function showTrainerUI(){
@@ -3672,14 +3756,13 @@ function clientCardHtml(c){
         + infoLine
         + clientDateBadges(c)
       + '</div>'
+      + ((typeof u19ChipsCliente === "function") ? ('<div class="u-chips">' + u19ChipsCliente(c) + '</div>') : '')
       + (c.notes ? '<div class="text-xs text-muted" style="margin-top:.4rem;">'+escapeHtml(c.notes)+'</div>' : '')
     + '</div>'
     + '<div class="card-actions">'
       + actionsExtra
-      + '<button class="btn btn-ghost btn-sm" onclick="openClientTracking(\''+c.id+'\')" title="Medidas corporales y evaluaciones">📏 Seguimiento</button>'
-      + ((c.progressions && c.progressions.length) ? '<button class="btn btn-ghost btn-sm" onclick="openProgressHistory(\''+c.id+'\')" title="Progresiones importadas (cargas, reps, RPE)">📈 Progresiones ('+c.progressions.length+')</button>' : '')
-      + ((c.rendimiento && c.rendimiento.length) ? '<button class="btn btn-ghost btn-sm" onclick="u19HistorialRendimiento(\''+c.id+'\')" title="Evaluaciones de velocidad de reaccion y simetria">⚡ Rendimiento ('+c.rendimiento.length+')</button>' : '')
-      + '<button class="btn btn-ghost btn-sm" onclick="u19ExportarCliente(\''+c.id+'\')" title="Descargar todos sus datos (JSON)">⬇</button>'
+      + '<button class="btn btn-primary btn-sm" onclick="abrirFicha(\''+c.id+'\')" title="Toda la información de esta persona en una pantalla">📂 Abrir ficha</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="openClientTracking(\''+c.id+'\')" title="Medidas corporales y evaluaciones">📏</button>'
       + (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\''+c.id+'\')" title="Enviar resumen semanal por WhatsApp">📊 Resumen</button>' : '')
       + waBtn
       + '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\''+c.id+'\')">Editar</button>'
@@ -4094,6 +4177,7 @@ function exerciseRowHtml(ex, idx){
       + '<div><span class="field-tag">Reps / Tiempo</span><input type="text" data-row-idx="'+idx+'" data-field="reps" value="'+escapeAttr(ex.reps||"")+'" placeholder="10 ó 30s"></div>'
       + '<div><span class="field-tag">Peso</span><input type="text" data-row-idx="'+idx+'" data-field="weight" value="'+escapeAttr(ex.weight||"")+'" placeholder="kg"></div>'
       + '<div><span class="field-tag">Descanso</span><input type="text" data-row-idx="'+idx+'" data-field="rest" value="'+escapeAttr(ex.rest||"")+'" placeholder="60s"></div>'
+      + '<div><span class="field-tag" title="Repeticiones en reserva: con cuántas de margen debe terminar cada serie. 2 = RPE 8.">RIR objetivo</span><input type="text" data-row-idx="'+idx+'" data-field="rir" value="'+escapeAttr(ex.rir||"")+'" placeholder="1-2"></div>'
       + '<div><span class="field-tag">RIR objetivo</span><input type="text" data-row-idx="'+idx+'" data-field="rir" value="'+escapeAttr(ex.rir||"")+'" placeholder="1-2"></div>'
     + '</div>'
     + '</div>';
@@ -5256,14 +5340,17 @@ function renderLibrary(){
 
   document.getElementById("lib-search").addEventListener("input", function(){
     _libFilter.search = this.value;
+    _libVisibles = LIB_TANDA;
     renderLibraryGrid();
   });
   document.getElementById("lib-muscle").addEventListener("change", function(){
     _libFilter.muscle = this.value;
+    _libVisibles = LIB_TANDA;
     renderLibraryGrid();
   });
   document.getElementById("lib-equip").addEventListener("change", function(){
     _libFilter.equipment = this.value;
+    _libVisibles = LIB_TANDA;
     renderLibraryGrid();
   });
   renderLibraryGrid();
@@ -5310,8 +5397,14 @@ function renderLibraryGrid(){
     return;
   }
   grid.className = "exercise-grid";
+  /* Pintar 2.060 tarjetas de una vez bloquea el hilo y llena el DOM.
+     Se muestran por tandas: el resto llega al desplazarse. */
+  _libTotal = filtered.length;
+  /* Math.min ya cubre que el filtro deje menos de los visibles; resetear
+     aqui rompia el boton «mostrar mas». El reset va al cambiar de filtro. */
+  var _hasta = Math.min(_libVisibles, _libTotal);
   var html = '';
-  for (var i=0;i<filtered.length;i++){
+  for (var i=0;i<_hasta;i++){
     var e = filtered[i];
     var hasGif = e.gif && /^https?:\/\//.test(e.gif);
     var heavy = e.gif && e.gif.indexOf("data:") === 0;
@@ -5341,7 +5434,43 @@ function renderLibraryGrid(){
     + '</div>';
   }
   grid.innerHTML = html;
+  _libPintarMas(grid, filtered);
 }
+
+/* Boton/centinela para la tanda siguiente. */
+var LIB_TANDA = 60;
+var _libVisibles = LIB_TANDA, _libTotal = 0, _libObs = null;
+function _libPintarMas(grid, filtered){
+  var pie = document.getElementById("lib-mas");
+  if (pie && pie.parentNode) pie.parentNode.removeChild(pie);
+  if (_libObs){ try { _libObs.disconnect(); } catch(e){} _libObs = null; }
+  if (_libVisibles >= _libTotal){
+    if (_libTotal > LIB_TANDA){
+      var fin = document.createElement("div");
+      fin.id = "lib-mas"; fin.className = "lib-mas";
+      fin.innerHTML = '<span class="text-xs text-muted">' + _libTotal + ' ejercicios · los ves todos</span>';
+      grid.parentNode.insertBefore(fin, grid.nextSibling);
+    }
+    return;
+  }
+  var box = document.createElement("div");
+  box.id = "lib-mas"; box.className = "lib-mas";
+  box.innerHTML = '<button class="btn btn-secondary btn-sm" onclick="libVerMas()">Mostrar '
+    + Math.min(LIB_TANDA, _libTotal - _libVisibles) + ' más</button>'
+    + '<span class="text-xs text-muted">' + _libVisibles + ' de ' + _libTotal + '</span>';
+  grid.parentNode.insertBefore(box, grid.nextSibling);
+  /* Y sin tocar nada: al llegar abajo se carga la tanda siguiente. */
+  if (typeof IntersectionObserver === "function"){
+    _libObs = new IntersectionObserver(function(ent){
+      if (ent[0] && ent[0].isIntersecting) libVerMas();
+    }, { rootMargin: "300px" });
+    _libObs.observe(box);
+  }
+}
+window.libVerMas = function(){
+  _libVisibles += LIB_TANDA;
+  renderLibraryGrid();
+};
 
 function openExerciseForm(id){
   var ex = id ? getExercise(id) : null;
@@ -7954,6 +8083,7 @@ function phaseExerciseRowHtml(ex, idx){
       + '<div><span class="field-tag">Reps / Tiempo</span><input type="text" data-prow-idx="'+idx+'" data-field="reps" value="'+escapeAttr(ex.reps||"")+'" placeholder="10 ó 30s"></div>'
       + '<div><span class="field-tag">Carga</span><input type="text" data-prow-idx="'+idx+'" data-field="weight" value="'+escapeAttr(ex.weight||"")+'" placeholder="kg / banda"></div>'
       + '<div><span class="field-tag">Descanso</span><input type="text" data-prow-idx="'+idx+'" data-field="rest" value="'+escapeAttr(ex.rest||"")+'" placeholder="60s"></div>'
+      + '<div><span class="field-tag" title="Repeticiones en reserva al terminar cada serie">RIR objetivo</span><input type="text" data-prow-idx="'+idx+'" data-field="rir" value="'+escapeAttr(ex.rir||"")+'" placeholder="2-3"></div>'
     + '</div>'
     + '<div><span class="field-tag">Indicaciones / Tempo / Progresión</span><input type="text" data-prow-idx="'+idx+'" data-field="notes" value="'+escapeAttr(ex.notes||"")+'" placeholder="Ej. excéntrico 3s, RIR 2, sin dolor" style="font-size:.82rem;padding:.4rem .5rem;"></div>'
     + '</div>';
@@ -9292,7 +9422,7 @@ function buildCalendlyDashboardHtml(){
             html += '<span style="background:rgba(168,209,57,.15);color:var(--accent);border-radius:4px;padding:.1rem .45rem;font-size:.75rem;font-weight:700;">✅ '+escapeHtml(client.name)+'</span>';
             if (clientRoutines.length){
               clientRoutines.forEach(function(r){
-                html += '<span style="background:var(--surface-3);border:1px solid var(--border);border-radius:4px;padding:.1rem .45rem;font-size:.72rem;cursor:pointer;" onclick="openClientView(\''+r.clientId+'\')">📋 '+escapeHtml(r.name)+'</span>';
+                html += '<span style="background:var(--surface-3);border:1px solid var(--border);border-radius:4px;padding:.1rem .45rem;font-size:.72rem;cursor:pointer;" onclick="abrirFicha(\''+r.clientId+'\')">📋 '+escapeHtml(r.name)+'</span>';
               });
             }
             html += '</div>';
@@ -10495,6 +10625,13 @@ function renderLivePlayer(){
     var _lpTxt = (_lpLp.top>0?_lpLp.top+'kg':'') + (_lpPerSet?((_lpLp.top>0?' × ':'')+_lpPerSet+' reps'):'');
     html += '<button class="btn btn-secondary btn-sm" style="margin:.1rem 0 .55rem;" onclick="lpRepeatLast()" title="Rellena los sets vacíos con lo que hiciste la última sesión guardada">↩ Repetir semana pasada'+(_lpTxt?' ('+_lpTxt+')':'')+'</button>';
   }
+  var _lpObj = (typeof u19ObjetivoEsfuerzo === "function") ? u19ObjetivoEsfuerzo(rowEx) : null;
+  if (_lpObj){
+    html += '<div class="lp-obj">Objetivo: termina cada serie con <b>' + _lpObj.rirMin
+      + (_lpObj.rirMax !== _lpObj.rirMin ? '–' + _lpObj.rirMax : '')
+      + ' repetición(es) en reserva</b> · RPE ' + _lpObj.rpeMin
+      + (_lpObj.rpeMax !== _lpObj.rpeMin ? '–' + _lpObj.rpeMax : '') + '</div>';
+  }
   html += '<table class="ex-sets-table lp-table"><thead><tr><th>Set</th><th>Reps</th><th>Peso</th><th>RPE</th><th>EVA</th><th>✓</th></tr></thead><tbody>';
   for (var s=0;s<setsCount;s++){
     var key = _lpDay+":"+_lpIdx+":"+s;
@@ -10881,6 +11018,7 @@ window.applyDeloadWeek = function(){
 /* --- Búsqueda global --- */
 window.globalSearch = function(q){
   q = (q||"").trim().toLowerCase();
+  var q_ = q.normalize ? q.normalize("NFD").replace(/[\u0300-\u036f]/g,"") : q;
   var box = document.getElementById("gsearch-results");
   if (!box) return;
   if (q.length < 2){ box.style.display="none"; box.innerHTML=""; return; }
@@ -10893,7 +11031,38 @@ window.globalSearch = function(q){
   });
   state.routines.forEach(function(r){ if ((r.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoRoutine(\''+r.id+'\')"><span class="badge muted">Rutina</span> '+escapeHtml(r.name||"Sin nombre")+'</div>'); });
   state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoExercise(\''+e.id+'\')"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
-  res = res.slice(0,12);
+  /* Consultas sobre las evaluaciones, no solo nombres. */
+  var grupos = [];
+  var consultas = [
+    { re:/lsi|simetr|asimetr/, lbl:'LSI bajo 90%',
+      test:function(c){ var d=(typeof u19UltimoLSI==="function")?u19UltimoLSI(c):null; return d && d.lsi<90 ? ('LSI '+d.lsi.toFixed(0)+'% \u00b7 '+rndFdate(d.fecha)) : null; } },
+    { re:/report|adheren|abandon|dormid|inactiv/, lbl:'sin reportar hace 10+ días',
+      test:function(c){ var d=(typeof u19DiasSinReportar==="function")?u19DiasSinReportar(c):null;
+        var r=state.routines.some(function(x){ return x.clientId===c.id && x.status!=="archived"; });
+        if(!r) return null; return (d==null) ? 'nunca report\u00f3' : (d>=10 ? ('hace '+d+' d\u00edas') : null); } },
+    { re:/reeval|vencid|renov/, lbl:'reevaluación próxima o vencida',
+      test:function(c){ var d=(typeof u19DiasHastaReeval==="function")?u19DiasHastaReeval(c):null;
+        if(d==null||d>14) return null; return d<0 ? ('vencida hace '+Math.abs(d)+' d') : ('en '+d+' d'); } },
+    { re:/dolor|eva|bandera|derivar/, lbl:'con dolor o banderas rojas',
+      test:function(c){ if(c.redFlags&&c.redFlags.blocked) return 'banderas rojas';
+        var pl=(c.painLog||[]); if(!pl.length) return null; var u=pl[pl.length-1];
+        var e=(u.eva!=null)?u.eva:u.valor; return (e!=null&&e>=4) ? ('EVA '+e+'/10') : null; } }
+  ];
+  consultas.forEach(function(q){
+    if (!q.re.test(q_)) return;
+    var hits = state.clients.map(function(c){ var d=q.test(c); return d?{c:c,d:d}:null; }).filter(Boolean);
+    if (!hits.length) return;
+    var bloque = ['<div class="gs-head">' + escapeHtml(q.lbl) + ' · ' + hits.length + '</div>'];
+    hits.slice(0,6).forEach(function(x){
+      bloque.push('<div class="gs-item" onclick="closeGSearch();abrirFicha(&#39;' + escapeAttr(x.c.id) + '&#39;)">'
+        + '<span class="badge muted">Cliente</span> ' + escapeHtml(x.c.name||'')
+        + ' <span class="text-muted" style="font-size:.72rem;">' + escapeHtml(x.d) + '</span></div>');
+    });
+    grupos = grupos.concat(bloque);
+  });
+  /* Los grupos van primero: responden a la pregunta, no son una simple
+     coincidencia de texto. */
+  res = grupos.concat(res).slice(0, 16);
   box.innerHTML = res.length ? res.join("") : '<div class="gs-item text-muted">Sin resultados</div>';
   box.style.display = "block";
 };
@@ -14172,7 +14341,7 @@ function progApplyFromModal(){
     var sug=_progSuggestProgression(best, cur, { rpe:avgRpe, repsDone:repsMin });
     sugerencias.push({ nombre:pe.nombre, dia:pe.dia||"", diaIdx:diaIdx,
       logrado:(hasW?best.peso_kg:null), repsLog:best.reps, rpe:avgRpe, repsMin:repsMin,
-      curWeight:(cur.weight!=null?String(cur.weight):""), curReps:(cur.reps!=null?String(cur.reps):""), curSets:(cur.sets!=null?String(cur.sets):""),
+      curWeight:(cur.weight!=null?String(cur.weight):""), curReps:(cur.reps!=null?String(cur.reps):""), curSets:(cur.sets!=null?String(cur.sets):""), rir:(cur.rir||""),
       sugPeso:sug.sugPeso, sugReps:sug.sugReps, sugSets:sug.sugSets, motivo:sug.motivo });
   });
 
@@ -14246,6 +14415,35 @@ function _prgRepRange(reps){
 function _progSuggestProgression(best, cur, ctx){
   cur = cur || {}; ctx = ctx || {};
   var rpe = (ctx.rpe!=null) ? ctx.rpe : best.rpe;          // promedio de las series
+
+  /* Si el ejercicio lleva un RIR prescrito, el ajuste se mide contra ESE
+     objetivo en vez de contra los umbrales genericos de 7 y 9. Es la
+     diferencia entre "el RPE fue alto" y "el RPE fue alto PARA LO QUE
+     PEDISTE". Sin RIR prescrito, el comportamiento no cambia. */
+  if (typeof u19ObjetivoEsfuerzo === "function" && cur.rir){
+    var _obj = u19ObjetivoEsfuerzo({ rir: cur.rir });
+    var _w = (best.peso_kg!=null && best.peso_kg>0) ? best.peso_kg : null;
+    if (_obj && rpe != null && _w != null){
+      var _cw = cur.weight!=null?String(cur.weight):"";
+      var _cr = cur.reps!=null?String(cur.reps):"";
+      var _cs = cur.sets!=null?String(cur.sets):"";
+      var _obj_txt = "RIR " + _obj.rirMin + (_obj.rirMax!==_obj.rirMin ? "-"+_obj.rirMax : "");
+      var _d = 0, _mot = "";
+      if (rpe < _obj.rpeMin - 0.5){
+        _d = (rpe <= _obj.rpeMin - 2) ? 0.075 : 0.04;
+        _mot = "RPE " + rpe + " bajo el objetivo (" + _obj_txt + " = RPE " + _obj.rpeMin
+             + (_obj.rpeMax!==_obj.rpeMin ? "-"+_obj.rpeMax : "") + "): subir carga";
+      } else if (rpe > _obj.rpeMax + 0.5){
+        _d = (rpe >= _obj.rpeMax + 2) ? -0.075 : -0.04;
+        _mot = "RPE " + rpe + " sobre el objetivo (" + _obj_txt + "): bajar carga";
+      } else {
+        _mot = "RPE " + rpe + " dentro del objetivo (" + _obj_txt + "): mantener";
+      }
+      var _nw = _d === 0 ? _w : Math.round(_w * (1 + _d) * 2) / 2;
+      return { sugPeso: (_nw > 0 ? _nw : _w), sugReps: _cr, sugSets: _cs, motivo: _mot };
+    }
+  }
+
   var w = (best.peso_kg!=null && best.peso_kg>0) ? best.peso_kg : null;
   var curWeight = cur.weight!=null?String(cur.weight):"";
   var curReps   = cur.reps!=null?String(cur.reps):"";
@@ -14307,7 +14505,7 @@ function _progFindPrescription(r, nombre, diaIdx){
     var day=r.days[di]; if(!day||!day.exercises) continue;
     for(var ei=0;ei<day.exercises.length;ei++){
       var rx=day.exercises[ei], def=getExercise(rx.exerciseId);
-      if(def && _prgNorm(def.name)===_prgNorm(nombre)) return { sets:rx.sets, reps:rx.reps, weight:rx.weight };
+      if(def && _prgNorm(def.name)===_prgNorm(nombre)) return { sets:rx.sets, reps:rx.reps, weight:rx.weight, rir:rx.rir };
     }
   }
   return null;
@@ -15428,7 +15626,7 @@ function rndReporteDoc(m, cli, opts){
 /* ---------- UI ---------- */
 function renderRendimiento(){
   var html='<div class="section-head"><h1 class="section-title">RENDIMIENTO <span class="accent">/ EVALUACIÓN DEPORTIVA</span></h1></div>';
-  html+='<div class="card"><div class="card-main"><div class="card-title">1 · Deportista</div>'
+  var cDep='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Deportista</div>'
     +'<div class="form-row"><label class="form-label">Elige el cliente</label><select id="rnd-cliente"><option value="">— cargando… —</option></select></div>'
     +'<div class="form-row"><label class="form-label">Lado dominante (pierna/brazo hábil)</label>'
     +'<select id="rnd-dominante"><option value="derecho">Derecho</option><option value="izquierdo">Izquierdo</option></select></div>'
@@ -15437,20 +15635,20 @@ function renderRendimiento(){
     +'<div class="text-xs text-muted" style="margin-top:.25rem;line-height:1.5;">Si lo declaras, el LSI se calcula como <b>afectado / sano</b> (criterio clínico) en vez de menor / mayor. Puede pasar de 100% si el lado lesionado rinde más.</div></div>'
     +'<span id="rnd-cli-src" class="text-xs text-muted"></span></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">2 · Extraer datos de BlazePod</div>'
+  var cPromptBP='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Prompt solo de BlazePod</div>'
     +'<p class="text-xs text-muted" style="line-height:1.5;">Prompt <b>solo de BlazePod</b>. Normalmente no te hace falta: usa la <b>captura unificada</b> de abajo, '
     +'que acepta las capturas de Fitdays y BlazePod en un mismo mensaje. Este queda por si quieres procesar solo rendimiento.</p>'
     +'<button class="btn btn-secondary btn-sm" onclick="rndCopyPrompt()">📋 Copiar prompt de extracción</button></div></div>';
 
-  html+=u19IntakeCardHTML('rnd');
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3 · Sesiones (pega el JSON)</div>'
+  var cCaptura = u19IntakeCardHTML('rnd');
+  var cSesiones='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Sesiones de BlazePod (pega el JSON)</div>'
     +'<div class="form-row"><textarea id="rnd-json" style="min-height:120px;font-family:var(--font-mono);font-size:.72rem;" '
     +'placeholder="{ &quot;fuente&quot;:&quot;blazepod&quot;, &quot;sesiones&quot;:[ … ] }">'+escapeHtml(_rndState.raw||"")+'</textarea></div>'
     +'<button class="btn btn-primary" onclick="rndAnalizar()">Analizar sesiones</button> '
     +'<button class="btn btn-ghost btn-sm" onclick="rndDemo()">Cargar ejemplo</button> <span id="rnd-msg" class="text-xs"></span>'
     +'<div id="rnd-editor" style="margin-top:.8rem;"></div></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3c · Fuerza · ActiveForce 2</div>'
+  var cFuerza='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Fuerza · ActiveForce 2</div>'
     +'<p class="text-xs text-muted" style="line-height:1.5;">Dinamometr\u00eda isom\u00e9trica. Es la fuente de LSI m\u00e1s directa de las tres: mide la fuerza que el criterio de alta exige. '
     +'El t\u00edtulo de la captura trae el lado entre par\u00e9ntesis, as\u00ed que no hay que declararlo. '
     +'Normalmente llega desde la <b>captura unificada</b>; este cuadro queda por si quieres pegar solo dinamometr\u00eda.</p>'
@@ -15461,7 +15659,7 @@ function renderRendimiento(){
     +'<button class="btn btn-secondary btn-sm" onclick="frzGuardar()">\ud83d\udcbe Guardar en historial</button> <span id="frz-msg" class="text-xs"></span>'
     +'<div id="frz-analisis" style="margin-top:.7rem;"></div></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">3b · Montaje de la prueba</div>'
+  var cMontaje='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Montaje de la prueba</div>'
     +'<p class="text-xs text-muted" style="line-height:1.5;">Comparar dos fechas solo vale si el montaje es el mismo. Anotándolo aquí, la app te avisa si cambió respecto de la evaluación anterior.</p>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.5rem;margin-top:.5rem;">'
     +  '<div><label class="form-label">Nº de pods</label><input id="rnd-su-pods" type="number" min="1" placeholder="4"></div>'
@@ -15470,10 +15668,10 @@ function renderRendimiento(){
     +  '<div><label class="form-label">Consigna</label><input id="rnd-su-cons" type="text" placeholder="pie derecho, sin salto"></div>'
     +'</div><div id="rnd-su-diff" class="text-xs" style="margin-top:.5rem;"></div></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">4 · Análisis</div>'
+  var cAnalisis='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Análisis</div>'
     +'<div id="rnd-analisis"><p class="text-xs text-muted">Pega el JSON y pulsa «Analizar sesiones».</p></div></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">5 · Presentación del informe</div>'
+  var cPresent='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Presentación del informe</div>'
     +'<div class="iop-grid2" style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;">'
     +  '<div>'
     +    '<label class="iop-chk" style="display:block;margin:2px 0;"><input type="checkbox" id="rnd-opt-sello"> Mostrar sello profesional</label>'
@@ -15494,7 +15692,7 @@ function renderRendimiento(){
     +  '<option value="6">En 6 semanas</option><option value="8">En 8 semanas</option><option value="12">En 12 semanas</option></select>'
     +'</div></div></div>';
 
-  html+='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">6 · Informe</div>'
+  var cInforme='<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Informe por dominio</div>'
     +'<div class="form-row"><label class="form-label">Indicaciones del profesional (opcional)</label>'
     +'<textarea id="rnd-indic" rows="3" placeholder="Ej. Trabajo unilateral de pierna izquierda 2×/semana (pliometría reactiva y cambios de dirección). Reevaluar con el mismo montaje en 6 semanas.">'
     +escapeHtml(_rndState.notas||"")+'</textarea></div>'
@@ -15508,6 +15706,21 @@ function renderRendimiento(){
     +'<p class="text-xs text-muted" style="margin-top:.5rem;line-height:1.5;">«Adjuntar» deja esta evaluación en cola: el siguiente informe que generes en '
     +'<b>Informes</b> incluirá el anexo de rendimiento al final, con el mismo folio y la misma firma.</p>'
     +'<div id="rnd-attach-state" class="text-xs" style="margin-top:.3rem;"></div></div></div>';
+
+  /* Orden de uso real: elegir deportista, pegar la captura unificada y
+     generar. Todo lo manual queda plegado: es el camino alternativo. */
+  html += cDep
+    + cCaptura
+    + '<details class="u-acc"><summary>Carga manual por aparato'
+    +   '<span>si prefieres procesar un aparato por separado</span></summary>'
+    +   '<div class="u-acc-body">' + cPromptBP + cSesiones + cFuerza + cMontaje + '</div>'
+    + '</details>'
+    + cAnalisis
+    + '<details class="u-acc"><summary>Presentaci\u00f3n del informe'
+    +   '<span>sello, glosario, borrador, n.\u00ba de registro, reevaluaci\u00f3n</span></summary>'
+    +   '<div class="u-acc-body">' + cPresent + '</div>'
+    + '</details>'
+    + cInforme;
 
   html+='<div id="rnd-report-wrap" style="margin-top:1rem;"></div>';
   document.getElementById("view-rendimiento").innerHTML=html;
@@ -15773,9 +15986,15 @@ function u19IntakeCardHTML(idSuf){
     + '<div class="form-row" style="margin-top:.6rem;"><textarea id="u19-uni-json-' + idSuf + '" '
     +   'style="min-height:90px;font-family:var(--font-mono);font-size:.72rem;" '
     +   'placeholder="{ &quot;fuente&quot;:&quot;us19_unificado&quot;, &quot;evaluaciones&quot;:[ … ], &quot;rendimiento&quot;:{ … } }"></textarea></div>'
-    + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;">'
-    +   '<button class="btn btn-primary btn-sm" onclick="u19Repartir(\'' + idSuf + '\')">1 · Repartir</button>'
-    +   '<button class="btn btn-primary btn-sm" onclick="u19GenerarIntegral()" title="Un solo informe con todo lo cargado: composición, fuerza y rendimiento">2 · Generar informe único</button>'
+    + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
+    +   '<button class="btn btn-primary" onclick="u19Flujo(\'' + idSuf + '\')" title="Reparte, pregunta lo que falte y genera el informe con todo">⚡ Informe único</button>'
+    +   '<button class="btn btn-ghost btn-sm" onclick="u19Repartir(\'' + idSuf + '\')" title="Solo repartir a los apartados, sin generar ningún informe">Solo repartir</button>'
+    + '</div>'
+    + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;margin-top:.5rem;">'
+    +   '<span class="text-xs text-muted">o por separado:</span>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="u19FlujoDominio(\'' + idSuf + '\', \'bio\')" title="Solo composición corporal y perímetros">⚖ Composición</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="u19FlujoDominio(\'' + idSuf + '\', \'frz\')" title="Solo dinamometría ActiveForce">💪 Fuerza</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="u19FlujoDominio(\'' + idSuf + '\', \'rnd\')" title="Solo velocidad de reacción BlazePod">⚡ Rendimiento</button>'
     + '</div>'
     + '<div id="u19-inv-' + idSuf + '" class="text-xs text-muted" style="margin-top:.4rem;"></div>'
     + '<div id="u19-uni-msg-' + idSuf + '" class="text-xs" style="min-height:1.1em;margin-top:.4rem;"></div>'
@@ -15783,11 +16002,12 @@ function u19IntakeCardHTML(idSuf){
 }
 
 /* Reparte el JSON unificado a los dos módulos. */
-window.u19Repartir = function(idSuf){
+window.u19Repartir = function(idSuf, cb){
   var ta = document.getElementById("u19-uni-json-" + idSuf);
   var msg = document.getElementById("u19-uni-msg-" + idSuf);
   function say(html, color){ if(msg) msg.innerHTML = '<span style="color:' + color + ';">' + html + '</span>'; }
   function fail(m){ say('✗ ' + escapeHtml(m), 'var(--danger)'); }
+  var _cbNo = function(){ if(typeof cb === "function") cb(false); };
   if(!ta) return;
   var d;
   try { d = JSON.parse(ta.value || ""); } catch(e){ return fail("El JSON no es válido."); }
@@ -15797,6 +16017,25 @@ window.u19Repartir = function(idSuf){
      y la fecha se pregunta despues. Antes se perdia en silencio. */
   var evals = Array.isArray(d.evaluaciones) ? d.evaluaciones.filter(function(e){ return e && (e.bioimpedancia || e.circunferencias_cm || e.fecha); }) : [];
   evals = u19FusionarEvaluaciones(evals);
+
+  /* Una captura unificada es UNA evaluacion completa: lo que no venga en
+     este JSON se limpia. Sin esto, la dinamometria del deportista anterior
+     seguia en memoria y se colaba en el informe del siguiente. */
+  var reemplazado = [];
+  if (evals.length && (_infState.ev1raw || _infState.ev2raw)) reemplazado.push("composición");
+  if (!evals.length && (_infState.ev1raw || _infState.ev2raw)){
+    _infState.ev1raw = ""; _infState.ev2raw = "";
+    var _t1 = document.getElementById("inf-ev1"), _t2 = document.getElementById("inf-ev2");
+    if (_t1) _t1.value = ""; if (_t2) _t2.value = "";
+  }
+  if (!((d.rendimiento && d.rendimiento.sesiones || []).length) && _rndState.metrics){
+    _rndState.metrics = null; _rndState.data = null; _rndState.raw = "";
+    var _tr = document.getElementById("rnd-json"); if (_tr) _tr.value = "";
+  }
+  if (!((d.fuerza && d.fuerza.mediciones || []).length) && typeof _frzState !== "undefined" && _frzState.metrics){
+    _frzState.metrics = null; _frzState.data = null; _frzState.raw = "";
+    var _tf = document.getElementById("frz-json"); if (_tf) _tf.value = "";
+  }
   var rnd   = (d.rendimiento && Array.isArray(d.rendimiento.sesiones)) ? d.rendimiento.sesiones : [];
   var frz   = (d.fuerza && Array.isArray(d.fuerza.mediciones)) ? d.fuerza.mediciones : [];
   if(!evals.length && !rnd.length && !frz.length) return fail("No trae capturas reconocibles de Fitdays, BlazePod ni ActiveForce.");
@@ -15834,15 +16073,24 @@ window.u19Repartir = function(idSuf){
   if(d.descartadas && d.descartadas.length){
     hechos.push('<span style="color:#b45309;">' + d.descartadas.length + ' captura(s) no reconocida(s)</span>');
   }
+  if (reemplazado.length) hechos.push('<span class="text-muted">reemplaza lo cargado antes</span>');
   say("✓ " + hechos.join(" · "), "var(--success)");
   u19PintarInventario(idSuf);
+  /* Avisos de lectura: mejor verlos ahora que descubrirlos en el PDF. */
+  var wBio = (evals.length && typeof u19BioWarnings === "function") ? u19BioWarnings(evals) : [];
+  if (wBio.length && msg){
+    msg.innerHTML += '<div style="border-left:3px solid #b45309;background:rgba(180,83,9,.08);border-radius:0 6px 6px 0;'
+      + 'padding:.5rem .7rem;margin-top:.5rem;"><div style="font-weight:700;color:#b45309;margin-bottom:.25rem;">'
+      + '⚠ Revisa estas lecturas</div><ul style="margin:0;padding-left:1.1rem;line-height:1.55;">'
+      + wBio.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul></div>';
+  }
 
   /* Preguntas pendientes, en orden: primero las fechas de Fitdays,
      luego los lados de BlazePod (ActiveForce trae el lado en el título). */
   var faltanLados = rnd.filter(function(s){ return !s.lado; }).length;
   var seguirConLados = function(){
-    if(faltanLados) u19PreguntarLados(idSuf);
-    else if(rnd.length) u19TrasLados(idSuf);
+    if(faltanLados) u19PreguntarLados(idSuf, cb);
+    else { if(rnd.length) u19TrasLados(idSuf); if(typeof cb === "function") cb(); }
   };
   var evalsSinFecha = (_u19EvalsPendientes || []).filter(function(e){ return !e.fecha; });
   if(evalsSinFecha.length) u19PreguntarFechas(_u19EvalsPendientes, idSuf, seguirConLados);
@@ -15850,7 +16098,7 @@ window.u19Repartir = function(idSuf){
 };
 
 /* Modal: ¿cuál captura es la izquierda y cuál la derecha? */
-function u19PreguntarLados(idSuf){
+function u19PreguntarLados(idSuf, cb){
   var ses = (_rndState.data && _rndState.data.sesiones) || [];
   if(!ses.length) return;
 
@@ -15918,7 +16166,7 @@ function u19PreguntarLados(idSuf){
       });
     },
     footer: [
-      { label:"Cancelar", cls:"btn-ghost", onClick: closeModal },
+      { label:"Cancelar", cls:"btn-ghost", onClick: function(){ closeModal(); } },
       { label:"Confirmar", cls:"btn-primary", onClick: function(){
           var $d = document.getElementById("u19-dom");
           if($d) _rndState.dominante = $d.value;
@@ -15926,6 +16174,7 @@ function u19PreguntarLados(idSuf){
           _rndState.metrics = rndMetrics(_rndState.data, _rndState.dominante);
           closeModal();
           u19TrasLados(idSuf);
+          if (typeof cb === "function") cb(true);
         } }
     ]
   });
@@ -15948,7 +16197,7 @@ function u19TrasLados(idSuf){
   }
   var msg = document.getElementById("u19-uni-msg-" + idSuf);
   if(msg && !document.getElementById("rnd-analisis")){
-    msg.innerHTML += ' <a href="#" onclick="switchView(\'rendimiento\');return false;">Ver el análisis de rendimiento →</a>';
+    msg.innerHTML += ' <a href="#" onclick="showView(\'rendimiento\');return false;">Ver el análisis de rendimiento →</a>';
   }
 }
 /* ===CAPTURA_UNIFICADA_END=== */
@@ -16229,7 +16478,7 @@ window.u19CriterioAltaHTML = function(clientId){
   if (!d){
     return '<div style="border:1px dashed var(--border);border-radius:8px;padding:.6rem;margin:.5rem 0;">'
       + '<div class="text-xs text-muted">⚖ <b>Simetría medida:</b> sin datos. '
-      + 'Haz una evaluación en <a href="#" onclick="switchView(\'rendimiento\');return false;">Rendimiento</a> para respaldar el criterio «fuerza ≥90% vs lado sano» con una medición en vez de una estimación.</div></div>';
+      + 'Haz una evaluación en <a href="#" onclick="showView(\'rendimiento\');return false;">Rendimiento</a> para respaldar el criterio «fuerza ≥90% vs lado sano» con una medición en vez de una estimación.</div></div>';
   }
   var cumple = d.lsi >= 90;
   var fuenteTxt = (d.fuente === "manual") ? ("test manual: " + escapeHtml(d.etiqueta || "")) : escapeHtml(d.etiqueta || "BlazePod");
@@ -16351,7 +16600,7 @@ function u19PanelOperativoHTML(){
   }
   var chip = function(c, extra, color){
     return '<div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;padding:.3rem 0;border-bottom:1px solid var(--border);">'
-      + '<a href="#" onclick="openClientTracking(\'' + c.id + '\');return false;" style="font-size:.82rem;font-weight:600;text-decoration:none;">' + escapeHtml(c.name || '—') + '</a>'
+      + '<a href="#" onclick="abrirFicha(\'' + c.id + '\');return false;" style="font-size:.82rem;font-weight:600;text-decoration:none;">' + escapeHtml(c.name || '—') + '</a>'
       + '<span class="text-xs" style="' + (color ? 'color:' + color + ';font-weight:600;' : 'color:var(--muted);') + '">' + extra + '</span></div>';
   };
 
@@ -16754,24 +17003,16 @@ window.u19GenerarIntegral = function(){
   var opts = Object.assign({}, _rndOpts, {
     indicaciones: (document.getElementById("rnd-indic") || {}).value || "",
     setupTxt: (typeof rndSetupTxt === "function") ? rndSetupTxt(_rndSetup) : "",
-    setupDiff: sd ? sd.difs.join(" \u00b7 ") : ""
+    setupDiff: sd ? sd.difs.join(" \u00b7 ") : "",
+    proxSem: _rndOpts.proxSem || "",
+    cliente: c || ((typeof u19ClienteActual === "function") ? (u19ClienteActual().c || null) : null)
   });
 
   var tit = u19TituloInforme(inv);
   var doc = u19InformeUnicoDoc(inv, cli, opts);
   _rndState.reportHtml = doc;
 
-  var wrap = document.getElementById("rnd-report-wrap") || document.getElementById("inf-report-wrap");
-  if (wrap){
-    wrap.innerHTML = '<div class="card"><div class="card-main"><div class="card-title">' + escapeHtml(tit.t) + '</div>'
-      + '<p class="text-xs text-muted" style="margin:0 0 .5rem;">Un solo documento con todo lo que cargaste. '
-      + 'Para trabajar un dominio por separado, usa el generador de su propia pesta\u00f1a.</p>'
-      + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;">'
-      + '<button class="btn btn-primary btn-sm" onclick="rndPrint()">\ud83d\udda8 Imprimir / Guardar PDF</button></div>'
-      + '<iframe id="rnd-frame" style="width:100%;height:680px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe></div></div>';
-    var fr = document.getElementById("rnd-frame"); if (fr) fr.srcdoc = doc;
-    if (wrap.scrollIntoView) { try { wrap.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(e){} }
-  }
+  u19PintarInforme(tit.t, doc, true);
   toast("Listo \u2713 " + tit.t, "success");
 };
 
@@ -17296,6 +17537,9 @@ var US19_PROMPT_ECO = [
 'TIPO A y B -> van a "evaluaciones":',
 '- Lee todos los valores con su unidad, 1 decimal. Normaliza L/I a izquierdo, R/D a derecho.',
 '- Hombre a Masculino, Mujer a Femenino.',
+'- CUIDADO con dos filas que se confunden: "Masa osea" / "Hueso" va a "masa_osea_kg" (suele ser 2-5 kg), y',
+'  "Musculo esqueletico" va a "masa_esqueletica_kg" (en un adulto suele ser 25-40 kg). Si el valor que ibas a',
+'  poner en masa_esqueletica_kg es menor que 15 kg, casi seguro estas leyendo la masa osea: revisalo.',
 '',
 '  EMPAREJAMIENTO (importante): el envio habitual son CUATRO capturas de Fitdays, dos por cada fecha:',
 '  composicion inicial, perimetros inicial, composicion actual, perimetros actual. Cada par A+B del mismo',
@@ -17344,7 +17588,7 @@ var US19_PROMPT_ECO = [
 '  "cliente":{ "nombre":null, "genero":null, "edad":null, "estatura_cm":null },',
 '  "evaluaciones":[',
 '    { "fecha":"YYYY-MM-DD", "momento":"inicial", "orden_capturas":[],',
-'      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"puntuacion_corporal":null },',
+'      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"masa_osea_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"puntuacion_corporal":null },',
 '      "segmentario_musculo":{ "brazo_izq":{"kg":null},"brazo_der":{"kg":null},"tronco":{"kg":null},"pierna_izq":{"kg":null},"pierna_der":{"kg":null} },',
 '      "circunferencias_cm":{ "cuello":null,"hombro":null,"pecho":null,"cintura":null,"cadera":null,"brazo_izq":null,"brazo_der":null,"muslo_izq":null,"muslo_der":null,"pantorrilla_izq":null,"pantorrilla_der":null } }',
 '  ],',
@@ -17780,7 +18024,7 @@ function u19InformeUnicoDoc(inv, cli, opts){
     : '<div class="u-verdict">' + frases.map(function(t){ return '<p>' + t + '</p>'; }).join('') + '</div>';
 
   /* --- P2 composicion --- */
-  var compo = '';
+  var compo = '', compoB = '', compoC = '';
   if (bio.length){
     var barras = u19PrePostSVG([
       { label:'Peso (kg)', pre:b1.peso_kg, post:b2.peso_kg, mejorBaja:true },
@@ -17811,8 +18055,12 @@ function u19InformeUnicoDoc(inv, cli, opts){
       + '<div class="u-grid2">'
       + (barras ? '<div class="u-panel"><div class="u-panel-t">Antes y después <span>gris = inicial</span></div>' + barras + '</div>' : '')
       + (indices ? '<div class="u-panel"><div class="u-panel-t">Índices <span>actual (cambio)</span></div>' + indices + '</div>' : '')
-      + '</div>'
+      + '</div>';
+    compoB = (typeof u19RangosHTML === 'function') ? u19RangosHTML(bio, inv.cliente) : '';
+    compoC = ((typeof u19SegmentarioHTML === 'function') ? u19SegmentarioHTML(bio) : '')
       + (perim ? '<div class="u-panel" style="margin-top:4mm;"><div class="u-panel-t">Perímetros <span>cm actuales y cambio</span></div>' + perim + '</div>' : '');
+    if (compoC) compoC = '<div class="pr-sec"><div class="pr-letter">S</div><div class="pr-secttl">'
+      + '<h2>Reparto y perímetros</h2><p>Masa muscular por segmento y contorno corporal</p></div></div>' + compoC;
   }
 
   /* --- P3 funcion: fuerza + reaccion --- */
@@ -17838,9 +18086,14 @@ function u19InformeUnicoDoc(inv, cli, opts){
       col2 = '<div class="u-panel"><div class="u-panel-t">Respuesta reactiva <span>BlazePod</span></div>'
         + '<p style="font-size:8pt;color:#7c8a83;margin:0;">' + m.resumen.n + ' sesión(es) registrada(s); falta el lado contrario para calcular simetría.</p></div>';
     }
+    var mapa = (fm && typeof frzMapaSVG === 'function') ? frzMapaSVG(fm) : '';
+    var reps = (m && typeof u19RepeticionesHTML === 'function') ? u19RepeticionesHTML(m) : '';
     func = '<div class="pr-sec"><div class="pr-letter">F</div><div class="pr-secttl">'
       + '<h2>Función · fuerza y respuesta reactiva</h2><p>Comparación entre extremidades · la barra verde es el mejor lado</p></div></div>'
-      + '<div class="u-grid2">' + col1 + col2 + '</div>';
+      + '<div class="u-grid2">' + col1 + col2 + '</div>'
+      + (mapa ? '<div class="u-panel" style="margin-top:4mm;"><div class="u-panel-t">Mapa fuerza · tiempo '
+          + '<span>cada punto es una medición real</span></div>' + mapa + '</div>' : '')
+      + reps;
   }
 
   /* --- tabla resumen de mediciones --- */
@@ -17872,11 +18125,12 @@ function u19InformeUnicoDoc(inv, cli, opts){
   /* --- lectura integrada --- */
   var cruce = (bio.length && m && typeof u19CruceHTML === 'function') ? u19CruceHTML(evA, m) : '';
   var avisos = [];
+  if (bio.length && typeof u19BioWarnings === 'function') avisos = avisos.concat(u19BioWarnings(bio));
   if (fm && typeof frzSanityWarnings === 'function') avisos = avisos.concat(frzSanityWarnings(fm));
   if (m && typeof rndSanityWarnings === 'function') avisos = avisos.concat(rndSanityWarnings(m));
   var avisoBlock = avisos.length
     ? '<div class="pr-note" style="border-left-color:#b45309;"><b>Advertencias de calidad de la medición.</b>'
-      + '<ul style="margin:.5mm 0 0;padding-left:4mm;">' + avisos.map(function(t){ return '<li>' + u19Esc(t) + '</li>'; }).join('') + '</ul></div>'
+      + '<ul style="margin:.5mm 0 0;padding-left:4mm;">' + avisos.map(function(t){ return '<li>' + t + '</li>'; }).join('') + '</ul></div>'
     : '';
   var indic = (opts.indicaciones || '').trim();
   var indicBlock = indic
@@ -17892,17 +18146,35 @@ function u19InformeUnicoDoc(inv, cli, opts){
 
   /* --- ensamble: 4 paginas --- */
   var pgs = [];
+  var veredicto = (typeof u19VeredictoGlobal === 'function') ? u19VeredictoGlobal(inv) : null;
   pgs.push(ch.wm + ch.cover + '<div class="pr-content">'
+    + (veredicto ? u19BandaHTML(veredicto) : '')
     + '<div class="pr-sec"><div class="pr-letter">R</div><div class="pr-secttl"><h2>Panel de mando</h2>'
     + '<p>Lo esencial de la evaluación en una página</p></div></div>'
     + doms + kpis + hero + '</div>' + ch.foot);
-  if (compo) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + compo + '</div>' + ch.foot);
+  if (compo) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + compo + compoB + '</div>' + ch.foot);
+  if (compoC) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + compoC + '</div>' + ch.foot);
+  var tend = (typeof u19TendenciaHTML === 'function') ? u19TendenciaHTML(opts.cliente) : '';
+  if (tend) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + tend + '</div>' + ch.foot);
   if (func) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + func + detalle + '</div>' + ch.foot);
   else if (detalle) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + detalle + '</div>' + ch.foot);
-  pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + cruce + indicBlock + avisoBlock + nota + ch.firmas + '</div>' + ch.foot);
+  var plan = (typeof u19PlanHTML === 'function') ? u19PlanHTML(inv, opts) : '';
+  /* El plan y el cruce pueden ocupar bastante: si van juntos con las
+     firmas, la ultima pagina se desborda. Se reparten. */
+  if ((cruce ? 1 : 0) + (plan ? 1 : 0) === 2){
+    pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + cruce + plan + '</div>' + ch.foot);
+    pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + indicBlock + avisoBlock + nota + ch.firmas + '</div>' + ch.foot);
+  } else {
+    pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + cruce + plan + indicBlock + avisoBlock + nota + ch.firmas + '</div>' + ch.foot);
+  }
 
   var inner = pgs.map(function(x){ return '<div class="pr-page">' + x + '</div>'; }).join('');
-  var css = INF_V2_CSS.split('@media print').join('@media all') + RND_CSS + U19_CSS
+  /* Los modulos de estilo se suman solo si existen: que falte uno
+     opcional no debe tumbar la generacion del informe entero. */
+  var _cssMods = ['RND_CSS','U19_CSS','U19_CSS_MAX','U19_CSS_PRO','U19_CSS_TEND'].map(function(n){
+    try { var v = eval(n); return (typeof v === 'string') ? v : ''; } catch(e){ return ''; }
+  }).join('');
+  var css = INF_V2_CSS.split('@media print').join('@media all') + _cssMods
     + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
     + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;position:relative;}"
     + ' .pr-pageno::after{content:"—";}'
@@ -17912,7 +18184,1389 @@ function u19InformeUnicoDoc(inv, cli, opts){
     + '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + tit.t + ' · US19</title>'
     + fontLink + '<style>' + css + '</style></head><body><div id="printableReport">' + inner + '</div></body></html>';
 }
+
+/* Un solo boton: reparte si hace falta, espera a las preguntas
+   pendientes y genera el informe. Antes habia que pulsar "Repartir"
+   primero y, si no lo hacias, salia "No hay datos". */
+window.u19Flujo = function(idSuf){
+  var inv = u19Inventario();
+  var hayAlgo = inv.bio.length || inv.rnd || inv.frz;
+  var ta = document.getElementById("u19-uni-json-" + idSuf);
+  var texto = (ta && ta.value || "").trim();
+
+  if (!hayAlgo && !texto){
+    toast("Pega primero el JSON que te devolvi\u00f3 la IA", "warn");
+    if (ta && ta.focus) { try { ta.focus(); } catch(e){} }
+    return;
+  }
+  /* Con texto nuevo sin repartir, o sin nada repartido: reparte y sigue. */
+  if (texto && (!hayAlgo || texto !== _u19UltimoTexto)){
+    _u19UltimoTexto = texto;
+    u19Repartir(idSuf, function(ok){
+      if (ok === false) return;
+      u19GenerarIntegral();
+    });
+    return;
+  }
+  u19GenerarIntegral();
+};
+var _u19UltimoTexto = "";
+
+/* Control de calidad de las mediciones de Fitdays.
+   Nace de un caso real: la IA leyo "Masa osea 4,4 kg" y la puso en
+   musculo esqueletico, y unos perimetros de muslo crecieron 6-8 cm
+   en cinco semanas — imposible fisiologicamente, pero la app los
+   habria impreso como progreso. */
+function u19BioWarnings(evals){
+  var w = [];
+  (evals || []).forEach(function(e){
+    var b = e.bioimpedancia || {};
+    var et = e.fecha ? ("Medición del " + rndFdate(e.fecha)) : "Medición sin fecha";
+    if (b.masa_esqueletica_kg != null && b.peso_kg != null && b.peso_kg > 40 && b.masa_esqueletica_kg < 15){
+      w.push(et + ": el músculo esquelético aparece como " + b.masa_esqueletica_kg + " kg, valor propio de la "
+        + "<b>masa ósea</b>. Es casi seguro que se leyó la fila equivocada de Fitdays; en un adulto de "
+        + b.peso_kg + " kg el músculo esquelético ronda los 25-40 kg.");
+    }
+    if (b.peso_kg != null && b.grasa_kg != null && b.musculo_kg != null && (b.grasa_kg + b.musculo_kg) > b.peso_kg * 1.02){
+      w.push(et + ": grasa (" + b.grasa_kg + " kg) más músculo (" + b.musculo_kg + " kg) supera el peso total ("
+        + b.peso_kg + " kg). Alguno de los tres está mal leído.");
+    }
+    if (b.agua_pct != null && (b.agua_pct < 35 || b.agua_pct > 75)){
+      w.push(et + ": agua corporal de " + b.agua_pct + "%, fuera del rango fisiológico habitual (45-65%).");
+    }
+  });
+
+  /* Cambios de perímetro imposibles y saltos izquierda/derecha. */
+  if (evals && evals.length >= 2){
+    var e1 = evals[0], e2 = evals[evals.length - 1];
+    var c1 = e1.circunferencias_cm || {}, c2 = e2.circunferencias_cm || {};
+    var dias = (e1.fecha && e2.fecha)
+      ? Math.abs(Math.round((new Date(e2.fecha) - new Date(e1.fecha)) / 86400000)) : null;
+    var zonas = { cuello:"cuello", hombro:"hombro", pecho:"pecho", cintura:"cintura", cadera:"cadera",
+                  brazo_izq:"brazo izquierdo", brazo_der:"brazo derecho", muslo_izq:"muslo izquierdo",
+                  muslo_der:"muslo derecho", pantorrilla_izq:"pantorrilla izquierda", pantorrilla_der:"pantorrilla derecha" };
+    Object.keys(zonas).forEach(function(k){
+      if (c1[k] == null || c2[k] == null) return;
+      var d = c2[k] - c1[k];
+      if (Math.abs(d) >= 5 && (dias == null || dias <= 120)){
+        w.push("El perímetro de " + zonas[k] + " cambió " + (d > 0 ? "+" : "") + d.toFixed(1) + " cm"
+          + (dias ? " en " + dias + " días" : "") + ". Un cambio así no es fisiológico: revisa que el punto "
+          + "anatómico y la tensión de la cinta fueran los mismos en las dos tomas.");
+      }
+    });
+    [["brazo", "brazo_izq", "brazo_der"], ["muslo", "muslo_izq", "muslo_der"],
+     ["pantorrilla", "pantorrilla_izq", "pantorrilla_der"]].forEach(function(par){
+      var di = (c1[par[1]] != null && c2[par[1]] != null) ? c2[par[1]] - c1[par[1]] : null;
+      var dd = (c1[par[2]] != null && c2[par[2]] != null) ? c2[par[2]] - c1[par[2]] : null;
+      if (di == null || dd == null) return;
+      if (di * dd < 0 && (Math.abs(di) + Math.abs(dd)) >= 1.5){
+        w.push("En el " + par[0] + ", un lado subió y el otro bajó (" + (di > 0 ? "+" : "") + di.toFixed(1)
+          + " cm izquierdo frente a " + (dd > 0 ? "+" : "") + dd.toFixed(1) + " cm derecho). "
+          + "Suele ser una confusión de lado al anotar o un punto de medición distinto, más que un cambio real.");
+      }
+    });
+  }
+  return w;
+}
 /* ===UNICO_END=== */
+
+
+/* ============================================================
+   REFINAMIENTO DEL INFORME UNICO
+   1 · Banda de veredicto: el estado del deportista en una linea.
+   2 · Plan de trabajo derivado de los hallazgos.
+   3 · Repeticiones: sesiones del mismo lado leidas como intentos.
+   4 · Mapa fuerza-tiempo de la dinamometria.
+   5 · Robustez de impresion.
+   ============================================================ */
+
+var U19_CSS_MAX = "\n@media all{"
+  + ".u-band{display:flex;align-items:center;gap:4mm;border-radius:2mm;padding:3mm 4mm;margin:0 0 3.5mm;"
+  +   "-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid;page-break-inside:avoid;}"
+  + ".u-band-dot{width:9mm;height:9mm;border-radius:50%;flex-shrink:0;display:flex;align-items:center;"
+  +   "justify-content:center;color:#fff;font-size:11pt;font-weight:800;}"
+  + ".u-band-tx{flex:1;min-width:0;}"
+  + ".u-band-tx b{display:block;font-size:11pt;line-height:1.15;letter-spacing:.01em;}"
+  + ".u-band-tx span{display:block;font-size:8.4pt;margin-top:.8mm;line-height:1.4;}"
+  + ".u-band.ok{background:#f0fdf4;border:0.3mm solid #bbf7d0;} .u-band.ok .u-band-dot{background:#15803d;} .u-band.ok b{color:#14532d;} .u-band.ok span{color:#3f6b52;}"
+  + ".u-band.mid{background:#fffbeb;border:0.3mm solid #fde68a;} .u-band.mid .u-band-dot{background:#b45309;} .u-band.mid b{color:#78350f;} .u-band.mid span{color:#7c5c33;}"
+  + ".u-band.bad{background:#fef2f2;border:0.3mm solid #fecaca;} .u-band.bad .u-band-dot{background:#b91c1c;} .u-band.bad b{color:#7f1d1d;} .u-band.bad span{color:#7c4a4a;}"
+  + ".u-plan{counter-reset:pl;margin:2mm 0 0;}"
+  + ".u-plan-i{display:flex;gap:3mm;padding:2.4mm 0;border-bottom:0.2mm solid #eef2f0;break-inside:avoid;page-break-inside:avoid;}"
+  + ".u-plan-i:last-child{border-bottom:none;}"
+  + ".u-plan-n{counter-increment:pl;width:5.6mm;height:5.6mm;border-radius:50%;background:#0e5132;color:#fff;"
+  +   "font-size:7.4pt;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:.4mm;"
+  +   "-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-plan-n::before{content:counter(pl);}"
+  + ".u-plan-t{flex:1;min-width:0;}"
+  + ".u-plan-t b{display:block;font-size:8.8pt;color:#14241c;margin-bottom:.5mm;}"
+  + ".u-plan-t span{font-size:8.2pt;color:#46544c;line-height:1.45;}"
+  + ".u-plan-tag{font-size:6.4pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#fff;"
+  +   "background:#94a3b8;padding:.4mm 1.6mm;border-radius:.8mm;margin-left:1.6mm;vertical-align:.3mm;"
+  +   "-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-plan-tag.alta{background:#b91c1c;} .u-plan-tag.media{background:#b45309;} .u-plan-tag.baja{background:#0e5132;}"
+  + ".pr-sec,.pr-kpis,.u-grid2,.u-grid3,.u-hero{break-inside:avoid;page-break-inside:avoid;}"
+  + ".pr-sec{break-after:avoid;page-break-after:avoid;}"
+  + "}";
+
+/* ------------------------------------------------------------
+   1 · VEREDICTO GLOBAL
+   ------------------------------------------------------------ */
+function u19VeredictoGlobal(inv){
+  var lsis = [];
+  if (inv.frz){ (inv.frz.pares || []).forEach(function(p){ lsis.push({ v:p.q.lsi, q:'fuerza en ' + p.nombre }); }); }
+  if (inv.rnd && inv.rnd.asimetria){
+    /* Reaccion y toques son dos medidas distintas: se cuentan por separado,
+       igual que las dibuja el radar. */
+    if (inv.rnd.asimetria.reaccion) lsis.push({ v:inv.rnd.asimetria.reaccion.lsi, q:'tiempo de reacción' });
+    if (inv.rnd.asimetria.hits) lsis.push({ v:inv.rnd.asimetria.hits.lsi, q:'volumen de toques' });
+  }
+  if (inv.bio.length){
+    var _sm = inv.bio[inv.bio.length - 1].segmentario_musculo || {};
+    var _pi = (_sm.pierna_izq && _sm.pierna_izq.kg != null) ? Number(_sm.pierna_izq.kg) : null;
+    var _pd = (_sm.pierna_der && _sm.pierna_der.kg != null) ? Number(_sm.pierna_der.kg) : null;
+    if (_pi != null && _pd != null && _pi && _pd)
+      lsis.push({ v:+(Math.min(_pi, _pd) / Math.max(_pi, _pd) * 100).toFixed(1), q:'masa muscular de la pierna' });
+  }
+  if (!lsis.length){
+    return { nivel:'mid', icono:'i', titulo:'Registro de la evaluación',
+      frase:'No hay pares izquierda/derecha suficientes para valorar simetría. El documento deja constancia de lo medido.' };
+  }
+  lsis.sort(function(a, b){ return a.v - b.v; });
+  var peor = lsis[0], n = lsis.length;
+  var bajo90 = lsis.filter(function(x){ return x.v < 90; }).length;
+  if (peor.v >= 90){
+    return { nivel:'ok', icono:'✓', titulo:'Simetría dentro del objetivo',
+      frase:(n === 1
+          ? 'La única medida de simetría disponible alcanza el 90% (' + peor.v.toFixed(0) + '% en ' + peor.q + ').'
+          : 'Las ' + n + ' medidas de simetría evaluadas alcanzan o superan el 90% (la más baja, ' + peor.v.toFixed(0)
+            + '%, en ' + peor.q + ').')
+        + ' No hay un déficit lateral que condicione la progresión.' };
+  }
+  if (peor.v >= 85){
+    return { nivel:'mid', icono:'!', titulo:'Asimetría en zona de vigilancia',
+      frase:(n === 1 ? 'La única medida disponible queda bajo el 90%: ' + peor.v.toFixed(0) + '% en ' + peor.q
+             : bajo90 + ' de ' + n + ' medidas quedan bajo el 90%; la más baja es ' + peor.v.toFixed(0) + '% en ' + peor.q)
+        + '. Conviene trabajo unilateral compensatorio y control en la próxima reevaluación.' };
+  }
+  return { nivel:'bad', icono:'!', titulo:'Déficit lateral relevante',
+    frase:'La simetría más baja es ' + peor.v.toFixed(0) + '% en ' + peor.q + ', bajo el umbral de 90% empleado como '
+      + 'criterio de retorno deportivo. Es el punto que debe dirigir el trabajo de las próximas semanas.' };
+}
+
+function u19BandaHTML(v){
+  return '<div class="u-band ' + v.nivel + '"><div class="u-band-dot">' + v.icono + '</div>'
+    + '<div class="u-band-tx"><b>' + u19Esc(v.titulo) + '</b><span>' + v.frase + '</span></div></div>';
+}
+
+/* ------------------------------------------------------------
+   2 · PLAN DE TRABAJO
+   Traduce los hallazgos a acciones concretas. Son sugerencias
+   derivadas de los datos, no una prescripcion: la decision
+   clinica sigue siendo del profesional que firma.
+   ------------------------------------------------------------ */
+function u19PlanHTML(inv, opts){
+  var items = [];
+  var pf = inv.frz ? frzPeorPar(inv.frz) : null;
+  var pr = (inv.rnd && inv.rnd.asimetria) ? rndPeorAsim(inv.rnd.asimetria) : null;
+
+  /* Naturaleza del deficit: estructura frente a funcion. */
+  var estr = null;
+  if (inv.bio.length){
+    var sm = inv.bio[inv.bio.length - 1].segmentario_musculo || {};
+    var pi = (sm.pierna_izq && sm.pierna_izq.kg != null) ? Number(sm.pierna_izq.kg) : null;
+    var pd = (sm.pierna_der && sm.pierna_der.kg != null) ? Number(sm.pierna_der.kg) : null;
+    if (pi != null && pd != null && pi && pd) estr = rndAsim(pi, pd, true);
+  }
+  var func = pf ? pf.q : pr;
+
+  if (func && func.lsi < 90){
+    var lado = func.deficitLado ? rndLadoTxt(func.deficitLado).toLowerCase() : 'deficitario';
+    var tipo = 'mixto';
+    if (estr && estr.pct < 3) tipo = 'motor';
+    else if (estr && func.pct / Math.max(estr.pct, 0.5) >= 2) tipo = 'motor';
+    else if (estr && func.pct / Math.max(estr.pct, 0.5) <= 0.6) tipo = 'masa';
+    var txt = {
+      motor: 'La masa muscular está equilibrada entre lados, así que el déficit es de <b>control motor</b>, no de tamaño. '
+        + 'Trabajo unilateral con énfasis en reactividad y calidad del gesto: pliometría de bajo impacto, cambios de dirección '
+        + 'con estímulo visual y control excéntrico, priorizando la pierna ' + lado + '.',
+      masa: 'La diferencia de masa muscular supera a la funcional: hay <b>menos músculo</b> en el lado ' + lado + '. '
+        + 'Trabajo de fuerza e hipertrofia unilateral, series adicionales para ese lado y progresión de carga antes que de velocidad.',
+      mixto: 'El déficit tiene componente de masa y de control. Combinar <b>fuerza unilateral</b> con trabajo reactivo del lado ' + lado + '.'
+    }[tipo];
+    items.push({ p:'alta', t:'Trabajo unilateral dirigido al lado ' + lado, d:txt });
+  }
+
+  /* Fuerza y reaccion discrepan: prioridad distinta. */
+  if (pf && pr){
+    var dif = Math.abs(pf.q.lsi - pr.lsi);
+    if (dif >= 8){
+      items.push({ p:'media', t:'Priorizar el dominio más comprometido',
+        d:'La simetría de fuerza (' + pf.q.lsi.toFixed(0) + '%) y la reactiva (' + pr.lsi.toFixed(0) + '%) difieren en '
+          + dif.toFixed(0) + ' puntos. ' + (pf.q.lsi < pr.lsi
+            ? 'La fuerza va por detrás: consolidar base de fuerza antes de subir la exigencia reactiva.'
+            : 'La respuesta reactiva va por detrás: la fuerza está, falta expresarla rápido. Añadir trabajo de velocidad y toma de decisión.') });
+    }
+  }
+
+  /* Velocidad de produccion de fuerza. */
+  if (inv.frz && pf && pf.rfd && Math.abs(pf.rfd.pct - pf.q.pct) > 8){
+    items.push({ p:'media', t:'Entrenar la velocidad de producción de fuerza',
+      d:'La asimetría en llegar al pico (' + pf.rfd.pct.toFixed(1) + '%) no coincide con la del pico (' + pf.q.pct.toFixed(1)
+        + '%). Incorporar contracciones balísticas e isométricas explosivas: el objetivo no es solo más fuerza, sino producirla antes.' });
+  }
+
+  /* Composicion corporal. */
+  if (inv.bio.length > 1){
+    var b1 = inv.bio[0].bioimpedancia || {}, b2 = inv.bio[inv.bio.length - 1].bioimpedancia || {};
+    var dG = (b1.grasa_kg != null && b2.grasa_kg != null) ? b2.grasa_kg - b1.grasa_kg : null;
+    var dM = (b1.musculo_kg != null && b2.musculo_kg != null) ? b2.musculo_kg - b1.musculo_kg : null;
+    if (dM != null && dM > 0.3 && dG != null && dG < 0.3){
+      items.push({ p:'baja', t:'Mantener la estrategia nutricional',
+        d:'La composición evoluciona en la dirección buscada (' + (dM > 0 ? '+' : '') + dM.toFixed(1) + ' kg de músculo, '
+          + (dG > 0 ? '+' : '') + dG.toFixed(1) + ' kg de grasa). Sostener ingesta proteica y volumen de entrenamiento actuales.' });
+    } else if (dG != null && dG > 0.5 && dM != null && dM < 0.3){
+      items.push({ p:'media', t:'Revisar el balance energético',
+        d:'La grasa sube ' + dG.toFixed(1) + ' kg sin ganancia muscular equivalente. Revisar ingesta y gasto antes de aumentar cargas.' });
+    }
+  }
+
+  /* Calidad de la medicion. */
+  var wq = [];
+  if (inv.bio.length && typeof u19BioWarnings === 'function') wq = wq.concat(u19BioWarnings(inv.bio));
+  if (inv.frz && typeof frzSanityWarnings === 'function') wq = wq.concat(frzSanityWarnings(inv.frz));
+  if (inv.rnd && typeof rndSanityWarnings === 'function') wq = wq.concat(rndSanityWarnings(inv.rnd));
+  if (wq.length){
+    items.push({ p:'alta', t:'Repetir las mediciones señaladas',
+      d:'Hay ' + wq.length + ' lectura(s) marcada(s) como dudosa(s) en el apartado de advertencias. Conviene repetirlas antes de '
+        + 'tomar decisiones sobre ellas: una medición mala orienta peor que ninguna.' });
+  }
+
+  /* Reevaluacion. */
+  var sem = parseInt((opts && opts.proxSem) || '', 10);
+  if (sem > 0){
+    items.push({ p:'baja', t:'Reevaluar en ' + sem + ' semanas',
+      d:'Con el mismo montaje, el mismo operador y la misma consigna. Cambiar cualquiera de los tres invalida la comparación.' });
+  }
+
+  if (!items.length) return '';
+  var orden = { alta:0, media:1, baja:2 };
+  items.sort(function(a, b){ return orden[a.p] - orden[b.p]; });
+  return '<div class="pr-sec"><div class="pr-letter">P</div><div class="pr-secttl"><h2>Plan sugerido</h2>'
+    + '<p>Acciones derivadas de los hallazgos · a validar por el profesional que firma</p></div></div>'
+    + '<div class="u-plan">' + items.map(function(it){
+        return '<div class="u-plan-i"><div class="u-plan-n"></div><div class="u-plan-t">'
+          + '<b>' + u19Esc(it.t) + '<span class="u-plan-tag ' + it.p + '">' + it.p + '</span></b>'
+          + '<span>' + it.d + '</span></div></div>';
+      }).join('') + '</div>';
+}
+
+/* ------------------------------------------------------------
+   3 · REPETICIONES DEL MISMO LADO
+   Dos sesiones bilaterales no son izquierda contra derecha: son
+   dos intentos. Se leen como tales, con media, mejor marca y
+   consistencia entre intentos.
+   ------------------------------------------------------------ */
+function u19RepeticionesHTML(m){
+  if (!m || !m.porLado) return '';
+  var bloques = [];
+  ['bilateral', 'izquierdo', 'derecho', 'sinlado'].forEach(function(l){
+    var arr = (m.porLado[l] || []).filter(function(s){ return s.reaccion_ms_prom != null || s.hits != null; });
+    if (arr.length < 2) return;
+    function stats(vals){
+      if (!vals.length) return null;
+      var med = vals.reduce(function(a, b){ return a + b; }, 0) / vals.length;
+      var sd = Math.sqrt(vals.reduce(function(a, b){ return a + (b - med) * (b - med); }, 0) / vals.length);
+      return { med:med, mejor:Math.min.apply(null, vals), max:Math.max.apply(null, vals), cv:(med ? sd / med * 100 : 0) };
+    }
+    var R = stats(arr.map(function(s){ return s.reaccion_ms_prom; }).filter(function(v){ return v != null; }));
+    var H = stats(arr.map(function(s){ return s.hits; }).filter(function(v){ return v != null; }));
+    var nombre = l === 'sinlado' ? 'Sin lado asignado' : rndLadoTxt(l);
+    var filas = '';
+    if (R) filas += '<div class="u-kv"><span>Reacción media</span><b>' + R.med.toFixed(0) + ' ms</b></div>'
+      + '<div class="u-kv"><span>Mejor intento</span><b>' + R.mejor.toFixed(0) + ' ms</b></div>';
+    if (H) filas += '<div class="u-kv"><span>Toques (media)</span><b>' + H.med.toFixed(0) + '</b></div>'
+      + '<div class="u-kv"><span>Mejor intento</span><b>' + H.max.toFixed(0) + '</b></div>';
+    if (R) filas += '<div class="u-kv"><span>Consistencia entre intentos</span><b>'
+      + (R.cv < 5 ? 'alta' : (R.cv < 10 ? 'media' : 'baja')) + ' (CV ' + R.cv.toFixed(1) + '%)</b></div>';
+    bloques.push('<div class="u-panel"><div class="u-panel-t">' + nombre + ' <span>' + arr.length + ' intentos</span></div>' + filas + '</div>');
+  });
+  if (!bloques.length) return '';
+  return '<div class="pr-sec"><div class="pr-letter">I</div><div class="pr-secttl"><h2>Intentos repetidos</h2>'
+    + '<p>Sesiones del mismo lado leídas como repeticiones · la consistencia informa de la fiabilidad de la marca</p></div></div>'
+    + '<div class="u-grid2">' + bloques.join('') + '</div>'
+    + '<div class="pr-refnote">CV = coeficiente de variación entre intentos. Bajo 5% la marca es estable; sobre 10% conviene '
+    + 'repetir antes de darla por buena. Estas sesiones no se comparan entre lados porque no corresponden a extremidades distintas.</div>';
+}
+
+/* ------------------------------------------------------------
+   4 · MAPA FUERZA - TIEMPO AL PICO
+   Cada medicion es un punto real: cuanta fuerza y en cuanto
+   tiempo. Ninguna curva reconstruida, solo los dos valores que
+   el aparato entrega.
+   ------------------------------------------------------------ */
+function frzMapaSVG(fm){
+  var pts = (fm.mediciones || []).filter(function(m){ return m.fuerza_max_n != null && m.tiempo_al_pico_seg != null; });
+  if (pts.length < 2) return '';
+  var W = 300, H = 190, mx = 34, my = 16, pb = 26;
+  var xs = pts.map(function(p){ return p.tiempo_al_pico_seg; });
+  var ys = pts.map(function(p){ return p.fuerza_max_n; });
+  var x0 = 0, x1 = Math.max.apply(null, xs) * 1.15 || 1;
+  var y0 = 0, y1 = Math.max.apply(null, ys) * 1.15 || 1;
+  var X = function(v){ return mx + (v - x0) / (x1 - x0) * (W - mx - 8); };
+  var Y = function(v){ return (H - pb) - (v - y0) / (y1 - y0) * (H - pb - my); };
+  var grid = '';
+  for (var i = 1; i <= 3; i++){
+    var gy = Y(y1 * i / 3.45);
+    grid += '<line x1="' + mx + '" y1="' + gy.toFixed(1) + '" x2="' + (W - 8) + '" y2="' + gy.toFixed(1) + '" stroke="#eef2f0" stroke-width="0.8"/>'
+      + '<text x="' + (mx - 4) + '" y="' + (gy + 2.5).toFixed(1) + '" font-size="6.4" text-anchor="end" fill="#94a3b8">'
+      + (y1 * i / 3.45).toFixed(0) + '</text>';
+  }
+  var dots = pts.map(function(p){
+    var col = p.lado === 'izquierdo' ? '#0e5132' : (p.lado === 'derecho' ? '#e21c25' : '#94a3b8');
+    var nom = p.movimiento.length > 16 ? p.movimiento.slice(0, 15) + '…' : p.movimiento;
+    return '<circle cx="' + X(p.tiempo_al_pico_seg).toFixed(1) + '" cy="' + Y(p.fuerza_max_n).toFixed(1) + '" r="3.4" fill="' + col + '" stroke="#fff" stroke-width="1"/>'
+      + '<text x="' + (X(p.tiempo_al_pico_seg) + 5).toFixed(1) + '" y="' + (Y(p.fuerza_max_n) + 2).toFixed(1) + '" font-size="6.2" fill="#46544c">' + u19Esc(nom) + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + grid
+    + '<line x1="' + mx + '" y1="' + (H - pb) + '" x2="' + (W - 8) + '" y2="' + (H - pb) + '" stroke="#cbd5d1" stroke-width="0.9"/>'
+    + '<line x1="' + mx + '" y1="' + my + '" x2="' + mx + '" y2="' + (H - pb) + '" stroke="#cbd5d1" stroke-width="0.9"/>'
+    + dots
+    + '<text x="' + ((W + mx) / 2) + '" y="' + (H - 10) + '" font-size="6.8" text-anchor="middle" fill="#7c8a83">tiempo hasta el pico (s) →</text>'
+    + '<text x="8" y="' + ((H - pb + my) / 2) + '" font-size="6.8" text-anchor="middle" fill="#7c8a83" transform="rotate(-90 8 ' + ((H - pb + my) / 2) + ')">fuerza pico (N)</text>'
+    + '<text x="' + (W - 8) + '" y="' + (H - 4) + '" font-size="6.2" text-anchor="end" fill="#94a3b8">verde izq · rojo der</text>'
+    + '</svg>';
+}
+/* ===MAX_END=== */
+
+
+/* ============================================================
+   ACABADO PROFESIONAL DEL INFORME
+   1 · Barras de rango con zonas de referencia publicadas.
+   2 · Analisis segmentario de masa muscular.
+   3 · Informes por dominio, con el mismo formato que el unico.
+   4 · Refinamiento visual.
+   ============================================================ */
+
+var U19_CSS_PRO = "\n@media all{"
+  /* KPI con banda de acento y numero mas presente */
+  + ".pr-kpi{border-radius:1.8mm;overflow:hidden;box-shadow:0 0.2mm 0.6mm rgba(14,81,50,.05);}"
+  + ".pr-kpi .pr-kval{font-size:19pt;letter-spacing:-.01em;}"
+  + ".pr-kpi .pr-kbar{letter-spacing:.14em;font-size:6.2pt;}"
+  /* Paneles con jerarquia mas clara */
+  + ".u-panel{border-radius:2.4mm;box-shadow:0 0.2mm 0.7mm rgba(14,81,50,.045);}"
+  + ".u-panel-t{padding-bottom:1.4mm;border-bottom:0.25mm solid #eef2f0;margin-bottom:2.4mm;}"
+  /* Barras de rango */
+  + ".pr-rb-wrap{gap:4.5mm;}"
+  + ".pr-rb-track{height:5.2mm;}"
+  + ".pr-rb-zone{font-size:5.4pt;}"
+  + ".pr-rb-name{font-size:8.2pt;}"
+  + ".pr-rb-val{font-size:9.4pt;}"
+  /* Segmentario */
+  + ".u-seg{display:flex;flex-direction:column;gap:2.2mm;margin-top:1mm;}"
+  + ".u-seg-r{display:flex;align-items:center;gap:2.5mm;break-inside:avoid;page-break-inside:avoid;}"
+  + ".u-seg-n{width:26mm;font-size:7.8pt;color:#14241c;font-weight:600;flex-shrink:0;}"
+  + ".u-seg-b{flex:1;display:flex;align-items:center;gap:1.2mm;}"
+  + ".u-seg-half{flex:1;display:flex;align-items:center;height:4.4mm;}"
+  + ".u-seg-half.l{justify-content:flex-end;}"
+  + ".u-seg-bar{height:100%;border-radius:.8mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-seg-v{font-size:7pt;font-variant-numeric:tabular-nums;color:#46544c;width:9mm;flex-shrink:0;}"
+  + ".u-seg-v.l{text-align:right;} .u-seg-v.r{text-align:left;}"
+  + ".u-seg-a{width:14mm;text-align:right;font-size:8pt;font-weight:800;flex-shrink:0;font-variant-numeric:tabular-nums;}"
+  + ".u-seg-head{display:flex;gap:2.5mm;font-size:6.4pt;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.6mm;}"
+  + ".u-seg-head .a{width:26mm;} .u-seg-head .b{flex:1;text-align:center;} .u-seg-head .c{width:14mm;text-align:right;}"
+  + "}";
+
+/* ------------------------------------------------------------
+   1 · BARRAS DE RANGO
+   Solo se dibujan indicadores con una referencia publicada y
+   aplicable. Nada de inventar bandas: si no hay norma, va a la
+   tabla de indices y no a una barra con colores.
+   ------------------------------------------------------------ */
+function u19Referencias(genero){
+  var g = (genero || '').toLowerCase();
+  var esM = g.indexOf('fem') === 0 || g === 'mujer' || g === 'f';
+  var esH = g.indexOf('mas') === 0 || g === 'hombre' || g === 'm';
+  var REF = {
+    imc: { nombre:'Índice de masa corporal', unit:'kg/m²', dec:1, min:15, max:40, src:'OMS',
+      zones:[ { lbl:'Bajo', min:15, max:18.5, color:'#f59e0b' },
+              { lbl:'Normal', min:18.5, max:25, color:'#15803d' },
+              { lbl:'Sobrepeso', min:25, max:30, color:'#f59e0b' },
+              { lbl:'Obesidad', min:30, max:40, color:'#dc2626' } ] },
+    grasa_visceral_grado: { nombre:'Grasa visceral', unit:'grado', dec:0, min:1, max:20, src:'Tanita / Omron',
+      zones:[ { lbl:'Saludable', min:1, max:10, color:'#15803d' },
+              { lbl:'Elevado', min:10, max:15, color:'#f59e0b' },
+              { lbl:'Alto', min:15, max:20, color:'#dc2626' } ] },
+    whtr: { nombre:'Cintura / estatura', unit:'', dec:2, min:0.35, max:0.70, src:'WHtR · Ashwell',
+      zones:[ { lbl:'Bajo', min:0.35, max:0.40, color:'#f59e0b' },
+              { lbl:'Saludable', min:0.40, max:0.50, color:'#15803d' },
+              { lbl:'Elevado', min:0.50, max:0.60, color:'#f59e0b' },
+              { lbl:'Alto', min:0.60, max:0.70, color:'#dc2626' } ] }
+  };
+  if (esH) REF.grasa_pct = { nombre:'Grasa corporal', unit:'%', dec:1, min:2, max:35, src:'ACE · hombres',
+    zones:[ { lbl:'Esencial', min:2, max:6, color:'#f59e0b' },
+            { lbl:'Atlético', min:6, max:14, color:'#15803d' },
+            { lbl:'Fitness', min:14, max:18, color:'#22c55e' },
+            { lbl:'Aceptable', min:18, max:25, color:'#f59e0b' },
+            { lbl:'Alto', min:25, max:35, color:'#dc2626' } ] };
+  else if (esM) REF.grasa_pct = { nombre:'Grasa corporal', unit:'%', dec:1, min:10, max:42, src:'ACE · mujeres',
+    zones:[ { lbl:'Esencial', min:10, max:14, color:'#f59e0b' },
+            { lbl:'Atlético', min:14, max:21, color:'#15803d' },
+            { lbl:'Fitness', min:21, max:25, color:'#22c55e' },
+            { lbl:'Aceptable', min:25, max:32, color:'#f59e0b' },
+            { lbl:'Alto', min:32, max:42, color:'#dc2626' } ] };
+  if (esH) REF.whr = { nombre:'Índice cintura / cadera', unit:'', dec:2, min:0.65, max:1.05, src:'OMS · hombres',
+    zones:[ { lbl:'Saludable', min:0.65, max:0.90, color:'#15803d' },
+            { lbl:'Elevado', min:0.90, max:1.00, color:'#f59e0b' },
+            { lbl:'Alto', min:1.00, max:1.05, color:'#dc2626' } ] };
+  else if (esM) REF.whr = { nombre:'Índice cintura / cadera', unit:'', dec:2, min:0.60, max:1.00, src:'OMS · mujeres',
+    zones:[ { lbl:'Saludable', min:0.60, max:0.85, color:'#15803d' },
+            { lbl:'Elevado', min:0.85, max:0.95, color:'#f59e0b' },
+            { lbl:'Alto', min:0.95, max:1.00, color:'#dc2626' } ] };
+  return REF;
+}
+
+function u19ZonaDe(ref, v){
+  for (var i = 0; i < ref.zones.length; i++){
+    var z = ref.zones[i];
+    if (v >= z.min && (v < z.max || i === ref.zones.length - 1)) return z;
+  }
+  return v < ref.zones[0].min ? ref.zones[0] : ref.zones[ref.zones.length - 1];
+}
+
+function u19BarraRango(ref, actual, previo){
+  if (actual == null) return '';
+  var span = ref.max - ref.min;
+  var pos = function(v){ return Math.max(0, Math.min(100, (v - ref.min) / span * 100)); };
+  var z = u19ZonaDe(ref, actual);
+  var zonas = ref.zones.map(function(zz){
+    var w = (zz.max - zz.min) / span * 100;
+    return '<div class="pr-rb-zone" style="width:' + w.toFixed(2) + '%;background:' + zz.color + ';">'
+      + (w > 13 ? u19Esc(zz.lbl) : '') + '</div>';
+  }).join('');
+  var marcas = '<div class="pr-rb-mark cur" style="left:' + pos(actual).toFixed(2) + '%"></div>'
+    + (previo != null ? '<div class="pr-rb-mark prev" style="left:' + pos(previo).toFixed(2) + '%"></div>' : '');
+  var d = (previo != null) ? actual - previo : null;
+  return '<div class="pr-rb-row">'
+    + '<div class="pr-rb-head"><span class="pr-rb-name">' + u19Esc(ref.nombre) + '</span>'
+    + '<span class="pr-rb-val">' + actual.toFixed(ref.dec) + (ref.unit ? ' ' + ref.unit : '')
+    + (d != null && Math.abs(d) >= Math.pow(10, -ref.dec) / 2
+        ? ' <span style="font-weight:600;color:#7c8a83;font-size:7.6pt;">(' + (d > 0 ? '+' : '') + d.toFixed(ref.dec) + ')</span>' : '')
+    + '</span>'
+    + '<span class="pr-rb-badge" style="background:' + z.color + '">' + u19Esc(z.lbl) + '</span></div>'
+    + '<div class="pr-rb-track"><div class="pr-rb-zones">' + zonas + '</div>' + marcas + '</div>'
+    + '<div class="pr-rb-foot"><span>' + ref.min.toFixed(ref.dec) + '</span>'
+    + '<span class="pr-rb-src">' + u19Esc(ref.src) + '</span>'
+    + '<span>' + ref.max.toFixed(ref.dec) + '</span></div></div>';
+}
+
+function u19RangosHTML(bio, cliente){
+  if (!bio || !bio.length) return '';
+  var evA = bio[bio.length - 1], evI = bio.length > 1 ? bio[0] : null;
+  var b2 = evA.bioimpedancia || {}, b1 = evI ? (evI.bioimpedancia || {}) : {};
+  var REF = u19Referencias(cliente && cliente.genero);
+  var est = Number((cliente && cliente.estatura_cm) || 0);
+  var whtr2 = (est > 0 && (evA.circunferencias_cm || {}).cintura != null)
+    ? +((evA.circunferencias_cm.cintura) / est).toFixed(2) : null;
+  var whtr1 = (est > 0 && evI && (evI.circunferencias_cm || {}).cintura != null)
+    ? +((evI.circunferencias_cm.cintura) / est).toFixed(2) : null;
+
+  var filas = '';
+  if (REF.grasa_pct) filas += u19BarraRango(REF.grasa_pct, b2.grasa_pct, b1.grasa_pct);
+  filas += u19BarraRango(REF.imc, b2.imc, b1.imc);
+  filas += u19BarraRango(REF.grasa_visceral_grado, b2.grasa_visceral_grado, b1.grasa_visceral_grado);
+  if (whtr2 != null) filas += u19BarraRango(REF.whtr, whtr2, whtr1);
+  if (REF.whr && b2.whr != null) filas += u19BarraRango(REF.whr, b2.whr, b1.whr);
+  if (!filas) return '';
+
+  var sinSexo = !REF.grasa_pct;
+  return '<div class="pr-sec"><div class="pr-letter">R</div><div class="pr-secttl">'
+    + '<h2>Clasificación por rangos</h2><p>Cada indicador situado en su referencia publicada'
+    + (evI ? ' · marca continua = actual, discontinua = inicial' : '') + '</p></div></div>'
+    + '<div class="pr-rb-wrap">' + filas + '</div>'
+    + '<div class="pr-rb-hint">Las bandas provienen de referencias de uso extendido (OMS, ACE, Ashwell) y son orientativas para '
+    + 'población general adulta: en deportistas entrenados un porcentaje de grasa en zona «atlética» o un IMC en «sobrepeso» por '
+    + 'mayor masa muscular no indican riesgo por sí solos.'
+    + (sinSexo ? ' <b>Falta el sexo del evaluado</b>, por lo que no se muestran las bandas de grasa corporal ni de cintura/cadera, que dependen de él.' : '')
+    + '</div>';
+}
+
+/* ------------------------------------------------------------
+   2 · SEGMENTARIO DE MASA MUSCULAR
+   BodyPro GO mide por segmentos gracias a los 8 electrodos con
+   mango. Es el dato que permite distinguir un deficit de masa
+   de uno de control motor.
+   ------------------------------------------------------------ */
+function u19SegmentarioHTML(bio){
+  if (!bio || !bio.length) return '';
+  var sm = bio[bio.length - 1].segmentario_musculo || {};
+  var smI = bio.length > 1 ? (bio[0].segmentario_musculo || {}) : {};
+  var kg = function(o, k){ return (o && o[k] && o[k].kg != null) ? Number(o[k].kg) : null; };
+  var pares = [
+    { n:'Brazos', i:kg(sm, 'brazo_izq'), d:kg(sm, 'brazo_der'), i0:kg(smI, 'brazo_izq'), d0:kg(smI, 'brazo_der') },
+    { n:'Piernas', i:kg(sm, 'pierna_izq'), d:kg(sm, 'pierna_der'), i0:kg(smI, 'pierna_izq'), d0:kg(smI, 'pierna_der') }
+  ].filter(function(p){ return p.i != null && p.d != null; });
+  var tronco = kg(sm, 'tronco'), tronco0 = kg(smI, 'tronco');
+  if (!pares.length && tronco == null) return '';
+
+  var maxv = Math.max.apply(null, pares.map(function(p){ return Math.max(p.i, p.d); }).concat(tronco != null ? [tronco] : [1]));
+  function barra(p){
+    var asim = rndAsim(p.i, p.d, true);
+    var col = asim ? rndNivelColor(asim.nivel) : '#94a3b8';
+    var wI = (p.i / maxv * 100), wD = (p.d / maxv * 100);
+    var dI = (p.i0 != null) ? p.i - p.i0 : null, dD = (p.d0 != null) ? p.d - p.d0 : null;
+    var sub = (dI != null && dD != null)
+      ? '<span style="font-weight:400;color:#94a3b8;font-size:6.6pt;"> ' + (dI > 0 ? '+' : '') + dI.toFixed(1)
+        + ' / ' + (dD > 0 ? '+' : '') + dD.toFixed(1) + '</span>' : '';
+    return '<div class="u-seg-r"><div class="u-seg-n">' + p.n + sub + '</div>'
+      + '<div class="u-seg-v l">' + p.i.toFixed(1) + '</div>'
+      + '<div class="u-seg-b">'
+      +   '<div class="u-seg-half l"><div class="u-seg-bar" style="width:' + wI.toFixed(1) + '%;background:#11623c;"></div></div>'
+      +   '<div class="u-seg-half r"><div class="u-seg-bar" style="width:' + wD.toFixed(1) + '%;background:#e21c25;"></div></div>'
+      + '</div>'
+      + '<div class="u-seg-v r">' + p.d.toFixed(1) + '</div>'
+      + '<div class="u-seg-a" style="color:' + col + '">' + (asim ? asim.pct.toFixed(1) + '%' : '—') + '</div></div>';
+  }
+  var filasTronco = '';
+  if (tronco != null){
+    var dT = (tronco0 != null) ? tronco - tronco0 : null;
+    filasTronco = '<div class="u-seg-r"><div class="u-seg-n">Tronco'
+      + (dT != null ? '<span style="font-weight:400;color:#94a3b8;font-size:6.6pt;"> ' + (dT > 0 ? '+' : '') + dT.toFixed(1) + '</span>' : '')
+      + '</div>'
+      + '<div class="u-seg-v l"></div>'
+      + '<div class="u-seg-b"><div class="u-seg-half l"></div>'
+      + '<div class="u-seg-half r"><div class="u-seg-bar" style="width:' + (tronco / maxv * 100).toFixed(1) + '%;background:#64748b;"></div></div></div>'
+      + '<div class="u-seg-v r">' + tronco.toFixed(1) + '</div>'
+      + '<div class="u-seg-a" style="color:#94a3b8;">—</div></div>';
+  }
+  return '<div class="u-panel"><div class="u-panel-t">Masa muscular por segmento <span>kg · asimetría</span></div>'
+    + '<div class="u-seg-head"><span class="a"></span><span class="b">izquierda · derecha</span><span class="c">asim.</span></div>'
+    + '<div class="u-seg">' + pares.map(barra).join('') + filasTronco + '</div>'
+    + '<div class="pr-refnote" style="margin:2mm 0 0;">La bioimpedancia segmentaria estima la masa de cada segmento con menor '
+    + 'precisión que la de cuerpo completo. Léela como orientación del reparto, no como una medida exacta.</div></div>';
+}
+
+/* ------------------------------------------------------------
+   3 · INFORMES POR DOMINIO
+   Mismo formato y misma calidad que el unificado, pero acotado
+   a un aparato. Reutiliza el generador: no hay tres motores
+   distintos que puedan divergir.
+   ------------------------------------------------------------ */
+function u19InvFiltrado(dom){
+  var inv = u19Inventario();
+  return {
+    bio: (dom === 'bio' || dom === 'todo') ? inv.bio : [],
+    rnd: (dom === 'rnd' || dom === 'todo') ? inv.rnd : null,
+    frz: (dom === 'frz' || dom === 'todo') ? inv.frz : null,
+    cliente: inv.cliente
+  };
+}
+
+window.u19GenerarDominio = function(dom){
+  var inv = u19InvFiltrado(dom);
+  var falta = { bio:'composición corporal (Fitdays)', rnd:'rendimiento (BlazePod)', frz:'fuerza (ActiveForce)' };
+  if (!inv.bio.length && !inv.rnd && !inv.frz){
+    toast("No hay datos de " + (falta[dom] || 'ese dominio') + " cargados", "warn");
+    return;
+  }
+  var nombre = _infState.nombre || _rndState.nombre || inv.cliente.nombre || "";
+  var cli = { nombre: nombre, rut: _infState.rut || _rndState.rut || "" };
+  var c = (typeof getClient === "function") ? (getClient(_infState.clientId) || getClient(_rndState.clientId)) : null;
+  if (!_rndOpts.folio) _rndOpts.folio = (typeof infNextFolio === "function") ? infNextFolio() : "";
+  var sd = (typeof rndSetupDiff === "function") ? rndSetupDiff(c, _rndSetup) : null;
+  var opts = Object.assign({}, _rndOpts, {
+    indicaciones: (document.getElementById("rnd-indic") || {}).value || "",
+    setupTxt: (typeof rndSetupTxt === "function") ? rndSetupTxt(_rndSetup) : "",
+    setupDiff: sd ? sd.difs.join(" · ") : "",
+    proxSem: _rndOpts.proxSem || "",
+    cliente: c || ((typeof u19ClienteActual === "function") ? (u19ClienteActual().c || null) : null)
+  });
+  var tit = u19TituloInforme(inv);
+  var doc = u19InformeUnicoDoc(inv, cli, opts);
+  _rndState.reportHtml = doc;
+  u19PintarInforme(tit.t, doc, dom === 'todo');
+  toast("Listo ✓ " + tit.t, "success");
+};
+
+/* Vista previa comun a todos los generadores. */
+function u19PintarInforme(titulo, doc, esUnico){
+  var wrap = document.getElementById("rnd-report-wrap") || document.getElementById("inf-report-wrap");
+  if (!wrap) return;
+  wrap.innerHTML = '<div class="card"><div class="card-main"><div class="card-title">' + escapeHtml(titulo) + '</div>'
+    + '<p class="text-xs text-muted" style="margin:0 0 .5rem;">'
+    + (esUnico ? 'Un solo documento con todo lo cargado.' : 'Informe acotado a un dominio. Los botones de al lado cambian el alcance.')
+    + '</p>'
+    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;align-items:center;">'
+    + '<button class="btn btn-primary btn-sm" onclick="rndPrint()">🖨 Imprimir / Guardar PDF</button>'
+    + '<button class="btn btn-secondary btn-sm" id="u19-btn-guardar" onclick="u19GuardarEvaluacion()" title="Guarda composición, fuerza y rendimiento en la ficha de esta persona">💾 Guardar en el historial</button>'
+    + '<a href="#" id="u19-link-ficha" style="display:none;font-size:.78rem;" onclick="u19IrAFicha();return false;">Ver la ficha →</a>'
+    + '</div>'
+    + '<iframe id="rnd-frame" style="width:100%;height:680px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe>'
+    + '</div></div>';
+  var fr = document.getElementById("rnd-frame");
+  if (fr) fr.srcdoc = doc;
+  if (wrap.scrollIntoView){ try { wrap.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(e){} }
+}
+
+/* Reparte si hace falta y luego genera el dominio pedido. */
+window.u19FlujoDominio = function(idSuf, dom){
+  var inv = u19Inventario();
+  var hayAlgo = inv.bio.length || inv.rnd || inv.frz;
+  var ta = document.getElementById("u19-uni-json-" + idSuf);
+  var texto = (ta && ta.value || "").trim();
+  if (!hayAlgo && !texto){
+    toast("Pega primero el JSON que te devolvió la IA", "warn");
+    if (ta && ta.focus){ try { ta.focus(); } catch(e){} }
+    return;
+  }
+  if (texto && (!hayAlgo || texto !== _u19UltimoTexto)){
+    _u19UltimoTexto = texto;
+    u19Repartir(idSuf, function(ok){
+      if (ok === false) return;
+      u19GenerarDominio(dom);
+    });
+    return;
+  }
+  u19GenerarDominio(dom);
+};
+/* ===PRO_END=== */
+
+
+/* ============================================================
+   FICHA DEL DEPORTISTA — una pantalla, no siete modales.
+   Los datos de una persona viven en diez arrays distintos
+   (informes, rendimiento, fuerza, progressions, lsiTests,
+   measurements, assessments, painLog, evals, log) y hasta ahora
+   solo se llegaba a ellos por siete botones que abrian siete
+   modales. Aqui se reunen en una vista con pestanas internas y
+   una linea de tiempo comun.
+   ============================================================ */
+
+var _fichaState = { clientId: null, tab: 'resumen', tlFiltro: '' };
+
+/* ---------- utilidades de estado ---------- */
+function u19DiasSinReportar(c){
+  var t = null;
+  try {
+    (loadReports() || []).forEach(function(r){
+      var mismo = (r.clientId && r.clientId === c.id)
+        || (!r.clientId && r.clientName && c.name && r.clientName.toLowerCase() === c.name.toLowerCase());
+      if (mismo && r.sentAt && (!t || r.sentAt > t)) t = r.sentAt;
+    });
+  } catch(e){}
+  var pr = (c.progressions || []);
+  if (pr.length){
+    var ult = pr[pr.length - 1];
+    var ts = ult.importadoEl || (ult.fecha ? Date.parse(ult.fecha) : null);
+    if (ts && (!t || ts > t)) t = ts;
+  }
+  if (!t) return null;
+  return Math.floor((Date.now() - t) / 86400000);
+}
+function u19DiasHastaReeval(c){
+  if (!c.reevalDate) return null;
+  var d = Math.floor((Date.parse(c.reevalDate) - Date.now()) / 86400000);
+  return isNaN(d) ? null : d;
+}
+function u19UltimoInforme(c){
+  var a = (c.informes || []);
+  return a.length ? a[a.length - 1] : null;
+}
+
+/* ---------- chips de estado, reutilizables ---------- */
+function u19ChipsCliente(c, compacto){
+  var chips = [];
+  var lsi = (typeof u19UltimoLSI === 'function') ? u19UltimoLSI(c) : null;
+  if (lsi){
+    var col = lsi.lsi >= 90 ? 'var(--success)' : (lsi.lsi >= 85 ? '#d97706' : 'var(--danger)');
+    chips.push({ t: 'LSI ' + lsi.lsi.toFixed(0) + '%', c: col,
+      ti: 'Simetría medida el ' + rndFdate(lsi.fecha) + ' · ' + (lsi.etiqueta || '') });
+  }
+  var d = u19DiasSinReportar(c);
+  var tieneRutina = state.routines.some(function(r){ return r.clientId === c.id && r.status !== 'archived'; });
+  if (tieneRutina){
+    if (d == null) chips.push({ t: 'nunca reportó', c: 'var(--danger)', ti: 'Con rutina activa y sin ninguna sesión recibida' });
+    else if (d >= 10) chips.push({ t: 'hace ' + d + ' d sin reportar', c: d >= 21 ? 'var(--danger)' : '#d97706',
+      ti: 'Última señal de actividad hace ' + d + ' días' });
+  }
+  var r = u19DiasHastaReeval(c);
+  if (r != null && r <= 14){
+    chips.push({ t: r < 0 ? ('reeval. vencida ' + Math.abs(r) + ' d') : (r === 0 ? 'reevaluar hoy' : 'reeval. en ' + r + ' d'),
+      c: r <= 0 ? 'var(--danger)' : '#d97706', ti: 'Fecha de reevaluación: ' + rndFdate(c.reevalDate) });
+  }
+  if (c.redFlags && c.redFlags.blocked) chips.push({ t: '🚩 derivar', c: 'var(--danger)', ti: 'Banderas rojas registradas' });
+  if (c.alta && c.alta.fecha) chips.push({ t: '✓ alta ' + rndFdate(c.alta.fecha), c: 'var(--success)', ti: 'Alta terapéutica registrada' });
+  if (!chips.length) return '';
+  return chips.map(function(x){
+    return '<span class="u-chip" style="color:' + x.c + ';border-color:' + x.c + ';" title="' + escapeAttr(x.ti || '') + '">' + escapeHtml(x.t) + '</span>';
+  }).join('');
+}
+
+/* ---------- linea de tiempo unificada ---------- */
+function u19Timeline(c){
+  var ev = [];
+  function add(fecha, tipo, titulo, detalle, color){
+    if (!fecha) return;
+    ev.push({ f: String(fecha).slice(0, 10), tipo: tipo, t: titulo, d: detalle || '', col: color });
+  }
+  (c.informes || []).forEach(function(i){
+    var b = (i.payload && i.payload.ev2 && i.payload.ev2.bioimpedancia) || {};
+    add(i.fecha, 'Composición', 'Informe de composición corporal',
+      (b.peso_kg != null ? b.peso_kg + ' kg' : '') + (b.grasa_pct != null ? ' · ' + b.grasa_pct + '% grasa' : ''), '#0e5132');
+  });
+  (c.rendimiento || []).forEach(function(r){
+    var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
+    var peor = cand.length ? cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0] : null;
+    add(r.fecha, 'Rendimiento', 'Evaluación BlazePod',
+      ((r.resumen && r.resumen.reaccion_prom != null) ? r.resumen.reaccion_prom + ' ms' : '')
+      + (peor ? ' · LSI ' + peor.lsi.toFixed(0) + '%' : ''), '#2563eb');
+  });
+  (c.fuerza || []).forEach(function(f){
+    add(f.fecha, 'Fuerza', 'Dinamometría ActiveForce',
+      ((f.resumen && f.resumen.fuerza_max != null) ? f.resumen.fuerza_max.toFixed(0) + ' N' : '')
+      + (f.peor ? ' · LSI ' + f.peor.lsi.toFixed(0) + '% en ' + f.peor.nombre : ''), '#b45309');
+  });
+  (c.progressions || []).forEach(function(pr){
+    add(pr.fecha, 'Entrenamiento', 'Sesión reportada' + (pr.rutinaNombre ? ' · ' + pr.rutinaNombre : ''),
+      (pr.cumplimiento != null ? pr.cumplimiento + '% de cumplimiento' : '')
+      + (pr.origen === 'link' ? '' : ' · importada'), '#15803d');
+  });
+  (c.lsiTests || []).forEach(function(t){
+    add(t.date, 'Simetría', 'Test manual · ' + (t.name || 'LSI'), 'LSI ' + t.lsi + '%', '#7c3aed');
+  });
+  (c.painLog || []).forEach(function(pl){
+    add(pl.date || pl.fecha, 'Clínico', 'Registro de dolor',
+      (pl.eva != null ? 'EVA ' + pl.eva + '/10' : ''), '#b91c1c');
+  });
+  (c.measurements || []).forEach(function(mm){
+    add(mm.date, 'Medidas', 'Medidas corporales', (mm.weight ? mm.weight + ' kg' : ''), '#64748b');
+  });
+  (c.assessments || []).forEach(function(a2){
+    add(a2.date, 'Valoración', 'Valoración registrada', (a2.notes || '').slice(0, 90), '#0891b2');
+  });
+  (c.log || []).forEach(function(l){
+    add(l.date, 'Nota', 'Nota de seguimiento', (l.text || '').slice(0, 90), '#64748b');
+  });
+  (c.evals || []).forEach(function(e2){
+    var t = e2.tipo || e2.type || e2.nombre || e2.name || 'Evaluación clínica';
+    add(e2.date || e2.fecha, 'Clínico', String(t),
+      (e2.resultado || e2.result || e2.notas || e2.notes || '').toString().slice(0, 90), '#7c3aed');
+  });
+  if (c.alta && c.alta.fecha) add(c.alta.fecha, 'Clínico', 'Alta terapéutica', '', '#15803d');
+  ev.sort(function(a, b){ return a.f < b.f ? 1 : (a.f > b.f ? -1 : 0); });
+  if (!ev.length) return '<p class="text-xs text-muted">Todavía no hay eventos registrados para esta persona.</p>';
+
+  /* Con historial largo la lista se hace inmanejable: filtro por tipo. */
+  var tipos = [];
+  ev.forEach(function(x){ if (tipos.indexOf(x.tipo) < 0) tipos.push(x.tipo); });
+  var filtro = _fichaState.tlFiltro || '';
+  var visibles = filtro ? ev.filter(function(x){ return x.tipo === filtro; }) : ev;
+  var chips = tipos.length > 1
+    ? '<div class="u-tl-f2"><button class="u-tlc' + (filtro ? '' : ' on') + '" onclick="fichaFiltroTL(\'\')">Todo <span>'
+      + ev.length + '</span></button>'
+      + tipos.map(function(t){
+          var n = ev.filter(function(x){ return x.tipo === t; }).length;
+          return '<button class="u-tlc' + (filtro === t ? ' on' : '') + '" onclick="fichaFiltroTL(\'' + escapeAttr(t)
+            + '\')">' + escapeHtml(t) + ' <span>' + n + '</span></button>';
+        }).join('') + '</div>'
+    : '';
+  ev = visibles;
+  return chips + '<div class="u-tl">' + ev.map(function(x){
+    return '<div class="u-tl-i"><div class="u-tl-d" style="background:' + x.col + '"></div>'
+      + '<div class="u-tl-f">' + rndFdate(x.f) + '</div>'
+      + '<div class="u-tl-c"><span class="u-tl-k" style="color:' + x.col + '">' + escapeHtml(x.tipo) + '</span>'
+      + '<b>' + escapeHtml(x.t) + '</b>'
+      + (x.d ? '<span>' + escapeHtml(x.d) + '</span>' : '') + '</div></div>';
+  }).join('') + '</div>';
+}
+
+/* ---------- la vista ---------- */
+window.abrirFicha = function(clientId, tab){
+  var c = getClient(clientId);
+  if (!c){ toast('Cliente no encontrado', 'error'); return; }
+  _fichaState.clientId = clientId;
+  if (tab) _fichaState.tab = tab;
+  showView('ficha');
+  renderFicha();
+};
+
+function renderFicha(){
+  var c = getClient(_fichaState.clientId);
+  var cont = document.getElementById('view-ficha');
+  if (!cont) return;
+  if (!c){ cont.innerHTML = '<div class="empty-state"><h3>Cliente no encontrado</h3>'
+    + '<button class="btn btn-primary" onclick="showView(\'clients\')">Volver a Clientes</button></div>'; return; }
+
+  var tabs = [['resumen', 'Resumen'], ['evaluaciones', 'Evaluaciones'], ['entrenamiento', 'Entrenamiento'], ['clinico', 'Clínico']];
+  var h = '<div class="u-fh">'
+    + '<button class="btn btn-ghost btn-sm" onclick="showView(\'clients\')">← Clientes</button>'
+    + '<div class="u-fh-id"><h1>' + escapeHtml(c.name || '—') + '</h1>'
+    + '<div class="u-fh-meta">' + [c.goal, c.phone, c.notionPlan].filter(Boolean).map(escapeHtml).join(' · ') + '</div>'
+    + '<div class="u-chips">' + u19ChipsCliente(c) + '</div></div>'
+    + '<div class="u-fh-act">'
+    +   (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\'' + c.id + '\')" title="Resumen semanal por WhatsApp">📊</button>' : '')
+    +   '<button class="btn btn-ghost btn-sm" onclick="u19ExportarCliente(\'' + c.id + '\')" title="Descargar todos sus datos">⬇</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\'' + c.id + '\')">Editar</button>'
+    + '</div></div>';
+
+  h += '<div class="u-ftabs">' + tabs.map(function(t){
+    return '<button class="u-ftab' + (_fichaState.tab === t[0] ? ' on' : '') + '" onclick="fichaTab(\'' + t[0] + '\')">' + t[1] + '</button>';
+  }).join('') + '</div>';
+
+  h += '<div class="u-fbody">' + ({
+    resumen: fichaResumen, evaluaciones: fichaEvaluaciones,
+    entrenamiento: fichaEntrenamiento, clinico: fichaClinico
+  }[_fichaState.tab] || fichaResumen)(c) + '</div>';
+
+  cont.innerHTML = h;
+}
+window.fichaTab = function(t){ _fichaState.tab = t; renderFicha(); };
+window.fichaFiltroTL = function(t){ _fichaState.tlFiltro = (_fichaState.tlFiltro === t) ? '' : t; renderFicha(); };
+
+function u19Bloque(titulo, cuerpo, accion){
+  return '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
+    + '<div class="u-bh"><div class="card-title" style="margin:0;">' + titulo + '</div>'
+    + (accion || '') + '</div>' + cuerpo + '</div></div>';
+}
+
+function fichaResumen(c){
+  var lsi = (typeof u19UltimoLSI === 'function') ? u19UltimoLSI(c) : null;
+  var inf = u19UltimoInforme(c);
+  var b = (inf && inf.payload && inf.payload.ev2 && inf.payload.ev2.bioimpedancia) || {};
+  var d = u19DiasSinReportar(c);
+  var rut = state.routines.filter(function(r){ return r.clientId === c.id && r.status !== 'archived'; });
+
+  function tile(lbl, val, sub, col){
+    return '<div class="u-tile"><div class="u-tile-l">' + lbl + '</div>'
+      + '<div class="u-tile-v"' + (col ? ' style="color:' + col + '"' : '') + '>' + val + '</div>'
+      + '<div class="u-tile-s">' + (sub || '') + '</div></div>';
+  }
+  var tiles = '<div class="u-tiles">'
+    + tile('Peso', b.peso_kg != null ? b.peso_kg.toFixed(1) + ' kg' : '—', inf ? rndFdate(inf.fecha) : 'sin informes')
+    + tile('Grasa', b.grasa_pct != null ? b.grasa_pct.toFixed(1) + ' %' : '—', b.musculo_kg != null ? (b.musculo_kg.toFixed(1) + ' kg músculo') : '')
+    + tile('Simetría', lsi ? ('LSI ' + lsi.lsi.toFixed(0) + '%') : '—',
+        lsi ? (lsi.fuente === 'dinamometria' ? 'ActiveForce' : (lsi.fuente === 'manual' ? 'test manual' : 'BlazePod')) : 'sin medir',
+        lsi ? (lsi.lsi >= 90 ? 'var(--success)' : (lsi.lsi >= 85 ? '#d97706' : 'var(--danger)')) : '')
+    + tile('Adherencia', d == null ? '—' : ('hace ' + d + ' d'), d == null ? 'sin reportes' : 'último reporte',
+        (d != null && d >= 10) ? 'var(--danger)' : '')
+    + '</div>';
+
+  var conteos = [
+    ['Informes de composición', (c.informes || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Evaluaciones de rendimiento', (c.rendimiento || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Dinamometrías', (c.fuerza || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Sesiones reportadas', (c.progressions || []).length, "abrirFicha('" + c.id + "','entrenamiento')"],
+    ['Rutinas activas', rut.length, "abrirFicha('" + c.id + "','entrenamiento')"],
+    ['Registros de dolor', (c.painLog || []).length, "abrirFicha('" + c.id + "','clinico')"]
+  ];
+  var resumenN = '<div class="u-counts">' + conteos.map(function(x){
+    return '<button class="u-count" onclick="' + x[2] + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></button>';
+  }).join('') + '</div>';
+
+  return tiles + resumenN
+    + u19Bloque('Línea de tiempo', u19Timeline(c));
+}
+
+function fichaEvaluaciones(c){
+  var serie = (typeof u19SerieLSI === 'function') ? u19SerieLSI(c) : [];
+  var out = '';
+
+  if (serie.length){
+    var filas = serie.slice().reverse().map(function(p){
+      var col = p.lsi >= 90 ? 'var(--success)' : (p.lsi >= 85 ? '#b45309' : 'var(--danger)');
+      return '<tr><td>' + rndFdate(p.fecha) + '</td><td>' + escapeHtml(p.etiqueta) + '</td>'
+        + '<td style="color:' + col + ';font-weight:700;">' + p.lsi.toFixed(0) + '%</td>'
+        + '<td class="text-muted">' + escapeHtml(p.detalle || '') + '</td></tr>';
+    }).join('');
+    out += u19Bloque('Simetría (LSI) · todas las fuentes',
+      '<table class="u-tbl"><thead><tr><th>Fecha</th><th>Origen</th><th>LSI</th><th>Detalle</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody></table>',
+      '<button class="btn btn-ghost btn-sm" onclick="u19HistorialRendimiento(\'' + c.id + '\')">Ver curva</button>');
+  }
+
+  function lista(titulo, arr, fn, vacio, accion){
+    if (!arr || !arr.length) return u19Bloque(titulo, '<p class="text-xs text-muted">' + vacio + '</p>', accion);
+    return u19Bloque(titulo, '<table class="u-tbl"><tbody>'
+      + arr.slice().reverse().map(fn).join('') + '</tbody></table>', accion);
+  }
+  out += lista('Composición corporal', c.informes, function(i){
+    var b = (i.payload && i.payload.ev2 && i.payload.ev2.bioimpedancia) || {};
+    return '<tr><td>' + rndFdate(i.fecha) + '</td>'
+      + '<td>' + (b.peso_kg != null ? b.peso_kg + ' kg' : '—') + '</td>'
+      + '<td>' + (b.grasa_pct != null ? b.grasa_pct + '% grasa' : '—') + '</td>'
+      + '<td>' + (b.musculo_kg != null ? b.musculo_kg + ' kg músculo' : '—') + '</td></tr>';
+  }, 'Sin informes guardados. Genera uno en Informes y pulsa «Guardar en historial».');
+
+  out += lista('Rendimiento · BlazePod', c.rendimiento, function(r){
+    var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
+    var peor = cand.length ? cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0] : null;
+    return '<tr><td>' + rndFdate(r.fecha) + '</td>'
+      + '<td>' + ((r.resumen && r.resumen.reaccion_prom != null) ? r.resumen.reaccion_prom + ' ms' : '—') + '</td>'
+      + '<td>' + (peor ? 'LSI ' + peor.lsi.toFixed(0) + '%' : '—') + '</td>'
+      + '<td class="text-muted">' + escapeHtml(rndSetupTxt(r.setup) || '') + '</td></tr>';
+  }, 'Sin evaluaciones de BlazePod guardadas.');
+
+  out += lista('Fuerza · ActiveForce', c.fuerza, function(f){
+    return '<tr><td>' + rndFdate(f.fecha) + '</td>'
+      + '<td>' + ((f.resumen && f.resumen.fuerza_max != null) ? f.resumen.fuerza_max.toFixed(0) + ' N' : '—') + '</td>'
+      + '<td>' + (f.peor ? 'LSI ' + f.peor.lsi.toFixed(0) + '%' : '—') + '</td>'
+      + '<td class="text-muted">' + escapeHtml(f.peor ? f.peor.nombre : '') + '</td></tr>';
+  }, 'Sin dinamometrías guardadas.');
+
+  return out + '<button class="btn btn-primary" onclick="showView(\'rendimiento\')">Nueva evaluación →</button>';
+}
+
+function fichaEntrenamiento(c){
+  var rut = state.routines.filter(function(r){ return r.clientId === c.id; });
+  var out = '';
+  if (rut.length){
+    out += u19Bloque('Rutinas', '<table class="u-tbl"><tbody>' + rut.map(function(r){
+      return '<tr><td><b>' + escapeHtml(r.name || 'Sin nombre') + '</b></td>'
+        + '<td>' + (r.weeks || '—') + ' sem</td>'
+        + '<td>' + (r.status === 'archived' ? '<span class="text-muted">archivada</span>' : '<span style="color:var(--success)">activa</span>') + '</td>'
+        + '<td><button class="btn btn-ghost btn-sm" onclick="openRoutineBuilder(\'' + r.id + '\')">Abrir</button></td></tr>';
+    }).join('') + '</tbody></table>');
+  } else {
+    out += u19Bloque('Rutinas', '<p class="text-xs text-muted">Sin rutinas asignadas.</p>',
+      '<button class="btn btn-primary btn-sm" onclick="crearRutinaParaCliente(\'' + c.id + '\')">Crear rutina</button>');
+  }
+  var pr = c.progressions || [];
+  if (pr.length){
+    out += u19Bloque('Sesiones reportadas', '<table class="u-tbl"><tbody>' + pr.slice().reverse().slice(0, 15).map(function(x){
+      return '<tr><td>' + rndFdate(x.fecha) + '</td>'
+        + '<td>' + escapeHtml(x.rutinaNombre || '—') + '</td>'
+        + '<td>' + (x.cumplimiento != null ? x.cumplimiento + '%' : '—') + '</td>'
+        + '<td class="text-muted">' + (x.ejercicios ? x.ejercicios.length + ' ejercicios' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>',
+      '<button class="btn btn-ghost btn-sm" onclick="openProgressHistory(\'' + c.id + '\')">Detalle</button>');
+  } else {
+    out += u19Bloque('Sesiones reportadas',
+      '<p class="text-xs text-muted">Ninguna todavía. Cuando el cliente te mande su progreso por link, pulsa «Guardar en el historial».</p>');
+  }
+  return out;
+}
+
+function fichaClinico(c){
+  var out = '';
+  var f = c.ficha || null;
+  out += u19Bloque('Ficha clínica', f
+    ? '<div class="u-kvs">' + Object.keys(f).filter(function(k){ return f[k]; }).map(function(k){
+        return '<div class="u-kv2"><span>' + escapeHtml(k) + '</span><b>' + escapeHtml(String(f[k])) + '</b></div>';
+      }).join('') + '</div>'
+    : '<p class="text-xs text-muted">Sin ficha registrada.</p>',
+    (typeof rehabClinicoOn === 'function' && rehabClinicoOn())
+      ? '<button class="btn btn-ghost btn-sm" onclick="openPanelClinico(\'' + c.id + '\')">Panel clínico</button>' : '');
+
+  var pl = c.painLog || [];
+  out += u19Bloque('Registro de dolor', pl.length
+    ? '<table class="u-tbl"><tbody>' + pl.slice().reverse().slice(0, 12).map(function(x){
+        var eva = x.eva != null ? x.eva : (x.valor != null ? x.valor : null);
+        var col = eva == null ? '' : (eva <= 2 ? 'var(--success)' : (eva <= 5 ? '#d97706' : 'var(--danger)'));
+        return '<tr><td>' + rndFdate(x.date || x.fecha) + '</td>'
+          + '<td style="color:' + col + ';font-weight:700;">' + (eva != null ? 'EVA ' + eva + '/10' : '—') + '</td>'
+          + '<td class="text-muted">' + escapeHtml(x.nota || x.notes || '') + '</td></tr>';
+      }).join('') + '</tbody></table>'
+    : '<p class="text-xs text-muted">Sin registros de dolor.</p>');
+
+  if (c.alta && c.alta.fecha){
+    out += u19Bloque('Alta terapéutica',
+      '<p class="text-sm"><b>' + rndFdate(c.alta.fecha) + '</b></p>'
+      + '<p class="text-xs text-muted" style="line-height:1.6;">' + escapeHtml(c.alta.criterios || '') + '</p>');
+  } else if (typeof u19CriterioAltaHTML === 'function'){
+    out += u19Bloque('Criterio de alta', u19CriterioAltaHTML(c.id),
+      (typeof rehabClinicoOn === 'function' && rehabClinicoOn())
+        ? '<button class="btn btn-primary btn-sm" onclick="darAltaClinica(\'' + c.id + '\')">Dar de alta</button>' : '');
+  }
+  return out;
+}
+/* ===FICHA_END=== */
+
+
+/* ============================================================
+   GUARDAR LA EVALUACION COMPLETA
+   Tras generar el informe unico habia que ir a tres sitios
+   distintos a guardar cada dominio — o no guardar nada, y
+   entonces la ficha del deportista se quedaba vacia. Esto lo
+   persiste todo de una vez, en los mismos formatos que ya usan
+   infGuardar / rndGuardar / frzGuardar, para que el historial y
+   la serie LSI sigan funcionando igual.
+   ============================================================ */
+
+/* Localiza al cliente. Devuelve tambien COMO lo encontro: si no lo
+   elegiste tu, el nombre viene del JSON — y el de Fitdays a veces es
+   el del perfil de la bascula, no el de la persona. Guardar en el
+   cliente equivocado seria peor que no guardar, asi que se avisa. */
+function u19ClienteActual(){
+  if (typeof getClient === "function"){
+    var sel = getClient(_rndState.clientId) || getClient(_infState.clientId);
+    if (sel) return { c: sel, via: "seleccion" };
+  }
+  var nom = ((_rndState.nombre || _infState.nombre || "") + "").trim().toLowerCase();
+  var rut = ((_rndState.rut || _infState.rut || "") + "").replace(/[^0-9kK]/g, "").toUpperCase();
+  var tel = ((_rndState.phone || "") + "").replace(/[^0-9]/g, "").slice(-8);
+  for (var i = 0; i < state.clients.length; i++){
+    var x = state.clients[i];
+    if (rut && x.rut && x.rut.replace(/[^0-9kK]/g, "").toUpperCase() === rut) return { c: x, via: "rut" };
+    if (tel && x.phone && x.phone.replace(/[^0-9]/g, "").slice(-8) === tel) return { c: x, via: "telefono" };
+  }
+  var porNombre = state.clients.filter(function(x){ return nom && x.name && x.name.toLowerCase() === nom; });
+  if (porNombre.length === 1) return { c: porNombre[0], via: "nombre" };
+  if (porNombre.length > 1) return { c: null, via: "ambiguo", n: porNombre.length, nombre: nom };
+  return { c: null, via: "ninguno" };
+}
+
+/* Payload de composicion con la misma forma que produce infGenerar,
+   para que el historial y la relectura de informes no cambien. */
+function u19PayloadBio(bio, cliente){
+  if (!bio || !bio.length) return null;
+  var ev2 = bio[bio.length - 1];
+  var ev1 = bio.length > 1 ? bio[0] : ev2;
+  var bD = (typeof infDeltaBio === "function") ? infDeltaBio(ev1.bioimpedancia || {}, ev2.bioimpedancia || {}) : {};
+  var cD = {};
+  var cA = ev1.circunferencias_cm || {}, cB = ev2.circunferencias_cm || {};
+  Object.keys(cA).concat(Object.keys(cB)).forEach(function(k){
+    if (k in cD) return;
+    cD[k] = (typeof infND === "function") ? infND(cA[k], cB[k]) : null;
+  });
+  return {
+    cliente: {
+      nombre: (cliente && cliente.nombre) || "",
+      rut: _infState.rut || _rndState.rut || "",
+      genero: (cliente && cliente.genero) || "",
+      edad: cliente ? cliente.edad : null,
+      estatura_cm: cliente ? cliente.estatura_cm : null
+    },
+    ev1: ev1, ev2: ev2,
+    dias: (bio.length > 1 && typeof infDays === "function" && ev1.fecha && ev2.fecha) ? infDays(ev1.fecha, ev2.fecha) : 0,
+    bD: bD, cD: cD,
+    obs: (typeof infObs === "function") ? infObs(ev1, ev2, bD, cD) : null,
+    generadoEl: new Date().toISOString(),
+    folio: _rndOpts.folio || "",
+    indicaciones: (document.getElementById("rnd-indic") || {}).value || "",
+    origen: "evaluacion_integral"
+  };
+}
+
+/* ¿Ya existe un registro de ese dominio con la misma fecha? */
+function u19YaGuardado(arr, fecha){
+  return (arr || []).some(function(x){ return x && x.fecha === fecha; });
+}
+
+window.u19GuardarEvaluacion = function(){
+  var inv = u19Inventario();
+  if (!inv.bio.length && !inv.rnd && !inv.frz){
+    toast("No hay nada que guardar todavía", "warn");
+    return;
+  }
+  var hallado = u19ClienteActual();
+  var c = hallado.c;
+  if (!c){
+    toast(hallado.via === "ambiguo"
+      ? ("Hay " + hallado.n + " clientes llamados igual: elígelo en la tarjeta «Deportista»")
+      : "Elige el deportista en la tarjeta «Deportista» para poder guardar su historial", "warn");
+    var sel = document.getElementById("rnd-cliente");
+    if (sel && sel.focus){ try { sel.focus(); } catch(e){} }
+    return;
+  }
+
+  var hechos = [], omitidos = [];
+
+  if (inv.bio.length){
+    if (!Array.isArray(c.informes)) c.informes = [];
+    var pay = u19PayloadBio(inv.bio, inv.cliente);
+    var f = pay.ev2.fecha || new Date().toISOString().slice(0, 10);
+    if (u19YaGuardado(c.informes, f)) omitidos.push("composición del " + rndFdate(f));
+    else {
+      c.informes.push({ id: genId(), fecha: f, generadoEl: pay.generadoEl, payload: pay });
+      hechos.push("composición corporal");
+    }
+  }
+
+  if (inv.rnd){
+    if (!Array.isArray(c.rendimiento)) c.rendimiento = [];
+    var fr = inv.rnd.resumen.fecha_act || new Date().toISOString().slice(0, 10);
+    if (u19YaGuardado(c.rendimiento, fr)) omitidos.push("rendimiento del " + rndFdate(fr));
+    else {
+      c.rendimiento.push({
+        id: genId(), fecha: fr, generadoEl: new Date().toISOString(),
+        dominante: _rndState.dominante, afectado: _rndState.afectado || null,
+        setup: Object.assign({}, _rndSetup),
+        data: _rndState.data, resumen: inv.rnd.resumen,
+        asimetria: inv.rnd.asimetria ? { hits: inv.rnd.asimetria.hits, reaccion: inv.rnd.asimetria.reaccion } : null,
+        indicaciones: (document.getElementById("rnd-indic") || {}).value || ""
+      });
+      hechos.push("rendimiento");
+    }
+  }
+
+  if (inv.frz){
+    if (!Array.isArray(c.fuerza)) c.fuerza = [];
+    var ff = inv.frz.resumen.fecha_act || new Date().toISOString().slice(0, 10);
+    if (u19YaGuardado(c.fuerza, ff)) omitidos.push("fuerza del " + rndFdate(ff));
+    else {
+      var peor = frzPeorPar(inv.frz);
+      c.fuerza.push({
+        id: genId(), fecha: ff, generadoEl: Date.now(),
+        dispositivo: (_frzState.data && _frzState.data.dispositivo) || "ActiveForce 2",
+        afectado: _rndState.afectado || null, peso_kg: inv.frz.resumen.peso_kg,
+        data: _frzState.data, resumen: inv.frz.resumen,
+        pares: inv.frz.pares.map(function(p){
+          return { nombre: p.nombre, tipo: p.tipo, lsi: p.q.lsi, pct: p.q.pct, nivel: p.q.nivel, deficitLado: p.q.deficitLado || null };
+        }),
+        peor: peor ? { nombre: peor.nombre, lsi: peor.q.lsi, pct: peor.q.pct, nivel: peor.q.nivel, deficitLado: peor.q.deficitLado || null } : null
+      });
+      hechos.push("fuerza");
+    }
+  }
+
+  /* Al guardar una evaluación, la próxima reevaluación queda anotada:
+     es lo que alimenta el aviso del Panel y el chip de la ficha. */
+  var sem = parseInt(_rndOpts.proxSem || "", 10);
+  if (sem > 0){
+    var base = (inv.rnd && inv.rnd.resumen.fecha_act) || (inv.bio.length ? inv.bio[inv.bio.length - 1].fecha : null);
+    var d = base ? new Date(base + "T12:00:00") : new Date();
+    if (!isNaN(d.getTime())){
+      d.setDate(d.getDate() + sem * 7);
+      c.reevalDate = d.toISOString().slice(0, 10);
+    }
+  }
+
+  if (!hechos.length){
+    toast("Ya estaba guardado: " + omitidos.join(" · "), "info");
+    return;
+  }
+  saveState();
+  var msg = "Guardado en " + c.name + ": " + hechos.join(", ");
+  if (omitidos.length) msg += " (ya estaba: " + omitidos.join(", ") + ")";
+  /* Si no lo elegiste tu, di de donde salio el nombre: el de Fitdays
+     a veces es el del perfil de la bascula y no el de la persona. */
+  if (hallado.via === "nombre") msg += " · identificado por el nombre del JSON";
+  else if (hallado.via === "rut") msg += " · identificado por RUT";
+  else if (hallado.via === "telefono") msg += " · identificado por teléfono";
+  toast(msg + " ✓", hallado.via === "seleccion" ? "success" : "warn");
+
+  var btn = document.getElementById("u19-btn-guardar");
+  if (btn){ btn.textContent = "✓ Guardado en el historial"; btn.disabled = true; }
+  var link = document.getElementById("u19-link-ficha");
+  if (link){ link.style.display = ""; link.setAttribute("data-cid", c.id); }
+};
+
+window.u19IrAFicha = function(){
+  var link = document.getElementById("u19-link-ficha");
+  var cid = link && link.getAttribute("data-cid");
+  if (cid) abrirFicha(cid, "resumen");
+};
+/* ===GUARDAR_END=== */
+
+
+/* ============================================================
+   TENDENCIA HISTORICA
+   Con el guardado en la ficha, el historial deja de ser una
+   promesa: a partir de la tercera evaluacion el informe puede
+   mostrar hacia donde va la persona, no solo donde esta hoy.
+   Se dibuja solo cuando hay al menos tres puntos; con dos, la
+   comparativa antes/despues ya lo cuenta mejor.
+   ============================================================ */
+
+/* Serie de un indicador a lo largo de los informes guardados. */
+function u19SerieBio(c, campo){
+  return (c && c.informes || []).map(function(i){
+    var b = (i.payload && i.payload.ev2 && i.payload.ev2.bioimpedancia) || {};
+    var v = b[campo];
+    return (v == null || i.fecha == null) ? null : { f: i.fecha, v: Number(v) };
+  }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
+}
+function u19SerieRnd(c){
+  return (c && c.rendimiento || []).map(function(r){
+    var v = r.resumen && r.resumen.reaccion_prom;
+    return (v == null || !r.fecha) ? null : { f: r.fecha, v: Number(v) };
+  }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
+}
+function u19SerieFrz(c){
+  return (c && c.fuerza || []).map(function(x){
+    var v = x.resumen && x.resumen.fuerza_max;
+    return (v == null || !x.fecha) ? null : { f: x.fecha, v: Number(v) };
+  }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
+}
+function u19SerieLsiPuntos(c){
+  var s = (typeof u19SerieLSI === 'function') ? u19SerieLSI(c) : [];
+  return s.filter(function(p){ return p.fecha && p.lsi != null; })
+          .map(function(p){ return { f: p.fecha, v: Number(p.lsi) }; });
+}
+
+/* Miniatura de evolucion. Escala propia por indicador; el eje no
+   arranca en cero porque lo que interesa es el cambio, y se rotula
+   el primero y el ultimo para que no engane. */
+function u19SparkSVG(titulo, unidad, pts, dec, mejorBaja, refY){
+  if (!pts || pts.length < 3) return '';
+  var w = 220, hh = 92, px = 16, py = 18;
+  var vals = pts.map(function(p){ return p.v; });
+  var vmin = Math.min.apply(null, vals), vmax = Math.max.apply(null, vals);
+  if (refY != null){ vmin = Math.min(vmin, refY); vmax = Math.max(vmax, refY); }
+  var rng = (vmax - vmin) || 1;
+  var X = function(i){ return px + i * ((w - 2 * px) / (pts.length - 1)); };
+  var Y = function(v){ return (hh - py) - ((v - vmin) / rng) * (hh - 2 * py); };
+  var d0 = pts[0].v, dN = pts[pts.length - 1].v, delta = dN - d0;
+  var bueno = Math.abs(delta) < Math.pow(10, -(dec == null ? 1 : dec)) / 2 ? null : (mejorBaja ? delta < 0 : delta > 0);
+  var colFin = bueno === null ? '#64748b' : (bueno ? '#15803d' : '#b91c1c');
+  var linea = pts.map(function(p, i){ return (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p.v).toFixed(1); }).join(' ');
+  var area = 'M' + X(0).toFixed(1) + ',' + (hh - py) + ' ' + pts.map(function(p, i){ return 'L' + X(i).toFixed(1) + ',' + Y(p.v).toFixed(1); }).join(' ')
+    + ' L' + X(pts.length - 1).toFixed(1) + ',' + (hh - py) + ' Z';
+  var ref = (refY != null)
+    ? '<line x1="' + px + '" y1="' + Y(refY).toFixed(1) + '" x2="' + (w - px) + '" y2="' + Y(refY).toFixed(1)
+      + '" stroke="#15803d" stroke-width="0.9" stroke-dasharray="3 2.5"/>' : '';
+  var dots = pts.map(function(p, i){
+    var ult = i === pts.length - 1;
+    return '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p.v).toFixed(1) + '" r="' + (ult ? 3 : 2) + '" fill="'
+      + (ult ? colFin : '#94a3b8') + '"/>';
+  }).join('');
+  var dTxt = bueno === null ? 'sin cambio' : ((delta > 0 ? '+' : '') + delta.toFixed(dec == null ? 1 : dec));
+  return '<div class="u-spark"><div class="u-spark-h"><b>' + u19Esc(titulo) + '</b>'
+    + '<span style="color:' + colFin + '">' + dTxt + '</span></div>'
+    + '<svg viewBox="0 0 ' + w + ' ' + hh + '" xmlns="http://www.w3.org/2000/svg">'
+    + '<path d="' + area + '" fill="rgba(14,81,50,.09)"/>' + ref
+    + '<path d="' + linea + '" fill="none" stroke="#0e5132" stroke-width="1.6"/>' + dots
+    + '<text x="' + px + '" y="' + (hh - 4) + '" font-size="6.6" fill="#94a3b8">' + String(pts[0].f).slice(5) + '</text>'
+    + '<text x="' + (w - px) + '" y="' + (hh - 4) + '" font-size="6.6" fill="#94a3b8" text-anchor="end">'
+      + String(pts[pts.length - 1].f).slice(5) + '</text>'
+    + '<text x="' + X(0).toFixed(1) + '" y="' + (Y(d0) - 5).toFixed(1) + '" font-size="7" fill="#64748b" text-anchor="middle">'
+      + d0.toFixed(dec == null ? 1 : dec) + '</text>'
+    + '<text x="' + X(pts.length - 1).toFixed(1) + '" y="' + (Y(dN) - 5).toFixed(1) + '" font-size="7.6" font-weight="700" fill="'
+      + colFin + '" text-anchor="middle">' + dN.toFixed(dec == null ? 1 : dec) + '</text>'
+    + '</svg><div class="u-spark-f">' + u19Esc(unidad) + ' · ' + pts.length + ' mediciones</div></div>';
+}
+
+function u19TendenciaHTML(c){
+  if (!c) return '';
+  var sparks = [
+    u19SparkSVG('Peso', 'kg', u19SerieBio(c, 'peso_kg'), 1, true),
+    u19SparkSVG('Grasa corporal', '%', u19SerieBio(c, 'grasa_pct'), 1, true),
+    u19SparkSVG('Masa muscular', 'kg', u19SerieBio(c, 'musculo_kg'), 1, false),
+    u19SparkSVG('Simetría (LSI)', '% · línea verde = 90%', u19SerieLsiPuntos(c), 0, false, 90),
+    u19SparkSVG('Tiempo de reacción', 'ms', u19SerieRnd(c), 0, true),
+    u19SparkSVG('Fuerza pico', 'N', u19SerieFrz(c), 0, false)
+  ].filter(Boolean);
+  if (!sparks.length) return '';
+  return '<div class="pr-sec"><div class="pr-letter">T</div><div class="pr-secttl">'
+    + '<h2>Tendencia histórica</h2><p>Evolución a lo largo de las evaluaciones guardadas · '
+    + 'el número de la derecha es el cambio desde la primera</p></div></div>'
+    + '<div class="u-sparks">' + sparks.join('') + '</div>'
+    + '<div class="pr-refnote">Cada gráfico usa su propia escala vertical para que el cambio se aprecie: el eje '
+    + 'no arranca en cero. Solo se dibujan indicadores con tres mediciones o más.</div>';
+}
+
+var U19_CSS_TEND = "\n@media all{"
+  + ".u-sparks{display:grid;grid-template-columns:repeat(auto-fit,minmax(52mm,1fr));gap:4mm;margin:2mm 0 3mm;}"
+  + ".u-spark{border:0.3mm solid #e6ece9;border-radius:2mm;padding:2.4mm 3mm;background:#fbfdfc;"
+  +   "break-inside:avoid;page-break-inside:avoid;-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-spark-h{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;margin-bottom:1mm;}"
+  + ".u-spark-h b{font-size:8pt;color:#0e5132;}"
+  + ".u-spark-h span{font-size:8pt;font-weight:800;font-variant-numeric:tabular-nums;}"
+  + ".u-spark svg{width:100%;height:auto;display:block;}"
+  + ".u-spark-f{font-size:6.4pt;color:#94a3b8;margin-top:.6mm;}"
+  + "}";
+/* ===TEND_END=== */
+
+
+/* ============================================================
+   AUTORREGULACION POR RIR
+   La app recogia el RPE de cada serie que hacia el cliente, pero
+   nunca se prescribia un objetivo contra el que compararlo. Sin
+   objetivo, ese RPE era un numero suelto. Con el, la carga se
+   puede ajustar sola.
+
+   RIR = repeticiones en reserva. RPE (escala de esfuerzo de 1 a
+   10 de Zourdos) se relaciona con el RIR como RPE = 10 - RIR:
+   RIR 2 equivale a un RPE de 8.
+   ============================================================ */
+
+/* Los campos de la rutina son texto libre ("4", "4-6", "60kg").
+   Estas funciones los leen sin romperse. */
+function u19Num(v){
+  if (v == null) return null;
+  if (typeof v === "number") return isNaN(v) ? null : v;
+  var m = String(v).replace(",", ".").match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+/* "8-10" -> {min:8, max:10}; "10" -> {min:10, max:10} */
+function u19Rango(v){
+  if (v == null || v === "") return null;
+  var t = String(v).replace(",", ".");
+  var m = t.match(/(-?\d+(?:\.\d+)?)\s*[-–a]\s*(-?\d+(?:\.\d+)?)/);
+  if (m) return { min: parseFloat(m[1]), max: parseFloat(m[2]) };
+  var n = u19Num(t);
+  return n == null ? null : { min: n, max: n };
+}
+function u19RpeDeRir(rir){ return rir == null ? null : (10 - rir); }
+
+/* Lectura del objetivo prescrito en el ejercicio. */
+function u19ObjetivoEsfuerzo(rowEx){
+  if (!rowEx) return null;
+  var r = u19Rango(rowEx.rir);
+  if (!r) return null;
+  return { rirMin: Math.min(r.min, r.max), rirMax: Math.max(r.min, r.max),
+           rpeMin: u19RpeDeRir(Math.max(r.min, r.max)), rpeMax: u19RpeDeRir(Math.min(r.min, r.max)) };
+}
+
+/* Compara lo logrado con lo prescrito y sugiere que hacer con la carga.
+   Trabaja sobre la media de los RPE anotados: una serie suelta dice poco. */
+function u19AjustePorRPE(rowEx, series){
+  var obj = u19ObjetivoEsfuerzo(rowEx);
+  if (!obj) return null;
+  var rpes = (series || []).map(function(s){ return u19Num(s && (s.rpe != null ? s.rpe : s.RPE)); })
+                           .filter(function(v){ return v != null && v > 0 && v <= 10; });
+  if (!rpes.length) return null;
+  var med = rpes.reduce(function(a, b){ return a + b; }, 0) / rpes.length;
+  var pesos = (series || []).map(function(s){ return u19Num(s && (s.peso_kg != null ? s.peso_kg : s.weight)); })
+                            .filter(function(v){ return v != null && v > 0; });
+  var carga = pesos.length ? Math.max.apply(null, pesos) : null;
+
+  var d = 0, txt = "", nivel = "ok";
+  if (med < obj.rpeMin - 0.5){
+    d = med <= obj.rpeMin - 2 ? 0.075 : 0.04;
+    nivel = "subir";
+    txt = "El esfuerzo quedó por debajo de lo prescrito (RPE medio " + med.toFixed(1)
+      + " frente a " + obj.rpeMin + "–" + obj.rpeMax + "). La carga se quedó corta.";
+  } else if (med > obj.rpeMax + 0.5){
+    d = med >= obj.rpeMax + 2 ? -0.075 : -0.04;
+    nivel = "bajar";
+    txt = "El esfuerzo superó lo prescrito (RPE medio " + med.toFixed(1)
+      + " frente a " + obj.rpeMin + "–" + obj.rpeMax + "). La carga fue demasiado exigente.";
+  } else {
+    txt = "El esfuerzo cayó dentro de lo prescrito (RPE medio " + med.toFixed(1)
+      + ", objetivo " + obj.rpeMin + "–" + obj.rpeMax + "). Mantener la carga y progresar por repeticiones.";
+  }
+  var sugerida = (carga != null && d !== 0) ? Math.round(carga * (1 + d) * 2) / 2 : null;
+  return { rpeMedio: +med.toFixed(1), objetivo: obj, carga: carga, sugerida: sugerida,
+           pct: Math.round(d * 100), nivel: nivel, texto: txt, n: rpes.length };
+}
+
+/* Texto corto para la revisión de progresiones. */
+function u19AjusteTexto(a){
+  if (!a) return "";
+  if (a.nivel === "ok") return "mantener";
+  var s = (a.pct > 0 ? "+" : "") + a.pct + "%";
+  return (a.sugerida != null) ? (s + " → " + a.sugerida + " kg") : s;
+}
+
+/* Aplica el objetivo de RIR a todos los ejercicios de la rutina abierta. */
+window.u19AplicarRirGlobal = function(){
+  if (typeof _builderRoutine === "undefined" || !_builderRoutine){ toast("Abre una rutina primero", "warn"); return; }
+  var v = window.prompt("RIR objetivo para todos los ejercicios de esta rutina\n\n"
+    + "Repeticiones en reserva al terminar cada serie.\n"
+    + "2 = paras con dos repeticiones de margen (RPE 8).\n"
+    + "Puedes poner un rango: 1-2", "1-2");
+  if (v === null) return;
+  v = String(v).trim();
+  var n = 0;
+  (_builderRoutine.days || []).forEach(function(d){
+    (d.exercises || []).forEach(function(ex){ ex.rir = v; n++; });
+  });
+  if (typeof renderBuilder === "function") renderBuilder();
+  toast(v ? ("RIR " + v + " aplicado a " + n + " ejercicios") : ("Objetivo de RIR quitado de " + n + " ejercicios"), "success");
+};
+/* ===RIR_END=== */
 
 </script>
 </body>
