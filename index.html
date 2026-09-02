@@ -15758,64 +15758,8 @@ window.rndExport=function(){
    reconozcas.
    ============================================================ */
 
-var US19_PROMPT_UNI = [
-"Actúa como un sistema de extracción de datos (OCR + parser estructurado) para evaluaciones de Ultra-Sport 19. Te voy a adjuntar VARIAS capturas de pantalla en un mismo mensaje, de tipos distintos y mezcladas. Debes clasificar cada una y devolverme UN ÚNICO JSON estricto, sin texto adicional, sin markdown, sin backticks.",
-"",
-"PASO 1 — CLASIFICA CADA IMAGEN. Hay tres tipos posibles:",
-'· TIPO A — Fitdays, composición corporal: fondo claro, tabla con kg/% y evaluación, encabezado (ID, Género, Edad, Alto), análisis segmentario de grasa y músculo, puntuación corporal, grasa visceral, TMB, SMI, edad corporal, WHR.',
-'· TIPO B — Fitdays, detalles: lista de circunferencias en cm (Cuello, Hombro, Pecho, Cintura, Cadera, L/R Brazo, Antebrazo, Muslo, Pantorrilla).',
-'· TIPO C — BlazePod: fondo azul oscuro, arriba "BLAZEPOD ACTIVITY" y el nombre de la actividad en mayúsculas, una duración tipo "01:00:00", el nombre de usuario del jugador, y abajo dos números grandes bajo los rótulos "Hits" y "AVG ... Reaction".',
-'Si una imagen no encaja en ninguno, ignórala y anótala en "descartadas".',
-"",
-"PASO 2 — EXTRAE SEGÚN EL TIPO.",
-"",
-"TIPO A y B (van a \"evaluaciones\"):",
-'· Lee todos los valores con su unidad, 1 decimal. Normaliza L/I→izquierdo, R/D→derecho.',
-'· Hombre→Masculino, Mujer→Femenino.',
-'· Si mandas A y B de la MISMA fecha, fusiónalas en UNA sola evaluación.',
-'· Capturas de fechas distintas = entradas distintas, ordenadas de más antigua a más reciente.',
-"",
-"TIPO C (van a \"rendimiento.sesiones\"):",
-'· La duración viene como MM:SS:CC (minutos:segundos:centésimas). "01:00:00" son 60 segundos, NO una hora. duracion_seg = minutos*60 + segundos.',
-'· Los tiempos de reacción, en MILISEGUNDOS enteros (1032, no 1,032 ni 1.032 s).',
-'· "orden" = la posición de esa captura entre las imágenes que te mandé (1, 2, 3...). Es lo que me permite reconocerla después: NO lo omitas.',
-'· "lado": déjalo SIEMPRE en null. NO adivines qué pierna o brazo es: no se puede saber mirando la captura, yo se lo indico a mi aplicación después.',
-'· Si la captura muestra BEST/WORST/Accuracy/Misses o el número de pods, inclúyelos; si no, null.',
-"",
-"REGLAS GENERALES:",
-'1) Fechas a YYYY-MM-DD. Si una captura no muestra fecha, deja null (no la inventes).',
-'2) Comas decimales a puntos. Quita unidades: "62,4 kg"→62.4, "846 ms"→846, "1.520 kcal"→1520, "grado 7"→7.',
-'3) Valor ilegible → null. NUNCA inventes ni estimes un número.',
-'4) Si no hay ninguna captura de un tipo, deja su array VACÍO (no lo elimines).',
-"",
-"DEVUÉLVEME EXACTAMENTE ESTA ESTRUCTURA (JSON estricto, sin markdown):",
-'{ "fuente":"us19_unificado",',
-'  "descartadas":[],',
-'  "cliente":{ "nombre":null, "genero":null, "edad":null, "estatura_cm":null },',
-'  "evaluaciones":[',
-'    { "fecha":"YYYY-MM-DD",',
-'      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"puntuacion_corporal":null },',
-'      "segmentario_musculo":{ "brazo_izq":{"kg":null},"brazo_der":{"kg":null},"tronco":{"kg":null},"pierna_izq":{"kg":null},"pierna_der":{"kg":null} },',
-'      "circunferencias_cm":{ "cuello":null,"hombro":null,"pecho":null,"cintura":null,"cadera":null,"brazo_izq":null,"brazo_der":null,"muslo_izq":null,"muslo_der":null,"pantorrilla_izq":null,"pantorrilla_der":null } }',
-'  ],',
-'  "rendimiento":{ "atleta":{ "usuario":null },',
-'    "sesiones":[',
-'      { "orden":1, "fecha":null, "actividad":null, "duracion_str":null, "duracion_seg":null,',
-'        "lado":null, "segmento":null, "hits":null, "fallos":null, "precision_pct":null, "pods":null,',
-'        "reaccion_ms_prom":null, "reaccion_ms_mejor":null, "reaccion_ms_peor":null, "notas":null }',
-'    ] }',
-'}',
-"",
-"Reemplaza los null por los valores reales. Deja null SOLO lo que no puedas leer. Devuelve SOLO el JSON, sin explicaciones ni markdown."
-].join("\n");
-
-window.u19CopyPromptUni = function(){
-  if(navigator.clipboard && navigator.clipboard.writeText){
-    navigator.clipboard.writeText(US19_PROMPT_UNI).then(
-      function(){ toast("Prompt unificado copiado ✓","success"); },
-      function(){ toast("No se pudo copiar","error"); });
-  } else { toast("Copia manual: revisa la consola","warn"); console.log(US19_PROMPT_UNI); }
-};
+/* El prompt unificado de dos fuentes fue reemplazado por US19_PROMPT_ECO,
+   que cubre tambien ActiveForce 2. Ver mas abajo. */
 
 /* Tarjeta de captura unificada, compartida por Informes y Rendimiento. */
 function u19IntakeCardHTML(idSuf){
@@ -15831,7 +15775,7 @@ function u19IntakeCardHTML(idSuf){
     +   'placeholder="{ &quot;fuente&quot;:&quot;us19_unificado&quot;, &quot;evaluaciones&quot;:[ … ], &quot;rendimiento&quot;:{ … } }"></textarea></div>'
     + '<div style="display:flex;gap:.4rem;flex-wrap:wrap;">'
     +   '<button class="btn btn-primary btn-sm" onclick="u19Repartir(\'' + idSuf + '\')">1 · Repartir</button>'
-    +   '<button class="btn btn-primary btn-sm" onclick="u19GenerarIntegral()" title="Genera el documento que corresponda con lo que haya: integral, composición corporal o rendimiento">2 · Generar evaluación</button>'
+    +   '<button class="btn btn-primary btn-sm" onclick="u19GenerarIntegral()" title="Un solo informe con todo lo cargado: composición, fuerza y rendimiento">2 · Generar informe único</button>'
     + '</div>'
     + '<div id="u19-inv-' + idSuf + '" class="text-xs text-muted" style="margin-top:.4rem;"></div>'
     + '<div id="u19-uni-msg-' + idSuf + '" class="text-xs" style="min-height:1.1em;margin-top:.4rem;"></div>'
@@ -15849,7 +15793,10 @@ window.u19Repartir = function(idSuf){
   try { d = JSON.parse(ta.value || ""); } catch(e){ return fail("El JSON no es válido."); }
   if(!d || typeof d !== "object") return fail("El JSON no tiene la forma esperada.");
 
-  var evals = Array.isArray(d.evaluaciones) ? d.evaluaciones.filter(function(e){ return e && e.fecha; }) : [];
+  /* Una captura de Fitdays sin fecha legible NO se descarta: se conserva
+     y la fecha se pregunta despues. Antes se perdia en silencio. */
+  var evals = Array.isArray(d.evaluaciones) ? d.evaluaciones.filter(function(e){ return e && (e.bioimpedancia || e.circunferencias_cm || e.fecha); }) : [];
+  evals = u19FusionarEvaluaciones(evals);
   var rnd   = (d.rendimiento && Array.isArray(d.rendimiento.sesiones)) ? d.rendimiento.sesiones : [];
   var frz   = (d.fuerza && Array.isArray(d.fuerza.mediciones)) ? d.fuerza.mediciones : [];
   if(!evals.length && !rnd.length && !frz.length) return fail("No trae capturas reconocibles de Fitdays, BlazePod ni ActiveForce.");
@@ -15858,23 +15805,15 @@ window.u19Repartir = function(idSuf){
 
   /* --- parte bioimpedancia --> Informes --- */
   if(evals.length){
-    evals.sort(function(a,b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });
-    var cli = d.cliente || {};
-    var wrap = function(ev){ return JSON.stringify({ fuente:"fitdays", cliente:cli, evaluaciones:[ev] }, null, 2); };
-    if(evals.length === 1){
-      /* Una sola medición: es la ACTUAL. La inicial la traes del historial. */
-      _infState.ev2raw = wrap(evals[0]);
-      hechos.push("1 evaluación de Fitdays → <b>Informes</b> (como evaluación actual; carga la inicial desde el historial)");
-    } else {
-      _infState.ev1raw = wrap(evals[0]);
-      _infState.ev2raw = wrap(evals[evals.length - 1]);
-      hechos.push(evals.length + " evaluaciones de Fitdays → <b>Informes</b> (la más antigua como inicial, la más reciente como actual)");
-    }
-    if(cli.nombre && !_infState.nombre) _infState.nombre = cli.nombre;
-    /* Si estamos en la pestaña Informes, refleja los textareas al vuelo. */
-    var t1 = document.getElementById("inf-ev1"), t2 = document.getElementById("inf-ev2");
-    if(t1) t1.value = _infState.ev1raw || "";
-    if(t2) t2.value = _infState.ev2raw || "";
+    _u19CliUltimo = d.cliente || {};
+    if(_u19CliUltimo.nombre && !_infState.nombre) _infState.nombre = _u19CliUltimo.nombre;
+    u19AplicarEvalsBio(evals, idSuf);
+    var sinFecha = evals.filter(function(e){ return !e.fecha; }).length;
+    hechos.push(evals.length === 1
+      ? ("1 evaluaci\u00f3n de <b>Fitdays</b> \u2192 <b>Informes</b> (como actual; la inicial la traes del historial)")
+      : (evals.length + " evaluaciones de <b>Fitdays</b> \u2192 <b>Informes</b> (m\u00e1s antigua como inicial, m\u00e1s reciente como actual)"));
+    if(sinFecha) hechos.push('<span style="color:#b45309;">' + sinFecha + " sin fecha legible</span>");
+    _u19EvalsPendientes = evals;
   }
 
   /* --- parte BlazePod --> Rendimiento --- */
@@ -15898,10 +15837,16 @@ window.u19Repartir = function(idSuf){
   say("✓ " + hechos.join(" · "), "var(--success)");
   u19PintarInventario(idSuf);
 
-  /* Si hay sesiones sin lado, pregunta cuál es cuál antes de seguir. */
-  var faltan = rnd.filter(function(s){ return !s.lado; });
-  if(faltan.length) u19PreguntarLados(idSuf);
-  else if(rnd.length) u19TrasLados(idSuf);
+  /* Preguntas pendientes, en orden: primero las fechas de Fitdays,
+     luego los lados de BlazePod (ActiveForce trae el lado en el título). */
+  var faltanLados = rnd.filter(function(s){ return !s.lado; }).length;
+  var seguirConLados = function(){
+    if(faltanLados) u19PreguntarLados(idSuf);
+    else if(rnd.length) u19TrasLados(idSuf);
+  };
+  var evalsSinFecha = (_u19EvalsPendientes || []).filter(function(e){ return !e.fecha; });
+  if(evalsSinFecha.length) u19PreguntarFechas(_u19EvalsPendientes, idSuf, seguirConLados);
+  else seguirConLados();
 };
 
 /* Modal: ¿cuál captura es la izquierda y cuál la derecha? */
@@ -16655,10 +16600,13 @@ function u19Inventario(){
   var d1 = tryParse(_infState.ev1raw || ""), d2 = tryParse(_infState.ev2raw || "");
   if (d1) bio.push(d1.evaluaciones[0]);
   if (d2) bio.push(d2.evaluaciones[0]);
-  bio = bio.filter(function(e){ return e && e.fecha; });
-  bio.sort(function(a, b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });
+  bio = bio.filter(function(e){ return e && (e.fecha || u19TieneBio(e) || u19TieneCirc(e)); });
+  bio.sort(function(a, b){
+    if (a.fecha && b.fecha) return String(a.fecha) < String(b.fecha) ? -1 : 1;
+    return 0;
+  });
   /* Dedup por fecha: pegar la misma evaluacion en los dos cuadros no cuenta como dos. */
-  bio = bio.filter(function(e, i, arr){ return i === 0 || e.fecha !== arr[i - 1].fecha; });
+  bio = bio.filter(function(e, i, arr){ return i === 0 || !e.fecha || e.fecha !== arr[i - 1].fecha; });
   var cli = (d2 && d2.cliente) || (d1 && d1.cliente) || {};
   return { bio: bio, rnd: _rndState.metrics || null, frz: (typeof _frzState !== "undefined" ? _frzState.metrics : null) || null, cliente: cli };
 }
@@ -16793,95 +16741,38 @@ function u19TituloInforme(inv){
 
 window.u19GenerarIntegral = function(){
   var inv = u19Inventario();
-  if (!inv.bio.length && !inv.rnd){
+  if (!inv.bio.length && !inv.rnd && !inv.frz){
     toast("No hay datos: pega el JSON de la captura unificada primero", "warn");
     return;
   }
   var nombre = _infState.nombre || _rndState.nombre || inv.cliente.nombre || "";
   var cli = { nombre: nombre, rut: _infState.rut || _rndState.rut || "" };
   var c = (typeof getClient === "function") ? (getClient(_infState.clientId) || getClient(_rndState.clientId)) : null;
-
   if (!_rndOpts.folio) _rndOpts.folio = (typeof infNextFolio === "function") ? infNextFolio() : "";
-  var tit = u19TituloInforme(inv);
 
-  /* Camino A — hay comparativa de bioimpedancia: manda el informe V2,
-     que ya trae portada, firmas y glosario propios. El resumen ejecutivo
-     se antepone y el rendimiento entra como anexo (ya soportado). */
-  if (inv.bio.length >= 2){
-    if (inv.rnd){
-      _rndAttach = { metrics: inv.rnd, indicaciones: (document.getElementById("rnd-indic") || {}).value || "" };
-    }
-    if (typeof infGenerar === "function"){
-      /* infGenerar() lee los textarea de Informes: hay que renderizar esa
-         vista ANTES de llamarlo, o lee cadenas vacias y falla. */
-      if (typeof switchView === "function") switchView("informes");
-      if (typeof renderInformes === "function" && !document.getElementById("inf-ev1")) renderInformes();
-      setTimeout(function(){
-        try {
-          infGenerar();
-          toast(inv.rnd ? "Evaluaci\u00f3n integral generada \u2713" : "Informe de composici\u00f3n corporal generado \u2713", "success");
-        } catch(e){ toast("No se pudo generar: " + e.message, "error"); }
-      }, 0);
-      return;
-    }
-  }
-
-  /* Camino B — una sola bioimpedancia y/o solo rendimiento: documento propio. */
-  var m = inv.rnd;
-  var mFake = m || { resumen:{ n:0, fecha_ini:null, fecha_act:(inv.bio.length ? inv.bio[inv.bio.length-1].fecha : null), reaccion_prom:null, reaccion_mejor:null, hits_max:null, actividad:null, usuario:null },
-                     sesiones:[], porLado:{izquierdo:[],derecho:[],bilateral:[],sinlado:[]}, asimetria:null,
-                     evolucion:{izquierdo:null,derecho:null,global:null}, dominante:_rndState.dominante };
   var sd = (typeof rndSetupDiff === "function") ? rndSetupDiff(c, _rndSetup) : null;
   var opts = Object.assign({}, _rndOpts, {
     indicaciones: (document.getElementById("rnd-indic") || {}).value || "",
     setupTxt: (typeof rndSetupTxt === "function") ? rndSetupTxt(_rndSetup) : "",
-    setupDiff: sd ? sd.difs.join(" · ") : "",
-    evalBio: inv.bio.length ? inv.bio[inv.bio.length - 1] : null
+    setupDiff: sd ? sd.difs.join(" \u00b7 ") : ""
   });
 
-  var ch = rndChrome(cli, mFake, opts);
-  /* Portada y encabezado se reescriben con el titulo que corresponde. */
-  ch.cover = ch.cover.replace('Informe de rendimiento neuromuscular · Velocidad de reacción y agilidad', esc0(tit.t) + ' · ' + esc0(tit.s));
-  ch.hdr = ch.hdr.replace('INFORME DE RENDIMIENTO — NEUROMUSCULAR', tit.t.toUpperCase());
-  function esc0(x){ return (typeof escapeHtml === "function") ? escapeHtml(x) : x; }
-
-  var resumen = u19ResumenEjecutivoHTML(inv, cli);
-  var fz = (inv.frz && typeof u19FuerzaSecciones === "function") ? u19FuerzaSecciones(inv.frz) : { head:'', cuerpo:'' };
-  var basal = (inv.bio.length === 1) ? u19BioBasalHTML(inv.bio[0]) : '';
-  var b = m ? rndReportBlocks(m, cli, opts) : null;
-  var cruce = (inv.bio.length && m && typeof u19CruceHTML === "function") ? u19CruceHTML(inv.bio[inv.bio.length - 1], m) : '';
-
-  var pgs = [];
-  pgs.push(ch.wm + ch.cover + '<div class="pr-content">' + resumen + (b ? b.idbar : '') + (basal || (b ? b.kpis : '')) + '</div>' + ch.foot);
-  if (fz.head) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + fz.head + fz.cuerpo + '</div>' + ch.foot);
-  if (b) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + b.head + (basal ? b.kpis : '') + b.gaugeBlock + b.asimBlock + b.setupBlock + b.calidadBlock + '</div>' + ch.foot);
-  if (b) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + b.tabla + b.narrBlock + cruce + b.evoBlock + '</div>' + ch.foot);
-  pgs.push(ch.wm + ch.hdr + '<div class="pr-content">'
-    + (b ? b.indicBlock + b.nota : (fz.head ? u19NotaFuerza() : ''))
-    + (opts.glosario !== false && b ? b.glosario : '')
-    + ch.firmas + '</div>' + ch.foot);
-
-  var inner = pgs.map(function(x){ return '<div class="pr-page">' + x + '</div>'; }).join('');
-  var css = INF_V2_CSS.split("@media print").join("@media all") + RND_CSS
-    + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
-    + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;position:relative;}"
-    + ' .pr-pageno::after{content:"—";}'
-    + " @media print{ body{background:#fff !important;padding:0 !important;} .pr-page{box-shadow:none !important;} }";
-  var fontLink = '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">';
-  var doc = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
-    + '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + tit.t + ' · US19</title>'
-    + fontLink + '<style>' + css + '</style></head><body><div id="printableReport">' + inner + '</div></body></html>';
-
+  var tit = u19TituloInforme(inv);
+  var doc = u19InformeUnicoDoc(inv, cli, opts);
   _rndState.reportHtml = doc;
+
   var wrap = document.getElementById("rnd-report-wrap") || document.getElementById("inf-report-wrap");
   if (wrap){
-    wrap.innerHTML = '<div class="card"><div class="card-main"><div class="card-title">' + tit.t + '</div>'
+    wrap.innerHTML = '<div class="card"><div class="card-main"><div class="card-title">' + escapeHtml(tit.t) + '</div>'
+      + '<p class="text-xs text-muted" style="margin:0 0 .5rem;">Un solo documento con todo lo que cargaste. '
+      + 'Para trabajar un dominio por separado, usa el generador de su propia pesta\u00f1a.</p>'
       + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.6rem;">'
-      + '<button class="btn btn-primary btn-sm" onclick="rndPrint()">🖨 Imprimir / Guardar PDF</button></div>'
-      + '<iframe id="rnd-frame" style="width:100%;height:640px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe></div></div>';
+      + '<button class="btn btn-primary btn-sm" onclick="rndPrint()">\ud83d\udda8 Imprimir / Guardar PDF</button></div>'
+      + '<iframe id="rnd-frame" style="width:100%;height:680px;border:1px solid var(--border);border-radius:8px;background:#fff;"></iframe></div></div>';
     var fr = document.getElementById("rnd-frame"); if (fr) fr.srcdoc = doc;
+    if (wrap.scrollIntoView) { try { wrap.scrollIntoView({ behavior:"smooth", block:"start" }); } catch(e){} }
   }
-  toast("Listo ✓ " + tit.t, "success");
+  toast("Listo \u2713 " + tit.t, "success");
 };
 
 /* Si se declara el lado lesionado, la asimetria pasa a leerse en clave
@@ -16966,6 +16857,130 @@ function u19PintarInventario(idSuf){
   box.innerHTML = '<span style="color:var(--success);">Al pulsar \u00abGenerar\u00bb saldr\u00e1: <b>' + escapeHtml(tit.t) + '</b></span>'
     + ' <span class="text-muted">\u00b7 con ' + escapeHtml(partes.join(" y ")) + '</span>';
 }
+
+/* ¿Trae datos de bioimpedancia / de perimetros? */
+function u19TieneBio(e){
+  var b = e && e.bioimpedancia;
+  return !!(b && Object.keys(b).some(function(k){ return b[k] != null; }));
+}
+function u19TieneCirc(e){
+  var c = e && e.circunferencias_cm;
+  return !!(c && Object.keys(c).some(function(k){ return c[k] != null; }));
+}
+
+/* Fusiona las capturas de Fitdays que pertenecen al mismo momento.
+   El envio tipico son 4 imagenes (composicion + perimetros, dos fechas)
+   y la IA a veces devuelve 4 entradas en vez de 2. Aqui se juntan:
+   por fecha si la hay, por "momento" si no, y por adyacencia como
+   ultimo recurso — una entrada de solo perimetros se pega a la
+   entrada de composicion inmediatamente anterior. */
+function u19FusionarEvaluaciones(evals){
+  if (!Array.isArray(evals) || evals.length < 2) return evals || [];
+  function clave(e, i){
+    if (e.fecha) return "f:" + e.fecha;
+    if (e.momento) return "m:" + e.momento;
+    return null;
+  }
+  var out = [], porClave = {};
+  evals.forEach(function(e, i){
+    var k = clave(e, i);
+    if (k && porClave[k] != null){ u19MezclarEval(out[porClave[k]], e); return; }
+    /* Sin clave: si es solo-perimetros, va con la anterior. */
+    if (!k && out.length && u19TieneCirc(e) && !u19TieneBio(e) && !u19TieneCirc(out[out.length - 1])){
+      u19MezclarEval(out[out.length - 1], e); return;
+    }
+    out.push(e);
+    if (k) porClave[k] = out.length - 1;
+  });
+  return out;
+}
+function u19MezclarEval(base, extra){
+  if (!base || !extra) return base;
+  ["bioimpedancia", "segmentario_musculo", "circunferencias_cm"].forEach(function(sec){
+    if (!extra[sec]) return;
+    if (!base[sec]) { base[sec] = extra[sec]; return; }
+    Object.keys(extra[sec]).forEach(function(k){
+      var v = extra[sec][k];
+      if (v == null) return;
+      if (base[sec][k] == null) base[sec][k] = v;
+      else if (typeof v === "object" && typeof base[sec][k] === "object"){
+        Object.keys(v).forEach(function(k2){ if (base[sec][k][k2] == null) base[sec][k][k2] = v[k2]; });
+      }
+    });
+  });
+  if (!base.fecha && extra.fecha) base.fecha = extra.fecha;
+  if (!base.momento && extra.momento) base.momento = extra.momento;
+  base.orden_capturas = (base.orden_capturas || []).concat(extra.orden_capturas || []);
+  return base;
+}
+
+/* Pide las fechas que la captura no mostraba. Sin fecha no hay
+   periodo ni evolucion, asi que el informe las necesita. */
+function u19PreguntarFechas(evals, idSuf, cb){
+  var faltan = evals.filter(function(e){ return !e.fecha; });
+  if (!faltan.length){ if (cb) cb(); return; }
+  function ident(e){
+    var b = e.bioimpedancia || {}, t = [];
+    if (e.momento) t.push('<b>' + escapeHtml(e.momento) + '</b>');
+    if (b.peso_kg != null) t.push(b.peso_kg + ' kg');
+    if (b.grasa_pct != null) t.push(b.grasa_pct + '% grasa');
+    if (b.musculo_kg != null) t.push(b.musculo_kg + ' kg músculo');
+    if (u19TieneCirc(e)) t.push('con perímetros');
+    return t.join(' · ') || 'sin datos legibles';
+  }
+  var hoy = new Date().toISOString().slice(0, 10);
+  openModal({
+    title: "¿De qué fecha es cada medición?",
+    bodyHtml: '<p class="text-xs text-muted" style="line-height:1.5;margin-bottom:.8rem;">'
+      + 'Estas capturas de Fitdays no mostraban la fecha. Sin ella no se puede calcular el período ni la evolución. '
+      + 'Reconócelas por el peso y el porcentaje de grasa.</p>'
+      + evals.map(function(e, i){
+          return '<div style="display:flex;align-items:center;gap:.6rem;padding:.5rem .2rem;border-bottom:1px solid var(--border);">'
+            + '<div style="flex:1;min-width:0;"><div style="font-size:.82rem;font-weight:600;">Medición ' + (i + 1) + '</div>'
+            + '<div class="text-xs text-muted">' + ident(e) + '</div></div>'
+            + '<input type="date" data-u19-fecha="' + i + '" value="' + (e.fecha || '') + '" max="' + hoy + '" style="font-size:.8rem;">'
+            + '</div>';
+        }).join(''),
+    bodyMount: function(body){
+      body.querySelectorAll('[data-u19-fecha]').forEach(function(el){
+        el.addEventListener('change', function(){ evals[+el.getAttribute('data-u19-fecha')].fecha = el.value || null; });
+      });
+    },
+    footer: [
+      { label:"Continuar sin fechas", cls:"btn-ghost", onClick: function(){ closeModal(); if (cb) cb(); } },
+      { label:"Confirmar", cls:"btn-primary", onClick: function(){
+          closeModal();
+          u19AplicarEvalsBio(evals, idSuf);
+          if (cb) cb();
+        } }
+    ]
+  });
+}
+
+/* Vuelca las evaluaciones ya fusionadas en los cuadros de Informes. */
+function u19AplicarEvalsBio(evals, idSuf){
+  var conFecha = evals.filter(function(e){ return e.fecha; });
+  var lista = conFecha.length ? conFecha : evals;
+  lista = lista.slice().sort(function(a, b){
+    if (a.fecha && b.fecha) return String(a.fecha) < String(b.fecha) ? -1 : 1;
+    if (a.momento && b.momento) return a.momento === "inicial" ? -1 : 1;
+    return 0;
+  });
+  var cli = _u19CliUltimo || {};
+  var wrap = function(ev){ return JSON.stringify({ fuente:"fitdays", cliente:cli, evaluaciones:[ev] }, null, 2); };
+  if (lista.length === 1){
+    _infState.ev2raw = wrap(lista[0]);
+  } else if (lista.length > 1){
+    _infState.ev1raw = wrap(lista[0]);
+    _infState.ev2raw = wrap(lista[lista.length - 1]);
+  }
+  var t1 = document.getElementById("inf-ev1"), t2 = document.getElementById("inf-ev2");
+  if (t1) t1.value = _infState.ev1raw || "";
+  if (t2) t2.value = _infState.ev2raw || "";
+  if (idSuf) u19PintarInventario(idSuf);
+}
+var _u19CliUltimo = null;
+var _u19EvalsPendientes = null;
 /* ===INTEGRAL_END=== */
 
 
@@ -17281,8 +17296,22 @@ var US19_PROMPT_ECO = [
 'TIPO A y B -> van a "evaluaciones":',
 '- Lee todos los valores con su unidad, 1 decimal. Normaliza L/I a izquierdo, R/D a derecho.',
 '- Hombre a Masculino, Mujer a Femenino.',
-'- Si mandas A y B de la MISMA fecha, fusionalas en UNA sola evaluacion.',
-'- Capturas de fechas distintas son entradas distintas, de mas antigua a mas reciente.',
+'',
+'  EMPAREJAMIENTO (importante): el envio habitual son CUATRO capturas de Fitdays, dos por cada fecha:',
+'  composicion inicial, perimetros inicial, composicion actual, perimetros actual. Cada par A+B del mismo',
+'  momento es UNA SOLA evaluacion, no dos. Debes devolver 2 entradas en "evaluaciones", no 4.',
+'  Para emparejarlas, en este orden de preferencia:',
+'    1) Por FECHA, si las dos capturas la muestran.',
+'    2) Si no hay fecha visible, por CERCANIA EN EL ORDEN en que te las mande: una captura B pertenece a la',
+'       captura A inmediatamente anterior.',
+'    3) Como apoyo, la coherencia de los datos (una misma persona el mismo dia).',
+'',
+'- "momento": marca cada evaluacion como "inicial" (la mas antigua) o "actual" (la mas reciente). Si solo mando',
+'  una fecha, usa "actual". Este campo es obligatorio y me sirve aunque no haya fechas legibles.',
+'- "orden_capturas": lista con los numeros de las capturas que fusionaste en esa evaluacion, ej. [1,2].',
+'- Ordena el array de mas antigua a mas reciente.',
+'- Si de un momento solo mando la composicion y no los perimetros (o al reves), devuelve igualmente esa',
+'  evaluacion con la parte que falte en null. NO la descartes.',
 "",
 'TIPO C -> van a "rendimiento.sesiones":',
 '- La duracion viene como MM:SS:CC (minutos:segundos:centesimas). "01:00:00" son 60 segundos, NO una hora. duracion_seg = minutos*60 + segundos.',
@@ -17304,6 +17333,7 @@ var US19_PROMPT_ECO = [
 "REGLAS GENERALES:",
 '1) Fechas a YYYY-MM-DD. Si una captura no muestra fecha, deja null (no la inventes). La hora del reloj del telefono NO es la fecha.',
 '2) Comas decimales a puntos. Quita unidades: "62,4 kg" -> 62.4, "846 ms" -> 846, "200,5 N" -> 200.5, "4,20 seg" -> 4.2, "1.520 kcal" -> 1520.',
+'2b) Una evaluacion de Fitdays SIN fecha legible es valida: devuelvela con "fecha":null y su "momento". La app me la pedira a mi.',
 '3) Valor ilegible -> null. NUNCA inventes ni estimes un numero.',
 '4) Si no hay ninguna captura de un tipo, deja su array VACIO (no elimines la clave). El informe se adapta solo.',
 '5) Una entrada por CADA captura. No fusiones capturas distintas salvo el caso A+B de la misma fecha.',
@@ -17313,7 +17343,7 @@ var US19_PROMPT_ECO = [
 '  "descartadas":[],',
 '  "cliente":{ "nombre":null, "genero":null, "edad":null, "estatura_cm":null },',
 '  "evaluaciones":[',
-'    { "fecha":"YYYY-MM-DD",',
+'    { "fecha":"YYYY-MM-DD", "momento":"inicial", "orden_capturas":[],',
 '      "bioimpedancia":{ "peso_kg":null,"grasa_kg":null,"grasa_pct":null,"masa_esqueletica_kg":null,"proteina_kg":null,"agua_kg":null,"agua_pct":null,"musculo_kg":null,"musculo_pct":null,"imc":null,"grasa_visceral_grado":null,"tmb_kcal":null,"peso_sin_grasa_kg":null,"grasa_subcutanea_pct":null,"smi":null,"edad_corporal_anios":null,"whr":null,"puntuacion_corporal":null },',
 '      "segmentario_musculo":{ "brazo_izq":{"kg":null},"brazo_der":{"kg":null},"tronco":{"kg":null},"pierna_izq":{"kg":null},"pierna_der":{"kg":null} },',
 '      "circunferencias_cm":{ "cuello":null,"hombro":null,"pecho":null,"cintura":null,"cadera":null,"brazo_izq":null,"brazo_der":null,"muslo_izq":null,"muslo_der":null,"pantorrilla_izq":null,"pantorrilla_der":null } }',
@@ -17474,6 +17504,415 @@ function u19NotaFuerza(){
     + 'no constituye diagn\u00f3stico ni reemplaza una evaluaci\u00f3n cl\u00ednica presencial.</div>';
 }
 /* ===ECO_END=== */
+
+
+/* ============================================================
+   INFORME UNICO — el documento que sale del prompt unificado.
+   Formato propio, resumido y grafico: cuatro paginas que juntan
+   composicion corporal (pre/post), fuerza y rendimiento en un
+   solo relato. Los apartados por separado siguen generando sus
+   informes clasicos; este es el del ecosistema completo.
+   ============================================================ */
+
+var U19_CSS = "\n@media all{"
+  + ".u-grid2{display:grid;grid-template-columns:1fr 1fr;gap:5mm;align-items:start;}"
+  + ".u-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;align-items:start;}"
+  + ".u-panel{border:0.3mm solid #e6ece9;border-radius:2mm;padding:3mm 3.5mm;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;break-inside:avoid;page-break-inside:avoid;}"
+  + ".u-panel-t{font-size:8pt;font-weight:800;color:#0e5132;text-transform:uppercase;letter-spacing:.08em;margin-bottom:2mm;}"
+  + ".u-panel-t span{float:right;font-weight:500;text-transform:none;letter-spacing:0;color:#7c8a83;}"
+  + ".u-hero{display:grid;grid-template-columns:1.15fr 1fr;gap:5mm;align-items:center;margin:2mm 0 3mm;}"
+  + ".u-verdict{border-left:0.9mm solid #e21c25;background:linear-gradient(180deg,#f7faf8,#fff);border-radius:0 2mm 2mm 0;padding:3mm 4mm;}"
+  + ".u-verdict p{margin:0 0 1.4mm;font-size:9pt;line-height:1.5;color:#15241c;}"
+  + ".u-verdict p:last-child{margin-bottom:0;}"
+  + ".u-verdict b{color:#0e5132;}"
+  + ".u-dom{display:flex;gap:3mm;margin:0 0 3mm;}"
+  + ".u-dom-i{flex:1;border:0.3mm solid #e6ece9;border-top:1mm solid #cbd5d1;border-radius:1.6mm;padding:2mm 2.5mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-dom-i.on{border-top-color:#0e5132;}"
+  + ".u-dom-i b{display:block;font-size:10pt;color:#0e5132;line-height:1.1;}"
+  + ".u-dom-i span{font-size:6.6pt;color:#7c8a83;text-transform:uppercase;letter-spacing:.08em;}"
+  + ".u-dom-i.off b{color:#b6c2bd;}"
+  + ".u-legend{display:flex;gap:4mm;justify-content:center;font-size:7pt;color:#46544c;margin-top:1.5mm;}"
+  + ".u-legend i{display:inline-block;width:2.4mm;height:2.4mm;border-radius:50%;margin-right:1mm;vertical-align:-.2mm;-webkit-print-color-adjust:exact;print-color-adjust:exact;}"
+  + ".u-kv{display:flex;justify-content:space-between;font-size:8pt;padding:1mm 0;border-bottom:0.2mm solid #eef2f0;}"
+  + ".u-kv:last-child{border-bottom:none;}"
+  + ".u-kv b{color:#14241c;font-variant-numeric:tabular-nums;}"
+  + ".u-kv .up{color:#b91c1c;} .u-kv .dn{color:#15803d;} .u-kv .eq{color:#7c8a83;}"
+  + "}";
+
+/* ---------- helpers ---------- */
+function u19Esc(x){ return (typeof escapeHtml === "function") ? escapeHtml(String(x)) : String(x); }
+function u19N(v, d){ return (v == null || isNaN(v)) ? null : Number(Number(v).toFixed(d == null ? 1 : d)); }
+
+/* ---------- 1 · RADAR DE SIMETRIA ----------
+   Todos los ejes comparten escala (LSI 0-100) y el mismo objetivo
+   (90%), asi que la figura es honesta: no mezcla unidades ni inventa
+   normas. Es el resumen de una ojeada del estado del deportista. */
+function u19RadarSVG(ejes){
+  if (!ejes || ejes.length < 3) return '';
+  var W = 300, H = 230, cx = 150, cy = 112, R = 78;
+  var n = ejes.length, min = 60;
+  function pt(i, val){
+    var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+    var r = R * Math.max(0, Math.min(1, (val - min) / (100 - min)));
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function borde(i, k){
+    var a = -Math.PI / 2 + i * 2 * Math.PI / n;
+    return [cx + R * k * Math.cos(a), cy + R * k * Math.sin(a)];
+  }
+  var anillos = [0.5, 0.75, 1].map(function(k){
+    var p = ejes.map(function(_, i){ var q = borde(i, k); return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ');
+    return '<polygon points="' + p + '" fill="none" stroke="#e2e8e5" stroke-width="0.8"/>';
+  }).join('');
+  /* Anillo objetivo: LSI 90 */
+  var k90 = (90 - min) / (100 - min);
+  var obj = ejes.map(function(_, i){ var q = borde(i, k90); return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ');
+  var radios = ejes.map(function(_, i){
+    var q = borde(i, 1);
+    return '<line x1="' + cx + '" y1="' + cy + '" x2="' + q[0].toFixed(1) + '" y2="' + q[1].toFixed(1) + '" stroke="#e2e8e5" stroke-width="0.7"/>';
+  }).join('');
+  var pts = ejes.map(function(e, i){ var q = pt(i, e.lsi); return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' ');
+  var dots = ejes.map(function(e, i){
+    var q = pt(i, e.lsi);
+    var col = e.lsi >= 90 ? '#15803d' : (e.lsi >= 85 ? '#d97706' : '#b91c1c');
+    return '<circle cx="' + q[0].toFixed(1) + '" cy="' + q[1].toFixed(1) + '" r="3" fill="' + col + '" stroke="#fff" stroke-width="1"/>';
+  }).join('');
+  var labels = ejes.map(function(e, i){
+    var q = borde(i, 1.24);
+    var anchor = Math.abs(q[0] - cx) < 12 ? 'middle' : (q[0] > cx ? 'start' : 'end');
+    var col = e.lsi >= 90 ? '#15803d' : (e.lsi >= 85 ? '#b45309' : '#b91c1c');
+    return '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 2).toFixed(1) + '" font-size="7.4" text-anchor="' + anchor + '" fill="#46544c">'
+      + u19Esc(e.label) + '</text>'
+      + '<text x="' + q[0].toFixed(1) + '" y="' + (q[1] + 10).toFixed(1) + '" font-size="8.4" font-weight="800" text-anchor="' + anchor + '" fill="' + col + '">'
+      + e.lsi.toFixed(0) + '%</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + anillos + radios
+    + '<polygon points="' + obj + '" fill="none" stroke="#15803d" stroke-width="1.1" stroke-dasharray="3 2.5"/>'
+    + '<polygon points="' + pts + '" fill="rgba(14,81,50,.16)" stroke="#0e5132" stroke-width="1.7"/>'
+    + dots + labels
+    + '<text x="' + cx + '" y="' + (cy + R + 40) + '" font-size="6.8" text-anchor="middle" fill="#94a3b8">escala 60-100% · línea verde = objetivo 90%</text>'
+    + '</svg>';
+}
+
+/* ---------- 2 · BARRAS PRE / POST ---------- */
+function u19PrePostSVG(items){
+  items = (items || []).filter(function(x){ return x.pre != null && x.post != null; });
+  if (!items.length) return '';
+  var fila = 26, W = 300, H = items.length * fila + 16, x0 = 74, w = 150;
+  var body = items.map(function(it, i){
+    var y = 12 + i * fila;
+    var maxv = Math.max(it.pre, it.post) || 1;
+    var bw = function(v){ return Math.max(2, v / maxv * w); };
+    var d = it.post - it.pre;
+    var bueno = it.mejorBaja ? (d < 0) : (d > 0);
+    var col = Math.abs(d) < 1e-9 ? '#94a3b8' : (bueno ? '#15803d' : '#b91c1c');
+    var dec = it.dec == null ? 1 : it.dec;
+    return '<text x="0" y="' + (y + 5) + '" font-size="7.6" fill="#46544c">' + u19Esc(it.label) + '</text>'
+      + '<rect x="' + x0 + '" y="' + (y - 3) + '" width="' + bw(it.pre).toFixed(1) + '" height="7" rx="1.4" fill="#cbd5d1"/>'
+      + '<rect x="' + x0 + '" y="' + (y + 6) + '" width="' + bw(it.post).toFixed(1) + '" height="7" rx="1.4" fill="#0e5132"/>'
+      + '<text x="' + (x0 + Math.max(bw(it.pre), bw(it.post)) + 5).toFixed(1) + '" y="' + (y + 7) + '" font-size="7.8" font-weight="700" fill="#14241c">'
+      + it.post.toFixed(dec) + '</text>'
+      + '<text x="' + W + '" y="' + (y + 7) + '" font-size="7.8" font-weight="800" text-anchor="end" fill="' + col + '">'
+      + (d > 0 ? '+' : '') + d.toFixed(dec) + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + (W + 34) + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + body + '</svg>';
+}
+
+/* ---------- 3 · PERIMETROS: cambio por zona ---------- */
+function u19PerimetrosSVG(c1, c2){
+  var zonas = [['cuello','Cuello'],['pecho','Pecho'],['cintura','Cintura'],['cadera','Cadera'],
+               ['brazo_izq','Brazo izq.'],['brazo_der','Brazo der.'],['muslo_izq','Muslo izq.'],['muslo_der','Muslo der.']];
+  var items = zonas.map(function(z){
+    var a = (c1 || {})[z[0]], b = (c2 || {})[z[0]];
+    if (a == null || b == null) return null;
+    return { label: z[1], d: +(b - a).toFixed(1), act: b };
+  }).filter(Boolean);
+  if (!items.length) return '';
+  var maxAbs = Math.max.apply(null, items.map(function(i){ return Math.abs(i.d); })) || 1;
+  var fila = 15, W = 300, H = items.length * fila + 14, cxm = 190, half = 74;
+  var body = items.map(function(it, i){
+    var y = 10 + i * fila;
+    var len = Math.abs(it.d) / maxAbs * half;
+    var neg = it.d < 0;
+    var col = neg ? '#15803d' : (it.d > 0 ? '#b45309' : '#94a3b8');
+    return '<text x="0" y="' + (y + 4) + '" font-size="7.4" fill="#46544c">' + it.label + '</text>'
+      + '<text x="112" y="' + (y + 4) + '" font-size="7.4" text-anchor="end" fill="#14241c">' + it.act.toFixed(1) + '</text>'
+      + '<rect x="' + (neg ? cxm - len : cxm).toFixed(1) + '" y="' + (y - 1) + '" width="' + Math.max(1.2, len).toFixed(1) + '" height="6" rx="1.2" fill="' + col + '"/>'
+      + '<text x="' + (W - 4) + '" y="' + (y + 4) + '" font-size="7.4" font-weight="700" text-anchor="end" fill="' + col + '">'
+      + (it.d > 0 ? '+' : '') + it.d.toFixed(1) + '</text>';
+  }).join('');
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">'
+    + '<line x1="' + cxm + '" y1="4" x2="' + cxm + '" y2="' + (H - 6) + '" stroke="#dbe4e0" stroke-width="0.8"/>'
+    + body + '</svg>';
+}
+
+/* ---------- 4 · EJES DEL RADAR ---------- */
+function u19EjesSimetria(inv){
+  var ejes = [];
+  if (inv.frz && inv.frz.pares){
+    inv.frz.pares.slice(0, 3).forEach(function(par){
+      var nom = par.nombre.length > 20 ? par.nombre.slice(0, 19) + '…' : par.nombre;
+      ejes.push({ label: nom, lsi: par.q.lsi, dominio: 'fuerza' });
+    });
+  }
+  if (inv.rnd && inv.rnd.asimetria){
+    if (inv.rnd.asimetria.reaccion) ejes.push({ label: 'Reacción', lsi: inv.rnd.asimetria.reaccion.lsi, dominio: 'reaccion' });
+    if (inv.rnd.asimetria.hits) ejes.push({ label: 'Toques', lsi: inv.rnd.asimetria.hits.lsi, dominio: 'reaccion' });
+  }
+  /* Masa muscular por pierna, de la bioimpedancia segmentaria */
+  if (inv.bio.length){
+    var sm = (inv.bio[inv.bio.length - 1].segmentario_musculo) || {};
+    var pi = (sm.pierna_izq && sm.pierna_izq.kg != null) ? Number(sm.pierna_izq.kg) : null;
+    var pd = (sm.pierna_der && sm.pierna_der.kg != null) ? Number(sm.pierna_der.kg) : null;
+    if (pi != null && pd != null && pi && pd){
+      ejes.push({ label: 'Músculo pierna', lsi: +(Math.min(pi, pd) / Math.max(pi, pd) * 100).toFixed(1), dominio: 'estructura' });
+    }
+  }
+  return ejes;
+}
+
+/* ---------- 5 · EL DOCUMENTO ---------- */
+function u19InformeUnicoDoc(inv, cli, opts){
+  opts = opts || {};
+  var bio = inv.bio, m = inv.rnd, fm = inv.frz;
+  var evI = bio.length > 1 ? bio[0] : null;
+  var evA = bio.length ? bio[bio.length - 1] : null;
+  var b1 = evI ? (evI.bioimpedancia || {}) : {};
+  var b2 = evA ? (evA.bioimpedancia || {}) : {};
+  var tit = u19TituloInforme(inv);
+  /* El periodo de la portada abarca TODOS los dominios, no solo el de
+     rendimiento: con bioimpedancia de julio y BlazePod de septiembre,
+     el documento cubre julio-septiembre. */
+  var fechas = [];
+  bio.forEach(function(e){ if (e.fecha) fechas.push(e.fecha); });
+  if (m){ if (m.resumen.fecha_ini) fechas.push(m.resumen.fecha_ini); if (m.resumen.fecha_act) fechas.push(m.resumen.fecha_act); }
+  if (fm){ if (fm.resumen.fecha_ini) fechas.push(fm.resumen.fecha_ini); if (fm.resumen.fecha_act) fechas.push(fm.resumen.fecha_act); }
+  fechas.sort();
+  var fIni = fechas.length ? fechas[0] : null;
+  var fAct = fechas.length ? fechas[fechas.length - 1] : null;
+
+  var mFake = { resumen: Object.assign({}, (m ? m.resumen : { n:0, reaccion_prom:null, reaccion_mejor:null, hits_max:null, actividad:null, usuario:null }),
+                                       { fecha_ini:fIni, fecha_act:fAct }),
+                sesiones:[], asimetria:null, dominante:_rndState.dominante };
+  var ch = rndChrome(cli, mFake, opts);
+  /* Si las dos fechas coinciden, el encabezado muestra una sola. */
+  if (fIni && fAct && fIni === fAct){
+    ch.hdr = ch.hdr.replace(rndFdate(fIni) + ' → ' + rndFdate(fAct), rndFdate(fAct));
+  }
+  ch.cover = ch.cover.replace('Informe de rendimiento neuromuscular · Velocidad de reacción y agilidad', u19Esc(tit.t) + ' · ' + u19Esc(tit.s));
+  ch.hdr = ch.hdr.replace('INFORME DE RENDIMIENTO — NEUROMUSCULAR', 'EVALUACIÓN INTEGRAL DEL DEPORTISTA');
+
+  /* --- dominios evaluados --- */
+  function domI(on, valor, etiqueta){
+    return '<div class="u-dom-i ' + (on ? 'on' : 'off') + '"><b>' + valor + '</b><span>' + etiqueta + '</span></div>';
+  }
+  var doms = '<div class="u-dom">'
+    + domI(bio.length, bio.length ? (bio.length === 1 ? 'Basal' : bio.length + ' fechas') : 'No evaluada', 'Composición · BodyPro GO')
+    + domI(!!fm, fm ? (fm.resumen.nPares + ' par' + (fm.resumen.nPares === 1 ? '' : 'es')) : 'No evaluada', 'Fuerza · ActiveForce 2')
+    + domI(!!m, m ? (m.resumen.n + (m.resumen.n === 1 ? ' sesión' : ' sesiones')) : 'No evaluado', 'Reacción · BlazePod')
+    + '</div>';
+
+  /* --- KPIs --- */
+  function kpi(cls, bar, val, unit, foot){
+    return '<div class="pr-kpi ' + cls + '"><div class="pr-kbar">' + bar + '</div><div class="pr-kbody">'
+      + '<div class="pr-kval">' + val + '</div><div class="pr-kunit">' + unit + '</div>'
+      + (foot ? '<div class="pr-kdelta">' + foot + '</div>' : '') + '</div></div>';
+  }
+  function delta(a, z, dec, mejorBaja){
+    if (a == null || z == null) return '';
+    var d = z - a;
+    return '<span class="pr-vs">' + (d > 0 ? '+' : '') + d.toFixed(dec == null ? 1 : dec) + '</span>';
+  }
+  var tiles = [];
+  if (b2.peso_kg != null) tiles.push(kpi('neut', 'Peso', b2.peso_kg.toFixed(1), 'kg', evI ? delta(b1.peso_kg, b2.peso_kg, 1, true) : 'basal'));
+  if (b2.grasa_pct != null) tiles.push(kpi('neut', 'Grasa', b2.grasa_pct.toFixed(1), '%', evI ? delta(b1.grasa_pct, b2.grasa_pct, 1, true) : 'basal'));
+  if (b2.musculo_kg != null) tiles.push(kpi('good', 'Músculo', b2.musculo_kg.toFixed(1), 'kg', evI ? delta(b1.musculo_kg, b2.musculo_kg, 1) : 'basal'));
+  if (fm && fm.resumen.fuerza_max != null) tiles.push(kpi('neut', 'Fuerza pico', fm.resumen.fuerza_max.toFixed(0), 'N',
+    fm.resumen.peso_kg ? ((fm.resumen.fuerza_max / fm.resumen.peso_kg).toFixed(2) + ' N/kg') : 'ActiveForce'));
+  if (m && m.resumen.reaccion_prom != null) tiles.push(kpi('neut', 'Reacción', m.resumen.reaccion_prom, 'ms',
+    m.resumen.reaccion_mejor != null ? ('mejor ' + m.resumen.reaccion_mejor) : 'BlazePod'));
+  while (tiles.length > 4 && tiles.length % 4 !== 0) tiles.pop();
+  var kpis = tiles.length ? '<div class="pr-kpis">' + tiles.join('') + '</div>' : '';
+
+  /* --- radar + veredicto --- */
+  var ejes = u19EjesSimetria(inv);
+  var pf = fm ? frzPeorPar(fm) : null;
+  var pr = (m && m.asimetria) ? rndPeorAsim(m.asimetria) : null;
+  var peorLsi = null;
+  [pf ? pf.q.lsi : null, pr ? pr.lsi : null].forEach(function(v){ if (v != null && (peorLsi == null || v < peorLsi)) peorLsi = v; });
+
+  var frases = [];
+  if (evI && b2.peso_kg != null && b1.peso_kg != null){
+    var dG = (b2.grasa_kg != null && b1.grasa_kg != null) ? b2.grasa_kg - b1.grasa_kg : null;
+    var dM = (b2.musculo_kg != null && b1.musculo_kg != null) ? b2.musculo_kg - b1.musculo_kg : null;
+    if (dG != null && dM != null && dG < -0.3 && dM > 0.3)
+      frases.push('<b>Recomposición favorable</b> en el período: la grasa baja ' + Math.abs(dG).toFixed(1) + ' kg mientras la masa muscular sube ' + dM.toFixed(1) + ' kg.');
+    else if (dG != null && dG < -0.3) frases.push('La masa grasa descendió <b>' + Math.abs(dG).toFixed(1) + ' kg</b> en el período.');
+    else if (dM != null && dM > 0.3) frases.push('La masa muscular aumentó <b>' + dM.toFixed(1) + ' kg</b> en el período.');
+    else frases.push('La composición corporal se mantuvo estable (peso ' + ((b2.peso_kg - b1.peso_kg) >= 0 ? '+' : '') + (b2.peso_kg - b1.peso_kg).toFixed(1) + ' kg).');
+  } else if (evA){
+    frases.push('Esta es la <b>medición basal</b> de composición corporal: es el punto de partida del seguimiento.');
+  }
+  if (pf){
+    frases.push('En dinamometría, el test más comprometido es <b>' + u19Esc(pf.nombre) + '</b> con <b>LSI ' + pf.q.lsi.toFixed(0) + '%</b>'
+      + (pf.q.lsi >= 90 ? ', por sobre el umbral de retorno deportivo.' : ', bajo el 90% exigido'
+        + (pf.q.deficitLado ? ', con el déficit en el lado ' + rndLadoTxt(pf.q.deficitLado).toLowerCase() + '.' : '.')));
+  }
+  if (pr){
+    frases.push('En respuesta reactiva, la asimetría entre extremidades es de <b>' + pr.pct.toFixed(1) + '%</b> (LSI ' + pr.lsi.toFixed(0) + '%), '
+      + rndNivelTxt(pr.nivel).toLowerCase() + '.');
+  }
+  if (peorLsi != null){
+    frases.push(peorLsi >= 90
+      ? 'Todos los dominios evaluados quedan <b>en o sobre el 90%</b> de simetría.'
+      : 'El eslabón más débil del perfil está en <b>' + peorLsi.toFixed(0) + '%</b>: es donde debe concentrarse el trabajo unilateral hasta la próxima reevaluación.');
+  }
+  if (!frases.length) frases.push('Documento de registro de la evaluación realizada.');
+
+  var radar = u19RadarSVG(ejes);
+  var hero = radar
+    ? '<div class="u-hero"><div class="u-panel"><div class="u-panel-t">Perfil de simetría <span>LSI por dominio</span></div>'
+      + radar
+      + '<div class="u-legend"><span><i style="background:#15803d"></i>≥ 90%</span><span><i style="background:#d97706"></i>85–90%</span><span><i style="background:#b91c1c"></i>&lt; 85%</span></div></div>'
+      + '<div class="u-verdict">' + frases.map(function(t){ return '<p>' + t + '</p>'; }).join('') + '</div></div>'
+    : '<div class="u-verdict">' + frases.map(function(t){ return '<p>' + t + '</p>'; }).join('') + '</div>';
+
+  /* --- P2 composicion --- */
+  var compo = '';
+  if (bio.length){
+    var barras = u19PrePostSVG([
+      { label:'Peso (kg)', pre:b1.peso_kg, post:b2.peso_kg, mejorBaja:true },
+      { label:'Grasa (kg)', pre:b1.grasa_kg, post:b2.grasa_kg, mejorBaja:true },
+      { label:'Grasa (%)', pre:b1.grasa_pct, post:b2.grasa_pct, mejorBaja:true },
+      { label:'Músculo (kg)', pre:b1.musculo_kg, post:b2.musculo_kg },
+      { label:'Agua (%)', pre:b1.agua_pct, post:b2.agua_pct }
+    ]);
+    function kv(lbl, v1, v2, u, dec, mejorBaja){
+      if (v2 == null) return '';
+      var d = (v1 != null) ? v2 - v1 : null;
+      var cls = d == null ? 'eq' : (Math.abs(d) < 1e-9 ? 'eq' : ((mejorBaja ? d < 0 : d > 0) ? 'dn' : 'up'));
+      return '<div class="u-kv"><span>' + lbl + '</span><b>' + Number(v2).toFixed(dec == null ? 1 : dec) + (u ? ' ' + u : '')
+        + (d != null ? ' <span class="' + cls + '">(' + (d > 0 ? '+' : '') + d.toFixed(dec == null ? 1 : dec) + ')</span>' : '') + '</b></div>';
+    }
+    var indices = kv('IMC', b1.imc, b2.imc, '', 1, true)
+      + kv('Grasa visceral', b1.grasa_visceral_grado, b2.grasa_visceral_grado, '', 0, true)
+      + kv('TMB', b1.tmb_kcal, b2.tmb_kcal, 'kcal', 0)
+      + kv('Proteína', b1.proteina_kg, b2.proteina_kg, 'kg', 1)
+      + kv('Músc. esquelético', b1.masa_esqueletica_kg, b2.masa_esqueletica_kg, 'kg', 1)
+      + kv('SMI', b1.smi, b2.smi, '', 1)
+      + kv('WHR', b1.whr, b2.whr, '', 2, true)
+      + kv('Edad corporal', b1.edad_corporal_anios, b2.edad_corporal_anios, 'años', 0, true);
+    var perim = evI ? u19PerimetrosSVG(evI.circunferencias_cm, evA.circunferencias_cm) : '';
+    compo = '<div class="pr-sec"><div class="pr-letter">C</div><div class="pr-secttl">'
+      + '<h2>Composición corporal</h2><p>Bioimpedanciometría BodyPro GO'
+      + (evI ? ' · ' + rndFdate(evI.fecha) + ' → ' + rndFdate(evA.fecha) : ' · medición basal del ' + rndFdate(evA.fecha)) + '</p></div></div>'
+      + '<div class="u-grid2">'
+      + (barras ? '<div class="u-panel"><div class="u-panel-t">Antes y después <span>gris = inicial</span></div>' + barras + '</div>' : '')
+      + (indices ? '<div class="u-panel"><div class="u-panel-t">Índices <span>actual (cambio)</span></div>' + indices + '</div>' : '')
+      + '</div>'
+      + (perim ? '<div class="u-panel" style="margin-top:4mm;"><div class="u-panel-t">Perímetros <span>cm actuales y cambio</span></div>' + perim + '</div>' : '');
+  }
+
+  /* --- P3 funcion: fuerza + reaccion --- */
+  var func = '';
+  if (fm || m){
+    var col1 = '', col2 = '';
+    if (fm){
+      var fb = frzReportBlocks(fm, {});
+      col1 = '<div class="u-panel"><div class="u-panel-t">Fuerza isométrica <span>ActiveForce 2</span></div>'
+        + (fm.pares.length ? fm.pares.slice(0, 3).map(function(par){
+            var campo = par.tipo === 'rango' ? 'rango_grados' : 'fuerza_max_n';
+            var un = par.tipo === 'rango' ? '°' : 'N';
+            return rndBarsSVG(par.nombre, un, par.izq[campo], par.der[campo], true);
+          }).join('') : '<p style="font-size:8pt;color:#7c8a83;margin:0;">Sin pares izquierda/derecha comparables.</p>')
+        + '</div>';
+    }
+    if (m && m.asimetria){
+      col2 = '<div class="u-panel"><div class="u-panel-t">Respuesta reactiva <span>BlazePod</span></div>'
+        + rndBarsSVG('Tiempo de reacción', 'ms', m.asimetria.izq.reaccion_ms_prom, m.asimetria.der.reaccion_ms_prom, false)
+        + rndBarsSVG('Toques válidos', 'hits', m.asimetria.izq.hits, m.asimetria.der.hits, true)
+        + '</div>';
+    } else if (m){
+      col2 = '<div class="u-panel"><div class="u-panel-t">Respuesta reactiva <span>BlazePod</span></div>'
+        + '<p style="font-size:8pt;color:#7c8a83;margin:0;">' + m.resumen.n + ' sesión(es) registrada(s); falta el lado contrario para calcular simetría.</p></div>';
+    }
+    func = '<div class="pr-sec"><div class="pr-letter">F</div><div class="pr-secttl">'
+      + '<h2>Función · fuerza y respuesta reactiva</h2><p>Comparación entre extremidades · la barra verde es el mejor lado</p></div></div>'
+      + '<div class="u-grid2">' + col1 + col2 + '</div>';
+  }
+
+  /* --- tabla resumen de mediciones --- */
+  var detalle = '';
+  if (fm && fm.mediciones.length){
+    detalle += '<div class="u-panel" style="margin-top:4mm;"><div class="u-panel-t">Dinamometría · detalle</div>'
+      + '<table class="pr-tbl" style="margin:0;"><thead><tr><th>Test</th><th class="num">Lado</th><th class="num">N</th>'
+      + '<th class="num">N/kg</th><th class="num">t pico</th><th class="num">N/s</th></tr></thead><tbody>'
+      + fm.mediciones.map(function(x){
+          return '<tr><td class="lbl">' + u19Esc(x.movimiento) + '</td><td class="num">' + rndLadoTxt(x.lado) + '</td>'
+            + '<td class="num">' + (x.fuerza_max_n != null ? x.fuerza_max_n.toFixed(1) : '—') + '</td>'
+            + '<td class="num">' + (x.n_por_kg != null ? x.n_por_kg.toFixed(2) : '—') + '</td>'
+            + '<td class="num">' + (x.tiempo_al_pico_seg != null ? x.tiempo_al_pico_seg.toFixed(2) + ' s' : '—') + '</td>'
+            + '<td class="num">' + (x.rfd != null ? x.rfd.toFixed(0) : '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+  }
+  if (m && m.sesiones.length){
+    detalle += '<div class="u-panel" style="margin-top:4mm;"><div class="u-panel-t">BlazePod · detalle</div>'
+      + '<table class="pr-tbl" style="margin:0;"><thead><tr><th>Fecha</th><th class="num">Actividad</th><th class="num">Lado</th>'
+      + '<th class="num">Hits</th><th class="num">Hits/min</th><th class="num">Reacción</th></tr></thead><tbody>'
+      + m.sesiones.map(function(x){
+          return '<tr><td class="lbl">' + rndFdate(x.fecha) + '</td><td class="num">' + (x.actividad ? u19Esc(x.actividad) : '—') + '</td>'
+            + '<td class="num">' + rndLadoTxt(x.lado) + '</td><td class="num">' + (x.hits != null ? x.hits : '—') + '</td>'
+            + '<td class="num">' + (x.hits_min != null ? x.hits_min.toFixed(1) : '—') + '</td>'
+            + '<td class="num">' + (x.reaccion_ms_prom != null ? x.reaccion_ms_prom + ' ms' : '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+  }
+
+  /* --- lectura integrada --- */
+  var cruce = (bio.length && m && typeof u19CruceHTML === 'function') ? u19CruceHTML(evA, m) : '';
+  var avisos = [];
+  if (fm && typeof frzSanityWarnings === 'function') avisos = avisos.concat(frzSanityWarnings(fm));
+  if (m && typeof rndSanityWarnings === 'function') avisos = avisos.concat(rndSanityWarnings(m));
+  var avisoBlock = avisos.length
+    ? '<div class="pr-note" style="border-left-color:#b45309;"><b>Advertencias de calidad de la medición.</b>'
+      + '<ul style="margin:.5mm 0 0;padding-left:4mm;">' + avisos.map(function(t){ return '<li>' + u19Esc(t) + '</li>'; }).join('') + '</ul></div>'
+    : '';
+  var indic = (opts.indicaciones || '').trim();
+  var indicBlock = indic
+    ? '<div class="pr-sec"><div class="pr-letter">✎</div><div class="pr-secttl"><h2>Indicaciones del profesional</h2>'
+      + '<p>Plan a partir de esta evaluación</p></div></div>'
+      + '<div class="pr-indic"><p>' + u19Esc(indic).replace(/\n/g, '<br>') + '</p></div>'
+    : '';
+  var nota = '<div class="pr-note"><b>Alcance de este informe.</b> Reúne tres instrumentos distintos: bioimpedancia (BodyPro GO), '
+    + 'dinamometría manual (ActiveForce 2) y respuesta reactiva (BlazePod). Ninguno cuenta con valores normativos poblacionales '
+    + 'aplicables a este protocolo, de modo que la referencia es <b>el propio evaluado</b>: la comparación entre extremidades y la '
+    + 'evolución medida con el mismo montaje, operador y consigna. Documento de seguimiento del entrenamiento; no constituye '
+    + 'diagnóstico ni reemplaza una evaluación clínica presencial.</div>';
+
+  /* --- ensamble: 4 paginas --- */
+  var pgs = [];
+  pgs.push(ch.wm + ch.cover + '<div class="pr-content">'
+    + '<div class="pr-sec"><div class="pr-letter">R</div><div class="pr-secttl"><h2>Panel de mando</h2>'
+    + '<p>Lo esencial de la evaluación en una página</p></div></div>'
+    + doms + kpis + hero + '</div>' + ch.foot);
+  if (compo) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + compo + '</div>' + ch.foot);
+  if (func) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + func + detalle + '</div>' + ch.foot);
+  else if (detalle) pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + detalle + '</div>' + ch.foot);
+  pgs.push(ch.wm + ch.hdr + '<div class="pr-content">' + cruce + indicBlock + avisoBlock + nota + ch.firmas + '</div>' + ch.foot);
+
+  var inner = pgs.map(function(x){ return '<div class="pr-page">' + x + '</div>'; }).join('');
+  var css = INF_V2_CSS.split('@media print').join('@media all') + RND_CSS + U19_CSS
+    + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
+    + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;position:relative;}"
+    + ' .pr-pageno::after{content:"—";}'
+    + " @media print{ body{background:#fff !important;padding:0 !important;} .pr-page{box-shadow:none !important;} }";
+  var fontLink = '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Bebas+Neue&display=swap" rel="stylesheet">';
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1"><title>' + tit.t + ' · US19</title>'
+    + fontLink + '<style>' + css + '</style></head><body><div id="printableReport">' + inner + '</div></body></html>';
+}
+/* ===UNICO_END=== */
 
 </script>
 </body>
