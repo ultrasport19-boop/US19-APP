@@ -12126,7 +12126,7 @@ function finNormalize(d){
   return out;
 }
 function _finLocal(){
-  var activos = u19ClientesActivos();   /* mismo criterio que las tarjetas */
+  var activos = state.clients.filter(function(c){ var d = daysUntil(c.planEndDate); return (d===null) || (d > -30); });
   var conPrecio = activos.filter(function(c){ return c.planPrice; });
   var ingresos = conPrecio.reduce(function(a,c){ return a + (c.planPrice||0); }, 0);
   var ticket = conPrecio.length ? ingresos/conPrecio.length : 0;
@@ -12192,21 +12192,6 @@ window.finSync = function(){
    ============================================================ */
 
 function u19FinNum(v){ var n = Number(v); return isNaN(n) ? 0 : n; }
-
-/* Quien cuenta como cliente activo. Antes habia dos criterios sueltos y
-   las cifras de cabecera podian no cuadrar con las tarjetas de abajo.
-   Manda la marca manual; si no la hay, se mira que el plan no lleve mas
-   de un mes vencido (margen para renovaciones que llegan tarde). */
-function u19ClienteActivo(c){
-  if (!c) return false;
-  if (c.activo === false) return false;
-  if (!c.planEndDate) return true;
-  var d = (typeof daysUntil === "function") ? daysUntil(c.planEndDate) : null;
-  return (d === null) || (d > -30);
-}
-function u19ClientesActivos(){
-  return (state.clients || []).filter(u19ClienteActivo);
-}
 function u19FinMes(ts){
   if (!ts) return null;
   var t = (typeof ts === "number") ? ts : Date.parse(ts);
@@ -12224,7 +12209,7 @@ function u19FinMes(ts){
 function u19FinRiesgo(){
   var out = { total: 0, n: 0, items: [], mrr: 0 };
   (state.clients || []).forEach(function(c){
-    if (!u19ClienteActivo(c)) return;
+    if (c.activo === false) return;
     var precio = u19FinNum(c.planPrice);
     if (precio > 0) out.mrr += precio;
     var tieneRutina = (state.routines || []).some(function(r){ return r.clientId === c.id && r.status !== "archived"; });
@@ -12254,7 +12239,7 @@ function u19FinAntiguedad(){
   ];
   var sinFecha = { n: 0, mrr: 0 };
   (state.clients || []).forEach(function(c){
-    if (!u19ClienteActivo(c)) return;
+    if (c.activo === false) return;
     var precio = u19FinNum(c.planPrice);
     var m = u19FinMes(c.createdAt);
     if (m == null){ sinFecha.n++; sinFecha.mrr += precio; return; }
@@ -12267,7 +12252,7 @@ function u19FinAntiguedad(){
 
 function u19FinConcentracion(){
   var conPrecio = (state.clients || [])
-    .filter(function(c){ return u19ClienteActivo(c) && u19FinNum(c.planPrice) > 0; })
+    .filter(function(c){ return c.activo !== false && u19FinNum(c.planPrice) > 0; })
     .map(function(c){ return { n: c.name || "—", p: u19FinNum(c.planPrice), id: c.id }; })
     .sort(function(a, b){ return b.p - a.p; });
   var total = conPrecio.reduce(function(a, x){ return a + x.p; }, 0);
@@ -12291,7 +12276,7 @@ function u19FinOcupacion(sesionesSemana){
   var cuposSemana = horas * dias * cap;
   var porCliente = sesionesSemana || 3;
   var capacidadClientes = porCliente > 0 ? Math.floor(cuposSemana / porCliente) : 0;
-  var activos = u19ClientesActivos().length;
+  var activos = (state.clients || []).filter(function(c){ return c.activo !== false; }).length;
   return {
     horas: horas, dias: dias, cap: cap, cuposSemana: cuposSemana,
     porCliente: porCliente, capacidadClientes: capacidadClientes, activos: activos,
@@ -12306,7 +12291,7 @@ function u19FinOcupacion(sesionesSemana){
 function u19FinRenovaciones(){
   var venc = [], pronto = [];
   (state.clients || []).forEach(function(c){
-    if (!u19ClienteActivo(c)) return;
+    if (c.activo === false) return;
     var precio = u19FinNum(c.planPrice);
     if (precio <= 0 || !c.planEndDate) return;
     var d = (typeof daysUntil === "function") ? daysUntil(c.planEndDate) : null;
@@ -12395,7 +12380,7 @@ function u19PlantelMetrics(){
               deficit: [], mejoran: [], empeoran: [], reeval: [],
               cobertura: { tres: 0, dos: 0, uno: 0, cero: 0 } };
   (state.clients || []).forEach(function(c){
-    if (!u19ClienteActivo(c)) return;
+    if (c.activo === false) return;
     out.total++;
     var sRnd = u19SerieRnd(c);
     var sFrz = u19SerieFrz(c);
@@ -12636,7 +12621,7 @@ function u19FinColchonHTML(ingresos, costo, ticket){
   var colchon = (ticket > 0) ? Math.floor(util / ticket) : 0;
   var falta = (ticket > 0) ? Math.ceil(-util / ticket) : 0;
   var beCli = (ticket > 0) ? Math.ceil(costo / ticket) : 0;
-  var activos = u19ClientesActivos().length;
+  var activos = (state.clients || []).filter(function(c){ return c.activo !== false; }).length;
   var pct = costo > 0 ? Math.min(160, ingresos / costo * 100) : 0;
   var estado, col, txt;
   if (util < 0){
@@ -12825,7 +12810,7 @@ function u19FybFit(){
 function u19FybPublicar(){
   try {
     /* Forma que espera rosterToDash dentro del panel: activo/monto/plan. */
-    var cl = u19ClientesActivos().map(function(c){
+    var cl = (state.clients || []).filter(function(c){ return c.activo !== false; }).map(function(c){
       var precio = u19FinNum(c.planPrice);
       return { activo: true,
                monto: precio > 0 ? precio : null,
@@ -13018,7 +13003,7 @@ function u19FrecuenciaPlan(nombre){
 function u19FinPorCupo(){
   var grupos = {}, sinFrec = 0;
   (state.clients || []).forEach(function(c){
-    if (!u19ClienteActivo(c)) return;
+    if (c.activo === false) return;
     var precio = u19FinNum(c.planPrice);
     if (precio <= 0) return;
     var nm = (c.notionPlan || "").trim() || (_finCLP(precio) + "/mes");
@@ -13051,7 +13036,7 @@ function u19FinMeta(objetivo, ingresos, ticket, costo){
   objetivo = u19FinNum(objetivo);
   if (objetivo <= 0) return null;
   var falta = objetivo - ingresos;
-  var conPrecio = u19ClientesActivos().filter(function(c){ return u19FinNum(c.planPrice) > 0; }).length;
+  var conPrecio = (state.clients || []).filter(function(c){ return c.activo !== false && u19FinNum(c.planPrice) > 0; }).length;
   var o = u19FinOcupacion(u19FinNum(settings.finSesSemana) || 3);
   var clientesNec = ticket > 0 ? Math.ceil(falta / ticket) : null;
   var subidaPct = ingresos > 0 ? ((objetivo / ingresos) - 1) * 100 : null;
@@ -17731,7 +17716,7 @@ function u19PanelOperativoHTML(){
 
   var hoyEntrenan = [], dormidos = [], reevals = [], asimetricos = [];
   state.clients.forEach(function(c){
-    if (!u19ClienteActivo(c)) return;   /* mismo criterio que Finanzas */
+    if (c.activo === false) return;
     /* Con la simetria acumulandose en la ficha, el Panel puede decir quien
        necesita trabajo unilateral sin abrir a nadie. */
     var _lsi = (typeof u19UltimoLSI === "function") ? u19UltimoLSI(c) : null;
