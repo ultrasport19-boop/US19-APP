@@ -4054,7 +4054,10 @@ function renderBuilder(){
     var _wn = (r.weekNotes && r.weekNotes[_wi]) || "";
     html += '<div><span class="field-tag">Semana '+(_wi+1)+'</span><input type="text" class="rb-weeknote" data-week-idx="'+_wi+'" value="'+escapeAttr(_wn)+'" placeholder="Ej: +2,5% carga · RIR 2 · descarga"></div>';
   }
-  html += '</div><button class="btn btn-ghost btn-sm" style="margin-top:.5rem;" onclick="applyDeloadWeek()">📉 Añadir semana de descarga</button></details>';
+  html += '</div><div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem;">'
+    + '<button class="btn btn-ghost btn-sm" onclick="applyDeloadWeek()">📉 Añadir semana de descarga</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="u19AplicarRirGlobal()" title="Fija el mismo RIR objetivo en todos los ejercicios de la rutina">⚙ RIR objetivo para toda la rutina</button>'
+    + '</div></details>';
 
   html += '<div class="card" style="margin-bottom:1rem;background:var(--surface-2);">'
     + '<div class="card-main">'
@@ -16566,9 +16569,13 @@ function u19PanelOperativoHTML(){
     if (!ultimo[k] || t > ultimo[k]) ultimo[k] = t;
   });
 
-  var hoyEntrenan = [], dormidos = [], reevals = [];
+  var hoyEntrenan = [], dormidos = [], reevals = [], asimetricos = [];
   state.clients.forEach(function(c){
     if (c.activo === false) return;
+    /* Con la simetria acumulandose en la ficha, el Panel puede decir quien
+       necesita trabajo unilateral sin abrir a nadie. */
+    var _lsi = (typeof u19UltimoLSI === "function") ? u19UltimoLSI(c) : null;
+    if (_lsi && _lsi.lsi < 90) asimetricos.push({ c:c, d:_lsi });
     /* ¿Tiene rutina con algo programado para hoy? */
     var rut = state.routines.filter(function(r){
       return r.clientId === c.id && r.status !== "archived";
@@ -16592,6 +16599,7 @@ function u19PanelOperativoHTML(){
   });
   dormidos.sort(function(a, b){ return (b.dias == null ? 9999 : b.dias) - (a.dias == null ? 9999 : a.dias); });
   reevals.sort(function(a, b){ return a.dias - b.dias; });
+  asimetricos.sort(function(a, b){ return a.d.lsi - b.d.lsi; });
 
   function lista(arr, vacio, fn){
     if (!arr.length) return '<div class="text-xs text-muted">' + vacio + '</div>';
@@ -16615,8 +16623,11 @@ function u19PanelOperativoHTML(){
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Reevaluaciones (' + reevals.length + ')</div>'
     +     lista(reevals, 'Ninguna en los próximos 7 días.', function(o){
             return chip(o.c, o.dias < 0 ? 'vencida hace ' + Math.abs(o.dias) + ' d' : (o.dias === 0 ? 'hoy' : 'en ' + o.dias + ' d'), o.dias <= 0 ? '#b91c1c' : '#d97706'); }) + '</div>'
+    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Simetría bajo 90% (' + asimetricos.length + ')</div>'
+    +     lista(asimetricos, 'Nadie con déficit lateral medido.', function(o){
+            return chip(o.c, 'LSI ' + o.d.lsi.toFixed(0) + '%', o.d.lsi < 85 ? '#b91c1c' : '#d97706'); }) + '</div>'
     + '</div>'
-    + '<div class="text-xs text-muted" style="margin-top:.7rem;line-height:1.5;">«Sin señales» = con rutina activa y sin reporte de progreso ni progresión guardada en 10 días o más. Es el aviso temprano de abandono.</div>'
+    + '<div class="text-xs text-muted" style="margin-top:.7rem;line-height:1.5;">«Sin señales» = con rutina activa y sin reporte de progreso ni progresión guardada en 10 días o más: el aviso temprano de abandono. «Simetría» toma la última medición de cada persona, venga de dinamometría, BlazePod o un test manual.</div>'
     + '</div></div>';
 }
 
@@ -16984,7 +16995,12 @@ function u19TituloInforme(inv){
     return { t: 'Evaluación integral del deportista', s: sub };
   }
   if (inv.bio.length) return { t: 'Informe de composición corporal', s: 'Bioimpedanciometría y perímetros' };
-  if (inv.frz) return { t: 'Informe de fuerza isométrica', s: 'Dinamometría manual · ActiveForce 2' };
+  if (inv.frz){
+    var _hf = (inv.frz.resumen.nFuerza || 0) > 0, _hr = (inv.frz.resumen.nRango || 0) > 0;
+    if (_hf && _hr) return { t: 'Informe de fuerza y movilidad', s: 'Dinamometría e inclinometría · ActiveForce 2' };
+    if (_hf) return { t: 'Informe de fuerza isométrica', s: 'Dinamometría manual · ActiveForce 2' };
+    return { t: 'Informe de rango de movimiento', s: 'Inclinometría · ActiveForce 2' };
+  }
   return { t: 'Informe de rendimiento neuromuscular', s: 'Velocidad de reacción y agilidad' };
 }
 
@@ -17336,8 +17352,12 @@ function frzMetrics(data, dominante, afectado, pesoKg){
   pares.sort(function(a, b){ return b.q.pct - a.q.pct; });
 
   var fuerzas = meds.filter(function(m){ return m.tipo === "fuerza" && m.fuerza_max_n != null; });
+  var rangos = meds.filter(function(m){ return m.tipo === "rango" && m.rango_grados != null; });
   var resumen = {
     n: meds.length,
+    nFuerza: fuerzas.length,
+    nRango: rangos.length,
+    rango_max: rangos.length ? Math.max.apply(null, rangos.map(function(m){ return m.rango_grados; })) : null,
     nTests: Object.keys(tests).length,
     nPares: pares.length,
     fecha_ini: (meds[0] || {}).fecha || null,
@@ -17445,13 +17465,25 @@ function frzReportBlocks(fm, opts){
       + '<div class="pr-kval">' + val + '</div><div class="pr-kunit">' + unit + '</div>'
       + (foot ? '<div class="pr-kdelta">' + foot + '</div>' : '') + '</div></div>';
   }
-  var kpis = '<div class="pr-kpis">'
-    + kpi('neut', 'Fuerza pico', (r.fuerza_max != null ? r.fuerza_max.toFixed(0) : '—'), 'N', r.nTests + ' test' + (r.nTests === 1 ? '' : 's'))
-    + kpi('neut', 'Fuerza relativa', (r.fuerza_max != null && r.peso_kg) ? (r.fuerza_max / r.peso_kg).toFixed(2) : '—', 'N/kg', r.peso_kg ? (r.peso_kg.toFixed(1) + ' kg') : 'requiere bioimpedancia')
-    + kpi(peor ? (peor.q.nivel === 'ok' ? 'good' : (peor.q.nivel === 'vigilar' ? 'neut' : 'bad')) : 'neut',
-        'LSI más bajo', (peor ? peor.q.lsi.toFixed(0) : '—'), '%', peor ? esc(peor.nombre) : 'requiere ambos lados')
-    + kpi('neut', 'Pares comparables', r.nPares, 'tests', r.nPares ? 'con ambos lados' : 'falta un lado')
-    + '</div>';
+  /* Con mediciones de rango pero sin fuerza, los KPIs de newtons salian
+     vacios. Se muestran los del tipo de medicion que realmente hay. */
+  var hayFuerza = (r.nFuerza || 0) > 0, hayRango = (r.nRango || 0) > 0;
+  var _t = [];
+  if (hayFuerza){
+    _t.push(kpi('neut', 'Fuerza pico', (r.fuerza_max != null ? r.fuerza_max.toFixed(0) : '—'), 'N',
+      r.nFuerza + ' medición' + (r.nFuerza === 1 ? '' : 'es')));
+    _t.push(kpi('neut', 'Fuerza relativa', (r.fuerza_max != null && r.peso_kg) ? (r.fuerza_max / r.peso_kg).toFixed(2) : '—',
+      'N/kg', r.peso_kg ? (r.peso_kg.toFixed(1) + ' kg') : 'requiere bioimpedancia'));
+  }
+  if (hayRango){
+    _t.push(kpi('neut', 'Rango máximo', (r.rango_max != null ? r.rango_max.toFixed(0) : '—'), 'grados',
+      r.nRango + ' medición' + (r.nRango === 1 ? '' : 'es')));
+  }
+  _t.push(kpi(peor ? (peor.q.nivel === 'ok' ? 'good' : (peor.q.nivel === 'vigilar' ? 'neut' : 'bad')) : 'neut',
+    'LSI más bajo', (peor ? peor.q.lsi.toFixed(0) : '—'), '%', peor ? esc(peor.nombre) : 'requiere ambos lados'));
+  _t.push(kpi('neut', 'Pares comparables', r.nPares, 'de ' + r.nTests + ' tests', r.nPares ? 'con ambos lados' : 'falta un lado'));
+  var kpis = '<div class="pr-kpis"' + (_t.length === 3 ? ' style="grid-template-columns:repeat(3,1fr);"' : '') + '>'
+    + _t.join('') + '</div>';
 
   /* Tabla de todas las mediciones */
   var filas = fm.mediciones.map(function(m){
@@ -17735,7 +17767,10 @@ function u19FuerzaSecciones(fm){
   var b = frzReportBlocks(fm, {});
   return {
     head: '<div class="pr-sec"><div class="pr-letter">F</div><div class="pr-secttl">'
-      + '<h2>Fuerza isom\u00e9trica \u00b7 dinamometr\u00eda</h2><p>ActiveForce 2 \u00b7 fuerza m\u00e1xima y simetr\u00eda entre extremidades</p></div></div>'
+      + '<h2>' + (((fm.resumen.nFuerza || 0) > 0)
+          ? (((fm.resumen.nRango || 0) > 0) ? 'Fuerza y rango de movimiento' : 'Fuerza isom\u00e9trica \u00b7 dinamometr\u00eda')
+          : 'Rango de movimiento') + '</h2>'
+      + '<p>ActiveForce 2 \u00b7 ' + (((fm.resumen.nFuerza || 0) > 0) ? 'fuerza m\u00e1xima y ' : '') + 'simetr\u00eda entre extremidades</p></div></div>'
       + b.kpis + b.simBlock,
     cuerpo: b.tabla + b.narrBlock + b.calidad
   };
@@ -19008,6 +19043,7 @@ function renderFicha(){
     +   (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\'' + c.id + '\')" title="Resumen semanal por WhatsApp">📊</button>' : '')
     +   '<button class="btn btn-ghost btn-sm" onclick="u19ExportarCliente(\'' + c.id + '\')" title="Descargar todos sus datos">⬇</button>'
     +   '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\'' + c.id + '\')">Editar</button>'
+    +   '<button class="btn btn-ghost btn-sm" onclick="u19BorrarDatosCliente(\'' + c.id + '\')" title="Eliminar todo lo que la app guarda de esta persona" style="color:var(--danger);">🗑</button>'
     + '</div></div>';
 
   h += '<div class="u-ftabs">' + tabs.map(function(t){
@@ -19509,46 +19545,11 @@ function u19ObjetivoEsfuerzo(rowEx){
            rpeMin: u19RpeDeRir(Math.max(r.min, r.max)), rpeMax: u19RpeDeRir(Math.min(r.min, r.max)) };
 }
 
-/* Compara lo logrado con lo prescrito y sugiere que hacer con la carga.
-   Trabaja sobre la media de los RPE anotados: una serie suelta dice poco. */
-function u19AjustePorRPE(rowEx, series){
-  var obj = u19ObjetivoEsfuerzo(rowEx);
-  if (!obj) return null;
-  var rpes = (series || []).map(function(s){ return u19Num(s && (s.rpe != null ? s.rpe : s.RPE)); })
-                           .filter(function(v){ return v != null && v > 0 && v <= 10; });
-  if (!rpes.length) return null;
-  var med = rpes.reduce(function(a, b){ return a + b; }, 0) / rpes.length;
-  var pesos = (series || []).map(function(s){ return u19Num(s && (s.peso_kg != null ? s.peso_kg : s.weight)); })
-                            .filter(function(v){ return v != null && v > 0; });
-  var carga = pesos.length ? Math.max.apply(null, pesos) : null;
-
-  var d = 0, txt = "", nivel = "ok";
-  if (med < obj.rpeMin - 0.5){
-    d = med <= obj.rpeMin - 2 ? 0.075 : 0.04;
-    nivel = "subir";
-    txt = "El esfuerzo quedó por debajo de lo prescrito (RPE medio " + med.toFixed(1)
-      + " frente a " + obj.rpeMin + "–" + obj.rpeMax + "). La carga se quedó corta.";
-  } else if (med > obj.rpeMax + 0.5){
-    d = med >= obj.rpeMax + 2 ? -0.075 : -0.04;
-    nivel = "bajar";
-    txt = "El esfuerzo superó lo prescrito (RPE medio " + med.toFixed(1)
-      + " frente a " + obj.rpeMin + "–" + obj.rpeMax + "). La carga fue demasiado exigente.";
-  } else {
-    txt = "El esfuerzo cayó dentro de lo prescrito (RPE medio " + med.toFixed(1)
-      + ", objetivo " + obj.rpeMin + "–" + obj.rpeMax + "). Mantener la carga y progresar por repeticiones.";
-  }
-  var sugerida = (carga != null && d !== 0) ? Math.round(carga * (1 + d) * 2) / 2 : null;
-  return { rpeMedio: +med.toFixed(1), objetivo: obj, carga: carga, sugerida: sugerida,
-           pct: Math.round(d * 100), nivel: nivel, texto: txt, n: rpes.length };
-}
-
-/* Texto corto para la revisión de progresiones. */
-function u19AjusteTexto(a){
-  if (!a) return "";
-  if (a.nivel === "ok") return "mantener";
-  var s = (a.pct > 0 ? "+" : "") + a.pct + "%";
-  return (a.sugerida != null) ? (s + " → " + a.sugerida + " kg") : s;
-}
+/* El ajuste de carga contra el RIR prescrito vive en
+   _progSuggestProgression, que es donde la app revisa las cargas tras
+   recibir una sesion. Aqui habia una segunda implementacion que hacia
+   lo mismo y nadie llamaba: dos copias de la misma regla acaban
+   divergiendo, asi que se elimino. */
 
 /* Aplica el objetivo de RIR a todos los ejercicios de la rutina abierta. */
 window.u19AplicarRirGlobal = function(){
@@ -19567,6 +19568,73 @@ window.u19AplicarRirGlobal = function(){
   toast(v ? ("RIR " + v + " aplicado a " + n + " ejercicios") : ("Objetivo de RIR quitado de " + n + " ejercicios"), "success");
 };
 /* ===RIR_END=== */
+
+
+/* Historial unificado de simetria: mezcla los tests manuales de
+   Seguimiento, las evaluaciones de BlazePod y las dinamometrias de
+   ActiveForce en una sola curva. La llama u19HistorialRendimiento. */
+function u19HistorialSimetria(c, serie){
+  var conFecha = serie.filter(function(p){ return p.fecha; });
+  var spark = "";
+  if (conFecha.length >= 2){
+    var w = 500, hh = 140, px = 36, py = 22;
+    var vals = conFecha.map(function(p){ return p.lsi; });
+    var vmin = Math.min(70, Math.min.apply(null, vals));
+    var vmax = Math.max(100, Math.max.apply(null, vals));
+    var X = function(i){ return px + i * ((w - 2 * px) / (conFecha.length - 1)); };
+    var Y = function(v){ return (hh - py) - ((v - vmin) / (vmax - vmin)) * (hh - 2 * py); };
+    var y90 = Y(90);
+    spark = '<svg viewBox="0 0 ' + w + ' ' + hh + '" style="width:100%;height:auto;background:var(--surface-2,#f4f7fb);border-radius:8px;">'
+      + '<line x1="' + px + '" y1="' + y90.toFixed(1) + '" x2="' + (w - px) + '" y2="' + y90.toFixed(1)
+        + '" stroke="#15803d" stroke-width="1.2" stroke-dasharray="4 3"/>'
+      + '<text x="' + (w - px + 3) + '" y="' + (y90 + 3).toFixed(1) + '" font-size="9" fill="#15803d">90%</text>'
+      + '<path d="' + conFecha.map(function(p, i){ return (i ? 'L' : 'M') + X(i).toFixed(1) + ',' + Y(p.lsi).toFixed(1); }).join(' ')
+        + '" fill="none" stroke="#0e5132" stroke-width="2"/>'
+      + conFecha.map(function(p, i){
+          var col = p.lsi >= 90 ? '#15803d' : (p.lsi >= 85 ? '#d97706' : '#b91c1c');
+          var forma = p.fuente === 'manual'
+            ? '<rect x="' + (X(i) - 3.2).toFixed(1) + '" y="' + (Y(p.lsi) - 3.2).toFixed(1) + '" width="6.4" height="6.4" fill="' + col + '"/>'
+            : (p.fuente === 'dinamometria'
+              ? '<polygon points="' + X(i).toFixed(1) + ',' + (Y(p.lsi) - 4).toFixed(1)
+                + ' ' + (X(i) + 4).toFixed(1) + ',' + Y(p.lsi).toFixed(1)
+                + ' ' + X(i).toFixed(1) + ',' + (Y(p.lsi) + 4).toFixed(1)
+                + ' ' + (X(i) - 4).toFixed(1) + ',' + Y(p.lsi).toFixed(1) + '" fill="' + col + '"/>'
+              : '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(p.lsi).toFixed(1) + '" r="3.6" fill="' + col + '"/>');
+          return forma
+            + '<text x="' + X(i).toFixed(1) + '" y="' + (Y(p.lsi) - 9).toFixed(1) + '" font-size="9" text-anchor="middle" fill="#334155">'
+              + p.lsi.toFixed(0) + '</text>'
+            + '<text x="' + X(i).toFixed(1) + '" y="' + (hh - 5) + '" font-size="8" text-anchor="middle" fill="#94a3b8">'
+              + String(p.fecha).slice(5) + '</text>';
+        }).join('')
+      + '</svg>';
+  }
+  var filas = serie.slice().reverse().map(function(p){
+    var col = 'color:' + (p.lsi >= 90 ? '#15803d' : (p.lsi >= 85 ? '#b45309' : '#b91c1c')) + ';font-weight:700;';
+    var icono = p.fuente === 'manual' ? '&#9632;' : (p.fuente === 'dinamometria' ? '&#9670;' : '&#9679;');
+    return '<tr><td style="padding:.4rem .3rem;">' + rndFdate(p.fecha) + '</td>'
+      + '<td style="padding:.4rem .3rem;">' + icono + ' ' + escapeHtml(p.etiqueta) + '</td>'
+      + '<td style="padding:.4rem .3rem;' + col + '">' + p.lsi.toFixed(0) + '%</td>'
+      + '<td style="padding:.4rem .3rem;font-size:.72rem;color:var(--muted);">' + escapeHtml(p.detalle || '') + '</td></tr>';
+  }).join('');
+  openModal({
+    title: "Simetría (LSI) · " + (c.name || ""), large: true,
+    bodyHtml: (spark
+        ? '<div style="margin-bottom:.8rem;"><div class="text-xs text-muted" style="margin-bottom:.3rem;">'
+          + '&#9632; test manual &nbsp; &#9670; ActiveForce &nbsp; &#9679; BlazePod &nbsp;&nbsp; '
+          + 'la línea verde es el umbral de 90% para retorno deportivo</div>' + spark + '</div>'
+        : '')
+      + '<table style="width:100%;border-collapse:collapse;font-size:.8rem;">'
+      + '<thead><tr style="text-align:left;border-bottom:1px solid var(--border);">'
+      + '<th style="padding:.3rem;">Fecha</th><th style="padding:.3rem;">Origen</th>'
+      + '<th style="padding:.3rem;">LSI</th><th style="padding:.3rem;">Detalle</th></tr></thead>'
+      + '<tbody>' + filas + '</tbody></table>'
+      + '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">'
+      + 'Los tests manuales se registran en Seguimiento; los de BlazePod y ActiveForce, en Evaluación. '
+      + 'Los tres alimentan el mismo criterio de alta.</p>',
+    footer: [{ label:"Cerrar", cls:"btn-ghost" }]
+  });
+}
+/* ===SIMETRIA_END=== */
 
 </script>
 </body>
