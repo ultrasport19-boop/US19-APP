@@ -7,9 +7,19 @@
  *
  * COMO USARLO
  *   1. Apps Script → pega este archivo.
- *   2. Propiedades del script: NOTION_TOKEN y NOTION_DB (ver abajo).
+ *   2. Propiedades del script: NOTION_TOKEN, NOTION_DB y API_CLAVE.
+ *      API_CLAVE es una cadena larga que inventas tu. SIN ELLA EL PUENTE
+ *      NO RESPONDE A NADIE: preferimos que se caiga a dejarlo abierto.
  *   3. Implementar → Aplicacion web → Ejecutar como: yo · Acceso: Cualquiera.
- *   4. Copia la URL /exec y pegala en la app: Finanzas → Conexion con Notion.
+ *      ("Cualquiera" sigue siendo necesario para que el navegador pueda
+ *      llamarlo sin sesion de Google; quien controla el acceso es la clave.)
+ *   4. Copia la URL /exec y pegala en la app, y la clave en su campo
+ *      aparte: Finanzas → Conexion con Notion.
+ *
+ * POR QUE LA CLAVE VA APARTE DE LA URL
+ *   Si la clave viajara pegada a la /exec, ensenar la URL en una captura
+ *   o pegarla en un chat regalaria el acceso completo. Separadas, filtrar
+ *   una no basta.
  *
  * ENDPOINTS
  *   ?tipo=clientes    roster completo, un objeto por cliente
@@ -21,6 +31,36 @@ var PROPS = PropertiesService.getScriptProperties();
 var NOTION_TOKEN = PROPS.getProperty('NOTION_TOKEN');   // secret_xxx del integration
 var NOTION_DB    = PROPS.getProperty('NOTION_DB') || '545559de-0423-4016-9823-ae3c654aa12e';
 var NOTION_VER   = '2022-06-28';
+var API_CLAVE    = PROPS.getProperty('API_CLAVE');
+
+/**
+ * Nadie entra sin clave. Si API_CLAVE no esta configurada, el puente deja
+ * de atender: mas vale que la app se queje a que la base de clientes siga
+ * al alcance de cualquiera que adivine o herede la URL.
+ */
+function _autorizado(e) {
+  if (!API_CLAVE) return false;
+  var k = (e && e.parameter && e.parameter.k) || '';
+  if (!k && e && e.postData) {
+    try { k = JSON.parse(e.postData.contents).k || ''; } catch (_e) {}
+  }
+  return _clavesIguales(String(k), String(API_CLAVE));
+}
+
+/* Comparacion de tiempo constante: no le cuenta al que prueba cuantos
+   caracteres lleva acertados. */
+function _clavesIguales(a, b) {
+  if (a.length !== b.length) return false;
+  var d = 0;
+  for (var i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
+/* Una sola respuesta para todo lo que no pasa el filtro: no distingue
+   entre "falta la clave", "clave mala" y "endpoint que no existe". */
+function _noAutorizado() {
+  return _json({ error: 'no autorizado' });
+}
 
 /* Nombres exactos de las propiedades en Notion. */
 var P = {
@@ -49,6 +89,7 @@ var P = {
 };
 
 function doGet(e) {
+  if (!_autorizado(e)) return _noAutorizado();
   var tipo = (e && e.parameter && e.parameter.tipo) || '';
   try {
     if (tipo === 'clientes')  return _json(rosterClientes());
@@ -69,6 +110,7 @@ function doGet(e) {
  * Requiere una propiedad de script ANTHROPIC_KEY con tu sk-ant-...
  */
 function doPost(e) {
+  if (!_autorizado(e)) return _noAutorizado();
   var tipo = (e && e.parameter && e.parameter.tipo) || '';
   try {
     if (tipo === 'notion_bio') return _json(escribirBioimpedancia(JSON.parse(e.postData.contents)));

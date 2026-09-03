@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#E21C25">
+<!-- No puede bloquear el codigo en linea (la app entera lo es), pero acota
+     a donde se pueden mandar datos: si algun dia se colara un XSS, no
+     tendria a donde llevarselos. frame-ancestors y report-uri se ignoran
+     en <meta>; para esos harian falta cabeceras HTTP, que GitHub Pages no
+     deja poner. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https:; media-src 'self' data: blob: https:; connect-src 'self' https://api.github.com https://raw.githubusercontent.com https://api.calendly.com https://script.google.com https://script.googleusercontent.com https://api.anthropic.com https://api-ssl.bitly.com; frame-src 'self' blob: data:; worker-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Ultra-Sport 19 · Planificador de Rutinas</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3098,7 +3104,7 @@ function getCategoryBadge(catId){var c=getCategoryById(catId);if(!c)return'';ret
 var SEED_DATA = {"clients":[{"name":"Amanda Isidora","phone":"","email":"","goal":"Tendinopatia de la pata de ganso","notes":"","id":"8pbllen1","createdAt":1778888616182},{"name":"Marcia Nuñez","phone":"+56 9 4949 0001","email":"","goal":"Bajar de peso","notes":"","id":"f4vxwf2y","createdAt":1779101504557},{"name":"Daniela Vasquez","phone":"+56 9 6451 8099","email":"","goal":"Bajar de peso - Ganar confianza - Trotar 15 minutos","notes":"Objetivo: bajar a 70 kg, ganar confianza postop y llegar a 15 min de trote continuo. Aeróbico al inicio para activar y progresar cardio. RIR 3, sin dolor durante la ejecución. Detener ante cualquier signo de alarma (dolor punzante, mareo, fatiga inusual). Sumar 7.000-8.000 pasos diarios fuera de la sesión. Proteína 1.6 g/kg/día. Reevaluar cada 2 semanas.","id":"un55p8ps","createdAt":1779102425967},{"name":"Paula Urrutia","phone":"+56 9 7790 3239","email":"","goal":"Hipertrofia Gluteos","notes":"Notas: Lunes/Miércoles/Viernes en el gimnasio con foco glúteo (3 frecuencias/semana). Martes/Jueves/Sábado en casa con trabajo simple de brazos (mancuernas livianas, botellas o peso corporal). RIR 1-2 en gym, RIR 2-3 en casa. Doble progresión. Excéntrica 2-3s. Proteína 1.8-2.2 g/kg/día. Descarga en semana 5 (-1 serie, RIR 3). Domingo descanso activo (caminata 30-45 min).","id":"1yv9duxs","createdAt":1779103207425},{"name":"Sergio Castillo","phone":"+56 9 7189 6990","email":"","goal":"","notes":"","id":"as4tktv5","createdAt":1779558207147},{"name":"Javier Caceres","phone":"+56 9 9121 0262","email":"","goal":"","notes":"","id":"r7qcurhs","createdAt":1780153235483},{"name":"Javiera Celis","phone":"+56 9 4974 9300","email":"","goal":"","notes":"","id":"aslnpeh2","createdAt":1780153341399}],"routines":[{"id":"fpg4nfkj","name":"Full Body 4 días (Fuerza + Hipertrofia)","clientId":"","weeks":6,"startDate":"","notes":"Basado en evidencia de fuerza/hipertrofia: prioriza multiarticulares, 10–20 series/semana por grupo muscular (aprox), 1–3 RIR (cerca del fallo sin llegar), progresión semanal (sube 1–2 reps o +2,5–5% carga si completas el rango). Descansos 2–3min en compuestos y 60–90s en accesorios. Alterna 2 patrones de sentadilla/hinge/upper push/pull para repartir fatiga. Calentamiento 5–8 min Bicicleta estática + 1–2 series de aproximación por ejercicio grande.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"4-6","weight":"","rest":"3min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"5-8","weight":"","rest":"3min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"10-15","weight":"","rest":"90s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"30-60","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"wk6hv8q7","sets":"4","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"4vq5o72k","sets":"3","reps":"5-8","weight":"","rest":"3min","notes":""},{"exerciseId":"lwb6140n","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"8-12","weight":"","rest":"90s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"30-60","weight":"","rest":"60s","notes":""}]},{"day":3,"exercises":[]},{"day":4,"exercises":[{"exerciseId":"93669dei","sets":"4","reps":"8-12","weight":"","rest":"3min","notes":""},{"exerciseId":"j47nas4p","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"fkevh8gb","sets":"3","reps":"8-12","weight":"","rest":"2min","notes":""},{"exerciseId":"3zrynnlg","sets":"3","reps":"10-15","weight":"","rest":"90s","notes":""},{"exerciseId":"m9rv2jkb","sets":"3","reps":"30-45","weight":"","rest":"45s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"3-5","weight":"","rest":"3min","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"AMRAP","weight":"","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"3","reps":"AMRAP","weight":"","rest":"3min","notes":""},{"exerciseId":"wgn1b96d","sets":"3","reps":"6-10","weight":"","rest":"3min","notes":""},{"exerciseId":"n0tvqg49","sets":"3","reps":"12-20","weight":"","rest":"60s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778888132491,"updatedAt":1778888135538,"category":"cuerpo_completo"},{"id":"s75ckkbn","name":"Fase 1","clientId":"8pbllen1","weeks":2,"startDate":"","notes":"Tareas para la casa los días sábado y domingo. Evitar actividades que compriman o estiren el tendón.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"3zrynnlg","sets":"3","reps":"60s","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90s","weight":"","rest":"60s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"15","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"3zrynnlg","sets":"4","reps":"12","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"60s","weight":"","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"30","weight":"","rest":"30s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"3zrynnlg","sets":"3","reps":"12","weight":"","rest":"45s","notes":""},{"exerciseId":"5bu9lyvc","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"12","weight":"","rest":"60s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"","rest":"","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"12","weight":"","rest":"60s","notes":""}]},{"day":7,"exercises":[{"exerciseId":"cjv20vqf","sets":"1","reps":"20min","weight":"","rest":"","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"10","weight":"","rest":"60s","notes":""}]}],"createdAt":1778888563516,"updatedAt":1779557103600,"category":"rehabilitacion"},{"id":"dkvimj4m","name":"Full Body 4D (Fuerza + Hipertrofia)","clientId":"as4tktv5","weeks":6,"startDate":"","notes":"Full body 4 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: cuando completes todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"10","weight":"80 ","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"53.2","rest":"2min","notes":""},{"exerciseId":"9j6py7e7","sets":"3","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"51,6","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"3","reps":"15","weight":"8 kg ","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45","weight":"Corporal ","rest":"45s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"10","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"30 kg","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"8","weight":"15","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"10","rest":"90s","notes":""}]},{"day":3,"exercises":[]},{"day":4,"exercises":[{"exerciseId":"skwox951","sets":"4","reps":"10","weight":"10 ","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"20 ","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"50 ","rest":"2min","notes":""},{"exerciseId":"nhvza9n8","sets":"3","reps":"15","weight":"15","rest":"60s","notes":""},{"exerciseId":"n0tvqg49","sets":"3","reps":"60 s","weight":"","rest":"60s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"50 kg ","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"8","weight":"53.2 ","rest":"2min","notes":""},{"exerciseId":"fkevh8gb","sets":"4","reps":"10","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"3hu5a1nd","sets":"4","reps":"12","weight":"","rest":"90s","notes":""},{"exerciseId":"yj5uc0jk","sets":"4","reps":"12","weight":"15 ","rest":"90s","notes":""},{"exerciseId":"pjdpwp7g","sets":"4","reps":"12","weight":"20 ","rest":"90s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778889140988,"updatedAt":1781271239976,"category":"cuerpo_completo"},{"id":"tf80sgk1","name":"Full Body 3D (Fuerza + Hipertrofia)","clientId":"aslnpeh2","weeks":6,"startDate":"","notes":"Full body 3 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: si completas todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"6","weight":"40","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"10","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"10","rest":"2min","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"30","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"4","reps":"15","weight":"2.5","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"30","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"10","rest":"120","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"15","weight":"18","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"20","rest":"120","notes":""},{"exerciseId":"3hu5a1nd","sets":"2","reps":"15","weight":"6","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"2","reps":"15","weight":"2.5","rest":"90s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"orcsx8fh","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"5","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"08pukekq","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"40","rest":"2min","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1778889282641,"updatedAt":1780153520145,"category":"cuerpo_completo"},{"id":"rhwin7so","name":"Rutina: MP (6AM)","clientId":"f4vxwf2y","weeks":4,"startDate":"","notes":"Enfoque en técnica y adherencia. RIR 3. Subir carga cuando complete el tope de reps con técnica intacta. Pasar a rutina intermedia tras 4 semanas.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"20","weight":"","rest":"0","notes":""},{"exerciseId":"grgwwddk","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"nhzm75zl","sets":"3","reps":"12-15","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"20","weight":"","rest":"20s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"cjv20vqf","sets":"1","reps":"12","weight":"","rest":"0","notes":""},{"exerciseId":"td9k3mnw","sets":"2","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"6anuy8t2","sets":"4","reps":"10","weight":"","rest":"75s","notes":""},{"exerciseId":"4by853es","sets":"4","reps":"12-15","weight":"","rest":"45s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"20","weight":"","rest":"0","notes":""},{"exerciseId":"6anuy8t2","sets":"3","reps":"10-12","weight":"","rest":"75s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"8-10","weight":"","rest":"60s","notes":""},{"exerciseId":"fkevh8gb","sets":"3","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"wgn1b96d","sets":"3","reps":"12","weight":"","rest":"75s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"10-12","weight":"","rest":"45s","notes":""},{"exerciseId":"0aezgpey","sets":"3","reps":"12","weight":"","rest":"45s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1779101520515,"updatedAt":1779101866170,"category":"mixta"},{"id":"juz7d66m","name":"Rutina: Daniela.V","clientId":"un55p8ps","weeks":4,"startDate":"","notes":"Objetivo: bajar a 70 kg, ganar confianza postop y llegar a 15 min de trote continuo. Aeróbico de 25 min al inicio (bicicleta o caminadora). RIR 3, sin dolor durante la ejecución. Detener ante cualquier signo de alarma (dolor punzante, mareo, fatiga inusual). Sumar 7.000-8.000 pasos diarios fuera de la sesión. Proteína 1.6 g/kg/día. Reevaluar cada 2 semanas.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"rtxdv082","sets":"1","reps":"25","weight":"V: 6.3","rest":"","notes":""},{"exerciseId":"nhzm75zl","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"60 s","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"6anuy8t2","sets":"3","reps":"15","weight":"","rest":"90s","notes":""},{"exerciseId":"fkevh8gb","sets":"4","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"60 s","weight":"Peso corporal ","rest":"45s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"V: 6.5 km/h","rest":"0","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"60s","weight":"Peso corporal ","rest":"45s","notes":""},{"exerciseId":"hsqs24tn","sets":"3","reps":"60 s","weight":"","rest":"45s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"r9h8tscr","sets":"1","reps":"25 min","weight":"6.7 km/h","rest":"1min","notes":""},{"exerciseId":"hxuhtdyy","sets":"3","reps":"10 ","weight":"5 kg (Mancuernas)","rest":"30s","notes":""},{"exerciseId":"skwox951","sets":"3","reps":"8","weight":"","rest":"75s","notes":""},{"exerciseId":"fmh626bt","sets":"3","reps":"15","weight":"Peso corporal","rest":"60s","notes":""},{"exerciseId":"lwb6140n","sets":"3","reps":"10","weight":"40 libras","rest":"60s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"60 s","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"b006joyr","sets":"3","reps":"60 s","weight":"Peso corporal","rest":"45s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1779102431106,"updatedAt":1780914275560,"category":"rehabilitacion"},{"id":"b4pwfs8x","name":"Hipertrofia glúteos + brazos en casa - 3 días gym","clientId":"1yv9duxs","weeks":6,"startDate":"","notes":"Lunes/Miércoles/Viernes en el gimnasio con foco glúteo (3 frecuencias/semana). Martes/Jueves/Sábado en casa con trabajo simple de brazos (mancuernas livianas, botellas o peso corporal). RIR 1-2 en gym, RIR 2-3 en casa. Doble progresión. Excéntrica 2-3s. Proteína 1.8-2.2 g/kg/día. Descarga en semana 5 (-1 serie, RIR 3). Domingo descanso activo (caminata 30-45 min).","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"wgn1b96d","sets":"4","reps":"8","weight":"55 ","rest":"150s","notes":""},{"exerciseId":"skwox951","sets":"4","reps":"12","weight":"10 kg","rest":"90s","notes":""},{"exerciseId":"6anuy8t2","sets":"4","reps":"12","weight":"20 kg","rest":"90s","notes":""},{"exerciseId":"u2yh462j","sets":"3","reps":"60s","weight":"Step","rest":"60s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"25 ","weight":"Banda elastica","rest":"45s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"45s","weight":"Peso corporal ","rest":"30s","notes":""}]},{"day":2,"exercises":[{"exerciseId":"arrer2i4","sets":"3","reps":"25","weight":"Peso corporal ","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"20","weight":"8","rest":"60s","notes":""},{"exerciseId":"yj5uc0jk","sets":"3","reps":"15","weight":"8","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"10","weight":"8 kg","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"90 s ","weight":"Peso corporal ","rest":"30s","notes":""}]},{"day":3,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"12 ","weight":"38 kg aprox","rest":"150s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"56.4","rest":"120s","notes":""},{"exerciseId":"62fy9y5f","sets":"3","reps":"12","weight":"10 kg ","rest":"90s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90 s","weight":"Peso corporal ","rest":"30s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"60 s","weight":"Step ","rest":"30s","notes":""}]},{"day":4,"exercises":[{"exerciseId":"z7ibmpe8","sets":"3","reps":"10-12","weight":"","rest":"60s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"8-10","weight":"","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"yj5uc0jk","sets":"3","reps":"12","weight":"","rest":"45s","notes":""},{"exerciseId":"b006joyr","sets":"3","reps":"10","weight":"","rest":"45s","notes":""}]},{"day":5,"exercises":[{"exerciseId":"6anuy8t2","sets":"4","reps":"12","weight":"20 ","rest":"120s","notes":""},{"exerciseId":"b55fv8zg","sets":"4","reps":"20","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"skwox951","sets":"3","reps":"12","weight":"10 ","rest":"90s","notes":""},{"exerciseId":"fmh626bt","sets":"3","reps":"20","weight":"Peso corporal ","rest":"60s","notes":""},{"exerciseId":"4qhffffu","sets":"3","reps":"60 s ","weight":"Peso corporal ","rest":"45s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"yj5uc0jk","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"arrer2i4","sets":"3","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"3hu5a1nd","sets":"3","reps":"10","weight":"","rest":"60s","notes":""},{"exerciseId":"sxzjwrbp","sets":"3","reps":"12","weight":"","rest":"60s","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"60","weight":"","rest":"30s","notes":""}]},{"day":7,"exercises":[]}],"createdAt":1779103393448,"updatedAt":1780913706002,"category":"mixta"},{"id":"edylfxnq","name":"Fase 2 - Recuperación de fuerza y control motor","clientId":"8pbllen1","weeks":3,"startDate":"2026-05-25","notes":"Tendinopatía semimembranoso distal. Énfasis excéntrico y control motor. Progresar carga si no hay dolor durante ni después del ejercicio.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"ut20qveb","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"12","weight":"13.2 aprox","rest":"90s","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"15","weight":"","rest":"90s","notes":""},{"exerciseId":"35yv2xhc","sets":"3","reps":"90s","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"4by853es","sets":"3","reps":"15","weight":"","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"ztvorhsp","sets":"4","reps":"10","weight":"","rest":"90s","notes":""},{"exerciseId":"5bu9lyvc","sets":"4","reps":"12","weight":"13.2","rest":"90s","notes":""},{"exerciseId":"rv060aky","sets":"3","reps":"20","weight":"Banda elastica","rest":"60s","notes":""},{"exerciseId":"2zu9nagb","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"fmh626bt","sets":"4","reps":"15","weight":"","rest":"60s","notes":""},{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"10 kg","rest":"90s","notes":""},{"exerciseId":"skwox951","sets":"4","reps":"12","weight":"S/n peso ","rest":"60s","notes":""},{"exerciseId":"7lhgd7fh","sets":"3","reps":"20","weight":"Banda elastica","rest":"60s","notes":""}]},{"day":6,"exercises":[{"exerciseId":"r9h8tscr","sets":"","reps":"25 min ","weight":"","rest":"","notes":""}]},{"day":7,"exercises":[{"exerciseId":"rmaa1t01","sets":"1","reps":"25 min","weight":"","rest":"25min","notes":""}]}],"createdAt":1779557598833,"updatedAt":1779558052661,"category":"rehabilitacion"},{"id":"lo1g3slk","name":"Full Body 3D (Fuerza + Hipertrofia)","clientId":"r7qcurhs","weeks":6,"startDate":"","notes":"Full body 3 días. Descansos: multiarticulares 2min, accesorios 90s, core 60s. Progresión: si completas todas las reps objetivo con buena técnica, sube 2,5-5% la carga la semana siguiente.","status":"active","days":[{"day":1,"exercises":[{"exerciseId":"5bu9lyvc","sets":"4","reps":"6","weight":"60","rest":"2min","notes":""},{"exerciseId":"apmakjrm","sets":"4","reps":"6","weight":"30","rest":"2min","notes":""},{"exerciseId":"abrquzoz","sets":"4","reps":"8","weight":"33.2","rest":"2min","notes":""},{"exerciseId":"wk6hv8q7","sets":"3","reps":"8","weight":"40","rest":"2min","notes":""},{"exerciseId":"bg58mqok","sets":"4","reps":"15","weight":"11","rest":"60s","notes":""}]},{"day":2,"exercises":[]},{"day":3,"exercises":[{"exerciseId":"vn9ikcin","sets":"3","reps":"12","weight":"32","rest":"2min","notes":""},{"exerciseId":"4vq5o72k","sets":"4","reps":"8","weight":"20","rest":"120","notes":""},{"exerciseId":"lwb6140n","sets":"4","reps":"15","weight":"27.2","rest":"90s","notes":""},{"exerciseId":"1harazo5","sets":"3","reps":"10","weight":"10","rest":"120","notes":""},{"exerciseId":"3hu5a1nd","sets":"2","reps":"15","weight":"10","rest":"90s","notes":""},{"exerciseId":"sxzjwrbp","sets":"2","reps":"15","weight":"6","rest":"90s","notes":""}]},{"day":4,"exercises":[]},{"day":5,"exercises":[{"exerciseId":"orcsx8fh","sets":"4","reps":"10","weight":"15","rest":"90s","notes":""},{"exerciseId":"j47nas4p","sets":"4","reps":"10","weight":"6","rest":"90s","notes":""},{"exerciseId":"9j6py7e7","sets":"4","reps":"6","weight":"","rest":"2min","notes":""},{"exerciseId":"wgn1b96d","sets":"4","reps":"10","weight":"40","rest":"2min","notes":""},{"exerciseId":"539c9hof","sets":"3","reps":"45s","weight":"","rest":"30s","notes":""}]},{"day":6,"exercises":[]},{"day":7,"exercises":[]}],"createdAt":1780153564651,"updatedAt":1781173977508,"category":"cuerpo_completo"}],"exercises":[{"id":"apmakjrm","name":"Press de banca con barra","muscle":"Pecho","equipment":"Barra","desc":"Acostado en banco plano, baja la barra al pecho controlado y empuja hacia arriba.","gif":"https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR2IeeZS4HvXUvKMQ7ll9rMHT2ZwljqFEaP3w&s"},{"id":"j47nas4p","name":"Press inclinado con mancuernas","muscle":"Pecho","equipment":"Mancuernas","desc":"Banco a 30-45°. Empuja desde los hombros sin chocar las mancuernas arriba.","gif":"https://fitcron.com/wp-content/uploads/2021/03/03241301-Dumbbell-Incline-Palm-in-Press_Chest_720.gif"},{"id":"kvl7qkct","name":"Aperturas con mancuernas","muscle":"Pecho","equipment":"Mancuernas","desc":"Brazos ligeramente flexionados, abre y cierra describiendo un arco.","gif":"https://fitcron.com/wp-content/uploads/2021/03/03081301-Dumbbell-Fly_Chest-FIX_720.gif"},{"id":"arrer2i4","name":"Flexiones de pecho","muscle":"Pecho","equipment":"Peso corporal","desc":"Cuerpo alineado, codos a 45°, baja hasta casi tocar el suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06621301-Push-up-m_Chest-FIX_720.gif"},{"id":"9j6py7e7","name":"Dominadas pronas","muscle":"Espalda","equipment":"Peso corporal","desc":"Agarre prono, sube llevando el pecho a la barra y baja controlado.","gif":"https://wefit.es/library/exercises/pull-ups-dominada.gif"},{"id":"abrquzoz","name":"Remo con barra","muscle":"Espalda","equipment":"Barra","desc":"Tronco inclinado 45°, lleva la barra al abdomen sin balanceos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00271301-Barbell-Bent-Over-Row_Back-FIX_720.gif"},{"id":"fkevh8gb","name":"Remo con mancuerna a una mano","muscle":"Espalda","equipment":"Mancuernas","desc":"Apoyado en banco, lleva la mancuerna al costado del torso.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02921301-Dumbbell-Bent-over-Row_back_Back_720.gif"},{"id":"lwb6140n","name":"Jalón al pecho","muscle":"Espalda","equipment":"Polea","desc":"Sentado, jala la barra al pecho contrayendo dorsales.","gif":"https://static.wixstatic.com/media/c94d75_33fa8ffcfe94421586595b5f05e83c64~mv2.gif"},{"id":"4vq5o72k","name":"Press militar con barra","muscle":"Hombro","equipment":"Barra","desc":"De pie, empuja la barra desde el pecho hasta extender brazos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/11651301-Barbell-Standing-Military-Press-without-rack_Shoulders_720.gif"},{"id":"bg58mqok","name":"Elevaciones laterales","muscle":"Hombro","equipment":"Mancuernas","desc":"Eleva las mancuernas hasta la altura de los hombros.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03341301-Dumbbell-Lateral-Raise_shoulder-AFIX_720.gif"},{"id":"6o2epqfj","name":"Pájaros (rear delts)","muscle":"Hombro","equipment":"Mancuernas","desc":"Inclinado, abre los brazos llevando los codos arriba y atrás.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03801301-Dumbbell-Rear-Lateral-Raise_Shoulders_720.gif"},{"id":"z7ibmpe8","name":"Curl con barra","muscle":"Brazo","equipment":"Barra","desc":"Codos pegados al cuerpo, sube la barra contrayendo bíceps.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00311301-Barbell-Curl_Upper-Arms_720.gif"},{"id":"3hu5a1nd","name":"Curl alterno con mancuernas","muscle":"Brazo","equipment":"Mancuernas","desc":"Alterna brazos, gira la muñeca al subir.","gif":"https://eresfitness.com/wp-content/uploads/2019/05/Curl-de-biceps.gif"},{"id":"yj5uc0jk","name":"Curl martillo","muscle":"Brazo","equipment":"Mancuernas","desc":"Agarre neutro, sube manteniendo las palmas enfrentadas.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02981301-Dumbbell-Cross-Body-Hammer-Curl_Forearms_720.gif"},{"id":"sxzjwrbp","name":"Press francés","muscle":"Brazo","equipment":"Barra","desc":"Acostado, baja la barra detrás de la cabeza flexionando codos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03521301-Dumbbell-Neutral-Grip-Bench-Press_Upper-Arms_720.gif"},{"id":"pjdpwp7g","name":"Extensión de tríceps en polea","muscle":"Brazo","equipment":"Polea","desc":"Codos pegados, extiende los antebrazos hacia abajo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/02411301-Cable-Triceps-Pushdown-V-bar-attachment_Upper-Arms_720.gif"},{"id":"t8md0zrf","name":"Fondos en paralelas","muscle":"Brazo","equipment":"Peso corporal","desc":"Cuerpo vertical, baja con codos atrás y empuja al subir.","gif":"https://fitcron.com/wp-content/uploads/2021/03/02511301-Chest-Dip_Chest_720.gif"},{"id":"5bu9lyvc","name":"Sentadilla con barra","muscle":"Pierna","equipment":"Barra","desc":"Barra en trapecios, baja hasta paralelo y sube.","gif":"https://fitcron.com/wp-content/uploads/2021/04/15141301-Barbell-Quarter-Squat_Thighs_720.gif"},{"id":"6anuy8t2","name":"Sentadilla goblet","muscle":"Pierna","equipment":"Mancuernas","desc":"Sostén la mancuerna al pecho, baja con torso erguido.","gif":"https://enfaf.com/wp-content/uploads/2026/04/sentadilla-globet.gif"},{"id":"vn9ikcin","name":"Peso muerto","muscle":"Pierna","equipment":"Barra","desc":"Espalda neutra, levanta la barra empujando el suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/00851301-Barbell-Romanian-Deadlift_Hips_720.gif"},{"id":"wk6hv8q7","name":"Peso muerto rumano","muscle":"Pierna","equipment":"Barra","desc":"Piernas semi-rígidas, baja la barra cerca del cuerpo.","gif":"https://i.pinimg.com/originals/d3/de/df/d3dedf6446a3d12e1774eec7b7b6c9e3.gif"},{"id":"1harazo5","name":"Zancadas con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"Da un paso largo y baja la rodilla trasera al suelo.","gif":"https://fitcron.com/wp-content/uploads/2021/04/03361301-Dumbbell-Lunge_Hips_720.gif"},{"id":"93669dei","name":"Prensa de piernas","muscle":"Pierna","equipment":"Máquina","desc":"Empuja la plataforma sin bloquear rodillas al final.","gif":"https://fitcron.com/wp-content/uploads/2021/04/15751301-Sled-45%C2%B0-Narrow-Stance-Leg-Press_Thighs_720.gif"},{"id":"unv9izrr","name":"Extensión de cuádriceps","muscle":"Pierna","equipment":"Máquina","desc":"Sentado, extiende rodillas contrayendo cuádriceps.","gif":"https://fitcron.com/wp-content/uploads/2021/04/05851301-Lever-Leg-Extension_Thighs_720.gif"},{"id":"3zrynnlg","name":"Curl femoral acostado","muscle":"Pierna","equipment":"Máquina","desc":"Boca abajo, lleva los talones hacia los glúteos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/05861301-Lever-Lying-Leg-Curl_Thighs_720.gif"},{"id":"wgn1b96d","name":"Hip thrust","muscle":"Glúteo","equipment":"Barra","desc":"Apoya espalda en banco, sube cadera contrayendo glúteos.","gif":"https://fitnessprogramer.com/wp-content/uploads/2021/02/Barbell-Hip-Thrust.gif"},{"id":"pt3896zx","name":"Patada de glúteo en polea","muscle":"Glúteo","equipment":"Polea","desc":"Lleva la pierna hacia atrás extendiendo cadera.","gif":"https://www.thingys.com.ar/gymapps/tutorial/gluteos_polea.gif"},{"id":"skwox951","name":"Sentadilla búlgara","muscle":"Glúteo","equipment":"Mancuernas","desc":"Pie trasero en banco, baja la rodilla delantera.","gif":"https://i.pinimg.com/originals/bb/a3/78/bba3784f1f2920245df7ae6934c365a9.gif"},{"id":"4by853es","name":"Elevación de talón de pie","muscle":"Pierna","equipment":"Máquina","desc":"Sube y baja en puntas de pie.","gif":"https://api.smartworkout.app/asset/image/01f86161-5bb5-4bec-bad0-13e96076fd37"},{"id":"539c9hof","name":"Plancha frontal","muscle":"Core","equipment":"Peso corporal","desc":"Mantén el cuerpo recto en apoyo de antebrazos.","gif":"https://fitcron.com/wp-content/uploads/2021/04/04631301-Front-Plank_waist-FIX_720.gif"},{"id":"2zu9nagb","name":"Plancha lateral","muscle":"Core","equipment":"Peso corporal","desc":"Apoyo lateral en codo, cadera elevada.","gif":"https://fitcron.com/wp-content/uploads/2021/04/07151301-Side-Plank-m_Waist_720.gif"},{"id":"0aezgpey","name":"Crunch abdominal  cruzado","muscle":"Core","equipment":"Peso corporal","desc":"Acostado, levanta los hombros contrayendo el abdomen.","gif":"https://fitcron.com/wp-content/uploads/2024/05/00031301-air-bike-m_waist_FIX_720.gif"},{"id":"kxvpu5vh","name":"Crunch en polea","muscle":"Core","equipment":"Polea","desc":"De rodillas, lleva los codos hacia las rodillas.","gif":"https://fitcron.com/wp-content/uploads/2021/04/01751301-Cable-Kneeling-Crunch_Waist-FIX_720.gif"},{"id":"n0tvqg49","name":"Russian twist","muscle":"Core","equipment":"Peso corporal","desc":"Sentado, gira el torso de un lado a otro.","gif":"https://media3.giphy.com/media/v1.Y2lkPTZjMDliOTUycThvdHRnanJrY215ZG56M3l2bG9vaXVyZHJ0NXZuemxmbHQyc3l3ZiZlcD12MV9naWZzX3NlYXJjaCZjdD1n/cpKD9u3S25xYL8tcbr/giphy.gif"},{"id":"m9rv2jkb","name":"Mountain climbers","muscle":"Core","equipment":"Peso corporal","desc":"En plancha, lleva las rodillas al pecho alternando.","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/484.gif"},{"id":"nnuit1dn","name":"Ab wheel rollout","muscle":"Core","equipment":"Rueda","desc":"De rodillas, rueda hacia adelante manteniendo core firme.","gif":"https://fitcron.com/wp-content/uploads/2024/05/08571301-Wheel-Rollout_Waist-FIX_720.gif"},{"id":"rtxdv082","name":"Caminadora ��� caminata","muscle":"Cardio","equipment":"Caminadora","desc":"Caminata enérgica, mantén postura erguida.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06841301-Run-equipment_Cardio_720.gif"},{"id":"r9h8tscr","name":"Caminadora — trote","muscle":"Cardio","equipment":"Caminadora","desc":"Trote suave a moderado.","gif":"https://fitcron.com/wp-content/uploads/2021/03/06841301-Run-equipment_Cardio_720.gif"},{"id":"cjv20vqf","name":"Bicicleta estática","muscle":"Cardio","equipment":"Máquina","desc":"Mantén cadencia constante, ajusta resistencia.","gif":"https://fitcron.com/wp-content/uploads/2021/03/22791301-Stationary-Bike-Run-version-4_Cardio_720.gif"},{"id":"ajj535t4","name":"Elíptica","muscle":"Cardio","equipment":"Máquina","desc":"Movimiento fluido, usa los brazos.","gif":""},{"id":"dygeqvil","name":"Burpees","muscle":"Cardio","equipment":"Peso corporal","desc":"Cuclilla, plancha, flexión, salto.","gif":"https://media4.giphy.com/media/v1.Y2lkPTZjMDliOTUycndhaWZoM3VqMXd6cW5sMm16ZzUwNHRiNmpqZWl5bzN4bmlvaDQ0dSZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/l4pT6Obikzs5gxWSI/giphy.gif"},{"id":"seg69eps","name":"Saltar la cuerda","muscle":"Cardio","equipment":"Peso corporal","desc":"Saltos cortos, mueve solo las muñecas.","gif":"https://fitcron.com/wp-content/uploads/2021/03/36761301-Skip-Jump-Rope-male_Cardio_720.gif"},{"id":"grgwwddk","name":"Sentadillas al aire","muscle":"Pierna","equipment":"Peso corporal","desc":"Baja con torso erguido, talones en el suelo.","gif":"https://media.tenor.com/hhzvx7eFir4AAAAM/1.gif"},{"id":"nhzm75zl","name":"Puente de glúteos","muscle":"Glúteo","equipment":"Peso corporal","desc":"Tendido, sube cadera apretando glúteos.","gif":"https://doriangym.es/wp-content/uploads/2022/10/puente-de-gluteos-dorian-gym.gif"},{"id":"40rddltx","name":"Superman","muscle":"Espalda","equipment":"Peso corporal","desc":"Boca abajo, eleva brazos y piernas a la vez.","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/94.gif"},{"id":"fx43j725","name":"Movilidad de cadera 90/90","muscle":"Movilidad","equipment":"Peso corporal","desc":"Rotaciones de cadera sentado en posición 90/90.","gif":"https://i.redd.it/ik1jxulb417e1.gif"},{"id":"ljav0z1w","name":"Estiramiento de isquios","muscle":"Movilidad","equipment":"Peso corporal","desc":"Pierna estirada, inclina el torso hacia adelante.","gif":"https://evalufit.com/wp-content/uploads/2024/02/Romanian-Dead-Lift-Evalufit.gif"},{"id":"htaz3g2v","name":"Elevación de piernas colgado","muscle":"Core","equipment":"Peso corporal","desc":"Colgado de barra, sube las rodillas al pecho.","gif":"https://fitcron.com/wp-content/uploads/2021/04/17641301-Hanging-Leg-Hip-Raise_Waist_720.gif"},{"id":"nhvza9n8","name":"Face pull","muscle":"Hombro","equipment":"Polea","desc":"Cuerda a la cara, codos altos, abre los brazos.","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/05/Face-pull.gif"},{"id":"48uwkm0n","name":"Encogimientos (shrugs)","muscle":"Espalda","equipment":"Mancuernas","desc":"Eleva los hombros hacia las orejas y baja.","gif":"https://fitcron.com/wp-content/uploads/2021/04/04061301-Dumbbell-Shrug_Back-FIX_720.gif"},{"id":"7lhgd7fh","name":"Clamshell con banda","muscle":"","equipment":"","desc":"","gif":"https://media.post.rvohealth.io/wp-content/uploads/2015/11/Clamshell-exercise-with-a-resistance-band.gif"},{"id":"td9k3mnw","name":"Bisagra de cadera con palo (RDL técnico)","muscle":"","equipment":"","desc":"","gif":"https://www.sportlife.es/uploads/s1/14/04/49/49/bisagra-de-cadera-con-pica.jpeg"},{"id":"rv060aky","name":"Abducción de cadera de pie con banda","muscle":"","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/c94d75_df299999d6e841dbbca071c3fd576aeb~mv2.gif"},{"id":"ftrj4vta","name":"Isométrico semitendinoso 3","muscle":"","equipment":"","desc":"","gif":""},{"id":"35yv2xhc","name":"Caminata lateral con banda","muscle":"","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/c94d75_4d38b29515754575a6d1868a140a5c89~mv2.gif"},{"name":"Puente glúteo unipodal","muscle":"Glúteo","equipment":"Peso corporal","desc":"","gif":"https://static.wixstatic.com/media/c94d75_0c29504633494d29a610ccc979695020~mv2.gif","id":"fmh626bt"},{"name":"Monster walks con banda","muscle":"Pierna","equipment":"Peso corporal","desc":"","gif":"https://gymvisual.com/img/p/3/7/2/5/6/37256.gif","id":"4qhffffu"},{"name":"Step-down","muscle":"Glúteo","equipment":"Peso corporal","desc":"","gif":"https://post.healthline.com/wp-content/uploads/2019/01/Step-Downs.gif","id":"mtnjp3ta"},{"name":"Wall sit","muscle":"Pierna","equipment":"","desc":"","gif":"https://blog.ocoach.app/wp-content/uploads/2023/03/Wall-sit-gif_2.gif","id":"ob9nm3qk"},{"name":"Terminal Knee Extension (TKE) con banda","muscle":"Pierna","equipment":"","desc":"","gif":"https://static.wixstatic.com/media/11c3fa_6afad4bc2b9c49029e1014799f9215d6~mv2.gif","id":"rsfxf5wb"},{"name":"Spanish squat","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.makeagif.com/media/8-22-2024/eGRw5v.gif","id":"41vimswj"},{"name":"Sentadilla isométrica en pared con pelota","muscle":"Pierna","equipment":"","desc":"https://i.ytimg.com/vi/TsKV-aEueyU/sddefault.jpg","gif":"","id":"ze7q9sbc"},{"name":"Copenhagen plank","muscle":"Pierna","equipment":"","desc":"","gif":"https://www.strengthlog.com/wp-content/uploads/2025/06/copenhagen-plank.gif","id":"qviagj5a"},{"name":"Elevación de talón sentado","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/bf/fa/48/bffa48da913d708f61e7a8425aa12b0b.gif","id":"zgujntmk"},{"name":"Tibialis raises","muscle":"","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-26-2023/M1f_Yb.gif","id":"wpgx854z"},{"name":"Inversión/Eversión con banda","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.makeagif.com/media/7-10-2024/WToT-Z.gif","id":"pv9jlxbs"},{"name":"Balance unipodal con bosu","muscle":"Pierna","equipment":"","desc":"","gif":"https://gymvisual.com/img/p/3/5/7/4/5/35745.gif","id":"9gygvdhn"},{"name":"Short foot","muscle":"Pierna","equipment":"","desc":"","gif":"https://cdn.shopify.com/s/files/1/1402/4425/files/Short_foot_1024x1024.gif?v=1618891237","id":"0hivtlvp"},{"name":"Dead bug","muscle":"Core","equipment":"","desc":"","gif":"https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUybWF0bm0yMGhzOHUxdmpnNXlyY29odHNsZnB4N2dhZW11MmI1aDd0ZSZlcD12MV9naWZzX3NlYXJjaCZjdD1n/aIyZ9Ra6pyo5ZOHQsm/200.gif","id":"b006joyr"},{"name":"Bird dog","muscle":"Core","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/07/Bird-Dog.gif","id":"hsqs24tn"},{"name":"Pallof press (anti-rotación)","muscle":"Core","equipment":"","desc":"","gif":"https://gym-animations.com/wp-content/uploads/2025/12/Pallof-Press-GIF.png","id":"h6esb0xx"},{"name":"Farmer carry","muscle":"Movilidad","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2022/02/Farmers-walk_Cardio.gif","id":"b7n6bs4h"},{"name":"Side plank con abducción","muscle":"Core","equipment":"","desc":"","gif":"https://cdn.jefit.com/assets/img/exercises/gifs/1358.gif","id":"d7u8n5d0"},{"name":"Rotación externa con banda (codo pegado)","muscle":"Hombro","equipment":"","desc":"","gif":"https://d5sbbf6usl3xq.cloudfront.net/mountain_pose_elbow_bent_arm_external_rotation_resistance_band__tadasana_nata_kehuni_hasta_external_rotation_resistance_band_yoga.png","id":"2dy5u26q"},{"name":"Rotación interna con banda","muscle":"Hombro","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-19-2017/_4n5Cp.gif","id":"o7r7h267"},{"name":"Scaption","muscle":"Espalda","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/c6/b8/66/c6b866afd4c0c451b1e5f2126766761b.gif","id":"vo5gy7md"},{"name":"Wall slides","muscle":"Espalda","equipment":"","desc":"","gif":"https://fitnessprogramer.com/wp-content/uploads/2021/02/wall-slide.gif","id":"s1sdq5m2"},{"name":"Serratus punch","muscle":"Espalda","equipment":"","desc":"","gif":"https://i.makeagif.com/media/11-28-2023/I9RiDP.gif","id":"d94kiush"},{"name":"Y-T-W (prono o con banda ligera)","muscle":"Espalda","equipment":"","desc":"","gif":"https://cdn.shopify.com/s/files/1/0958/4764/files/ytw.gif?v=1495186236","id":"b1xj4g9g"},{"name":"Remo con banda","muscle":"Espalda","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/38961301-Band-seated-row-male_Back_720.gif","id":"3oej23qo"},{"name":"Movilidad dorsiflexión tobillo","muscle":"Movilidad","equipment":"","desc":"","gif":"https://www.hsnstore.com/blog/wp-content/uploads/2015/11/tendiopatia-rotuliana.jpg","id":"lymhn1zl"},{"name":"Open book (rotación torácica)","muscle":"Movilidad","equipment":"","desc":"","gif":"https://gymvisual.com/img/p/2/3/7/6/4/23764.gif","id":"p9vi84pn"},{"name":"Cat-camel","muscle":"Movilidad","equipment":"","desc":"","gif":"https://media.tenor.com/-wXXHLdS4nYAAAAM/workout-working-out.gif","id":"sy4b18f2"},{"name":"Isométrico cuádriceps (extensión rodilla contra toalla)","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/2g_ITkl-mJM/hq720.jpg?sqp=-oaymwE7CK4FEIIDSFryq4qpAy0IARUAAAAAGAElAADIQj0AgKJD8AEB-AG-B4AC0AWKAgwIABABGGUgWyg-MA8=&rs=AOn4CLD61zzbAaxeDCLBaoM2RGmV_bUBHw","id":"awh44p0o"},{"name":"Isométrico de gemelos (de pie, banda)","muscle":"Pierna","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/15051301-Band-Calf-Raise-Version-3_Calves_720.gif","id":"1ftf1txw"},{"name":"Isométrico aductores","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/T-Ben-ppf6w/mqdefault.jpg","id":"65v26rww"},{"name":"Isométrico glúteo medio","muscle":"Glúteo","equipment":"","desc":"","gif":"https://i.ytimg.com/vi/0mY05s8Kh28/hqdefault.jpg","id":"wb7efzat"},{"id":"ut20qveb","name":"Nordic hamstring","muscle":"","equipment":"","desc":"","gif":""},{"id":"ztvorhsp","name":"Nordic hamstring","muscle":"","equipment":"","desc":"","gif":""},{"id":"rmaa1t01","name":"Trotadora min","muscle":"","equipment":"","desc":"","gif":""},{"name":"Press militar con mancuernas","muscle":"Hombro","equipment":"Mancuernas","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/04/04261301-Dumbbell-Standing-Overhead-Press_shoulder_720.gif","id":"hxuhtdyy"},{"name":"Step - up","muscle":"Pierna","equipment":"","desc":"","gif":"https://fitcron.com/wp-content/uploads/2021/03/37651301-Jump-Step-Up-male_Cardio_720.gif","id":"62fy9y5f"},{"name":"Patada glutea con banda elastica","muscle":"Glúteo","equipment":"","desc":"","gif":"https://api.smartworkout.app/asset/image/37ea06cc-aaf7-427c-ae6c-f05ea231c9a9","id":"b55fv8zg"},{"name":"Dominada australiana","muscle":"Espalda","equipment":"Máquina","desc":"","gif":"https://api.smartworkout.app/asset/image/8b7f387c-9518-48a7-8395-016dd135db47","id":"08pukekq"},{"name":"Bulgaras","muscle":"Pierna","equipment":"","desc":"","gif":"https://i.pinimg.com/originals/f1/b6/16/f1b616965d2583544602ffc922e99e5a.gif","id":"orcsx8fh"},{"name":"Inclinaciones laterales de cuello","muscle":"Movilidad","equipment":"","desc":"","gif":"https://api.smartworkout.app/asset/image/a987a61f-b0cf-42f0-bf61-1280cd45a0ab","id":"saahbvfj"},{"name":"Rotacion cervical","muscle":"Movilidad","equipment":"","desc":"","gif":"https://i0.wp.com/post.healthline.com/wp-content/uploads/2022/02/400x400_Neck_Exercises_for_Arthritis_Neck_Rotation.gif?w=1155&h=840","id":"00t41cts"},{"name":"Abducciones laterales con banda elastica (almeja)","muscle":"Glúteo","equipment":"","desc":"","gif":"https://media.glamour.mx/photos/6764a30df95045324a924854/master/w_1600%2Cc_limit/Amanda-banded-clamshell.gif","id":"u2yh462j"}]};
 
 var state = { clients: [], routines: [], exercises: [], protocols: [], horasExtra: [] };
-var settings = { baseUrl: DEFAULT_BASE_URL, githubToken: "", githubRepo: "ultrasport19-boop/APP-RUTINAS11", githubBranch: "main", bitlyToken: "", bitlyDomain: "", syncEnabled: false, calendlyToken: "", calendlyUserUri: "", notionSyncEnabled: false, encEnabled: false, dashApiUrl: "", costoFijo: 500000, horasEntrenador: "Eric", horasValorHora: 3000, horasInicio: 16, horasTermino: 22, horasDias: "1,2,3,4,5", horasCapacidad: 8, horasFactorBruto: 1, horasApiUrl: "", finSesSemana: 3, finMeta: 0, claudeKey: "", claudeProxy: false, claudeModelo: "claude-opus-5", franjas: null, calVentanaDias: 63 };
+var settings = { baseUrl: DEFAULT_BASE_URL, githubToken: "", githubRepo: "ultrasport19-boop/APP-RUTINAS11", githubBranch: "main", bitlyToken: "", bitlyDomain: "", syncEnabled: false, calendlyToken: "", calendlyUserUri: "", notionSyncEnabled: false, encEnabled: false, dashApiUrl: "", dashClave: "", costoFijo: 500000, horasEntrenador: "Eric", horasValorHora: 3000, horasInicio: 16, horasTermino: 22, horasDias: "1,2,3,4,5", horasCapacidad: 8, horasFactorBruto: 1, horasApiUrl: "", finSesSemana: 3, finMeta: 0, claudeKey: "", claudeProxy: false, claudeModelo: "claude-opus-5", franjas: null, calVentanaDias: 63 };
 
 var SEED_VERSION = 20260612;
 
@@ -3291,6 +3297,7 @@ function loadSettings(){
       if (typeof p.notionSyncEnabled === "boolean") settings.notionSyncEnabled = p.notionSyncEnabled;
       if (typeof p.encEnabled === "boolean") settings.encEnabled = p.encEnabled;
       if (typeof p.dashApiUrl === "string") settings.dashApiUrl = p.dashApiUrl;
+      if (typeof p.dashClave === "string") settings.dashClave = p.dashClave;
       if (typeof p.costoFijo === "number") settings.costoFijo = p.costoFijo;
     }
   } catch(e){ console.error("loadSettings:", e); }
@@ -3299,6 +3306,17 @@ function loadSettings(){
 function saveSettings(){
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
   catch(e){ console.error("saveSettings:", e); }
+}
+
+/* escapeHtml deja pasar `javascript:` sin inmutarse: escapa comillas y
+   angulos, no esquemas. Y notionUrl llega de Notion por el puente, o sea
+   de fuera. Solo se permite lo que de verdad es un enlace. */
+function u19Href(url){
+  var u = String(url == null ? "" : url).trim();
+  if (!u) return "#";
+  if (/^(https?:|mailto:|tel:)/i.test(u)) return u;
+  if (u.charAt(0) === "#" || u.charAt(0) === "/") return u;
+  return "#";
 }
 
 function genId(){
@@ -3827,12 +3845,31 @@ function _impFechaISO(s){
   var m = String(s||"").match(/\d{4}-\d{2}-\d{2}/);
   return m ? m[0] : "";
 }
+/* Toda llamada al puente pasa por aqui. La clave se manda como
+   parametro `k`, pero se guarda APARTE de la URL: si alguna vez ensenas
+   o pegas la /exec, no lleva la credencial pegada dentro.
+   Acepta url/clave explicitas para el boton de Verificar, que prueba lo
+   que acabas de teclear sin haberlo guardado todavia. */
+function u19DashUrl(tipo, url, clave){
+  url = String(url != null ? url
+        : ((typeof settings !== "undefined" && settings.dashApiUrl) || "")).trim();
+  if (!url) return "";
+  clave = String(clave != null ? clave
+          : ((typeof settings !== "undefined" && settings.dashClave) || "")).trim();
+  var q = [];
+  if (clave) q.push("k=" + encodeURIComponent(clave));
+  if (tipo)  q.push("tipo=" + encodeURIComponent(tipo));
+  if (!q.length) return url;
+  return url + (url.indexOf("?") >= 0 ? "&" : "?") + q.join("&");
+}
+/* ===DASH_URL_END=== */
+
 window.importClientesNotion = async function(){
   var url = ((typeof settings!=="undefined" && settings.dashApiUrl) || "").trim();
   if (!url){ toast("Guarda primero tu URL /exec en Finanzas → Conexión con Google Apps Script","warn"); return; }
   toast("Importando clientes activos desde Notion…");
   try {
-    var res = await fetch(url + (url.indexOf("?")>=0?"&":"?") + "tipo=clientes");
+    var res = await fetch(u19DashUrl("clientes"));
     var data = await res.json();
     var lista = Array.isArray(data) ? data : ((data && Array.isArray(data.clientes)) ? data.clientes : []);
     if (!lista.length){ toast("Notion no devolvió clientes. Revisa el endpoint ?tipo=clientes","warn"); return; }
@@ -7076,6 +7113,10 @@ function openSettings(){
     '<button class="btn btn-secondary btn-sm" id="btn-verify-dash" type="button">🔌 Verificar</button>' +
     '<span id="dash-verify-st" style="font-size:.78rem;"></span>' +
     '</div>';
+  bodyHtml += '<label style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem;">Clave del puente (API_CLAVE)</label>';
+  bodyHtml += '<input type="password" id="set-dash-clave" value="'+escapeAttr(settings.dashClave||'')+'" placeholder="la misma que pusiste en Propiedades del script" style="width:100%;margin-bottom:.4rem;">';
+  bodyHtml += '<p style="font-size:.75rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.5;">Va aparte de la URL a propósito: si enseñas la /exec en una captura, no lleva la clave dentro. Sin ella el puente no responde a nadie.</p>';
+  bodyHtml += u19RespCardHTML();
   bodyHtml += '<hr style="border-color:rgba(255,255,255,.07);margin:.5rem 0 1.2rem;">';
 
   bodyHtml += formField("Token de Bitly", '<input type="password" id="set-bt-token" value="'+escapeAttr(settings.bitlyToken)+'" placeholder="Pega tu Bearer Token" autocomplete="new-password">');
@@ -7184,14 +7225,16 @@ function openSettings(){
           var url = (inp ? inp.value : '').trim();
           if (!url) { st.textContent = '⚠ Pega la URL'; st.style.color='var(--warn)'; return; }
           st.textContent = 'Verificando…'; st.style.color='var(--muted)';
-          var sep = url.indexOf('?')>=0?'&':'?';
-          fetch(url+sep+'tipo=clientes')
+          var clv = (function(){ var c = document.getElementById('set-dash-clave');
+                                 return c ? c.value.trim() : null; })();
+          fetch(u19DashUrl('clientes', url, clv))
             .then(function(r){ return r.json(); })
             .then(function(data){
               if (data && data.error) throw new Error(data.error);
               var ok = data && (Array.isArray(data.clientes)||Array.isArray(data));
               if (!ok) throw new Error('Respuesta sin clientes');
               settings.dashApiUrl = url;
+              if (clv != null) settings.dashClave = clv;
               if (typeof saveSettings==='function') saveSettings();
               if (inp) inp.style.borderColor='var(--success)';
               st.innerHTML='<b style="color:var(--success)">✓ Guardado</b>';
@@ -7374,7 +7417,12 @@ function wipeAll(){
    ============================================================ */
 var ENC_MK_KEY  = "ultrasport19_mk";   // master key (b64) cacheada por dispositivo
 var ENC_ENV_KEY = "ultrasport19_env";  // sobre de llaves (JSON) cacheado
-var ENC_PBKDF2_ITERS = 150000;
+var ENC_PBKDF2_ITERS = 600000;        /* recomendacion OWASP para PBKDF2-SHA256 */
+var ENC_PBKDF2_LEGACY = 150000;       /* lo que usaban los sobres anteriores.
+                                         Un sobre sin `it` es de esa epoca:
+                                         si lo abrieramos con 600.000 la clave
+                                         derivada seria otra y diriamos que la
+                                         contrasena esta mal, teniendola bien. */
 var _encMkRaw = null;    // ArrayBuffer de la master key en memoria
 var _encEnvelope = null; // { pw:{...}, rec:{...} }
 var _encPromptTs = 0;
@@ -7388,25 +7436,47 @@ function _encUnb64(str){ var s=atob(String(str).replace(/\s/g,"")), b=new Uint8A
 function _encRand(n){ var a=new Uint8Array(n); window.crypto.getRandomValues(a); return a; }
 function _encGv(id){ var e=document.getElementById(id); return e ? e.value.trim() : ""; }
 
-function _encKEK(secret, saltBuf){
+function _encKEK(secret, saltBuf, iters){
   return window.crypto.subtle.importKey("raw", new TextEncoder().encode(secret), {name:"PBKDF2"}, false, ["deriveKey"])
     .then(function(base){
       return window.crypto.subtle.deriveKey(
-        { name:"PBKDF2", salt: saltBuf, iterations: ENC_PBKDF2_ITERS, hash:"SHA-256" },
+        { name:"PBKDF2", salt: saltBuf, iterations: iters || ENC_PBKDF2_ITERS, hash:"SHA-256" },
         base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]);
     });
 }
 function _encWrapMK(mkRaw, secret){
   var salt=_encRand(16), iv=_encRand(12);
-  return _encKEK(secret, salt).then(function(kek){
+  return _encKEK(secret, salt, ENC_PBKDF2_ITERS).then(function(kek){
     return window.crypto.subtle.encrypt({name:"AES-GCM", iv:iv}, kek, mkRaw);
-  }).then(function(ct){ return { salt:_encB64(salt), iv:_encB64(iv), ct:_encB64(ct) }; });
+  }).then(function(ct){
+    /* `it` va dentro del sobre para que dentro de dos anos se pueda volver
+       a subir el numero sin romper nada de lo de hoy. */
+    return { salt:_encB64(salt), iv:_encB64(iv), ct:_encB64(ct), it:ENC_PBKDF2_ITERS };
+  });
 }
 function _encUnwrapMK(wrap, secret){
-  return _encKEK(secret, new Uint8Array(_encUnb64(wrap.salt))).then(function(kek){
+  /* Sin `it` es un sobre de los antiguos: se abre con las suyas. */
+  var iters = (wrap && wrap.it) || ENC_PBKDF2_LEGACY;
+  return _encKEK(secret, new Uint8Array(_encUnb64(wrap.salt)), iters).then(function(kek){
     return window.crypto.subtle.decrypt({name:"AES-GCM", iv:new Uint8Array(_encUnb64(wrap.iv))}, kek, _encUnb64(wrap.ct));
   }); // resuelve MK (ArrayBuffer); lanza si el secreto es incorrecto
 }
+/* Vuelve a cerrar un sobre viejo con las vueltas de hoy. Silencioso a
+   proposito: no hay nada que el usuario deba decidir aqui. */
+function _encMigrarWrap(cual, secret, mkRaw){
+  var w = _encEnvelope && _encEnvelope[cual];
+  if (!w || (w.it || ENC_PBKDF2_LEGACY) >= ENC_PBKDF2_ITERS) return Promise.resolve(false);
+  return _encWrapMK(mkRaw, secret).then(function(nuevo){
+    /* Antes de tirar el sobre bueno, se comprueba que el nuevo abre. Un
+       fallo aqui dejaria los datos de la nube inaccesibles para siempre. */
+    return _encUnwrapMK(nuevo, secret).then(function(){
+      _encEnvelope[cual] = nuevo;
+      _encCache();
+      return true;
+    });
+  });
+}
+
 function _encImportMK(mkRaw){ return window.crypto.subtle.importKey("raw", mkRaw, {name:"AES-GCM"}, false, ["encrypt","decrypt"]); }
 
 function encRestoreFromCache(){
@@ -7479,10 +7549,17 @@ function encFetchEnvelope(){
 function encUnlock(secret, isRecovery){
   return encFetchEnvelope().then(function(env){
     if (!env) throw new Error("Aún no hay datos cifrados en la nube");
-    return _encUnwrapMK(isRecovery ? env.rec : env.pw, secret).then(function(mkRaw){
+    var cual = isRecovery ? "rec" : "pw";
+    return _encUnwrapMK(env[cual], secret).then(function(mkRaw){
       _encMkRaw=mkRaw; _encEnvelope=env; _encCache();
       if (!settings.encEnabled){ settings.encEnabled = true; saveSettings(); }
-      return true;
+      /* Aqui, y solo aqui, coinciden el secreto y la master key: es el unico
+         momento en que se puede volver a cerrar el sobre con mas vueltas.
+         Se migra la mitad que se acaba de usar; la otra sigue funcionando
+         con las suyas hasta que se use. Si falla, da igual: la sesion ya
+         esta desbloqueada y se reintentara la proxima vez. */
+      return _encMigrarWrap(cual, secret, mkRaw).then(function(){ return true; },
+                                                      function(){ return true; });
     });
   });
 }
@@ -7501,6 +7578,330 @@ function _syncMaybeDecrypt(remote){
   }
   return Promise.resolve(remote);
 }
+
+/* ============================================================
+   RESPALDO CIFRADO
+   Todo el negocio vive en el localStorage de un navegador: un
+   perfil corrupto, un "limpiar datos de navegacion" o un disco
+   muerto se lo llevan entero, y no hay copia en ninguna parte.
+   Esto lo saca a un archivo que solo se abre con tu frase.
+
+   NO reutiliza el sobre del cifrado de sincronizacion, a
+   proposito: aquel necesita la master key cacheada en ESTE
+   dispositivo y el state.json de GitHub. Un respaldo que depende
+   del equipo que se murio no sirve para nada. Aqui basta el
+   archivo y la frase, en cualquier maquina del mundo.
+   ============================================================ */
+var RESP_VER     = 1;
+var RESP_ITERS   = 600000;          /* PBKDF2-SHA256, recomendacion OWASP.
+                                       Mas alto que los 150000 de la sincro
+                                       porque esto se hace una vez al dia,
+                                       no en cada guardado. */
+var RESP_TS_KEY  = "us19_resp_ts";
+var RESP_AVISO_DIAS = 7;
+
+var RESP_PREFIJOS = ["ultrasport19_", "us19_"];
+/* Se respalda por prefijo, no por lista: asi una clave nueva entra sola
+   y nadie se olvida de anadirla. */
+var RESP_NUNCA = ["us19_catalogo_en_idb", RESP_TS_KEY];
+/* Fuera por defecto: un respaldo filtrado no debe entregar ademas las
+   llaves. Se recuperan pegandolas de nuevo, que son cuatro campos. */
+var RESP_SECRETO_CLAVES = ["ultrasport19_mk"];
+var RESP_SECRETO_CAMPOS = ["githubToken", "bitlyToken", "calendlyToken",
+                           "claudeKey", "dashClave"];
+
+function u19RespClaves(){
+  var out = [], i, j, k, vale;
+  for (i = 0; i < localStorage.length; i++){
+    k = localStorage.key(i);
+    if (!k) continue;
+    vale = false;
+    for (j = 0; j < RESP_PREFIJOS.length; j++)
+      if (k.indexOf(RESP_PREFIJOS[j]) === 0){ vale = true; break; }
+    if (!vale || RESP_NUNCA.indexOf(k) >= 0) continue;
+    out.push(k);
+  }
+  return out.sort();
+}
+
+function u19RespEsSecreta(k){ return RESP_SECRETO_CLAVES.indexOf(k) >= 0; }
+
+/* Deja los tokens en blanco sin tocar el resto de los ajustes. */
+function u19RespSinSecretos(json){
+  try {
+    var o = JSON.parse(json);
+    for (var i = 0; i < RESP_SECRETO_CAMPOS.length; i++)
+      if (RESP_SECRETO_CAMPOS[i] in o) o[RESP_SECRETO_CAMPOS[i]] = "";
+    return JSON.stringify(o);
+  } catch (e){ return json; }
+}
+
+function u19RespRecoger(conSecretos){
+  var datos = {};
+  u19RespClaves().forEach(function(k){
+    if (!conSecretos && u19RespEsSecreta(k)) return;
+    var v = localStorage.getItem(k);
+    if (v == null) return;
+    if (!conSecretos && k === SETTINGS_KEY) v = u19RespSinSecretos(v);
+    datos[k] = v;
+  });
+  return { v: RESP_VER, ts: Date.now(), secretos: !!conSecretos,
+           datos: datos, resumen: u19RespResumen(datos) };
+}
+
+/* Va en claro dentro del archivo para que puedas distinguir un respaldo
+   de otro sin descifrarlo. Son recuentos, no datos de nadie. */
+function u19RespResumen(datos){
+  var r = { claves: 0, clientes: 0, informes: 0 };
+  try { r.claves = Object.keys(datos).length; } catch (e){}
+  try { r.clientes = (JSON.parse(datos[APP_KEY] || "{}").clients || []).length; } catch (e){}
+  try { r.informes = (JSON.parse(datos[REPORTS_KEY] || "[]") || []).length; } catch (e){}
+  return r;
+}
+
+function u19RespDerivar(frase, salt, iters){
+  return window.crypto.subtle.importKey("raw", new TextEncoder().encode(frase),
+      { name: "PBKDF2" }, false, ["deriveKey"])
+    .then(function(base){
+      return window.crypto.subtle.deriveKey(
+        { name: "PBKDF2", salt: salt, iterations: iters || RESP_ITERS, hash: "SHA-256" },
+        base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    });
+}
+
+function u19RespCifrar(obj, frase){
+  if (!_cryptoOk()) return Promise.reject(new Error("Este navegador no puede cifrar"));
+  if (!frase || frase.length < 8)
+    return Promise.reject(new Error("La frase debe tener al menos 8 caracteres"));
+  var salt = _encRand(16), iv = _encRand(12);
+  return u19RespDerivar(frase, salt, RESP_ITERS).then(function(key){
+    return window.crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, key,
+      new TextEncoder().encode(JSON.stringify(obj)));
+  }).then(function(ct){
+    return { us19_respaldo: RESP_VER,
+             creado: new Date().toISOString(),
+             resumen: obj.resumen,
+             secretos: !!obj.secretos,
+             kdf: { alg: "PBKDF2-SHA256", iters: RESP_ITERS, salt: _encB64(salt) },
+             iv: _encB64(iv), ct: _encB64(ct) };
+  });
+}
+
+function u19RespDescifrar(sobre, frase){
+  if (!sobre || !sobre.us19_respaldo)
+    return Promise.reject(new Error("Este archivo no es un respaldo de Ultra-Sport 19"));
+  if (!_cryptoOk()) return Promise.reject(new Error("Este navegador no puede descifrar"));
+  /* Las vueltas salen del archivo, no de la constante: un respaldo viejo
+     se sigue abriendo aunque manana subamos el numero. */
+  var iters = (sobre.kdf && sobre.kdf.iters) || RESP_ITERS;
+  var salt = new Uint8Array(_encUnb64(sobre.kdf.salt));
+  return u19RespDerivar(frase, salt, iters).then(function(key){
+    return window.crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: new Uint8Array(_encUnb64(sobre.iv)) }, key, _encUnb64(sobre.ct));
+  }).then(function(pt){
+    return JSON.parse(new TextDecoder().decode(pt));
+  }).catch(function(){
+    /* AES-GCM falla igual con frase mala que con archivo tocado, y no
+       hay forma de distinguirlo: se dice lo que se sabe. */
+    throw new Error("No se pudo abrir: la frase no coincide o el archivo está dañado");
+  });
+}
+
+/* Restaurar pisa lo que hay. Dos cuidados:
+   - se borran las claves viejas primero, o un respaldo sin cierta clave
+     dejaria la actual mezclada con datos de otra epoca;
+   - las credenciales de ESTE dispositivo se conservan, porque el respaldo
+     no las lleva. Restauras tus datos sin quedarte desconectado. */
+function u19RespRestaurar(obj){
+  if (!obj || !obj.datos) throw new Error("Respaldo vacío");
+  var actuales = localStorage.getItem(SETTINGS_KEY);
+  u19RespClaves().forEach(function(k){
+    if (u19RespEsSecreta(k)) return;
+    try { localStorage.removeItem(k); } catch (e){}
+  });
+  Object.keys(obj.datos).forEach(function(k){
+    var v = obj.datos[k];
+    if (k === SETTINGS_KEY && !obj.secretos) v = u19RespFundirSecretos(v, actuales);
+    try { localStorage.setItem(k, v); } catch (e){}
+  });
+  return u19RespResumen(obj.datos);
+}
+
+function u19RespFundirSecretos(nuevoJson, actualJson){
+  if (!actualJson) return nuevoJson;
+  try {
+    var n = JSON.parse(nuevoJson), a = JSON.parse(actualJson);
+    for (var i = 0; i < RESP_SECRETO_CAMPOS.length; i++){
+      var c = RESP_SECRETO_CAMPOS[i];
+      if (!n[c] && a[c]) n[c] = a[c];
+    }
+    return JSON.stringify(n);
+  } catch (e){ return nuevoJson; }
+}
+
+function u19RespMarcar(){ try { localStorage.setItem(RESP_TS_KEY, String(Date.now())); } catch (e){} }
+
+function u19RespDias(){
+  var ts = Number(localStorage.getItem(RESP_TS_KEY) || 0);
+  if (!ts || isNaN(ts)) return null;
+  return Math.floor((Date.now() - ts) / 86400000);
+}
+
+function u19RespNombre(){
+  var d = new Date(), p = function(n){ return (n < 10 ? "0" : "") + n; };
+  return "us19-respaldo-" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate())
+       + "-" + p(d.getHours()) + p(d.getMinutes()) + ".json";
+}
+/* ===RESPALDO_END=== */
+
+/* -------- Respaldo: descargar, restaurar y dar la lata -------- */
+
+function u19RespDescargar(frase, conSecretos){
+  var obj = u19RespRecoger(conSecretos);
+  return u19RespCifrar(obj, frase).then(function(sobre){
+    var blob = new Blob([JSON.stringify(sobre, null, 1)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = u19RespNombre();
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function(){
+      try { URL.revokeObjectURL(url); } catch (e){}
+      if (a.parentNode) a.parentNode.removeChild(a);
+    }, 1500);
+    u19RespMarcar();
+    return sobre.resumen;
+  });
+}
+
+function u19RespLeerArchivo(file, frase){
+  return new Promise(function(res, rej){
+    var fr = new FileReader();
+    fr.onload = function(){
+      var o;
+      try { o = JSON.parse(fr.result); }
+      catch (e){ rej(new Error("El archivo no es un JSON válido")); return; }
+      res(o);
+    };
+    fr.onerror = function(){ rej(new Error("No se pudo leer el archivo")); };
+    fr.readAsText(file);
+  }).then(function(sobre){ return u19RespDescifrar(sobre, frase); });
+}
+
+/* -------- Manejadores de la interfaz -------- */
+
+window.u19RespExportarUI = function(){
+  var f1 = document.getElementById("resp-frase");
+  var f2 = document.getElementById("resp-frase2");
+  var sec = document.getElementById("resp-secretos");
+  var st  = document.getElementById("resp-estado");
+  var frase = f1 ? f1.value : "";
+  function di(txt, col){ if (st) st.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(txt) + '</span>'; }
+
+  if (frase.length < 8){ di("La frase debe tener al menos 8 caracteres.", "var(--warn)"); return; }
+  if (f2 && f2.value !== frase){ di("Las dos frases no coinciden.", "var(--warn)"); return; }
+  di("Cifrando… (tarda un segundo, es a propósito)", "var(--muted)");
+
+  u19RespDescargar(frase, !!(sec && sec.checked)).then(function(r){
+    di("Listo: " + r.clientes + " clientes y " + r.informes + " informes en "
+       + r.claves + " bloques. Guárdalo fuera de este equipo.", "var(--success)");
+    if (f1) f1.value = ""; if (f2) f2.value = "";
+    if (typeof toast === "function") toast("Respaldo descargado", "success");
+  }).catch(function(e){
+    di("No se pudo: " + (e && e.message ? e.message : e), "var(--danger)");
+  });
+};
+
+window.u19RespImportarUI = function(){
+  var inp = document.getElementById("resp-archivo");
+  var fr  = document.getElementById("resp-frase-imp");
+  var st  = document.getElementById("resp-estado-imp");
+  function di(txt, col){ if (st) st.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(txt) + '</span>'; }
+
+  if (!inp || !inp.files || !inp.files[0]){ di("Elige primero el archivo de respaldo.", "var(--warn)"); return; }
+  if (!fr || !fr.value){ di("Falta la frase con la que lo cifraste.", "var(--warn)"); return; }
+  di("Abriendo…", "var(--muted)");
+
+  u19RespLeerArchivo(inp.files[0], fr.value).then(function(obj){
+    var r = obj.resumen || u19RespResumen(obj.datos || {});
+    var cuando = obj.ts ? new Date(obj.ts).toLocaleString() : "fecha desconocida";
+    /* Pisa todo lo que hay ahora. Se pregunta con los numeros delante, no
+       con un "¿seguro?" a ciegas. */
+    var aviso = "Vas a REEMPLAZAR todos los datos de esta app.\n\n"
+      + "El respaldo es del " + cuando + " y trae:\n"
+      + "  · " + r.clientes + " clientes\n"
+      + "  · " + r.informes + " informes\n\n"
+      + "Lo que tengas ahora en este navegador se pierde.\n\n¿Continúo?";
+    if (!window.confirm(aviso)){ di("Cancelado. No se tocó nada.", "var(--muted)"); return; }
+    var hecho = u19RespRestaurar(obj);
+    di("Restaurados " + hecho.clientes + " clientes. Recargando…", "var(--success)");
+    setTimeout(function(){ location.reload(); }, 900);
+  }).catch(function(e){
+    di((e && e.message ? e.message : String(e)), "var(--danger)");
+  });
+};
+
+/* La tira que aparece en Finanzas cuando llevas mucho sin respaldar. */
+function u19RespAvisoHTML(){
+  var d = u19RespDias();
+  if (d != null && d < RESP_AVISO_DIAS) return '';
+  var txt = (d == null)
+    ? "No has hecho ningún respaldo. Todos tus datos viven solo en este navegador: si se borra el perfil o falla el disco, no hay copia."
+    : "Último respaldo hace " + d + " días. Conviene uno nuevo.";
+  return '<div class="card" style="margin-bottom:1rem;border-left:3px solid var(--warn);">'
+    + '<div class="card-main" style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;">'
+    + '<span style="font-size:1.1rem;">\u{1f4be}</span>'
+    + '<span class="text-xs" style="flex:1;min-width:200px;line-height:1.5;">' + escapeHtml(txt) + '</span>'
+    + '<button class="btn btn-secondary btn-sm" onclick="u19RespIrAAjustes()">Respaldar ahora</button>'
+    + '</div></div>';
+}
+
+window.u19RespIrAAjustes = function(){
+  if (typeof openSettings === "function") openSettings();
+  setTimeout(function(){
+    var e = document.getElementById("resp-frase");
+    if (e){ e.scrollIntoView({ block: "center" }); e.focus(); }
+  }, 250);
+};
+
+function u19RespCardHTML(){
+  var d = u19RespDias();
+  var estado = (d == null) ? "Nunca has respaldado."
+             : (d === 0 ? "Último respaldo: hoy."
+             : "Último respaldo hace " + d + " día" + (d === 1 ? "" : "s") + ".");
+  var col = (d == null || d >= RESP_AVISO_DIAS) ? "var(--warn)" : "var(--success)";
+
+  var h = '<div style="border-top:1px solid var(--line);margin:1.4rem 0 1rem;"></div>';
+  h += '<div style="display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.3rem;">'
+    + '<strong style="font-size:.95rem;">\u{1f4be} Respaldo cifrado</strong>'
+    + '<span class="text-xs" style="color:' + col + ';margin-left:auto;">' + escapeHtml(estado) + '</span></div>';
+  h += '<p style="font-size:.78rem;color:var(--muted);margin-bottom:.8rem;line-height:1.5;">'
+    + 'Saca todos tus datos a un archivo que solo se abre con tu frase. '
+    + 'Guárdalo <b>fuera de este equipo</b>: un disco externo o tu Drive. '
+    + 'Si pierdes la frase no hay forma de recuperarlo, ni yo ni nadie.</p>';
+
+  h += '<label style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem;">Frase para cifrar</label>';
+  h += '<input type="password" id="resp-frase" placeholder="mínimo 8 caracteres" style="width:100%;margin-bottom:.4rem;">';
+  h += '<input type="password" id="resp-frase2" placeholder="repítela" style="width:100%;margin-bottom:.5rem;">';
+  h += '<label style="display:flex;gap:.45rem;align-items:flex-start;font-size:.75rem;color:var(--muted);margin-bottom:.6rem;line-height:1.45;">'
+    + '<input type="checkbox" id="resp-secretos" style="margin-top:.15rem;">'
+    + '<span>Incluir también los tokens (Notion, Calendly, Claude, GitHub). '
+    + 'Por defecto van fuera: si el archivo se filtrara, no quiero que entregue además tus llaves.</span></label>';
+  h += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1.1rem;">'
+    + '<button class="btn btn-primary btn-sm" type="button" onclick="u19RespExportarUI()">⬇ Descargar respaldo</button>'
+    + '<span id="resp-estado" style="font-size:.78rem;"></span></div>';
+
+  h += '<label style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem;">Restaurar desde un archivo</label>';
+  h += '<input type="file" id="resp-archivo" accept="application/json,.json" style="width:100%;margin-bottom:.4rem;font-size:.8rem;">';
+  h += '<input type="password" id="resp-frase-imp" placeholder="la frase de ese respaldo" style="width:100%;margin-bottom:.5rem;">';
+  h += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">'
+    + '<button class="btn btn-secondary btn-sm" type="button" onclick="u19RespImportarUI()">↻ Restaurar</button>'
+    + '<span id="resp-estado-imp" style="font-size:.78rem;"></span></div>';
+  h += '<p style="font-size:.75rem;color:var(--danger);margin-top:.5rem;line-height:1.5;">'
+    + 'Restaurar <b>reemplaza</b> todo lo que haya ahora en este navegador. Te lo pregunto antes, con los números delante.</p>';
+  return h;
+}
+/* ===RESPALDO_UI_END=== */
 
 /* -------- UI de cifrado -------- */
 function encPromptUnlock(){ var now=Date.now(); if (now-_encPromptTs<1500) return; _encPromptTs=now; encOpenUnlockModal(); }
@@ -10343,7 +10744,7 @@ function buildNotionSyncHtml() {
           if (lastBio) html += '<span>⚖️ ' + (lastBio.weight ? lastBio.weight + ' kg' : '') + (lastBio.bodyFat ? ' · ' + lastBio.bodyFat + '% grasa' : '') + ' (' + escapeHtml(lastBio.date || '') + ')</span>';
           html += '</div>';
           html += '</div>';
-          html += '<a href="' + escapeHtml(n.notionUrl || '#') + '" target="_blank" style="flex:0 0 auto;font-size:.75rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:.2rem .5rem;white-space:nowrap;">🔗 Notion</a>';
+          html += '<a href="' + escapeHtml(u19Href(n.notionUrl)) + '" target="_blank" rel="noopener noreferrer" style="flex:0 0 auto;font-size:.75rem;color:var(--muted);text-decoration:none;border:1px solid var(--border);border-radius:4px;padding:.2rem .5rem;white-space:nowrap;">🔗 Notion</a>';
           html += '</div>';
         });
       }
@@ -10354,7 +10755,7 @@ function buildNotionSyncHtml() {
           html += '<div style="display:flex;align-items:center;gap:.75rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem 1rem;margin-bottom:.4rem;font-size:.85rem;">';
           html += '<div style="flex:1;">' + escapeHtml(n.name) + (n.plan ? ' <span style="color:var(--muted);">· ' + escapeHtml(n.plan) + '</span>' : '') + (n.membershipStatus === 'Inactivo' ? ' <span style="color:var(--danger);font-size:.75rem;">INACTIVO</span>' : '') + '</div>';
           html += '<button class="btn btn-secondary btn-sm" onclick="importarClienteNotion(' + JSON.stringify(n).replace(/"/g,"'") + ')">+ Importar</button>';
-          html += '<a href="' + escapeHtml(n.notionUrl||'#') + '" target="_blank" style="font-size:.75rem;color:var(--muted);">Notion ↗</a>';
+          html += '<a href="' + escapeHtml(u19Href(n.notionUrl)) + '" target="_blank" rel="noopener noreferrer" style="font-size:.75rem;color:var(--muted);">Notion ↗</a>';
           html += '</div>';
         });
       }
@@ -12375,16 +12776,17 @@ window.finSync = function(){
   if (!url){ if (st) st.innerHTML = '<span style="color:var(--warn);">Pega la URL de tu Web App (termina en /exec).</span>'; return; }
   settings.dashApiUrl = url; saveSettings();
   if (st) st.innerHTML = '<span style="color:var(--muted);">Sincronizando…</span>';
-  var sep = url.indexOf("?")>=0?"&":"?";
+  var inpk = document.getElementById("fin-clave");
+  if (inpk) { settings.dashClave = inpk.value.trim(); saveSettings(); }
   function _ok(){ try { localStorage.setItem("ultrasport19_fin", JSON.stringify(_finData)); } catch(e){} renderFinanzas(); toast("Finanzas sincronizadas desde Notion","success"); }
   // 1) intenta el roster por cliente (?tipo=clientes): números REALES
-  fetch(url + sep + "tipo=clientes").then(function(r){ return r.json(); }).then(function(d){
+  fetch(u19DashUrl("clientes")).then(function(r){ return r.json(); }).then(function(d){
     var arr = Array.isArray(d) ? d : (Array.isArray(d.clientes) ? d.clientes : null);
     if (arr){
       _finData = finFromRoster(arr); _finData._syncedAt = Date.now(); _finData._fromRoster = true;
       _ok();
       // opcional: historial mensual desde el endpoint agregado
-      fetch(url).then(function(r){ return r.json(); }).then(function(agg){
+      fetch(u19DashUrl("")).then(function(r){ return r.json(); }).then(function(agg){
         if (agg && Array.isArray(agg.historial) && agg.historial.length){ _finData.historial = finNormalize(agg).historial; _ok(); }
       }).catch(function(){});
       return;
@@ -12393,7 +12795,7 @@ window.finSync = function(){
     _finData = finNormalize(d); _finData._syncedAt = Date.now();
     _ok();
   }).catch(function(e){
-    if (st) st.innerHTML = '<span style="color:var(--danger);">No se pudo conectar. Verifica la URL (/exec) y que la Web App tenga acceso "Cualquiera".</span>';
+    if (st) st.innerHTML = '<span style="color:var(--danger);">No se pudo conectar. Revisa la URL (/exec), la clave, y que la Web App tenga acceso "Cualquiera".</span>';
   });
 };
 /* finChartSvg se elimino: u19FinTendenciaSVG lo reemplaza, y ademas
@@ -14682,7 +15084,7 @@ function u19ClaudePedir(imagenes, prompt){
   /* Camino recomendado: el Apps Script guarda la clave y hace la llamada. */
   if (settings.claudeProxy){
     if (!settings.dashApiUrl) return Promise.reject(new Error("Falta la URL del Apps Script en Finanzas → Conexión con Notion"));
-    var url = settings.dashApiUrl + (settings.dashApiUrl.indexOf("?") >= 0 ? "&" : "?") + "tipo=claude";
+    var url = u19DashUrl("claude");
     return fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
                         body: JSON.stringify(cuerpo) })
       .then(function(r){ return r.json(); })
@@ -14925,7 +15327,7 @@ function u19NotionListo(){
 /* El envio. Devuelve lo que informe el Apps Script. */
 function u19NotionEnviarBio(filas, notionId){
   if (!u19NotionListo()) return Promise.reject(new Error("Falta la URL del Apps Script"));
-  var url = settings.dashApiUrl + (settings.dashApiUrl.indexOf("?") >= 0 ? "&" : "?") + "tipo=notion_bio";
+  var url = u19DashUrl("notion_bio");
   return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -15425,8 +15827,9 @@ function u19FinRealHTML(){
 
   html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
     + '<div class="card-title">🔌 Conexión con Notion (Base Unificada)</div>'
-    + '<p class="text-xs text-muted" style="margin:.3rem 0 .5rem;line-height:1.5;">Pega la URL de tu Web App de Apps Script (US19_DASHBOARD_API.gs → Implementar → Aplicación web → acceso “Cualquiera”). Se guarda en este dispositivo, nunca en el código público.</p>'
-    + '<input type="text" id="fin-url" value="'+escapeAttr(settings.dashApiUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin-bottom:.5rem;">'
+    + '<p class="text-xs text-muted" style="margin:.3rem 0 .5rem;line-height:1.5;">Pega la URL de tu Web App y la clave que pusiste en Propiedades del script (API_CLAVE). Ambas se guardan solo en este dispositivo, nunca en el código público. Sin la clave el puente no responde.</p>'
+    + '<input type="text" id="fin-url" value="'+escapeAttr(settings.dashApiUrl||"")+'" placeholder="https://script.google.com/macros/s/…/exec" style="width:100%;margin-bottom:.4rem;">'
+    + '<input type="password" id="fin-clave" value="'+escapeAttr(settings.dashClave||"")+'" placeholder="Clave del puente (API_CLAVE)" style="width:100%;margin-bottom:.5rem;">'
     + '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"><button class="btn btn-primary btn-sm" onclick="finSync()">Sincronizar</button> <span id="fin-status" class="text-xs">'+fuente+'</span></div>'
     + '</div></div>';
 
@@ -15440,6 +15843,7 @@ function u19FinRealHTML(){
   html += '</div>';
 
   /* Primero qué hacer, después cómo estás. */
+  html += u19RespAvisoHTML();
   html += u19FinAccionesHTML();
 
   /* Lo que el ingreso bruto no dice: cuanto aguanta, quien se esta
@@ -15605,8 +16009,7 @@ function _infLocalClientes(){ return state.clients.map(function(c){ return { id:
 function infFetchClientes(cb){
   var url=(settings.dashApiUrl||"").trim();
   if(!url){ cb(_infLocalClientes(), "app"); return; }
-  var sep = url.indexOf("?")>=0?"&":"?";
-  fetch(url+sep+"tipo=clientes").then(function(r){ return r.json(); }).then(function(d){
+  fetch(u19DashUrl("clientes")).then(function(r){ return r.json(); }).then(function(d){
     var arr = Array.isArray(d)?d:(Array.isArray(d.clientes)?d.clientes:null);
     if(arr && arr.length){
       _infClientes = arr.map(function(x){ return { id:(x.id||x.nombre), nombre:(x.nombre||x.name||""), rut:(x.rut||""), plan:(x.plan||""), activo:(x.activo!==false), phone:(x.whatsapp||x.phone||"") }; });
@@ -20994,9 +21397,13 @@ function u19PerimetrosSVG(c1, c2){
 /* ---------- 4 · EJES DEL RADAR ---------- */
 function u19EjesSimetria(inv){
   var ejes = [];
-  if (inv.frz && inv.frz.pares){
+  if (inv.frz && inv.frz.pares && inv.frz.pares.length){
     inv.frz.pares.slice(0, 3).forEach(function(par){
-      var nom = par.nombre.length > 20 ? par.nombre.slice(0, 19) + '…' : par.nombre;
+      /* Un par a medias (un lado medido y el otro no) llega sin `q`, y
+         antes se llevaba por delante el grafico entero. */
+      if (!par || !par.q) return;
+      var nom = String(par.nombre || 'Sin nombre');
+      if (nom.length > 20) nom = nom.slice(0, 19) + '…';
       ejes.push({ label: nom, lsi: par.q.lsi, dominio: 'fuerza' });
     });
   }
@@ -21318,7 +21725,12 @@ var _u19UltimoTexto = "";
    habria impreso como progreso. */
 function u19BioWarnings(evals){
   var w = [];
-  (evals || []).forEach(function(e){
+  /* Se limpia la lista UNA vez, aqui arriba, y todo lo de abajo queda a
+     salvo. Ir tapando cada desreferencia por separado deja siempre una
+     sin tapar: el hueco de la lista tumbaba primero el bucle y despues
+     la comparacion de circunferencias. */
+  evals = (Array.isArray(evals) ? evals : []).filter(function(e){ return !!e; });
+  evals.forEach(function(e){
     var b = e.bioimpedancia || {};
     var et = e.fecha ? ("Medición del " + rndFdate(e.fecha)) : "Medición sin fecha";
     if (b.masa_esqueletica_kg != null && b.peso_kg != null && b.peso_kg > 40 && b.masa_esqueletica_kg < 15){
