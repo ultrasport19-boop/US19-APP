@@ -1,0 +1,13 @@
+# Copias de seguridad locales del editor / de las sesiones de trabajo.
+# Son casi idénticas al index.html y engordan el historial para siempre.
+index.html.bak*
+*.bak
+*.tmp
+
+# Temporales del sistema
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Configuración local de herramientas (no debe viajar al repo)
+.claude/
