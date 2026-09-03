@@ -866,9 +866,14 @@ img{max-width:100%;display:block;}
 /* ---------- Ocupacion por franja ---------- */
 .fr-g{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;}
 .fr-b{border:1px solid var(--line);border-radius:8px;padding:.7rem .8rem;}
-.fr-t{display:flex;align-items:baseline;gap:.45rem;flex-wrap:wrap;font-weight:700;font-size:.9rem;margin-bottom:.5rem;}
+.fr-t{display:flex;align-items:baseline;gap:.45rem;flex-wrap:wrap;font-weight:700;font-size:.9rem;margin-bottom:.55rem;}
 .fr-h{font-size:.72rem;color:var(--muted);font-weight:400;}
-.fr-p{margin-left:auto;font-size:1.1rem;font-weight:800;font-variant-numeric:tabular-nums;}
+.fr-m{display:flex;align-items:center;gap:.7rem;}
+.fr-p{font-size:2rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;flex:none;}
+.fr-p small{font-size:.9rem;font-weight:700;margin-left:.05em;}
+.fr-bar{position:relative;flex:1;height:18px;border-radius:9px;background:var(--line);overflow:hidden;min-width:60px;}
+.fr-fill{height:100%;border-radius:9px;transition:width .3s ease;}
+.fr-85{position:absolute;top:0;bottom:0;left:85%;width:2px;background:rgba(255,255,255,.35);}
 .fr-d{font-size:.73rem;color:var(--muted);margin-top:.45rem;line-height:1.5;}
 .fr-cfg{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.6rem;}
 .fr-cfg label{font-size:.66rem;color:var(--muted);display:flex;flex-direction:column;gap:.15rem;}
@@ -12695,29 +12700,73 @@ var CAL_FRANJA_TTL = 6 * 3600 * 1000;   /* 6 h: las reservas no cambian tanto */
 
 /* Trae los eventos de una ventana de dias, paginando. La API
    devuelve 100 por pagina y un mes de un gimnasio se pasa de eso. */
+/* Calendly rechaza la peticion si algun parametro no le cuadra, y responde
+   «The supplied parameters are invalid» sin decir cual. Dos precauciones:
+   los instantes van SIN milisegundos (toISOString los pone y la API los
+   rechaza), y si aun asi falla se reintenta con menos filtros en vez de
+   rendirse. El detalle que devuelva la API se propaga tal cual. */
+function u19CalIso(d){
+  return new Date(d).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function u19CalError(d){
+  var m = (d && (d.message || d.title)) || "Calendly rechazó la petición";
+  var det = d && d.details;
+  if (Array.isArray(det) && det.length){
+    m += ": " + det.map(function(x){
+      return (x.parameter || x.field || "?") + " " + (x.message || "");
+    }).join("; ");
+  }
+  return m;
+}
+
 function u19CalendlyRango(dias){
   if (!settings.calendlyToken) return Promise.reject(new Error("Calendly no está conectado"));
   var hasta = new Date();
   var desde = new Date(Date.now() - (dias || 30) * 86400000);
+
   return calendlyGetUserUri().then(function(userUri){
-    var out = [];
-    var pedir = function(pageToken){
-      var url = "https://api.calendly.com/scheduled_events?user=" + encodeURIComponent(userUri)
-        + "&min_start_time=" + encodeURIComponent(desde.toISOString())
-        + "&max_start_time=" + encodeURIComponent(hasta.toISOString())
-        + "&status=active&count=100"
-        + (pageToken ? "&page_token=" + encodeURIComponent(pageToken) : "");
-      return fetch(url, { headers: calendlyHeaders() })
-        .then(function(r){ return r.json(); })
-        .then(function(d){
-          if (d && d.message && !d.collection) throw new Error(d.message);
-          out = out.concat(d.collection || []);
-          var next = d.pagination && d.pagination.next_page_token;
-          /* Tope de seguridad: 10 paginas son 1.000 reservas. */
-          return (next && out.length < 1000) ? pedir(next) : out;
+    /* De mas filtrado a menos. La primera que responda, gana. */
+    var intentos = [
+      "&min_start_time=" + encodeURIComponent(u19CalIso(desde))
+        + "&max_start_time=" + encodeURIComponent(u19CalIso(hasta)) + "&status=active",
+      "&min_start_time=" + encodeURIComponent(u19CalIso(desde))
+        + "&max_start_time=" + encodeURIComponent(u19CalIso(hasta)),
+      ""
+    ];
+
+    var traer = function(filtro){
+      var out = [];
+      var pedir = function(pageToken){
+        var url = "https://api.calendly.com/scheduled_events?user=" + encodeURIComponent(userUri)
+          + "&count=100" + filtro
+          + (pageToken ? "&page_token=" + encodeURIComponent(pageToken) : "");
+        return fetch(url, { headers: calendlyHeaders() }).then(function(r){
+          return r.json().then(function(d){
+            if (!r.ok || (d && d.message && !d.collection)) throw new Error(u19CalError(d));
+            out = out.concat(d.collection || []);
+            var next = d.pagination && d.pagination.next_page_token;
+            return (next && out.length < 1000) ? pedir(next) : out;
+          });
         });
+      };
+      return pedir(null);
     };
-    return pedir(null);
+
+    var i = 0, ultimo = null;
+    var siguiente = function(){
+      if (i >= intentos.length) return Promise.reject(ultimo || new Error("Calendly no respondió"));
+      var f = intentos[i++];
+      return traer(f).then(function(evs){
+        /* Sin ventana en la peticion, se recorta aqui. */
+        if (f) return evs;
+        return evs.filter(function(ev){
+          var t = Date.parse(ev.start_time);
+          return !isNaN(t) && t >= desde.getTime() && t <= hasta.getTime();
+        });
+      }).catch(function(e){ ultimo = e; return siguiente(); });
+    };
+    return siguiente();
   });
 }
 
@@ -13219,10 +13268,12 @@ function u19FranjaBloqueHTML(f){
   var col = pct >= 85 ? "var(--danger)" : (pct >= 60 ? "var(--success)" : "var(--warn)");
   var h = '<div class="fr-b">';
   h += '<div class="fr-t">' + (f.id === "am" ? "🌅" : "🌆") + ' ' + escapeHtml(f.nm)
-    + '<span class="fr-h">' + f.ini + ':00 – ' + f.fin + ':00</span>'
-    + '<span class="fr-p" style="color:' + col + ';">' + pct.toFixed(0) + '%</span></div>';
-  h += '<div class="fin-gauge-track"><div class="fin-gauge-fill" style="width:' + pct.toFixed(1)
-    + '%;background:' + col + ';"></div><div class="fin-gauge-mark" style="left:85%"></div></div>';
+    + '<span class="fr-h">' + f.ini + ':00 – ' + f.fin + ':00</span></div>';
+  /* El porcentaje pegado a la barra y en grande: con la barra fina y el
+     numero al otro extremo habia que cruzar la tarjeta con la vista. */
+  h += '<div class="fr-m"><div class="fr-p" style="color:' + col + ';">' + pct.toFixed(0) + '<small>%</small></div>'
+    + '<div class="fr-bar"><div class="fr-fill" style="width:' + pct.toFixed(1) + '%;background:' + col + ';"></div>'
+    + '<div class="fr-85" title="A partir del 85% la franja se satura"></div></div></div>';
   h += '<div class="fr-d">'
     + (f.fuente === "calendly"
         ? (f.reservasSemana + ' reservas/semana de ' + f.cuposSemana + ' cupos · <b>' + f.hueco + ' clientes más caben</b>'
