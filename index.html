@@ -12624,12 +12624,18 @@ function u19OcupacionFranja(franja, sesionesSemana, clientes){
   var cache = (typeof u19CalFranjaCache === "function") ? u19CalFranjaCache() : null;
   var resSem = (typeof u19ReservasSemana === "function") ? u19ReservasSemana(cache, franja.id) : null;
   var real = resSem != null && cupos > 0;
+  var sesSem = null, porSes = null;
+  if (real && cache && cache.sesiones && cache.dias){
+    sesSem = Math.round((cache.sesiones[franja.id] || 0) / (cache.dias / 7));
+    porSes = sesSem > 0 ? (resSem / sesSem).toFixed(1).replace(".", ",") : null;
+  }
   return {
     id: franja.id, nm: franja.nm, ini: franja.ini, fin: franja.fin, cap: franja.cap,
     horas: horas, dias: dias, cuposSemana: cupos, porCliente: porCliente,
     capacidadClientes: capacidad, activos: n,
     fuente: real ? "calendly" : "asignacion",
     reservasSemana: real ? Math.round(resSem) : null,
+    sesionesSemana: sesSem, porSesionMedia: porSes,
     pct: real ? Math.min(100, resSem / cupos * 100)
               : (capacidad > 0 ? Math.min(100, n / capacidad * 100) : 0),
     hueco: real ? Math.max(0, Math.round((cupos - resSem) / porCliente))
@@ -12705,6 +12711,22 @@ var CAL_FRANJA_TTL = 6 * 3600 * 1000;   /* 6 h: las reservas no cambian tanto */
    los instantes van SIN milisegundos (toISOString los pone y la API los
    rechaza), y si aun asi falla se reintenta con menos filtros en vez de
    rendirse. El detalle que devuelva la API se propaga tal cual. */
+/* La cuenta de Calendly tiene un usuario y una organizacion. Filtrar por
+   usuario solo devuelve lo que tu alojas; los grupos que crea tu
+   automatizacion pueden ir bajo otro anfitrion. Por organizacion salen
+   todos. */
+function u19CalendlyOrg(){
+  if (settings.calendlyOrgUri) return Promise.resolve(settings.calendlyOrgUri);
+  return fetch("https://api.calendly.com/users/me", { headers: calendlyHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var org = d && d.resource && d.resource.current_organization;
+      if (org){ settings.calendlyOrgUri = org; saveSettings(); }
+      return org || null;
+    })
+    .catch(function(){ return null; });
+}
+
 function u19CalIso(d){
   return new Date(d).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
@@ -12724,29 +12746,36 @@ function u19CalendlyRango(dias){
   if (!settings.calendlyToken) return Promise.reject(new Error("Calendly no está conectado"));
   var hasta = new Date();
   var desde = new Date(Date.now() - (dias || 30) * 86400000);
+  var ventana = "&min_start_time=" + encodeURIComponent(u19CalIso(desde))
+              + "&max_start_time=" + encodeURIComponent(u19CalIso(hasta));
 
-  return calendlyGetUserUri().then(function(userUri){
-    /* De mas filtrado a menos. La primera que responda, gana. */
-    var intentos = [
-      "&min_start_time=" + encodeURIComponent(u19CalIso(desde))
-        + "&max_start_time=" + encodeURIComponent(u19CalIso(hasta)) + "&status=active",
-      "&min_start_time=" + encodeURIComponent(u19CalIso(desde))
-        + "&max_start_time=" + encodeURIComponent(u19CalIso(hasta)),
-      ""
-    ];
+  return Promise.all([calendlyGetUserUri(), u19CalendlyOrg()]).then(function(ids){
+    var userUri = ids[0], orgUri = ids[1];
+    /* Por organizacion primero: incluye lo que agenda la automatizacion
+       aunque el anfitrion sea otro. */
+    var ambitos = [];
+    if (orgUri) ambitos.push("organization=" + encodeURIComponent(orgUri));
+    ambitos.push("user=" + encodeURIComponent(userUri));
 
-    var traer = function(filtro){
+    var intentos = [];
+    ambitos.forEach(function(am){
+      intentos.push(am + ventana + "&status=active");
+      intentos.push(am + ventana);
+      intentos.push(am);
+    });
+
+    var traer = function(q){
       var out = [];
       var pedir = function(pageToken){
-        var url = "https://api.calendly.com/scheduled_events?user=" + encodeURIComponent(userUri)
-          + "&count=100" + filtro
+        var url = "https://api.calendly.com/scheduled_events?" + q + "&count=100"
           + (pageToken ? "&page_token=" + encodeURIComponent(pageToken) : "");
         return fetch(url, { headers: calendlyHeaders() }).then(function(r){
           return r.json().then(function(d){
             if (!r.ok || (d && d.message && !d.collection)) throw new Error(u19CalError(d));
             out = out.concat(d.collection || []);
             var next = d.pagination && d.pagination.next_page_token;
-            return (next && out.length < 1000) ? pedir(next) : out;
+            /* Un mes de gimnasio pasa de 100 eventos: hay que paginar. */
+            return (next && out.length < 3000) ? pedir(next) : out;
           });
         });
       };
@@ -12756,10 +12785,10 @@ function u19CalendlyRango(dias){
     var i = 0, ultimo = null;
     var siguiente = function(){
       if (i >= intentos.length) return Promise.reject(ultimo || new Error("Calendly no respondió"));
-      var f = intentos[i++];
-      return traer(f).then(function(evs){
-        /* Sin ventana en la peticion, se recorta aqui. */
-        if (f) return evs;
+      var q = intentos[i++];
+      var conVentana = q.indexOf("min_start_time") >= 0;
+      return traer(q).then(function(evs){
+        if (conVentana) return evs;
         return evs.filter(function(ev){
           var t = Date.parse(ev.start_time);
           return !isNaN(t) && t >= desde.getTime() && t <= hasta.getTime();
@@ -12771,20 +12800,41 @@ function u19CalendlyRango(dias){
 }
 
 /* Reparte las reservas entre las franjas por su hora de inicio. */
+/* Cuenta PERSONAS, no eventos. Una clase grupal es un solo evento con
+   N inscritos, y para la ocupacion importan los N: son los que ocupan
+   sitio en el bloque. Contar eventos daba 15 donde habia cientos. */
+function u19PersonasEvento(ev){
+  var c = ev && ev.invitees_counter;
+  if (c){
+    var n = (c.active != null) ? c.active : c.total;
+    if (n != null && !isNaN(n) && n >= 0) return Number(n);
+  }
+  /* Sin el contador, el evento vale por una persona. */
+  return 1;
+}
+
 function u19ContarPorFranja(eventos, franjas){
-  var res = { am: 0, pm: 0, fuera: 0, total: 0, dias: {} };
+  var res = { am: 0, pm: 0, fuera: 0, total: 0, dias: {},
+              sesiones: { am: 0, pm: 0, fuera: 0, total: 0 } };
   (eventos || []).forEach(function(ev){
     var d = new Date(ev.start_time);
     if (isNaN(d.getTime())) return;
-    res.total++;
+    var personas = u19PersonasEvento(ev);
+    res.total += personas;
+    res.sesiones.total++;
     res.dias[d.toISOString().slice(0, 10)] = true;
     var hora = d.getHours() + d.getMinutes() / 60;
     var puesto = false;
     for (var i = 0; i < franjas.length; i++){
       var f = franjas[i];
-      if (hora >= f.ini && hora < f.fin){ res[f.id]++; puesto = true; break; }
+      if (hora >= f.ini && hora < f.fin){
+        res[f.id] += personas;
+        res.sesiones[f.id]++;
+        puesto = true;
+        break;
+      }
     }
-    if (!puesto) res.fuera++;
+    if (!puesto){ res.fuera += personas; res.sesiones.fuera++; }
   });
   res.diasConDatos = Object.keys(res.dias).length;
   return res;
@@ -12814,10 +12864,12 @@ window.u19ActualizarFranjasCalendly = function(silencioso){
   return u19CalendlyRango(dias).then(function(evs){
     var r = u19ContarPorFranja(evs, u19Franjas());
     var d = { ts: Date.now(), dias: dias, am: r.am, pm: r.pm, fuera: r.fuera,
-              total: r.total, diasConDatos: r.diasConDatos };
+              total: r.total, diasConDatos: r.diasConDatos, sesiones: r.sesiones };
     try { localStorage.setItem(CAL_FRANJA_KEY, JSON.stringify(d)); } catch(e){}
     if (!silencioso){
-      toast(r.total + " reservas leídas · " + r.am + " por la mañana, " + r.pm + " por la tarde", "success");
+      toast(r.total + " personas en " + r.sesiones.total + " sesiones · "
+        + r.am + " por la mañana, " + r.pm + " por la tarde"
+        + (r.fuera ? " · " + r.fuera + " fuera de las dos franjas" : ""), "success");
       if (typeof renderFinanzas === "function") renderFinanzas();
     }
     return d;
@@ -13276,7 +13328,8 @@ function u19FranjaBloqueHTML(f){
     + '<div class="fr-85" title="A partir del 85% la franja se satura"></div></div></div>';
   h += '<div class="fr-d">'
     + (f.fuente === "calendly"
-        ? (f.reservasSemana + ' reservas/semana de ' + f.cuposSemana + ' cupos · <b>' + f.hueco + ' clientes más caben</b>'
+        ? ('<b>' + f.reservasSemana + ' personas/semana</b> de ' + f.cuposSemana + ' cupos · ' + f.hueco + ' clientes más caben'
+           + (f.sesionesSemana != null ? '<br>' + f.sesionesSemana + ' sesiones/semana · ' + f.porSesionMedia + ' personas por sesión' : '')
            + '<br><span style="color:var(--success);">✓ medido en Calendly</span>')
         : (f.activos + ' de ' + f.capacidadClientes + ' · <b>' + f.hueco + ' cupos libres</b> · ' + f.cuposSemana + ' cupos/semana'
            + '<br><span style="opacity:.7;">según la franja asignada a cada cliente</span>'))
@@ -13314,7 +13367,9 @@ function u19FinOcupacionHTML(){
     + 'Separadas porque no se deciden igual: una franja llena pide subir el precio, una vacía pide llenarla. '
     + 'Un promedio de las dos esconde justo eso.'
     + (_real
-        ? ' <b>Medido con tus reservas de Calendly</b>' + (_cache ? ' · ' + _cache.total + ' reservas en ' + _cache.dias + ' días' : '') + '.'
+        ? ' <b>Medido con tus reservas de Calendly</b>'
+          + (_cache ? ' · ' + _cache.total + ' personas en '
+             + ((_cache.sesiones && _cache.sesiones.total) || 0) + ' sesiones, últimos ' + _cache.dias + ' días' : '') + '.'
         : (settings.calendlyToken
             ? ' Pulsa <b>Leer Calendly</b> para medirlo con las reservas reales en vez de con la franja asignada a mano.'
             : ' Conecta Calendly en Ajustes y esto se mide solo.'))
