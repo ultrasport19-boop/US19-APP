@@ -571,6 +571,27 @@ img{max-width:100%;display:block;}
   .hr-dia-x{display:none;}
 }
 
+/* ---- Panel v2, rejillas de tarjetas y franjas de estado ---- */
+.dash-2col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;margin:0 0 1rem;align-items:start;}
+.dash-2col > .card{margin:0 !important;}
+.dash-card{align-items:stretch;}
+@media (max-width:900px){.dash-2col{grid-template-columns:1fr;}}
+.rt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(310px,100%),1fr));gap:.9rem;margin-bottom:1rem;}
+.rt-grid > .card{margin:0;flex-direction:column;align-items:stretch;gap:.6rem;}
+.rt-grid > .card .card-actions{border-top:1px solid var(--border);padding-top:.7rem;margin-top:auto;}
+.cl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(430px,100%),1fr));gap:.9rem;margin-bottom:1rem;}
+.cl-grid > .card{margin:0;flex-direction:column;align-items:stretch;gap:.6rem;position:relative;padding-left:1.35rem;}
+.cl-grid > .card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:var(--radius-lg) 0 0 var(--radius-lg);background:var(--border);}
+.cl-grid > .card.cl-ok::before{background:var(--success);}
+.cl-grid > .card.cl-pronto::before{background:var(--warn);}
+.cl-grid > .card.cl-venc::before{background:var(--danger);}
+.cl-grid > .card.cl-off{opacity:.6;}
+.cl-grid > .card .card-actions{border-top:1px solid var(--border);padding-top:.7rem;margin-top:auto;}
+.cl-leyenda{display:flex;gap:1rem;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin:-.6rem 0 1rem;align-items:center;}
+.cl-leyenda i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.35rem;vertical-align:-1px;}
+.lib-count{font-size:.78rem;color:var(--muted);margin:-.4rem 0 .8rem;}
+.lib-count b{color:var(--text);}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -3635,34 +3656,162 @@ function hideTrainerUI(){
   }
 })();
 
+/* ============================================================
+   PANEL · PORTADA v2 (sep 2026)
+   Antes el panel operativo salía ANTES del título, las cifras
+   contaban cosas de la app (rutinas creadas, ejercicios) y las
+   rutinas recientes eran filas a todo lo ancho. Ahora:
+     · cabecera con la fecha y las dos acciones;
+     · cuatro cifras que hablan del negocio de hoy;
+     · el panel operativo (entrenan hoy, sin señales, reevaluaciones,
+       simetría) en su sitio, debajo de las cifras;
+     · la semana de entrenamiento como gráfico, al lado de la
+       prioridad del día;
+     · las rutinas recientes en rejilla.
+   Ningún constructor cambia: se reordenan y se envuelven.
+   ============================================================ */
+
+/* Cuántas sesiones hay programadas cada día de la semana, sumando
+   las rutinas activas. Cada rutina tiene siete días indexados desde
+   el lunes, igual que getTodayDayIdx(). */
+function u19SemanaDatos(){
+  var dias = [];
+  for (var i = 0; i < 7; i++) dias.push({ i: i, n: 0, seg: 0, personas: {} });
+  (state.routines || []).forEach(function(r){
+    if (!r || r.status === "archived") return;
+    var ds = Array.isArray(r.days) ? r.days : [];
+    for (var k = 0; k < Math.min(7, ds.length); k++){
+      var d = ds[k];
+      if (!d || !Array.isArray(d.exercises) || !d.exercises.length) continue;
+      dias[k].n++;
+      dias[k].seg += (typeof calculateDayDuration === "function") ? (calculateDayDuration(d) || 0) : 0;
+      if (r.clientId) dias[k].personas[r.clientId] = true;
+    }
+  });
+  dias.forEach(function(d){ d.personas = Object.keys(d.personas).length; });
+  return dias;
+}
+
+function u19SemanaSVG(dias, hoy){
+  var max = Math.max.apply(null, dias.map(function(d){ return d.n; })) || 1;
+  var W = 420, H = 118, padL = 6, padR = 6, padT = 18, padB = 26, bw = (W - padL - padR) / 7;
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;overflow:visible;">';
+  dias.forEach(function(d, i){
+    var alto = d.n / max * (H - padT - padB);
+    var x0 = padL + i * bw + bw * 0.16, w = bw * 0.68, xm = x0 + w / 2;
+    var y0 = d.n ? (H - padB - alto) : (H - padB - 2);
+    var esHoy = i === hoy;
+    var col = esHoy ? 'var(--accent)' : (d.n ? 'var(--surface-3)' : 'transparent');
+    var titulo = escapeAttr(DAY_NAMES[i] + ': ' + d.n + ' sesión' + (d.n === 1 ? '' : 'es') + (d.seg ? ' · ~' + fmtDuration(d.seg) : ''));
+    s += '<rect x="' + x0.toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + (d.n ? alto : 2).toFixed(1)
+      + '" rx="3" fill="' + col + '"' + (d.n ? '' : ' stroke="var(--border)"') + '><title>' + titulo + '</title></rect>';
+    if (d.n)
+      s += '<text x="' + xm.toFixed(1) + '" y="' + (y0 - 5).toFixed(1) + '" text-anchor="middle" font-size="9" font-weight="700" fill="'
+        + (esHoy ? 'var(--accent)' : 'var(--text)') + '">' + d.n + '</text>';
+    s += '<text x="' + xm.toFixed(1) + '" y="' + (H - padB + 12) + '" text-anchor="middle" font-size="8.5" font-weight="' + (esHoy ? '800' : '500')
+      + '" fill="' + (esHoy ? 'var(--accent)' : 'var(--muted)') + '">' + escapeHtml(DAY_NAMES_SHORT[i]) + '</text>';
+    if (d.seg)
+      s += '<text x="' + xm.toFixed(1) + '" y="' + (H - padB + 22) + '" text-anchor="middle" font-size="7.5" fill="var(--muted)" opacity=".75">'
+        + escapeHtml(fmtDuration(d.seg)) + '</text>';
+  });
+  s += '</svg>';
+  return s;
+}
+
+function u19SemanaHTML(){
+  var dias = u19SemanaDatos();
+  var total = dias.reduce(function(s, d){ return s + d.n; }, 0);
+  var hoy = getTodayDayIdx();
+  var h = '<div class="card dash-card"><div class="card-main">';
+  h += '<div class="fin-g-t">Semana de entrenamiento <span>'
+    + (total ? total + ' sesión' + (total === 1 ? '' : 'es') + ' programada' + (total === 1 ? '' : 's') + ' · hoy ' + escapeHtml(DAY_NAMES[hoy].toLowerCase())
+             : 'sin rutinas activas') + '</span></div>';
+  if (!total){
+    h += '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">Cuando asignes rutinas con días marcados, aquí verás cuánta gente entrena cada día.</p>';
+  } else {
+    h += u19SemanaSVG(dias, hoy);
+    var pico = dias.slice().sort(function(a, b){ return b.n - a.n; })[0];
+    var vacios = dias.filter(function(d, i){ return !d.n && i < 5; }).length;
+    h += '<p class="text-xs text-muted" style="margin:.5rem 0 0;line-height:1.5;">'
+      + 'El día más cargado es el <b>' + escapeHtml(DAY_NAMES[pico.i].toLowerCase()) + '</b>, con ' + pico.n + ' sesión' + (pico.n === 1 ? '' : 'es')
+      + (vacios ? ' · ' + vacios + ' día' + (vacios === 1 ? '' : 's') + ' de semana sin nadie programado' : '') + '.</p>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+/* Estado del plan de un cliente, para la franja de color de su tarjeta:
+   verde al día, ámbar vence en una semana, rojo vencido, gris sin fecha. */
+function u19ClienteEstadoClase(c){
+  if (!c) return 'na';
+  if (c.activo === false) return 'off';
+  var d = (typeof daysUntil === "function" && c.planEndDate) ? daysUntil(c.planEndDate) : null;
+  if (d == null) return 'na';
+  if (d < 0) return 'venc';
+  if (d <= 7) return 'pronto';
+  return 'ok';
+}
+
+function u19LibContador(n, q, muscle, equip){
+  var el = document.getElementById("lib-count");
+  if (!el) return;
+  var f = [];
+  if (q) f.push('«' + escapeHtml(q) + '»');
+  if (muscle === "terap:") f.push('terapéuticos');
+  else if (muscle === "contr:") f.push('por contracción');
+  else if (muscle === "nogif") f.push('sin GIF ni vídeo');
+  else if (muscle) f.push(escapeHtml(String(muscle).replace(/^(terap|contr|mus):/, '')));
+  if (equip) f.push(escapeHtml(equip));
+  el.innerHTML = '<b>' + n + '</b> de ' + state.exercises.length + ' ejercicios'
+    + (f.length ? ' · filtrando por ' + f.join(' · ') : '');
+}
+
+function u19FechaLargaHoy(){
+  var d = new Date();
+  var meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return DAY_NAMES[getTodayDayIdx()] + ' ' + d.getDate() + ' de ' + meses[d.getMonth()];
+}
+
 function renderDashboard(){
   var totalClients = state.clients.length;
+  var activos = (typeof u19ClientesActivos === "function") ? u19ClientesActivos().length : totalClients;
+  var conRutina = {};
+  state.routines.forEach(function(r){ if (r.clientId && r.status !== "archived") conRutina[r.clientId] = true; });
+  var nConRutina = state.clients.filter(function(c){ return conRutina[c.id]; }).length;
   var totalRoutines = state.routines.length;
   var activeRoutines = state.routines.filter(function(r){ return r.status !== "archived"; }).length;
   var totalExercises = state.exercises.length;
+  var conMedio = state.exercises.filter(function(e){ return e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0); }).length;
   var thisWeek = state.routines.filter(function(r){ return isThisWeek(r.startDate || r.createdAt); }).length;
+  var semana = u19SemanaDatos();
+  var hoyN = semana[getTodayDayIdx()].n;
 
   var recent = state.routines.slice().sort(function(a,b){
     return (b.updatedAt||b.createdAt||0) - (a.updatedAt||a.createdAt||0);
   }).slice(0, 6);
 
   var html = '';
+  html += '<div class="section-head fin-head">';
+  html += '<div><h1 class="section-title">PANEL <span class="accent">/ INICIO</span></h1>'
+    + '<p class="text-xs text-muted" style="margin:.2rem 0 0;">' + escapeHtml(u19FechaLargaHoy()) + '</p></div>';
+  html += '<div class="fin-head-r"><button class="btn btn-primary" onclick="openRoutineBuilder()">+ Nueva Rutina</button>'
+    + '<button class="btn btn-secondary" onclick="openTextImporter()">📋 Importar texto</button></div>';
+  html += '</div>';
+
+  html += '<div class="stat-grid fin-stats">';
+  html += statCard("Clientes", totalClients,
+    (activos !== totalClients ? activos + " activos · " : "") + nConRutina + " con rutina");
+  html += statCard("Rutinas activas", activeRoutines,
+    totalRoutines !== activeRoutines ? (totalRoutines - activeRoutines) + " archivadas"
+      : (thisWeek ? thisWeek + " iniciada" + (thisWeek === 1 ? "" : "s") + " esta semana" : "todas en uso"));
+  html += statCard("Entrenan hoy", hoyN, hoyN ? "sesion" + (hoyN === 1 ? "" : "es") + " programada" + (hoyN === 1 ? "" : "s") : "día sin sesiones");
+  html += statCard("Biblioteca", totalExercises, conMedio ? conMedio + " con vídeo o GIF" : "ejercicios");
+  html += '</div>';
+
   html += u19PanelOperativoHTML();
-  html += '<div class="section-head">';
-  html += '<h1 class="section-title">PANEL <span class="accent">/ INICIO</span></h1>';
-  html += '<button class="btn btn-primary" onclick="openRoutineBuilder()">+ Nueva Rutina</button>';
-  html += '<button class="btn btn-secondary" onclick="openTextImporter()">📋 Importar texto</button>';
-  html += '</div>';
-
-  html += '<div class="stat-grid">';
-  html += statCard("Clientes activos", totalClients, "");
-  html += statCard("Rutinas creadas", totalRoutines, activeRoutines + " activas");
-  html += statCard("Ejercicios biblioteca", totalExercises, "");
-  html += statCard("Esta semana", thisWeek, "iniciadas");
-  html += '</div>';
-
-  html += buildPriorityTodayHtml();
+  html += '<div class="dash-2col">' + u19SemanaHTML() + buildPriorityTodayHtml() + '</div>';
   html += buildAgendaHtml();
+
   // Paneles secundarios agrupados en un bloque colapsable (recuerda tu preferencia)
   var _dashSec = buildCalendlyDashboardHtml()+buildNotionSyncHtml()+buildBackupBannerHtml()+buildIncomeHtml()
     +buildClientDatesAlertsHtml()+buildAlertsHtml()+buildClinicalInboxHtml()+buildRutHygieneHtml()+buildReactivationHtml();
@@ -3681,7 +3830,9 @@ function renderDashboard(){
   if (!recent.length){
     html += emptyState("Sin rutinas todavía", "Crea tu primera rutina para empezar a planificar.", "+ Nueva Rutina", "openRoutineBuilder()");
   } else {
+    html += '<div class="rt-grid">';
     for (var i=0;i<recent.length;i++) html += routineCardHtml(recent[i]);
+    html += '</div>';
   }
 
   document.getElementById("view-dashboard").innerHTML = html;
@@ -3777,6 +3928,10 @@ function renderClients(){
   if (noRoutineCount) html += '<span class="cat-pill'+(_clientFilter==="noroutine"?" active":"")+'" onclick="filterClients(\'noroutine\')"><span class="cat-icon">🚫</span>Sin rutina<span class="cat-count">'+noRoutineCount+'</span></span>';
   if (expiredCount) html += '<span class="cat-pill'+(_clientFilter==="expired"?" active":"")+'" onclick="filterClients(\'expired\')"><span class="cat-icon">💳</span>Plan vencido<span class="cat-count">'+expiredCount+'</span></span>';
   html += '</div>';
+  html += '<div class="cl-leyenda"><span><i style="background:var(--success);"></i>plan al día</span>'
+    + '<span><i style="background:var(--warn);"></i>vence en 7 días</span>'
+    + '<span><i style="background:var(--danger);"></i>vencido</span>'
+    + '<span><i style="background:var(--border);"></i>sin fecha de plan</span></div>';
 
   // Orden: clientes CON plan primero (gym = tiene rutina; rehab = tiene protocolo),
   // luego alfabético. Así se llega rápido a Resumen/Seguimiento/Progresiones de los activos.
@@ -3794,7 +3949,7 @@ function renderClients(){
       return getClientType(c)===_clientFilter;
     });
     if (!filtered.length) html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">Sin clientes en este grupo.</p>';
-    else for (var i=0;i<filtered.length;i++) html += clientCardHtml(filtered[i]);
+    else { html += '<div class="cl-grid">'; for (var i=0;i<filtered.length;i++) html += clientCardHtml(filtered[i]); html += '</div>'; }
   } else {
     // Grouped: Gimnasio then Rehabilitación
     var groups = [["gym","🏋️ GIMNASIO"],["rehab","🩹 REHABILITACIÓN"]];
@@ -3802,7 +3957,7 @@ function renderClients(){
       var inGroup = sorted.filter(function(c){ return getClientType(c)===groups[g][0]; });
       if (!inGroup.length) continue;
       html += '<h2 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.05rem;color:var(--muted);margin:1.4rem 0 .7rem;text-transform:uppercase;">'+groups[g][1]+' <span style="color:var(--border);">·</span> <span style="font-size:.85rem;">'+inGroup.length+'</span></h2>';
-      for (var k=0;k<inGroup.length;k++) html += clientCardHtml(inGroup[k]);
+      html += '<div class="cl-grid">'; for (var k=0;k<inGroup.length;k++) html += clientCardHtml(inGroup[k]); html += '</div>';
     }
   }
 
@@ -4130,7 +4285,7 @@ function clientCardHtml(c){
     }
   }
 
-  return '<div class="card">'
+  return '<div class="card cl-card cl-' + u19ClienteEstadoClase(c) + '">'
     + '<div class="card-main">'
       + '<div class="card-title">'+escapeHtml(c.name||"Sin nombre")+'</div>'
       + '<div class="card-sub" style="flex-wrap:wrap;gap:.5rem;">'
@@ -4318,7 +4473,7 @@ function renderRoutines(){
   if (!filtered.length){
     html += emptyState(!state.routines.length?"Sin rutinas":"Sin rutinas en esta categoría", !state.routines.length?"Crea una nueva rutina y asígnala a un cliente.":"Cambia el filtro o asigna categorías.", "+ Nueva Rutina", "openRoutineBuilder()");
   } else {
-    for (var i=0;i<filtered.length;i++) html += routineCardHtml(filtered[i]);
+    html += '<div class="rt-grid">'; for (var i=0;i<filtered.length;i++) html += routineCardHtml(filtered[i]); html += '</div>';
   }
   document.getElementById("view-routines").innerHTML = html;
 }
@@ -5724,7 +5879,7 @@ function renderLibrary(){
   html += '</select>';
   html += '</div>';
 
-  html += '<div id="lib-grid"></div>';
+  html += '<div id="lib-count" class="lib-count"></div><div id="lib-grid"></div>';
   document.getElementById("view-library").innerHTML = html;
 
   document.getElementById("lib-search").addEventListener("input", function(){
@@ -5781,11 +5936,12 @@ function renderLibraryGrid(){
   }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
 
   if (!filtered.length){
-    grid.innerHTML = emptyState("Sin resultados", "Cambia el filtro o crea un nuevo ejercicio.", "+ Nuevo Ejercicio", "openExerciseForm()");
+    u19LibContador(0, q, muscle, equip); grid.innerHTML = emptyState("Sin resultados", "Cambia el filtro o crea un nuevo ejercicio.", "+ Nuevo Ejercicio", "openExerciseForm()");
     grid.className = "";
     return;
   }
   grid.className = "exercise-grid";
+  u19LibContador(filtered.length, q, muscle, equip);
   /* Pintar 2.060 tarjetas de una vez bloquea el hilo y llena el DOM.
      Se muestran por tandas: el resto llega al desplazarse. */
   _libTotal = filtered.length;
@@ -8484,7 +8640,7 @@ function renderProtocolList(){
     if (!filtered.length){
       html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">Sin protocolos en este segmento.</p>';
     } else {
-      for (var i=0;i<filtered.length;i++) html += protocolCardHtml(filtered[i]);
+      html += '<div class="rt-grid">'; for (var i=0;i<filtered.length;i++) html += protocolCardHtml(filtered[i]); html += '</div>';
     }
   } else {
     // Grouped by segment
@@ -8495,7 +8651,7 @@ function renderProtocolList(){
       html += '<h2 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.05rem;color:var(--muted);margin:1.4rem 0 .7rem;text-transform:uppercase;">'
         + gseg.icon + ' ' + escapeHtml(gseg.label)
         + ' <span style="color:var(--border);">·</span> <span style="font-size:.85rem;">'+inSeg.length+'</span></h2>';
-      for (var k=0;k<inSeg.length;k++) html += protocolCardHtml(inSeg[k]);
+      html += '<div class="rt-grid">'; for (var k=0;k<inSeg.length;k++) html += protocolCardHtml(inSeg[k]); html += '</div>';
     }
   }
 
