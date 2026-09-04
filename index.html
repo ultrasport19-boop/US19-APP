@@ -14382,7 +14382,7 @@ function u19PlantelHTML(){
   h += statCard("Evaluados", m.evaluados + " de " + m.total,
     m.sinEvaluar.length ? (m.sinEvaluar.length + " sin ninguna medición") : "cobertura completa");
   h += statCard("Bajo 90% de LSI", m.deficit.length,
-    m.deficit.length ? "asimetría a corregir" : "nadie con déficit lateral");
+    m.deficit.length ? "asimetría a corregir" : "nadie con asimetría lateral");
   h += statCard("Mejoran", m.mejoran.length, "respecto de su medición anterior");
   h += statCard("Retroceden", m.empeoran.length, m.empeoran.length ? "revisar carga" : "sin retrocesos");
   h += '</div>';
@@ -14402,7 +14402,7 @@ function u19PlantelHTML(){
   /* --- Quienes necesitan trabajo --- */
   if (m.deficit.length){
     h += '<div class="card" style="margin-top:1rem;border-left:4px solid var(--danger);"><div class="card-main">';
-    h += '<div class="card-title">⚠️ Déficit lateral · ' + m.deficit.length + '</div>';
+    h += '<div class="card-title">⚠️ Asimetría lateral · ' + m.deficit.length + '</div>';
     h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl"><tr><th>Deportista</th><th>LSI</th><th>Fuente</th><th>Última</th><th></th></tr>';
     m.deficit.slice(0, 10).forEach(function(f){
       var v = f.lsi.lsi;
@@ -17923,7 +17923,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
   const narrativeBlock = `
     <div class="pr-sec">
       <div class="pr-letter">B</div>
-      <div class="pr-secttl"><h2>Lectura clínica del progreso</h2><p>Síntesis interpretativa automática a partir de las variaciones registradas</p></div>
+      <div class="pr-secttl"><h2>Lectura del progreso</h2><p>Síntesis interpretativa automática a partir de las variaciones registradas</p></div>
     </div>
     <div class="pr-narr"><p>${narrativa}</p></div>`;
 
@@ -18340,7 +18340,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
     </div>` : '';
 
   // Layout completo (4-8 páginas):
-  // P1 portada + identificación + resumen (A) + lectura clínica (B)
+  // P1 portada + identificación + resumen (A) + lectura del progreso (B)
   // P2 clasificación por rangos (C) + gráfico (D)
   // P3 leyenda + composición (E) + índices (F)
   // P4 (condicional) tendencia (I) + segmentario (J) + metas (K) + ritmo (L)
@@ -20140,7 +20140,7 @@ function rndAsim(izq, der, mejorEsMayor){
   return { pct:+pct.toFixed(1), lsi:+(bajo/alto*100).toFixed(1), mejorLado:mejorLado,
            deficitLado:(mejorLado==="derecho"?"izquierdo":"derecho"), nivel:nivel };
 }
-function rndNivelTxt(n){ return n==="ok"?"Simetría adecuada":(n==="vigilar"?"A vigilar":"Déficit relevante"); }
+function rndNivelTxt(n){ return n==="ok"?"Simetría adecuada":(n==="vigilar"?"A vigilar":"Asimetría marcada"); }
 function rndNivelColor(n){ return n==="ok"?"#15803d":(n==="vigilar"?"#b45309":"#dc2626"); }
 
 /* Motor de análisis: agrupa por lado, calcula asimetría y evolución. */
@@ -20229,11 +20229,11 @@ function rndNarrativa(m){
     var peor=rndPeorAsim(a);
     if(peor){
       if(peor.deficitLado===a.dominante){
-        p.push("El déficit se ubica en el lado declarado como <b>dominante</b>, hallazgo poco habitual: conviene descartar fatiga acumulada, dolor o una limitación específica de ese segmento antes de atribuirlo al aprendizaje motor.");
+        p.push("La asimetría se ubica en el lado declarado como <b>dominante</b>, hallazgo poco habitual: conviene descartar fatiga acumulada, dolor o una limitación específica de ese segmento antes de atribuirlo al aprendizaje motor.");
       } else {
-        p.push("El déficit se ubica en el lado <b>no dominante</b>, patrón esperable por la mayor exposición y control motor del lado hábil; se considera relevante cuando supera el 10–15%.");
+        p.push("La asimetría se ubica en el lado <b>no dominante</b>, patrón esperable por la mayor exposición y control motor del lado hábil; se considera relevante cuando supera el 10–15%.");
       }
-      if(peor.nivel==="deficit") p.push("Con una asimetría por sobre el <b>15%</b>, se sugiere trabajo unilateral dirigido al lado deficitario y reevaluación con el mismo protocolo en 4–6 semanas.");
+      if(peor.nivel==="deficit") p.push("Con una asimetría por sobre el <b>15%</b>, se sugiere trabajo unilateral dirigido al lado de menor rendimiento y reevaluación con el mismo protocolo en 4–6 semanas.");
       else if(peor.nivel==="vigilar") p.push("La asimetría se ubica en la <b>zona de vigilancia (10–15%)</b>: conviene incorporar trabajo unilateral compensatorio y controlar su evolución.");
       else p.push("La diferencia entre extremidades se encuentra <b>dentro del rango habitual (menos de 10%)</b>.");
     }
@@ -20382,7 +20382,7 @@ function rndReportBlocks(m, cli, opts){
         +'<div class="pr-seg">'+rows+'</div>'
         +'<div class="pr-legend"><span class="pr-lg"><span class="pr-dot good"></span>&lt;10% habitual</span>'
         +'<span class="pr-lg"><span class="pr-dot" style="background:#d97706"></span>10–15% vigilancia</span>'
-        +'<span class="pr-lg"><span class="pr-dot bad"></span>&gt;15% déficit relevante</span>'
+        +'<span class="pr-lg"><span class="pr-dot bad"></span>&gt;15% asimetría marcada</span>'
         +'<span class="pr-lg-note">criterio LSI de retorno deportivo</span></div>'
         +'<div class="pr-refnote">En tiempo de reacción, un valor menor es mejor. Carácter descriptivo: no constituye diagnóstico clínico.</div>';
     }
@@ -20392,7 +20392,7 @@ function rndReportBlocks(m, cli, opts){
         +'<div class="pr-gauge-wrap">'
         +  '<div class="pr-gauge">'+rndGaugeSVG(peor.pct,peor.nivel)
         +    '<div class="pr-gauge-cap"><b style="color:'+rndNivelColor(peor.nivel)+'">'+rndNivelTxt(peor.nivel)+'</b><br>'
-        +    'LSI '+peor.lsi.toFixed(0)+'% · déficit en lado '+rndLadoTxt(peor.deficitLado).toLowerCase()+'</div></div>'
+        +    'LSI '+peor.lsi.toFixed(0)+'% · lado más bajo: '+rndLadoTxt(peor.deficitLado).toLowerCase()+'</div></div>'
         +  '<div class="pr-gcharts">'
         +    (a.reaccion?'<div class="pr-gchart">'+rndBarsSVG('Tiempo de reacción','ms',a.izq.reaccion_ms_prom,a.der.reaccion_ms_prom,false)+'</div>':'')
         +    (a.hits?'<div class="pr-gchart">'+rndBarsSVG('Toques válidos','hits',a.izq.hits,a.der.hits,true)+'</div>':'')
@@ -20463,9 +20463,9 @@ function rndReportBlocks(m, cli, opts){
     +'<p><b>Tiempo de reacción (ms).</b> Milisegundos entre que el pod se enciende y lo apagas. Incluye el procesamiento del estímulo y el desplazamiento hasta el pod: es reacción <i>y</i> agilidad, no solo reflejo. Menos es mejor.</p>'
     +'<p><b>Hits.</b> Toques válidos en la duración de la actividad. Con el mismo montaje, más hits significa más ciclos completados.</p>'
     +'<p><b>Hits/min.</b> Toques normalizados por minuto. Permite comparar sesiones de distinta duración.</p>'
-    +'<p><b>Asimetría (%).</b> Diferencia entre extremidades respecto del mejor lado. Bajo 10% se considera habitual; entre 10 y 15% conviene vigilar; sobre 15% se interpreta como déficit relevante.</p>'
+    +'<p><b>Asimetría (%).</b> Diferencia entre extremidades respecto del mejor lado. Bajo 10% se considera habitual; entre 10 y 15% conviene vigilar; sobre 15% se interpreta como asimetría marcada.</p>'
     +'<p><b>LSI (Limb Symmetry Index).</b> El lado más débil expresado como porcentaje del más fuerte. Un LSI de 90% o más es el criterio de uso extendido para autorizar retorno deportivo.</p>'
-    +'<p><b>Lado dominante.</b> La extremidad hábil declarada. Un déficit en el lado no dominante es esperable; en el dominante obliga a investigar fatiga, dolor o limitación específica.</p>'
+    +'<p><b>Lado dominante.</b> La extremidad hábil declarada. Que rinda menos el lado no dominante es esperable; que lo haga el dominante obliga a investigar fatiga, dolor o limitación específica.</p>'
     +'</div>';
 
   var wq = (typeof rndSanityWarnings === "function") ? rndSanityWarnings(m) : [];
@@ -20873,7 +20873,7 @@ function rndPintarAnalisis(){
     h+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.8rem;">'
       + (a.reaccion?box('Asimetría reacción', a.reaccion.pct.toFixed(1),'% · LSI '+a.reaccion.lsi.toFixed(0)+'%', rndNivelColor(a.reaccion.nivel)):'')
       + (a.hits?box('Asimetría hits', a.hits.pct.toFixed(1),'% · LSI '+a.hits.lsi.toFixed(0)+'%', rndNivelColor(a.hits.nivel)):'')
-      + (q?box('Lectura', rndNivelTxt(q.nivel),'déficit: '+rndLadoTxt(q.deficitLado).toLowerCase(), rndNivelColor(q.nivel)):'')
+      + (q?box('Lectura', rndNivelTxt(q.nivel),'lado más bajo: '+rndLadoTxt(q.deficitLado).toLowerCase(), rndNivelColor(q.nivel)):'')
       + '</div>';
   } else {
     h+='<p class="text-xs" style="color:#b45309;">Marca el <b>lado</b> de al menos una sesión izquierda y una derecha para obtener el análisis de simetría.</p>';
@@ -21439,14 +21439,14 @@ window.u19CriterioAltaHTML = function(clientId){
     + (cumple ? ' — cumple el criterio de ≥90%' : ' — NO cumple el criterio de ≥90%') + '</div>'
     + '<div class="text-xs text-muted" style="margin-top:.25rem;">Medido el ' + rndFdate(d.fecha)
     + ' · ' + fuenteTxt + ' · asimetría ' + d.pct.toFixed(1) + '%'
-    + (d.deficitLado ? (' · déficit en lado ' + rndLadoTxt(d.deficitLado).toLowerCase()) : '')
+    + (d.deficitLado ? (' · lado más bajo: ' + rndLadoTxt(d.deficitLado).toLowerCase()) : '')
     + ' · <a href="#" onclick="u19HistorialRendimiento(\'' + clientId + '\');return false;">ver historial</a></div></div>';
 };
 
 /* B5 · Cruce estructura ↔ función.
    La bioimpedancia da músculo por pierna; BlazePod da reacción por
-   pierna. Comparar las dos asimetrías distingue un déficit de masa
-   de uno de control motor, que es la decisión de entrenamiento. */
+   pierna. Comparar las dos asimetrías distingue una asimetría de masa
+   de una de control motor, que es la decisión de entrenamiento. */
 function u19CruceHTML(ev, m){
   if (!ev || !m || !m.asimetria) return '';
   var sm = ev.segmentario_musculo || {};
@@ -21462,7 +21462,7 @@ function u19CruceHTML(ev, m){
   if (ratio == null || estr.pct < 3){
     lectura = 'La masa muscular está prácticamente equilibrada entre piernas (' + estr.pct.toFixed(1) + '%), '
       + 'mientras la respuesta funcional difiere un ' + func.pct.toFixed(1) + '%. '
-      + '<b>El déficit no es de masa: es de control motor.</b> El trabajo indicado es neuromuscular '
+      + '<b>La diferencia no es de masa: es de control motor.</b> El trabajo indicado es neuromuscular '
       + '(reactividad, cambios de dirección, propiocepción), no de hipertrofia.';
   } else if (ratio >= 2){
     lectura = 'La asimetría funcional (' + func.pct.toFixed(1) + '%) es <b>' + ratio.toFixed(1) + ' veces</b> la estructural ('
@@ -21470,10 +21470,10 @@ function u19CruceHTML(ev, m){
       + '<b>predomina el componente de control motor sobre el de masa.</b> Priorizar trabajo neuromuscular unilateral.';
   } else if (ratio <= 0.6){
     lectura = 'La asimetría estructural (' + estr.pct.toFixed(1) + '%) supera a la funcional (' + func.pct.toFixed(1) + '%). '
-      + '<b>Hay una diferencia real de masa muscular</b> que la función todavía compensa. Indicado trabajo de fuerza e hipertrofia unilateral del lado deficitario.';
+      + '<b>Hay una diferencia real de masa muscular</b> que la función todavía compensa. Indicado trabajo de fuerza e hipertrofia unilateral del lado con menos masa.';
   } else {
     lectura = 'Las asimetrías estructural (' + estr.pct.toFixed(1) + '%) y funcional (' + func.pct.toFixed(1) + '%) son de magnitud comparable, '
-      + 'lo que sugiere un <b>déficit mixto</b>: conviene combinar fuerza unilateral con trabajo reactivo del lado más débil.';
+      + 'lo que sugiere un <b>componente mixto</b>: conviene combinar fuerza unilateral con trabajo reactivo del lado más débil.';
   }
 
   return '<div class="pr-sec"><div class="pr-letter">X</div><div class="pr-secttl">'
@@ -21571,7 +21571,7 @@ function u19PanelOperativoHTML(){
     +     lista(reevals, 'Ninguna en los próximos 7 días.', function(o){
             return chip(o.c, o.dias < 0 ? 'vencida hace ' + Math.abs(o.dias) + ' d' : (o.dias === 0 ? 'hoy' : 'en ' + o.dias + ' d'), o.dias <= 0 ? '#b91c1c' : '#d97706'); }) + '</div>'
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Simetría bajo 90% (' + asimetricos.length + ')</div>'
-    +     lista(asimetricos, 'Nadie con déficit lateral medido.', function(o){
+    +     lista(asimetricos, 'Nadie con asimetría lateral medida.', function(o){
             return chip(o.c, 'LSI ' + o.d.lsi.toFixed(0) + '%', o.d.lsi < 85 ? '#b91c1c' : '#d97706'); }) + '</div>'
     + '</div>'
     + '<div class="text-xs text-muted" style="margin-top:.7rem;line-height:1.5;">«Sin señales» = con rutina activa y sin reporte de progreso ni progresión guardada en 10 días o más: el aviso temprano de abandono. «Simetría» toma la última medición de cada persona, venga de dinamometría, BlazePod o un test manual.</div>'
@@ -22274,7 +22274,7 @@ function frzNarrativa(fm){
     p.push("<b>" + escapeHtml(par.nombre) + "</b>: izquierda " + par.izq[campo].toFixed(1) + un
       + " frente a derecha " + par.der[campo].toFixed(1) + un
       + " — LSI <b>" + q.lsi.toFixed(0) + "%</b> (" + rndNivelTxt(q.nivel).toLowerCase() + ")"
-      + (q.deficitLado ? ", con el déficit en el lado " + rndLadoTxt(q.deficitLado).toLowerCase() : "") + ".");
+      + (q.deficitLado ? ", con el valor más bajo en el lado " + rndLadoTxt(q.deficitLado).toLowerCase() : "") + ".");
   });
   var peor = frzPeorPar(fm);
   if (peor && frzDentroDelError(peor)){
@@ -22286,10 +22286,10 @@ function frzNarrativa(fm){
     if (peor.q.lsi >= 90)
       p.push("El test más comprometido alcanza un <b>LSI de " + peor.q.lsi.toFixed(0) + "%</b>, por sobre el umbral de 90% que se emplea como criterio de simetría para el retorno deportivo.");
     else
-      p.push("El test más comprometido queda en <b>LSI " + peor.q.lsi.toFixed(0) + "%</b>, <b>por debajo del 90%</b> habitualmente exigido para autorizar el retorno deportivo. Indicado trabajo de fuerza unilateral dirigido al lado deficitario.");
+      p.push("El test más comprometido queda en <b>LSI " + peor.q.lsi.toFixed(0) + "%</b>, <b>por debajo del 90%</b> habitualmente exigido para autorizar el retorno deportivo. Indicado trabajo de fuerza unilateral dirigido al lado más bajo.");
     if (peor.rfd && Math.abs(peor.rfd.pct - peor.q.pct) > 8){
       p.push("La asimetría en la <b>velocidad de producción de fuerza</b> (" + peor.rfd.pct.toFixed(1) + "%) difiere de la del pico (" + peor.q.pct.toFixed(1)
-        + "%): el lado deficitario " + (peor.rfd.pct > peor.q.pct ? "tarda más en llegar a su máximo de lo que su fuerza pico sugiere, lo que apunta a un componente de control neuromuscular" : "produce fuerza a buen ritmo pese al déficit de pico") + ".");
+        + "%): el lado más bajo " + (peor.rfd.pct > peor.q.pct ? "tarda más en llegar a su máximo de lo que su fuerza pico sugiere, lo que apunta a un componente de control neuromuscular" : "produce fuerza a buen ritmo pese a su menor pico") + ".");
     }
   }
   return p;
@@ -22861,7 +22861,7 @@ function u19InformeUnicoDoc(inv, cli, opts){
   if (pf){
     frases.push('En dinamometría, el test más comprometido es <b>' + u19Esc(pf.nombre) + '</b> con <b>LSI ' + pf.q.lsi.toFixed(0) + '%</b>'
       + (pf.q.lsi >= 90 ? ', por sobre el umbral de retorno deportivo.' : ', bajo el 90% exigido'
-        + (pf.q.deficitLado ? ', con el déficit en el lado ' + rndLadoTxt(pf.q.deficitLado).toLowerCase() + '.' : '.')));
+        + (pf.q.deficitLado ? ', con el valor más bajo en el lado ' + rndLadoTxt(pf.q.deficitLado).toLowerCase() + '.' : '.')));
   }
   if (pr){
     frases.push('En respuesta reactiva, la asimetría entre extremidades es de <b>' + pr.pct.toFixed(1) + '%</b> (LSI ' + pr.lsi.toFixed(0) + '%), '
@@ -23205,7 +23205,7 @@ function u19VeredictoGlobal(inv){
           ? 'La única medida de simetría disponible alcanza el 90% (' + peor.v.toFixed(0) + '% en ' + peor.q + ').'
           : 'Las ' + n + ' medidas de simetría evaluadas alcanzan o superan el 90% (la más baja, ' + peor.v.toFixed(0)
             + '%, en ' + peor.q + ').')
-        + ' No hay un déficit lateral que condicione la progresión.' };
+        + ' No hay una asimetría lateral que condicione la progresión.' };
   }
   if (peor.v >= 85){
     return { nivel:'mid', icono:'!', titulo:'Asimetría en zona de vigilancia',
@@ -23213,7 +23213,7 @@ function u19VeredictoGlobal(inv){
              : bajo90 + ' de ' + n + ' medidas quedan bajo el 90%; la más baja es ' + peor.v.toFixed(0) + '% en ' + peor.q)
         + '. Conviene trabajo unilateral compensatorio y control en la próxima reevaluación.' };
   }
-  return { nivel:'bad', icono:'!', titulo:'Déficit lateral relevante',
+  return { nivel:'bad', icono:'!', titulo:'Asimetría lateral marcada',
     frase:'La simetría más baja es ' + peor.v.toFixed(0) + '% en ' + peor.q + ', bajo el umbral de 90% empleado como '
       + 'criterio de retorno deportivo. Es el punto que debe dirigir el trabajo de las próximas semanas.' };
 }
@@ -23245,18 +23245,18 @@ function u19PlanHTML(inv, opts){
   var func = pf ? pf.q : pr;
 
   if (func && func.lsi < 90){
-    var lado = func.deficitLado ? rndLadoTxt(func.deficitLado).toLowerCase() : 'deficitario';
+    var lado = func.deficitLado ? rndLadoTxt(func.deficitLado).toLowerCase() : 'más bajo';
     var tipo = 'mixto';
     if (estr && estr.pct < 3) tipo = 'motor';
     else if (estr && func.pct / Math.max(estr.pct, 0.5) >= 2) tipo = 'motor';
     else if (estr && func.pct / Math.max(estr.pct, 0.5) <= 0.6) tipo = 'masa';
     var txt = {
-      motor: 'La masa muscular está equilibrada entre lados, así que el déficit es de <b>control motor</b>, no de tamaño. '
+      motor: 'La masa muscular está equilibrada entre lados, así que la diferencia es de <b>control motor</b>, no de tamaño. '
         + 'Trabajo unilateral con énfasis en reactividad y calidad del gesto: pliometría de bajo impacto, cambios de dirección '
         + 'con estímulo visual y control excéntrico, priorizando la pierna ' + lado + '.',
       masa: 'La diferencia de masa muscular supera a la funcional: hay <b>menos músculo</b> en el lado ' + lado + '. '
         + 'Trabajo de fuerza e hipertrofia unilateral, series adicionales para ese lado y progresión de carga antes que de velocidad.',
-      mixto: 'El déficit tiene componente de masa y de control. Combinar <b>fuerza unilateral</b> con trabajo reactivo del lado ' + lado + '.'
+      mixto: 'La diferencia tiene componente de masa y de control. Combinar <b>fuerza unilateral</b> con trabajo reactivo del lado ' + lado + '.'
     }[tipo];
     items.push({ p:'alta', t:'Trabajo unilateral dirigido al lado ' + lado, d:txt });
   }
