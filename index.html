@@ -13726,6 +13726,9 @@ function u19MallaCardHTML(){
     h += '</div>';
   });
 
+  /* El aviso de faltas es decoracion util, no un requisito: si el modulo
+     no estuviera, la malla se pinta igual. */
+  h += (typeof u19NoShowAvisoMalla === "function") ? u19NoShowAvisoMalla() : '';
   h += '<p class="text-xs text-muted" style="margin-top:.8rem;line-height:1.5;">'
     + 'Cada persona cuenta en <b>todas las horas que su reserva ocupa</b>, no solo en la de inicio. '
     + 'Las casillas grises son horas sin ninguna reserva en ' + malla.diasObservados + ' días: '
@@ -13825,6 +13828,135 @@ function u19TendenciaTexto(t){
 /* ===MALLA_RENDER_END=== */
 
 
+
+/* ============================================================
+   FALTAS Y FUGA
+   Notion ya manda "No-shows 30 d", "Reservas 30 días", "Última
+   reserva" y "NPS nota" desde hace tiempo. La app los importaba
+   y no los miraba: llegaban y morian ahi.
+
+   Las dos preguntas que contestan son las que de verdad tiene
+   encima un negocio con la tarde llena y la manana vacia:
+   cuanta capacidad se tira, y a quien se esta a punto de perder.
+   ============================================================ */
+
+/* Sesiones que se esperan de un cliente al mes, segun su plan. */
+function u19SesionesMes(){
+  var porSemana = u19FinNum(settings.finSesSemana) || 3;
+  return porSemana * 4.33;
+}
+
+/* -------- 1 · FALTAS --------
+   Cada falta es un cupo pagado que no se uso. Pero solo cuesta
+   dinero de verdad si alguien mas lo habria ocupado: en la tarde
+   llena, si; en la manana al 13%, no. Por eso el coste se declara
+   como techo, no como perdida cierta. */
+function u19NoShows(){
+  var out = { faltas: 0, reservas: 0, conFaltas: 0, activos: 0,
+              coste: 0, items: [], pct: 0, hayDatos: false };
+  var sesMes = u19SesionesMes();
+
+  (state.clients || []).forEach(function(c){
+    if (!u19ClienteActivo(c)) return;
+    out.activos++;
+    /* Notion no deberia mandar negativos, pero uno solo descuadraria
+       todos los totales y la tasa saldria fuera de rango. */
+    var ns  = Math.max(0, u19FinNum(c.notionNoShows30));
+    var res = Math.max(0, u19FinNum(c.notionReservas30));
+    if (c.notionNoShows30 != null || c.notionReservas30 != null) out.hayDatos = true;
+    if (ns <= 0){ out.reservas += res; return; }
+
+    var precio = u19FinNum(c.planPrice);
+    /* Lo que vale una sesion de ESE cliente, no un promedio. */
+    var valorSesion = (precio > 0 && sesMes > 0) ? precio / sesMes : 0;
+    var coste = ns * valorSesion;
+
+    out.faltas   += ns;
+    out.reservas += res;
+    out.conFaltas++;
+    out.coste    += coste;
+    out.items.push({ c: c, faltas: ns, reservas: res, coste: coste,
+                     pct: (res + ns) > 0 ? (ns / (res + ns) * 100) : 100 });
+  });
+
+  out.items.sort(function(a, b){ return b.faltas - a.faltas || b.coste - a.coste; });
+  var citas = out.faltas + out.reservas;
+  out.pct = citas > 0 ? (out.faltas / citas * 100) : 0;
+  /* Cuanta de la gente que reserva aparece de verdad. Es el numero que
+     corrige la malla horaria: ahi se cuentan reservas, no asistencias. */
+  out.asistencia = citas > 0 ? (out.reservas / citas) : 1;
+  return out;
+}
+
+/* -------- 2 · FUGA --------
+   u19FinRiesgo ya detecta al que dejo de venir del todo. Esto mira al
+   que SIGUE viniendo pero a la mitad: no ha cancelado nada, no aparece
+   en ninguna lista, y se esta yendo igual.
+
+   Se reutiliza a proposito el mismo umbral de ausencia (10 dias) que
+   u19FinRiesgo, para que las dos pantallas nunca digan cosas distintas
+   del mismo cliente. */
+var RET_AUSENTE = 10;     /* dias sin venir para considerarlo ausencia */
+var RET_FUGA    = 21;     /* tres semanas: ya no es un parentesis */
+
+function u19Retencion(){
+  var out = { fuga: [], riesgo: [], atencion: [], bien: 0, activos: 0,
+              mrrEnJuego: 0, mrr: 0, hayDatos: false };
+  var esperadas = u19SesionesMes();
+
+  (state.clients || []).forEach(function(c){
+    if (!u19ClienteActivo(c)) return;
+    out.activos++;
+    var precio = u19FinNum(c.planPrice);
+    out.mrr += precio;
+
+    var dias = (typeof u19DiasSinVenir === "function") ? u19DiasSinVenir(c) : null;
+    var res  = (c.notionReservas30 != null) ? u19FinNum(c.notionReservas30) : null;
+    var nps  = (c.notionNps != null && c.notionNps !== "") ? u19FinNum(c.notionNps) : null;
+    if (dias != null || res != null || nps != null) out.hayDatos = true;
+
+    /* Cuanto ha bajado su ritmo respecto a lo que paga. */
+    var caida = (res != null && esperadas > 0) ? (1 - res / esperadas) : null;
+
+    var motivos = [], nivel = "bien";
+    if (dias != null && dias >= RET_FUGA){
+      nivel = "fuga"; motivos.push("lleva " + dias + " días sin venir");
+    } else if (dias != null && dias >= RET_AUSENTE){
+      nivel = "riesgo"; motivos.push("lleva " + dias + " días sin venir");
+    }
+    if (caida != null && caida >= 0.5){
+      motivos.push("viene menos de la mitad de lo que paga (" + res + " de " + Math.round(esperadas) + ")");
+      nivel = (nivel === "fuga") ? "fuga" : "riesgo";
+    } else if (caida != null && caida >= 0.25){
+      motivos.push("su ritmo bajó a " + res + " sesiones de " + Math.round(esperadas));
+      if (nivel === "bien") nivel = "atencion";
+    }
+    /* El NPS solo por si solo no dice nada: una nota baja de alguien que
+       sigue viniendo igual es ruido. Suma cuando ya hay otra senal. */
+    if (nps != null && nps <= 6){
+      if (motivos.length){
+        motivos.push("y te puso un " + nps + " de 10");
+        if (nivel === "atencion") nivel = "riesgo";
+      } else {
+        motivos.push("te puso un " + nps + " de 10, aunque sigue viniendo");
+        if (nivel === "bien") nivel = "atencion";
+      }
+    }
+
+    if (nivel === "bien"){ out.bien++; return; }
+    var it = { c: c, dias: dias, reservas: res, nps: nps, precio: precio,
+               caida: caida, motivo: motivos.join("; ") };
+    out[nivel === "fuga" ? "fuga" : (nivel === "riesgo" ? "riesgo" : "atencion")].push(it);
+    if (nivel !== "atencion") out.mrrEnJuego += precio;
+  });
+
+  [out.fuga, out.riesgo, out.atencion].forEach(function(l){
+    l.sort(function(a, b){ return b.precio - a.precio; });
+  });
+  out.pctEnJuego = out.mrr > 0 ? (out.mrrEnJuego / out.mrr * 100) : 0;
+  return out;
+}
+/* ===RETENCION_END=== */
 
 /* ===FIN_CALC_END=== */
 
@@ -14429,6 +14561,147 @@ function u19FybPublicar(){
     }
   } catch(e){}
 }
+/* -------- Render de faltas y fuga -------- */
+
+function u19PesosResp(n){
+  return "$" + Math.round(n || 0).toLocaleString("es-CL");
+}
+
+function u19NoShowsHTML(){
+  var d = u19NoShows();
+  if (!d.hayDatos)
+    return '<div class="card" style="margin-top:1rem;"><div class="card-main">'
+      + '<div class="card-title">\u{1f6ab} Faltas</div>'
+      + '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">'
+      + 'Notion todavía no ha mandado «No-shows 30 d». Sincroniza en '
+      + 'Finanzas → Conexión con Notion y aparecerá aquí.</p></div></div>';
+
+  var col = d.pct >= 15 ? "var(--danger)" : (d.pct >= 8 ? "var(--warn)" : "var(--success)");
+  var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
+  h += '<div class="card-title">\u{1f6ab} Faltas · la capacidad que pagas y no usas</div>';
+
+  h += '<div class="fin-kpis" style="margin-top:.6rem;">';
+  h += '<div class="fin-k"><span class="fin-k-l">Faltas en 30 días</span>'
+    + '<span class="fin-k-v" style="color:' + col + ';">' + d.faltas + '</span>'
+    + '<span class="fin-k-x">de ' + (d.faltas + d.reservas) + ' citas agendadas</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Tasa</span>'
+    + '<span class="fin-k-v" style="color:' + col + ';">' + d.pct.toFixed(1) + '%</span>'
+    + '<span class="fin-k-x">no se presentan</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Vale</span>'
+    + '<span class="fin-k-v">' + u19PesosResp(d.coste) + '</span>'
+    + '<span class="fin-k-x">al mes, como techo</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Quiénes</span>'
+    + '<span class="fin-k-v">' + d.conFaltas + '</span>'
+    + '<span class="fin-k-x">de ' + d.activos + ' activos</span></div>';
+  h += '</div>';
+
+  /* El matiz que hace util el numero: una falta solo cuesta si alguien
+     mas habria ocupado ese hueco. */
+  h += '<div class="fin-estado" style="border-color:' + col + ';margin-top:.6rem;">'
+    + escapeHtml('Ese dinero es un techo, no una pérdida cierta: una falta solo te cuesta '
+      + 'si alguien más habría ocupado ese cupo. En las horas llenas de la tarde, sí. '
+      + 'En la mañana al 13%, no.') + '</div>';
+
+  if (d.items.length){
+    h += '<div class="ml-t">Quién falta más</div>';
+    h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
+      + '<tr><th>Cliente</th><th>Faltas</th><th>De sus citas</th><th>Vale</th></tr>';
+    d.items.slice(0, 8).forEach(function(it){
+      var c2 = it.pct >= 30 ? "var(--danger)" : (it.pct >= 15 ? "var(--warn)" : "var(--muted)");
+      h += '<tr><td>' + escapeHtml(it.c.name || "Sin nombre") + '</td>'
+        + '<td style="font-weight:700;">' + it.faltas + '</td>'
+        + '<td style="color:' + c2 + ';">' + it.pct.toFixed(0) + '%</td>'
+        + '<td>' + u19PesosResp(it.coste) + '</td></tr>';
+    });
+    h += '</table></div>';
+  }
+
+  h += '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">'
+    + 'La tasa sale de dividir las faltas entre las citas agendadas '
+    + '(faltas + reservas). Si tu automatización ya cuenta las faltas dentro de '
+    + '«Reservas 30 días», la tasa real es algo menor que ésta.</p>';
+  h += '</div></div>';
+  return h;
+}
+
+/* La linea que corrige la malla horaria: alli se cuentan RESERVAS, y lo
+   que llena la sala son ASISTENCIAS. */
+function u19NoShowAvisoMalla(){
+  var d = u19NoShows();
+  if (!d.hayDatos || d.faltas <= 0 || d.pct < 3) return '';
+  var cap = u19FinNum(settings.horasCapacidad) || 8;
+  var reales = Math.round(cap * d.asistencia * 10) / 10;
+  return '<div class="fin-estado" style="border-color:var(--warn);margin-top:.6rem;">'
+    + escapeHtml('Ojo: estas casillas cuentan RESERVAS, no asistencias. Con tu tasa de faltas '
+      + 'del ' + d.pct.toFixed(0) + '%, una hora con ' + cap + ' reservados recibe unas '
+      + reales + ' personas. Las horas que ves al tope tienen algo más de sitio del que parece.')
+    + '</div>';
+}
+
+function u19RetencionHTML(){
+  var r = u19Retencion();
+  if (!r.hayDatos)
+    return '<div class="card" style="margin-top:1rem;"><div class="card-main">'
+      + '<div class="card-title">\u{1f9ed} ¿A quién estoy a punto de perder?</div>'
+      + '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">'
+      + 'Hace falta que Notion mande «Última reserva» y «Reservas 30 días». '
+      + 'Sincroniza en Finanzas → Conexión con Notion.</p></div></div>';
+
+  var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
+  h += '<div style="display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;">'
+    + '<div class="card-title" style="margin:0;">\u{1f9ed} ¿A quién estoy a punto de perder?</div>'
+    + '<span class="text-xs text-muted" style="margin-left:auto;">' + r.activos + ' activos</span></div>';
+  h += '<p class="text-xs text-muted" style="margin:.3rem 0 .8rem;line-height:1.5;">'
+    + 'Con la tarde llena, retener vale más que captar: el que se va deja un hueco '
+    + 'que no rellenas rápido. Aquí no solo está el que dejó de venir, también el que '
+    + '<b>sigue viniendo a la mitad</b> — ése no aparece en ninguna lista y se va igual.</p>';
+
+  h += '<div class="fin-kpis">';
+  h += '<div class="fin-k"><span class="fin-k-l">Se están yendo</span>'
+    + '<span class="fin-k-v" style="color:var(--danger);">' + r.fuga.length + '</span>'
+    + '<span class="fin-k-x">' + RET_FUGA + '+ días sin venir</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">En riesgo</span>'
+    + '<span class="fin-k-v" style="color:var(--warn);">' + r.riesgo.length + '</span>'
+    + '<span class="fin-k-x">ausencia o ritmo a la mitad</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Ojo</span>'
+    + '<span class="fin-k-v">' + r.atencion.length + '</span>'
+    + '<span class="fin-k-x">bajaron el ritmo</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">En juego</span>'
+    + '<span class="fin-k-v" style="color:var(--danger);">' + u19PesosResp(r.mrrEnJuego) + '</span>'
+    + '<span class="fin-k-x">' + r.pctEnJuego.toFixed(0) + '% de tu ingreso mensual</span></div>';
+  h += '</div>';
+
+  var lista = r.fuga.concat(r.riesgo).concat(r.atencion);
+  if (!lista.length){
+    h += '<div class="fin-estado" style="border-color:var(--success);margin-top:.6rem;">'
+      + 'Nadie con señales de fuga. Los ' + r.bien + ' activos vienen al ritmo que pagan.</div>';
+  } else {
+    h += '<div class="ml-t">A quién llamar, por orden</div>';
+    h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
+      + '<tr><th>Cliente</th><th>Qué pasa</th><th>Al mes</th></tr>';
+    lista.slice(0, 12).forEach(function(it){
+      var col = r.fuga.indexOf(it) >= 0 ? "var(--danger)"
+              : (r.riesgo.indexOf(it) >= 0 ? "var(--warn)" : "var(--muted)");
+      h += '<tr><td style="border-left:3px solid ' + col + ';padding-left:.4rem;">'
+        + escapeHtml(it.c.name || "Sin nombre") + '</td>'
+        + '<td class="text-xs">' + escapeHtml(it.motivo) + '</td>'
+        + '<td>' + u19PesosResp(it.precio) + '</td></tr>';
+    });
+    h += '</table></div>';
+    if (lista.length > 12)
+      h += '<p class="text-xs text-muted" style="margin-top:.4rem;">Y ' + (lista.length - 12) + ' más.</p>';
+  }
+
+  h += '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">'
+    + 'La ausencia se cuenta desde «Última reserva» de Notion, con el mismo umbral de '
+    + RET_AUSENTE + ' días que usa el aviso de cobros, para que las dos pantallas nunca '
+    + 'digan cosas distintas del mismo cliente. El NPS por sí solo no marca a nadie: '
+    + 'una nota baja de quien sigue viniendo igual es ruido.</p>';
+  h += '</div></div>';
+  return h;
+}
+/* ===RETENCION_RENDER_END=== */
+
 /* ===FIN_RENDER_END=== */
 
 /* ============================================================
@@ -15845,6 +16118,8 @@ function u19FinRealHTML(){
   /* Primero qué hacer, después cómo estás. */
   html += u19RespAvisoHTML();
   html += u19FinAccionesHTML();
+  html += u19RetencionHTML();
+  html += u19NoShowsHTML();
 
   /* Lo que el ingreso bruto no dice: cuanto aguanta, quien se esta
      enfriando, cuanto se debe y cuanto queda por llenar. */
