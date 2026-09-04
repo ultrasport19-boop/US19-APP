@@ -47,7 +47,11 @@
 
 var PROPS = PropertiesService.getScriptProperties();
 var NOTION_TOKEN = PROPS.getProperty('NOTION_TOKEN');   // secret_xxx del integration
-var NOTION_DB    = PROPS.getProperty('NOTION_DB') || '545559de-0423-4016-9823-ae3c654aa12e';
+/* 545559de-... es la FUENTE DE DATOS de la Base Unificada, no la base.
+   La API REST v2022-06-28 solo acepta el ID de la base de datos; con el
+   otro responde 'Could not find database', que parece un problema de
+   permisos y no lo es. Mismo fallo que ya se corrigio en BIO_DB. */
+var NOTION_DB    = PROPS.getProperty('NOTION_DB') || 'd4ef74ae300e4a41934e63ec70cf2cce';
 var NOTION_VER   = '2022-06-28';
 var API_CLAVE    = PROPS.getProperty('API_CLAVE');
 
@@ -355,12 +359,22 @@ function US19_DIAGNOSTICO() {
 
   /* --- 4. Los interruptores --- */
   L.push('4. Interruptores');
+  /* Las Propiedades del Script son de CADA proyecto. VISION_SIMULACION
+     vive en el del asistente, no aqui, asi que desde el puente siempre
+     sale null: darlo por FALLA seria una falsa alarma en cada ejecucion.
+     Solo se avisa si alguien la definio tambien aqui, porque esa copia
+     no manda y confunde. */
   var vis = PROPS.getProperty('VISION_SIMULACION');
-  if (vis === 'false') ok('VISION_SIMULACION = false (lector de comprobantes en produccion)');
-  else {
-    mal('VISION_SIMULACION = ' + (vis === null ? 'SIN DEFINIR' : vis));
-    nota('Vale TRUE por defecto si no existe. Con TRUE los comprobantes no');
-    nota('se escriben en Notion y las activaciones dejan de registrarse.');
+  if (vis === null) {
+    nota('VISION_SIMULACION no se comprueba desde aqui: vive en las');
+    nota('propiedades del ASISTENTE, que es otro proyecto de Apps Script.');
+    nota('Para verla, corre US19_ESTADO_INTERRUPTORES() en ESE editor.');
+  } else if (vis === 'false') {
+    ok('VISION_SIMULACION = false (copia local; la que manda es la del asistente)');
+  } else {
+    mal('VISION_SIMULACION = ' + vis + ' definida en ESTE proyecto');
+    nota('Aqui no hace nada y despista. La que manda es la del asistente:');
+    nota('corre alli US19_ESTADO_INTERRUPTORES().');
   }
   L.push('');
 

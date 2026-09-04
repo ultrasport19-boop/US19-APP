@@ -1,0 +1,13 @@
+# clasp sube por defecto todo .js y .html que encuentre en la carpeta, y
+# aqui viven index.html (1,9 MB), el service worker y 32 MB de respaldos.
+# Subirlos al proyecto de Apps Script lo rompe. Se listan uno a uno
+# porque el comodin generico no atrapa .html ni .js.
+index.html
+index.html.*
+sw.js
+manifest.json
+us19_catalogo.json
+videos/**
+*.bak*
+*.png
+*.md

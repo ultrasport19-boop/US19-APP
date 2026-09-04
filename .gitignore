@@ -11,3 +11,6 @@ desktop.ini
 
 # Configuración local de herramientas (no debe viajar al repo)
 .claude/
+
+# Enlace local con el proyecto de Apps Script (solo el scriptId).
+.clasp.json
