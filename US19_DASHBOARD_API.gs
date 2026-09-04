@@ -26,6 +26,8 @@
  *   POST ?tipo=cliente_estado
  *                     reactiva y renueva. Solo ids explicitos, maximo 25,
  *                     y devuelve el valor anterior de cada uno.
+ *   Tope de 500 peticiones al dia por si la clave se filtra. El uso
+ *   normal ronda las 50, asi que no deberia notarse.
  *   ?tipo=pendientes  lo que espera tu visto bueno, con su costo en WhatsApp
  *   POST ?tipo=marcar  marca una casilla que el bot vigila. La app NO
  *                      envia mensajes: los envia el bot al ver la casilla.
@@ -73,6 +75,32 @@ function _noAutorizado() {
   return _json({ error: 'no autorizado' });
 }
 
+/* ---------- tope diario ----------
+   La clave protege de quien no la tiene; esto acota el dano si alguien la
+   consigue. El contador vive en el cache del script, que se vacia solo.
+   El limite es alto a proposito: el uso normal ronda las 50 al dia. */
+var TOPE_DIA = 500;
+
+function _dentroDelTope() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var clave = 'us19_reqs_' + Utilities.formatDate(new Date(), 'America/Santiago', 'yyyyMMdd');
+    var n = Number(cache.get(clave) || 0) + 1;
+    /* 6 h es el maximo que admite el cache de Apps Script; con la clave
+       por dia basta, porque al cambiar de dia cambia la clave. */
+    cache.put(clave, String(n), 21600);
+    return n <= TOPE_DIA;
+  } catch (e) {
+    /* Si el cache falla, se deja pasar: preferimos que el negocio siga
+       funcionando a bloquearlo por un contador. */
+    return true;
+  }
+}
+
+function _topeSuperado() {
+  return _json({ error: 'tope diario de peticiones alcanzado' });
+}
+
 /* Nombres exactos de las propiedades en Notion. */
 var P = {
   nombre:      'Cliente',
@@ -108,6 +136,7 @@ var P = {
 
 function doGet(e) {
   if (!_autorizado(e)) return _noAutorizado();
+  if (!_dentroDelTope()) return _topeSuperado();
   var tipo = (e && e.parameter && e.parameter.tipo) || '';
   try {
     if (tipo === 'clientes')  return _json(rosterClientes());
@@ -135,6 +164,7 @@ function doGet(e) {
  */
 function doPost(e) {
   if (!_autorizado(e)) return _noAutorizado();
+  if (!_dentroDelTope()) return _topeSuperado();
   var tipo = (e && e.parameter && e.parameter.tipo) || '';
   try {
     if (tipo === 'marcar')
@@ -365,7 +395,7 @@ var MARCAS_MAX = 25;
 /* Lo que esta esperando una decision tuya. */
 function pendientes() {
   var todas = _todas();
-  var r = { reactivacion: [], ingreso: [], comprobante: [], costos: {} };
+  var r = { reactivacion: [], ingreso: [], costos: {} };
 
   todas.forEach(function (pg) {
     var p = pg.properties || {};
