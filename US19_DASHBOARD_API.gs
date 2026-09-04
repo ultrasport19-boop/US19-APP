@@ -5,6 +5,11 @@
  * "👥 Clientes - Base Unificada" (data source 545559de-0423-4016-9823-ae3c654aa12e),
  * leida el 2026-09-02. Si renombras una propiedad en Notion, cambiala aqui.
  *
+ * DIAGNOSTICO
+ *   Ejecuta US19_DIAGNOSTICO() desde el editor tras cada despliegue.
+ *   Solo lee. Comprueba llaves, acceso a las dos bases, nombres de
+ *   columna e interruptores, y dice en una linea que falta.
+ *
  * COMO USARLO
  *   1. Apps Script → pega este archivo.
  *   2. Propiedades del script: NOTION_TOKEN, NOTION_DB y API_CLAVE.
@@ -257,6 +262,115 @@ function _val(props, nombre) {
 function _texto(arr) {
   if (!arr || !arr.length) return null;
   return arr.map(function (t) { return t.plain_text || ''; }).join('').trim() || null;
+}
+
+/* ---------- diagnostico ----------
+   Se corre a mano desde el editor. Solo lee: no escribe, no envia, no
+   gasta cupo de nada. Devuelve el resultado en el registro. */
+
+function US19_DIAGNOSTICO() {
+  var L = [];
+  function ok(t)   { L.push('  OK    ' + t); }
+  function mal(t)  { L.push('  FALLA ' + t); }
+  function nota(t) { L.push('        ' + t); }
+
+  L.push('DIAGNOSTICO DEL PUENTE US19 - ' + new Date().toLocaleString());
+  L.push('');
+
+  /* --- 1. Las llaves --- */
+  L.push('1. Propiedades del script');
+  if (API_CLAVE) ok('API_CLAVE configurada (' + String(API_CLAVE).length + ' caracteres)');
+  else {
+    mal('API_CLAVE NO configurada');
+    nota('Sin ella el puente no responde a NADIE. Es a proposito: preferimos');
+    nota('que se caiga a que quede abierto. Ponla en Configuracion del proyecto.');
+  }
+  if (NOTION_TOKEN) ok('NOTION_TOKEN configurado');
+  else mal('NOTION_TOKEN NO configurado: nada de Notion va a funcionar');
+  if (PROPS.getProperty('ANTHROPIC_KEY')) ok('ANTHROPIC_KEY configurada');
+  else nota('ANTHROPIC_KEY sin configurar (solo hace falta si usas el proxy de Claude)');
+  L.push('');
+
+  /* --- 2. Las dos bases, con sus columnas --- */
+  var bases = [
+    { nombre: 'Clientes - Base Unificada', id: NOTION_DB, mapa: P,
+      omitir: ['estadoReact', 'msgReact', 'aprobarReact', 'aprobarIng', 'comprobante', 'sinPromos'] },
+    { nombre: 'Resultados Bioimpedancia', id: BIO_DB, mapa: PB, omitir: [] }
+  ];
+
+  bases.forEach(function (b) {
+    L.push('2. ' + b.nombre);
+    nota('id: ' + b.id);
+    var db;
+    try { db = _notion('databases/' + b.id, 'get'); }
+    catch (e) {
+      mal('no se pudo leer: ' + e.message);
+      if (String(e.message).indexOf('Could not find database') >= 0) {
+        nota('OJO: este error PARECE de permisos y casi nunca lo es.');
+        nota('Notion muestra dos identificadores por tabla y la API solo');
+        nota('acepta el de la BASE DE DATOS, no el de la fuente de datos.');
+      }
+      L.push('');
+      return;
+    }
+    ok('accesible');
+
+    /* Los nombres de columna: si renombras una en Notion, el puente deja
+       de leerla y no avisa. Aqui si avisa. */
+    var reales = {};
+    Object.keys(db.properties || {}).forEach(function (k) { reales[k] = true; });
+    var faltan = [];
+    Object.keys(b.mapa).forEach(function (clave) {
+      if (b.omitir.indexOf(clave) >= 0) return;
+      if (!reales[b.mapa[clave]]) faltan.push(b.mapa[clave]);
+    });
+    if (!faltan.length) ok('las ' + Object.keys(b.mapa).length + ' columnas esperadas existen');
+    else {
+      mal(faltan.length + ' columna(s) que el codigo espera y Notion no tiene:');
+      faltan.forEach(function (f) { nota('- "' + f + '"'); });
+      nota('Si la renombraste en Notion, cambiala tambien en el mapa P o PB.');
+    }
+    L.push('');
+  });
+
+  /* --- 3. Que de verdad devuelve datos --- */
+  L.push('3. Lectura real');
+  try {
+    var r = rosterClientes();
+    var n = (r && r.clientes) ? r.clientes.length : 0;
+    if (n > 0) ok('el roster devuelve ' + n + ' clientes activos');
+    else mal('el roster devuelve 0 clientes: revisa el filtro "Membresia Activa"');
+  } catch (e) { mal('el roster fallo: ' + e.message); }
+
+  try {
+    var est = estadoSistema();
+    var rotas = est.senales.filter(function (x) { return x.estado !== 'ok'; });
+    ok('el tablero responde (' + est.activos + ' activos)');
+    if (rotas.length) {
+      nota(rotas.length + ' automatismo(s) con problema:');
+      rotas.forEach(function (x) { nota('- ' + x.nombre + ': ' + x.detalle); });
+    }
+  } catch (e) { mal('el tablero fallo: ' + e.message); }
+  L.push('');
+
+  /* --- 4. Los interruptores --- */
+  L.push('4. Interruptores');
+  var vis = PROPS.getProperty('VISION_SIMULACION');
+  if (vis === 'false') ok('VISION_SIMULACION = false (lector de comprobantes en produccion)');
+  else {
+    mal('VISION_SIMULACION = ' + (vis === null ? 'SIN DEFINIR' : vis));
+    nota('Vale TRUE por defecto si no existe. Con TRUE los comprobantes no');
+    nota('se escriben en Notion y las activaciones dejan de registrarse.');
+  }
+  L.push('');
+
+  var fallas = L.filter(function (x) { return x.indexOf('FALLA') === 0; }).length;
+  L.push(fallas ? '=> ' + fallas + ' problema(s). Mira las lineas FALLA.'
+                : '=> Todo en orden. El puente esta listo.');
+
+  var txt = L.join('\n');
+  Logger.log(txt);
+  return txt;
 }
 
 /* ---------- el tablero de mando ----------
