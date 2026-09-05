@@ -736,7 +736,7 @@ img{max-width:100%;display:block;}
       <div class="brand-tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div>
     </div>
     <div class="header-actions">
-      <div class="gsearch-wrap"><input id="gsearch-input" class="gsearch-input" type="search" placeholder="Buscar..." oninput="globalSearch(this.value)" onblur="setTimeout(function(){window.hideGSearch&&window.hideGSearch();},200)"><div id="gsearch-results" class="gsearch-results"></div></div>
+      <div class="gsearch-wrap"><input id="gsearch-input" class="gsearch-input" type="search" placeholder="Buscar cliente, rutina, ejercicio…" oninput="globalSearch(this.value)" onkeydown="gsKey(event)" onblur="setTimeout(function(){window.hideGSearch&&window.hideGSearch();},200)"><div id="gsearch-results" class="gsearch-results"></div></div>
       <span class="sync-badge off" id="sync-badge" onclick="window.manualSync()" title="Sincronización"><span class="sync-dot"></span><span id="sync-label">Sync off</span></span>
       <button class="icon-btn" id="btn-settings" title="Ajustes" aria-label="Ajustes">⚙</button>
     </div>
@@ -907,8 +907,10 @@ img{max-width:100%;display:block;}
 .lib-mas{display:flex;align-items:center;justify-content:center;gap:.75rem;padding:1rem 0 .5rem;}
 .lp-obj{background:rgba(14,81,50,.10);border-left:3px solid var(--success,#15803d);border-radius:0 6px 6px 0;padding:.4rem .6rem;margin:.1rem 0 .5rem;font-size:.78rem;line-height:1.4;}
 .gsearch-wrap{position:relative;}
-.gsearch-input{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;color:var(--text);font-size:.85rem;width:130px;}
-.gsearch-input:focus{width:190px;outline:none;border-color:var(--accent);}
+.gsearch-input{background:var(--surface-2);border:1px solid var(--border);border-radius:999px;padding:.4rem .8rem;color:var(--text);font-size:.85rem;width:150px;transition:width .15s;}
+.gsearch-input:focus{width:270px;outline:none;border-color:var(--accent);}
+.gs-act-p{border-color:var(--accent);color:var(--accent);}
+.gs-more{color:var(--muted);font-size:.78rem;}
 .gsearch-results{position:absolute;top:120%;right:0;min-width:300px;max-height:340px;overflow-y:auto;background:var(--surface-1,#111);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:9999;display:none;}
 .gs-item{padding:.55rem .8rem;cursor:pointer;font-size:.85rem;border-bottom:1px solid var(--border);}
 .gs-item:last-child{border-bottom:none;}
@@ -4036,29 +4038,40 @@ function renderClients(){
 
   // Counts by type
   var typeCounts = { gym:0, rehab:0 };
-  for (var t=0;t<state.clients.length;t++) typeCounts[getClientType(state.clients[t])]++;
+  for (var t=0;t<state.clients.length;t++) if (_cliActivo(state.clients[t])) typeCounts[getClientType(state.clients[t])]++;
   var notionCount = 0;
-  for (var nn=0;nn<state.clients.length;nn++) if (state.clients[nn].notionId) notionCount++;
+  for (var nn=0;nn<state.clients.length;nn++) if (state.clients[nn].notionId && _cliActivo(state.clients[nn])) notionCount++;
 
   // Mapa de clientes con rutina + conteos para los filtros rápidos
   var _hasRoutine = {};
   state.routines.forEach(function(r){ if (r.clientId) _hasRoutine[r.clientId] = true; });
   function _cliHasPlan(c){ return getClientType(c)==="rehab" ? !!c.rehabProtocolId : !!_hasRoutine[c.id]; }
   function _cliPlanVencido(c){ var dp = daysUntil(c.planEndDate); return dp!==null && dp<0; }
+  /* Activo para esta lista: si viene de Notion manda Notion (activo === false
+     lo pone la importación cuando la membresía deja de estar Activa); si no
+     tiene Notion, la regla de fecha de plan de Finanzas. */
+  function _cliActivo(c){
+    if (c.activo === false) return false;
+    if (c.notionId) return true;
+    return (typeof u19ClienteActivo === "function") ? u19ClienteActivo(c) : true;
+  }
   var noRoutineCount = 0, expiredCount = 0;
+  var inactivosN = 0;
   state.clients.forEach(function(c){
+    if (!_cliActivo(c)){ inactivosN++; return; }
     if (getClientType(c)!=="rehab" && !_hasRoutine[c.id]) noRoutineCount++;
     if (_cliPlanVencido(c)) expiredCount++;
   });
 
   // Filter bar
   html += '<div class="cat-bar">';
-  html += '<span class="cat-pill'+(_clientFilter===""?" active":"")+'" onclick="filterClients(\'\')">Todos<span class="cat-count">'+state.clients.length+'</span></span>';
+  html += '<span class="cat-pill'+(_clientFilter===""?" active":"")+'" onclick="filterClients(\'\')">Activos<span class="cat-count">'+(state.clients.length - inactivosN)+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="gym"?" active":"")+'" onclick="filterClients(\'gym\')"><span class="cat-icon">🏋️</span>Gimnasio<span class="cat-count">'+typeCounts.gym+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="rehab"?" active":"")+'" onclick="filterClients(\'rehab\')"><span class="cat-icon">🩹</span>Rehabilitación<span class="cat-count">'+typeCounts.rehab+'</span></span>';
   if (notionCount) html += '<span class="cat-pill'+(_clientFilter==="notion"?" active":"")+'" onclick="filterClients(\'notion\')"><span class="cat-icon">🟢</span>Activos Notion<span class="cat-count">'+notionCount+'</span></span>';
   if (noRoutineCount) html += '<span class="cat-pill'+(_clientFilter==="noroutine"?" active":"")+'" onclick="filterClients(\'noroutine\')"><span class="cat-icon">🚫</span>Sin rutina<span class="cat-count">'+noRoutineCount+'</span></span>';
   if (expiredCount) html += '<span class="cat-pill'+(_clientFilter==="expired"?" active":"")+'" onclick="filterClients(\'expired\')"><span class="cat-icon">💳</span>Plan vencido<span class="cat-count">'+expiredCount+'</span></span>';
+  if (inactivosN) html += '<span class="cat-pill'+(_clientFilter==="inactivos"?" active":"")+'" onclick="filterClients(\'inactivos\')" title="Dados de baja en Notion o con plan vencido hace más de 30 días"><span class="cat-icon">💤</span>Inactivos<span class="cat-count">'+inactivosN+'</span></span>';
   html += '</div>';
   html += '<div class="cl-leyenda"><span><i style="background:var(--success);"></i>plan al día</span>'
     + '<span><i style="background:var(--warn);"></i>vence en 7 días</span>'
@@ -4073,8 +4086,10 @@ function renderClients(){
     return (a.name||"").localeCompare(b.name||"");
   });
 
+  var activosL = sorted.filter(_cliActivo), inactivosL = sorted.filter(function(c){ return !_cliActivo(c); });
   if (_clientFilter){
-    var filtered = sorted.filter(function(c){
+    var filtered = (_clientFilter==="inactivos" ? inactivosL : activosL).filter(function(c){
+      if (_clientFilter==="inactivos") return true;
       if (_clientFilter==="notion") return !!c.notionId;
       if (_clientFilter==="noroutine") return getClientType(c)!=="rehab" && !_hasRoutine[c.id];
       if (_clientFilter==="expired") return _cliPlanVencido(c);
@@ -4086,10 +4101,18 @@ function renderClients(){
     // Grouped: Gimnasio then Rehabilitación
     var groups = [["gym","🏋️ GIMNASIO"],["rehab","🩹 REHABILITACIÓN"]];
     for (var g=0; g<groups.length; g++){
-      var inGroup = sorted.filter(function(c){ return getClientType(c)===groups[g][0]; });
+      var inGroup = activosL.filter(function(c){ return getClientType(c)===groups[g][0]; });
       if (!inGroup.length) continue;
       html += '<h2 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.05rem;color:var(--muted);margin:1.4rem 0 .7rem;text-transform:uppercase;">'+groups[g][1]+' <span style="color:var(--border);">·</span> <span style="font-size:.85rem;">'+inGroup.length+'</span></h2>';
       html += '<div class="cl-grid">'; for (var k=0;k<inGroup.length;k++) html += clientCardHtml(inGroup[k]); html += '</div>';
+    }
+    if (!activosL.length) html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">No hay clientes activos. Revisa el apartado de inactivos o importa desde Notion.</p>';
+    /* Los inactivos no se mezclan con los activos: quedan en su apartado, plegado. */
+    if (inactivosL.length){
+      html += '<details class="u-acc cl-inactivos"><summary>💤 Inactivos <span>' + inactivosL.length + ' · dados de baja en Notion o con plan vencido hace más de 30 días · no cuentan en Finanzas ni en el plantel</span></summary>'
+        + '<div class="u-acc-body"><div class="cl-grid">';
+      for (var q2=0;q2<inactivosL.length;q2++) html += clientCardHtml(inactivosL[q2]);
+      html += '</div></div></details>';
     }
   }
 
@@ -12310,13 +12333,28 @@ window.globalSearch = function(q){
   if (q.length < 2){ box.style.display="none"; box.innerHTML=""; return; }
   var res = [];
   var qDigits = q.replace(/\D/g,"");
+  /* Sin acentos y por palabras: «nunez» encuentra a Nuñez, «marcia nu» también.
+     Los inactivos van al final y marcados. */
+  var norm = function(s){ s = String(s||"").toLowerCase(); return s.normalize ? s.normalize("NFD").replace(/[\u0300-\u036f]/g,"") : s; };
+  var toks = q_.split(/\s+/).filter(Boolean);
+  var cliHits = [];
   state.clients.forEach(function(c){
-    var nameHit = (c.name||"").toLowerCase().indexOf(q)>=0;
+    var nm = norm(c.name), extra = norm((c.goal||"") + " " + (c.notionPlan||"") + " " + (c.rut||"") + " " + (c.email||""));
+    var nameHit = toks.length > 0 && toks.every(function(t){ return nm.indexOf(t)>=0; });
+    var extraHit = !nameHit && toks.length > 0 && toks.every(function(t){ return (nm + " " + extra).indexOf(t)>=0; });
     var phoneHit = qDigits.length>=3 && (c.phone||"").replace(/\D/g,"").indexOf(qDigits)>=0;
-    if (nameHit || phoneHit) res.push(gsClientItem(c));
+    if (nameHit || extraHit || phoneHit) cliHits.push({ c:c, peso:(nameHit && nm.indexOf(q_)===0) ? 0 : (nameHit ? 1 : 2), off:(c.activo === false) ? 1 : 0 });
   });
-  state.routines.forEach(function(r){ if ((r.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoRoutine(\''+r.id+'\')"><span class="badge muted">Rutina</span> '+escapeHtml(r.name||"Sin nombre")+'</div>'); });
-  state.exercises.forEach(function(e){ if ((e.name||"").toLowerCase().indexOf(q)>=0) res.push('<div class="gs-item" onclick="gsGoExercise(\''+e.id+'\')"><span class="badge muted">Ejercicio</span> '+escapeHtml(e.name)+'</div>'); });
+  cliHits.sort(function(a,b){ return (a.off - b.off) || (a.peso - b.peso) || norm(a.c.name).localeCompare(norm(b.c.name)); });
+  if (cliHits.length){
+    res.push('<div class="gs-head">Clientes · ' + cliHits.length + '</div>');
+    cliHits.slice(0, 8).forEach(function(h){ res.push(gsClientItem(h.c)); });
+    if (cliHits.length > 8) res.push('<div class="gs-item gs-more" onclick="closeGSearch();showView(\'clients\')">… y ' + (cliHits.length - 8) + ' más · ver en Clientes</div>');
+  }
+  var rutHits = state.routines.filter(function(r){ var n = norm(r.name); return toks.length > 0 && toks.every(function(t){ return n.indexOf(t)>=0; }); });
+  if (rutHits.length){ res.push('<div class="gs-head">Rutinas · ' + rutHits.length + '</div>'); rutHits.slice(0,5).forEach(function(r){ var cl = getClient(r.clientId); res.push('<div class="gs-item" onclick="gsGoRoutine(\'' + r.id + '\')"><span class="badge muted">Rutina</span> ' + escapeHtml(r.name||'') + (cl ? ' <span class="text-muted" style="font-size:.72rem;">· ' + escapeHtml(cl.name||'') + '</span>' : '') + '</div>'); }); }
+  var ejHits = state.exercises.filter(function(e){ var n = norm(e.name); return toks.length > 0 && toks.every(function(t){ return n.indexOf(t)>=0; }); });
+  if (ejHits.length){ res.push('<div class="gs-head">Ejercicios · ' + ejHits.length + '</div>'); ejHits.slice(0,6).forEach(function(e){ res.push('<div class="gs-item" onclick="gsGoExercise(\'' + e.id + '\')"><span class="badge muted">Ejercicio</span> ' + escapeHtml(e.name||'') + (e.muscle ? ' <span class="text-muted" style="font-size:.72rem;">· ' + escapeHtml(e.muscle) + '</span>' : '') + '</div>'); }); if (ejHits.length > 6) res.push('<div class="gs-item gs-more" onclick="gsGoLibrary()">… y ' + (ejHits.length - 6) + ' más · ver en Biblioteca</div>'); }
   /* Consultas sobre las evaluaciones, no solo nombres. */
   var grupos = [];
   var consultas = [
@@ -12348,22 +12386,34 @@ window.globalSearch = function(q){
   });
   /* Los grupos van primero: responden a la pregunta, no son una simple
      coincidencia de texto. */
-  res = grupos.concat(res).slice(0, 16);
+  res = grupos.concat(res).slice(0, 40);
   box.innerHTML = res.length ? res.join("") : '<div class="gs-item text-muted">Sin resultados</div>';
   box.style.display = "block";
 };
 window.hideGSearch = function(){ var b=document.getElementById("gsearch-results"); if(b) b.style.display="none"; };
+/* Teclado: Enter abre el primer resultado, Escape cierra. */
+window.gsKey = function(ev){
+  if (ev.key === "Escape"){ closeGSearch(); ev.target.blur(); return; }
+  if (ev.key === "Enter"){
+    var first = document.querySelector("#gsearch-results .gs-cli-head[onclick], #gsearch-results .gs-item[onclick]");
+    if (first){ ev.preventDefault(); first.click(); }
+  }
+};
 function closeGSearch(){ window.hideGSearch(); var i=document.getElementById("gsearch-input"); if(i) i.value=""; }
 /* Resultado de cliente en la búsqueda: nombre + acciones directas (perfil, seguimiento,
    progresiones, resumen), para no tener que abrir siempre el perfil. */
 function gsClientItem(c){
   var progN = (c.progressions && c.progressions.length) ? c.progressions.length : 0;
-  var acts = '<button class="gs-act" onclick="gsGoClient(\''+c.id+'\')">👤 Perfil</button>'
+  var acts = '<button class="gs-act gs-act-p" onclick="closeGSearch();abrirFicha(\''+c.id+'\')">📂 Ficha</button>'
+    + '<button class="gs-act" onclick="gsGoClient(\''+c.id+'\')">✏️ Editar</button>'
     + '<button class="gs-act" onclick="gsAct(\'track\',\''+c.id+'\')">📏 Seguimiento</button>'
     + '<button class="gs-act" onclick="gsAct(\'prog\',\''+c.id+'\')">📈 Progresiones'+(progN?' ('+progN+')':'')+'</button>'
     + (c.phone ? '<button class="gs-act" onclick="gsAct(\'resumen\',\''+c.id+'\')">📊 Resumen</button>' : '');
   return '<div class="gs-item gs-client">'
-    + '<div class="gs-cli-head"><span class="badge muted">Cliente</span> <strong>'+escapeHtml(c.name)+'</strong></div>'
+    + '<div class="gs-cli-head" onclick="closeGSearch();abrirFicha(\''+c.id+'\')" style="cursor:pointer;"><strong>'+escapeHtml(c.name)+'</strong>'
+    + (c.activo === false ? ' <span class="badge muted">inactivo</span>' : '')
+    + (c.notionPlan ? ' <span class="text-muted" style="font-size:.72rem;">· '+escapeHtml(c.notionPlan)+'</span>' : '')
+    + (c.phone ? ' <span class="text-muted" style="font-size:.72rem;">· '+escapeHtml(c.phone)+'</span>' : '') + '</div>'
     + '<div class="gs-cli-acts">'+acts+'</div>'
     + '</div>';
 }
