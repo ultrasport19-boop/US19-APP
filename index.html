@@ -619,6 +619,16 @@ img{max-width:100%;display:block;}
 .rnd-pane > .u-acc:first-child{margin-top:0;}
 #rnd-analisis,#frz-analisis,#rnd-editor{overflow-x:auto;}
 
+/* ---- Panel v3: cifras con estado, avisos ordenados ---- */
+.stat-card.st-danger::before{background:var(--danger);}
+.stat-card.st-warn::before{background:var(--warn);}
+.stat-card.st-ok::before{background:var(--success);}
+.dash-panels-toggle .dp-n{margin-left:auto;background:var(--surface-3,#233039);color:var(--text);border-radius:999px;padding:.05rem .55rem;font-size:.72rem;letter-spacing:0;}
+.dash-panels.open .dash-panels-body{display:flex;flex-direction:column;gap:1rem;padding-top:1rem;}
+.dash-panels-body > .card{margin:0 !important;}
+.dash-panels + .u-acc{margin-top:1rem;}
+#calendly-dash > div:last-child{margin-bottom:0 !important;}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -3729,7 +3739,7 @@ function u19SemanaSVG(dias, hoy){
     var y0 = d.n ? (H - padB - alto) : (H - padB - 2);
     var esHoy = i === hoy;
     var col = esHoy ? 'var(--accent)' : (d.n ? 'var(--surface-3)' : 'transparent');
-    var titulo = escapeAttr(DAY_NAMES[i] + ': ' + d.n + ' sesión' + (d.n === 1 ? '' : 'es') + (d.seg ? ' · ~' + fmtDuration(d.seg) : ''));
+    var titulo = escapeAttr(DAY_NAMES[i] + ': ' + d.n + (d.n === 1 ? ' sesión' : ' sesiones') + (d.seg ? ' · ~' + fmtDuration(d.seg) : ''));
     s += '<rect x="' + x0.toFixed(1) + '" y="' + y0.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + (d.n ? alto : 2).toFixed(1)
       + '" rx="3" fill="' + col + '"' + (d.n ? '' : ' stroke="var(--border)"') + '><title>' + titulo + '</title></rect>';
     if (d.n)
@@ -3751,7 +3761,7 @@ function u19SemanaHTML(){
   var hoy = getTodayDayIdx();
   var h = '<div class="card dash-card"><div class="card-main">';
   h += '<div class="fin-g-t">Semana de entrenamiento <span>'
-    + (total ? total + ' sesión' + (total === 1 ? '' : 'es') + ' programada' + (total === 1 ? '' : 's') + ' · hoy ' + escapeHtml(DAY_NAMES[hoy].toLowerCase())
+    + (total ? total + (total === 1 ? ' sesión programada' : ' sesiones programadas') + ' · hoy ' + escapeHtml(DAY_NAMES[hoy].toLowerCase())
              : 'sin rutinas activas') + '</span></div>';
   if (!total){
     h += '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">Cuando asignes rutinas con días marcados, aquí verás cuánta gente entrena cada día.</p>';
@@ -3760,7 +3770,7 @@ function u19SemanaHTML(){
     var pico = dias.slice().sort(function(a, b){ return b.n - a.n; })[0];
     var vacios = dias.filter(function(d, i){ return !d.n && i < 5; }).length;
     h += '<p class="text-xs text-muted" style="margin:.5rem 0 0;line-height:1.5;">'
-      + 'El día más cargado es el <b>' + escapeHtml(DAY_NAMES[pico.i].toLowerCase()) + '</b>, con ' + pico.n + ' sesión' + (pico.n === 1 ? '' : 'es')
+      + 'El día más cargado es el <b>' + escapeHtml(DAY_NAMES[pico.i].toLowerCase()) + '</b>, con ' + pico.n + (pico.n === 1 ? ' sesión' : ' sesiones')
       + (vacios ? ' · ' + vacios + ' día' + (vacios === 1 ? '' : 's') + ' de semana sin nadie programado' : '') + '.</p>';
   }
   h += '</div></div>';
@@ -3799,19 +3809,63 @@ function u19FechaLargaHoy(){
   return DAY_NAMES[getTodayDayIdx()] + ' ' + d.getDate() + ' de ' + meses[d.getMonth()];
 }
 
+/* Tarjeta de cifra con franja de color según estado (misma estructura
+   que statCard, más una clase). */
+function u19StatCard(label, value, extra, cls){
+  return '<div class="stat-card' + (cls ? ' ' + cls : '') + '"><div class="stat-label">' + escapeHtml(label) + '</div>'
+    + '<div class="stat-value">' + escapeHtml(String(value)) + '</div>'
+    + (extra ? '<div class="stat-extra">' + escapeHtml(extra) + '</div>' : '') + '</div>';
+}
+
+/* Citas de Calendly y clientes de Notion, dentro del Panel.
+   Sus constructores originales devuelven una cabecera de sección (h2)
+   más un contenedor que rellenan de forma asíncrona. Aquí se llama a
+   cada uno para que registre esa carga y se pinta solo el contenedor,
+   en una tarjeta normal. Si el constructor devuelve un aviso de
+   configuración (sin contenedor), se muestra tal cual. */
+function u19DashCitasHTML(){
+  var raw = buildCalendlyDashboardHtml();
+  if (!raw) return '';
+  if (raw.indexOf('id="calendly-dash"') < 0) return raw;
+  return '<div class="card dash-card" style="margin-bottom:1rem;"><div class="card-main">'
+    + '<div class="fin-g-t"><div>Citas de hoy <span>Calendly</span></div>'
+    + '<button class="btn btn-ghost btn-sm" onclick="calendlyRefresh()">↻ Actualizar</button></div>'
+    + '<div id="calendly-dash"></div></div></div>';
+}
+function u19DashNotionHTML(){
+  var raw = buildNotionSyncHtml();
+  if (!raw) return '';
+  if (raw.indexOf('id="notion-sync-dash"') < 0) return raw;
+  return '<details class="u-acc"><summary>Notion · clientes y membresías'
+    + '<span>vinculados, solo en Notion, última sincronización</span></summary>'
+    + '<div class="u-acc-body">'
+    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:0 0 .8rem;">'
+    +   '<button class="btn btn-ghost btn-sm" onclick="notionSyncRefresh()">↻ Actualizar</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="notionSyncTrigger()">🔄 Sincronizar</button></div>'
+    + '<div id="notion-sync-dash"></div></div></details>';
+}
+
+/* PANEL · PORTADA v3 (sep 2026)
+   Orden: cifras del día → hoy (entrenan, sin señales, reevaluaciones,
+   simetría) → semana y prioridad → citas de Calendly → respaldo →
+   avisos y seguimiento (plegable, con contador) → Notion (plegado) →
+   rutinas recientes. Se quitaron del Panel dos tarjetas que repetían
+   lo que ya está arriba o en Finanzas: «Ingresos proyectados» y
+   «Reevaluaciones y pagos»; sus funciones siguen existiendo. La agenda
+   «Hoy entrenan» se fundió con la columna «Entrenan hoy», que ahora
+   enlaza a la rutina del día. */
 function renderDashboard(){
   var totalClients = state.clients.length;
   var activos = (typeof u19ClientesActivos === "function") ? u19ClientesActivos().length : totalClients;
   var conRutina = {};
   state.routines.forEach(function(r){ if (r.clientId && r.status !== "archived") conRutina[r.clientId] = true; });
   var nConRutina = state.clients.filter(function(c){ return conRutina[c.id]; }).length;
-  var totalRoutines = state.routines.length;
-  var activeRoutines = state.routines.filter(function(r){ return r.status !== "archived"; }).length;
-  var totalExercises = state.exercises.length;
-  var conMedio = state.exercises.filter(function(e){ return e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0); }).length;
-  var thisWeek = state.routines.filter(function(r){ return isThisWeek(r.startDate || r.createdAt); }).length;
   var semana = u19SemanaDatos();
   var hoyN = semana[getTodayDayIdx()].n;
+  /* Por cobrar: mismo criterio que «Ingresos proyectados» (plan con precio y fecha vencida). */
+  var vencidos = state.clients.filter(function(c){ var d = daysUntil(c.planEndDate); return d !== null && d < 0 && parseFloat(c.planPrice) > 0; });
+  var vencidoSum = vencidos.reduce(function(s, c){ return s + (parseFloat(c.planPrice) || 0); }, 0);
+  var porVencer = state.clients.filter(function(c){ var d = daysUntil(c.planEndDate); return d !== null && d >= 0 && d <= 7; }).length;
 
   var recent = state.routines.slice().sort(function(a,b){
     return (b.updatedAt||b.createdAt||0) - (a.updatedAt||a.createdAt||0);
@@ -3826,29 +3880,31 @@ function renderDashboard(){
   html += '</div>';
 
   html += '<div class="stat-grid fin-stats">';
-  html += statCard("Clientes", totalClients,
-    (activos !== totalClients ? activos + " activos · " : "") + nConRutina + " con rutina");
-  html += statCard("Rutinas activas", activeRoutines,
-    totalRoutines !== activeRoutines ? (totalRoutines - activeRoutines) + " archivadas"
-      : (thisWeek ? thisWeek + " iniciada" + (thisWeek === 1 ? "" : "s") + " esta semana" : "todas en uso"));
-  html += statCard("Entrenan hoy", hoyN, hoyN ? "sesion" + (hoyN === 1 ? "" : "es") + " programada" + (hoyN === 1 ? "" : "s") : "día sin sesiones");
-  html += statCard("Biblioteca", totalExercises, conMedio ? conMedio + " con vídeo o GIF" : "ejercicios");
+  html += u19StatCard("Clientes activos", activos,
+    (totalClients !== activos ? (totalClients - activos) + " inactivo" + (totalClients - activos === 1 ? "" : "s") + " · " : "") + nConRutina + " con rutina");
+  html += u19StatCard("Entrenan hoy", hoyN, hoyN ? (hoyN === 1 ? "sesión programada" : "sesiones programadas") : "día sin sesiones");
+  html += u19StatCard("Por cobrar", fmtCLP(vencidoSum),
+    vencidos.length ? vencidos.length + " plan" + (vencidos.length === 1 ? "" : "es") + " vencido" + (vencidos.length === 1 ? "" : "s") : "nadie con plan vencido",
+    vencidos.length ? "st-danger" : "st-ok");
+  html += u19StatCard("Vencen en 7 días", porVencer, porVencer ? "renovar esta semana" : "sin vencimientos cercanos", porVencer ? "st-warn" : "");
   html += '</div>';
 
   html += u19PanelOperativoHTML();
   html += '<div class="dash-2col">' + u19SemanaHTML() + buildPriorityTodayHtml() + '</div>';
-  html += buildAgendaHtml();
+  html += u19DashCitasHTML();
+  html += buildBackupBannerHtml();
 
-  // Paneles secundarios agrupados en un bloque colapsable (recuerda tu preferencia)
-  var _dashSec = buildCalendlyDashboardHtml()+buildNotionSyncHtml()+buildBackupBannerHtml()+buildIncomeHtml()
-    +buildClientDatesAlertsHtml()+buildAlertsHtml()+buildClinicalInboxHtml()+buildRutHygieneHtml()+buildReactivationHtml();
+  var _dashSec = buildAlertsHtml() + buildClinicalInboxHtml() + buildRutHygieneHtml() + buildReactivationHtml();
   if (_dashSec.trim()){
+    var nSec = (_dashSec.match(/class="card-title"/g) || []).length;
     var _dashOpen = settings.dashPanelsOpen !== false;   // por defecto abierto
-    html += '<div class="dash-panels'+(_dashOpen?' open':'')+'" id="dash-panels">'
-      + '<button class="dash-panels-toggle" onclick="toggleDashPanels()"><span class="dp-chevron">▸</span> <span>Paneles y avisos</span></button>'
-      + '<div class="dash-panels-body">'+_dashSec+'</div>'
+    html += '<div class="dash-panels' + (_dashOpen ? ' open' : '') + '" id="dash-panels">'
+      + '<button class="dash-panels-toggle" onclick="toggleDashPanels()"><span class="dp-chevron">▸</span> <span>Avisos y seguimiento</span>'
+      + (nSec ? '<span class="dp-n">' + nSec + '</span>' : '') + '</button>'
+      + '<div class="dash-panels-body">' + _dashSec + '</div>'
       + '</div>';
   }
+  html += u19DashNotionHTML();
 
   html += '<div class="section-head" style="margin-top:1.5rem;"><h2 class="section-title">RUTINAS <span class="accent">/ RECIENTES</span></h2>';
   if (state.routines.length>3) html += '<button class="btn btn-ghost btn-sm" onclick="showView(\'routines\')">Ver todas →</button>';
@@ -22254,7 +22310,7 @@ function u19PanelOperativoHTML(){
       var d = (r.days || [])[hoyIdx];
       return d && d.exercises && d.exercises.length;
     });
-    if (entrenaHoy) hoyEntrenan.push(c);
+    if (entrenaHoy) hoyEntrenan.push({ c:c, r:rut.filter(function(r){ var d = (r.days || [])[hoyIdx]; return d && d.exercises && d.exercises.length; })[0] });
 
     var t = ultimo[c.id] || ultimo[(c.name || "").toLowerCase()] || null;
     var prog = (c.progressions && c.progressions.length) ? c.progressions[c.progressions.length - 1] : null;
@@ -22286,7 +22342,7 @@ function u19PanelOperativoHTML(){
     + '<div class="card-title">📌 Hoy — ' + DAY_NAMES[hoyIdx] + '</div>'
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:.6rem;">'
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Entrenan hoy (' + hoyEntrenan.length + ')</div>'
-    +     lista(hoyEntrenan, 'Nadie tiene sesión programada hoy.', function(c){ return chip(c, 'sesión programada'); }) + '</div>'
+    +     lista(hoyEntrenan, 'Nadie tiene sesión programada hoy.', function(o){ return chip(o.c, o.r ? '<a href="#" onclick="openRoutineBuilder(\'' + o.r.id + '\');return false;" style="text-decoration:none;color:inherit;" title="Abrir la rutina">' + escapeHtml(o.r.name || 'rutina') + ' →</a>' : 'sesión programada'); }) + '</div>'
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Sin señales (' + dormidos.length + ')</div>'
     +     lista(dormidos, 'Todos con actividad reciente ✓', function(o){
             return chip(o.c, o.dias == null ? 'nunca reportó' : 'hace ' + o.dias + ' días', o.dias == null || o.dias >= 21 ? '#b91c1c' : '#d97706'); }) + '</div>'
