@@ -618,6 +618,7 @@ img{max-width:100%;display:block;}
 @media (max-width:520px){.rnd-lados{grid-template-columns:1fr;}}
 .rnd-pane > .u-acc:first-child{margin-top:0;}
 #rnd-analisis,#frz-analisis,#rnd-editor{overflow-x:auto;}
+.hr-nav{display:inline-flex;gap:.2rem;}
 
 /* ---- Panel v3: cifras con estado, avisos ordenados ---- */
 .stat-card.st-danger::before{background:var(--danger);}
@@ -10787,21 +10788,21 @@ function renderHoras(){
   var c = horasCfg(), ciclo = horasCiclo(_horasRef);
 
   var html = '';
-  html += '<div class="section-head">';
-  html += '<h1 class="section-title">HORAS <span class="accent">/ ENTRENADOR</span></h1>';
-  html += '<button class="btn btn-ghost btn-sm" onclick="horasNav(-1)">◀</button>';
-  html += '<button class="btn btn-ghost btn-sm" onclick="horasNav(1)">▶</button>';
-  html += '<button class="btn btn-secondary btn-sm" onclick="horasRefresh()">↻ Recalcular</button>';
-  html += '<button class="btn btn-ghost btn-sm" onclick="horasExportCsv()">⬇ CSV</button>';
-  html += '<button class="btn btn-primary btn-sm" onclick="horasSyncNotion()">🟣 Enviar a Notion</button>';
+  /* Cabecera al estilo de Finanzas: el ciclo y el pago van en el
+     subtítulo, así la tarjeta que los repetía sobra. */
+  html += '<div class="section-head fin-head">';
+  html += '<div><h1 class="section-title">HORAS <span class="accent">/ ENTRENADOR</span></h1>'
+    + '<p class="text-xs text-muted" style="margin:.2rem 0 0;line-height:1.5;">Ciclo ' + escapeHtml(ciclo.etiqueta) + ' · ' + escapeHtml(ciclo.texto)
+    + ' · pago el ' + horasISO(ciclo.pago) + '<br>' + escapeHtml(c.entrenador)
+    + ' · ' + horasPad(c.inicio) + ':00–' + horasPad(c.termino) + ':00 · '
+    + c.dias.map(function(d){ return HORAS_DOW[d]; }).join(" ") + ' · ' + horasMoney(c.valorHora) + '/hora líquidos</p></div>';
+  html += '<div class="fin-head-r">'
+    + '<span class="hr-nav"><button class="btn btn-ghost btn-sm" onclick="horasNav(-1)" title="Ciclo anterior">◀</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="horasNav(1)" title="Ciclo siguiente">▶</button></span>'
+    + '<button class="btn btn-secondary btn-sm" onclick="horasRefresh()">↻ Recalcular</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="horasExportCsv()">⬇ CSV</button>'
+    + '<button class="btn btn-primary btn-sm" onclick="horasSyncNotion()">🟣 Enviar a Notion</button></div>';
   html += '</div>';
-
-  html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main">';
-  html += '<div class="card-title">Ciclo ' + escapeHtml(ciclo.etiqueta) + ' · ' + escapeHtml(ciclo.texto) + '</div>';
-  html += '<div class="card-sub">Pago el ' + horasISO(ciclo.pago) + ' · ' + escapeHtml(c.entrenador)
-        + ' · ' + horasPad(c.inicio) + ':00–' + horasPad(c.termino) + ':00 · '
-        + c.dias.map(function(d){ return HORAS_DOW[d]; }).join(" ") + ' · ' + horasMoney(c.valorHora) + '/hora líquidos</div>';
-  html += '</div></div>';
 
   html += '<div id="horas-body"><div style="color:var(--muted);font-size:.85rem;padding:1rem 0;">⏳ Calculando...</div></div>';
   box.innerHTML = html;
