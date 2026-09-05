@@ -7528,7 +7528,7 @@ function openSettings(){
   var eClaude = settings.claudeProxy ? 'por el puente' : (settings.claudeKey ? 'directo · clave en este navegador' : 'directo · sin clave');
 
   /* --- 4 · Calendly --- */
-  var sCal = nota('Conecta tu cuenta de Calendly para ver las citas del día en el Panel y cruzarlas con tus clientes. <strong>Cómo obtener el token:</strong> ve a <span class="kbd">calendly.com/app/settings/api</span> → Personal Access Token → Generar token → copia y pega aquí.')
+  var sCal = nota('Conecta tu cuenta de Calendly para ver las citas del día en el Panel y cruzarlas con tus clientes. <strong>Ojo con la cuota:</strong> Calendly permite 100 llamadas al día por token y este token es el mismo que usa el bot; por eso la app guarda las citas 30 minutos y pide los nombres solo cuando los pulsas. <strong>Cómo obtener el token:</strong> ve a <span class="kbd">calendly.com/app/settings/api</span> → Personal Access Token → Generar token → copia y pega aquí.')
     + formField("Personal Access Token", '<input type="password" id="set-cal-token" value="'+escapeAttr(settings.calendlyToken)+'" placeholder="eyJraW..." autocomplete="new-password">')
     + '<div><button class="btn btn-secondary btn-sm" id="btn-cal-test">🔍 Verificar token</button> <span id="cal-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
   var eCal = settings.calendlyToken ? 'token guardado' : 'sin token';
@@ -10440,7 +10440,20 @@ function storeReceivedReport(data){
 /* ============ CALENDLY INTEGRATION ============ */
 var _calendlyCache = null;
 var _calendlyFetchedAt = 0;
-var CALENDLY_TTL = 5 * 60 * 1000; // 5 min cache
+var CALENDLY_TTL = 30 * 60 * 1000; // 30 min: Calendly da 100 llamadas al dia por token, compartidas con el bot
+var CALENDLY_LS = "us19_cal_hoy";
+function calendlyCacheLeer(){
+  try {
+    var raw = localStorage.getItem(CALENDLY_LS); if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (!o || o.dia !== new Date().toDateString() || (Date.now() - o.at) > CALENDLY_TTL) return null;
+    _calendlyCache = o.events; _calendlyFetchedAt = o.at;
+    return o.events;
+  } catch (e){ return null; }
+}
+function calendlyCacheGuardar(events){
+  try { localStorage.setItem(CALENDLY_LS, JSON.stringify({ at: _calendlyFetchedAt, dia: new Date().toDateString(), events: events })); } catch (e){}
+}
 
 function calendlyHeaders(){
   return { "Authorization": "Bearer " + settings.calendlyToken, "Content-Type": "application/json" };
@@ -10461,6 +10474,8 @@ function calendlyGetUserUri(){
 
 function calendlyFetchEvents(){
   if (_calendlyCache && (Date.now() - _calendlyFetchedAt < CALENDLY_TTL)) return Promise.resolve(_calendlyCache);
+  var guardado = calendlyCacheLeer();
+  if (guardado) return Promise.resolve(guardado);
   return calendlyGetUserUri().then(function(userUri){
     var now = new Date();
     var dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -10472,21 +10487,30 @@ function calendlyFetchEvents(){
     return fetch(url, { headers: calendlyHeaders() }).then(function(r){ return r.json(); });
   }).then(function(data){
     var events = (data && data.collection) || [];
-    // For each event, fetch invitees
-    var promises = events.map(function(ev){
-      var evUuid = ev.uri.split("/").pop();
-      return fetch("https://api.calendly.com/scheduled_events/"+evUuid+"/invitees?count=50", { headers: calendlyHeaders() })
-        .then(function(r){ return r.json(); })
-        .then(function(inv){ ev._invitees = (inv && inv.collection) || []; return ev; })
-        .catch(function(){ ev._invitees = []; return ev; });
-    });
-    return Promise.all(promises);
+    /* Antes se pedian los invitados de cada bloque: 1 llamada por bloque en
+       cada carga del Panel, contra 100 al dia compartidas con el bot. Ahora
+       el bloque muestra los cupos (invitees_counter) y los nombres se cargan
+       solo si los pides, bloque a bloque. */
+    events.forEach(function(ev){ ev._invitees = null; });
+    return events;
   }).then(function(events){
     _calendlyCache = events;
     _calendlyFetchedAt = Date.now();
+    calendlyCacheGuardar(events);
     return events;
   });
 }
+/* Nombres de un bloque, a peticion: una llamada, y queda en la cache. */
+window.calendlyVerNombres = function(uuid){
+  var ev = (_calendlyCache || []).filter(function(e){ return e.uri && e.uri.split("/").pop() === uuid; })[0];
+  if (!ev) return;
+  var btn = document.getElementById("cal-nom-" + uuid); if (btn){ btn.disabled = true; btn.textContent = "⏳"; }
+  fetch("https://api.calendly.com/scheduled_events/" + uuid + "/invitees?count=50", { headers: calendlyHeaders() })
+    .then(function(r){ return r.json(); })
+    .then(function(inv){ ev._invitees = (inv && inv.collection) || []; })
+    .catch(function(){ ev._invitees = []; })
+    .then(function(){ calendlyCacheGuardar(_calendlyCache); buildCalendlyDashboardHtml(); });
+};
 
 function normalizeStr(s){ return (s||"|").toLowerCase().replace(/[^a-z0-9]/g,""); }
 
@@ -10556,9 +10580,17 @@ function buildCalendlyDashboardHtml(){
         });
         if (!invitees.length){
           var timeLabel2 = fmtCalTime(ev.start_time) + " – " + fmtCalTime(ev.end_time);
+          var nAct = (ev.invitees_counter && ev.invitees_counter.active) || 0;
+          var nLim = (ev.invitees_counter && ev.invitees_counter.limit) || 8;
+          var uuid2 = String(ev.uri || "").split("/").pop();
           html += '<div style="display:flex;align-items:center;gap:.75rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:.65rem 1rem;margin-bottom:.5rem;color:var(--muted);font-size:.85rem;">';
           html += '<span style="background:var(--surface-3);border-radius:6px;padding:.2rem .55rem;font-size:.75rem;font-weight:700;white-space:nowrap;">'+escapeHtml(timeLabel2)+'</span>';
-          html += escapeHtml(ev.name || "Cita") + ' — sin invitados confirmados';
+          if (ev._invitees === null){
+            html += '<span style="flex:1;">' + escapeHtml(ev.name || "Cita") + ' · <b>' + nAct + '</b> de ' + nLim + ' cupos</span>'
+              + (nAct ? '<button class="btn btn-ghost btn-sm" id="cal-nom-' + escapeAttr(uuid2) + '" onclick="calendlyVerNombres(\'' + escapeAttr(uuid2) + '\')" title="Carga los nombres de este bloque (1 llamada a Calendly)">👥 Nombres</button>' : '');
+          } else {
+            html += escapeHtml(ev.name || "Cita") + ' — sin invitados confirmados';
+          }
           html += '</div>';
         }
       });
