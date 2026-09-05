@@ -647,6 +647,19 @@ img{max-width:100%;display:block;}
 /* Dentro de un contenedor con scroll lateral, la cabecera pegajosa global se quedaria a media tabla. */
 .u19-scrollx .u-tbl thead th{position:static;}
 
+/* ---- composición del plantel y tendencia ---- */
+.bio-vent{display:inline-flex;gap:.15rem;margin-left:auto;}
+.bio-vent button{background:none;border:1px solid var(--border);color:var(--muted);border-radius:999px;padding:.1rem .5rem;font-size:.68rem;font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:0;text-transform:none;}
+.bio-vent button.active{background:var(--accent);border-color:var(--accent);color:var(--bg);}
+.bio-vent button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.pb-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin:.2rem 0 .8rem;}
+.pb-chip{font-size:.72rem;font-weight:600;border:1px solid var(--border);border-radius:999px;padding:.15rem .6rem;color:var(--muted);}
+.pb-chip b{color:inherit;}
+.pb-est{font-size:.68rem;font-weight:700;border-radius:999px;padding:.1rem .5rem;border:1px solid currentColor;white-space:nowrap;}
+.pb-d{font-size:.7rem;margin-left:.3rem;}
+.cl-bio{display:contents;}
+.rnd-pane > #plantel-bio > .card{margin-top:0 !important;}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -3990,6 +4003,7 @@ function clientTypeBadge(typeId){
 var _clientFilter = "";
 
 function renderClients(){
+  u19PlantelBioPedir();   /* composición del plantel para los chips (con caché de 30 min) */
   var html = '';
   html += '<div class="section-head">';
   html += '<h1 class="section-title">CLIENTES <span class="accent">/ GESTIÓN</span></h1>';
@@ -4429,7 +4443,8 @@ function clientCardHtml(c){
         + infoLine
         + clientDateBadges(c)
       + '</div>'
-      + ((typeof u19ChipsCliente === "function") ? ('<div class="u-chips">' + u19ChipsCliente(c) + '</div>') : '')
+      + ((typeof u19ChipsCliente === "function") ? ('<div class="u-chips">' + u19ChipsCliente(c)
+          + '<span class="cl-bio" data-cid="' + escapeAttr(String(c.id)) + '">' + u19BioChipCliente(c) + '</span></div>') : '')
       + (c.notes ? '<div class="text-xs text-muted" style="margin-top:.4rem;">'+escapeHtml(c.notes)+'</div>' : '')
     + '</div>'
     + '<div class="card-actions">'
@@ -21485,6 +21500,8 @@ function renderRendimiento(){
   var plantel = u19PlantelHTML();
   if (!plantel) plantel = '<div class="card"><div class="card-main"><div class="card-title">Plantel</div>'
     + '<p class="text-xs text-muted" style="line-height:1.5;">Sin clientes activos todavía. Cuando haya evaluaciones guardadas en sus fichas, aquí verás quién tiene asimetría, quién mejora y a quién le toca reevaluar.</p></div></div>';
+  plantel = '<div id="plantel-bio">' + u19PlantelBioInnerHTML() + '</div>' + plantel;
+  u19PlantelBioPedir();
 
   /* --- Nueva evaluación: entrada a la izquierda, resultado a la derecha --- */
   var cDep='<div class="card"><div class="card-main"><div class="card-title">Deportista</div>'
@@ -24847,6 +24864,250 @@ function u19FichaBioBloque(c){
     '<span style="display:flex;gap:.3rem;">' + recargar + '<button class="btn btn-primary btn-sm" onclick="u19FichaAInformes(\'' + c.id + '\')">Generar informe →</button></span>');
 }
 
+/* ============================================================
+   COMPOSICIÓN DEL PLANTEL Y TENDENCIA (sep 2026)
+   El puente devuelve en una sola petición (tipo=bio_todas&meses=N)
+   todas las bioimpedancias con fecha dentro de la ventana. La app las
+   guarda 30 minutos y con ellas pinta: la tabla del plantel en
+   Rendimiento → Plantel (quién mejora, quién se estanca, quién no se
+   mide), un chip por tarjeta en Clientes (sin cifras, para poder
+   mostrar la pantalla) y la tendencia de la ficha. Ninguna consulta
+   por cliente: el tope diario del puente queda intacto.
+   ============================================================ */
+var _bioVentanaMeses = 3;   /* ventana de tendencia elegida (sesión) */
+var _plantelBio = { at: 0, meses: 0, filas: null, cargando: false, error: "" };
+var _plantelBioAn = { at: -1, meses: 0, res: null };
+
+function u19BioNorm(s){
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/\([^)]*\)/g, " ").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+function u19BioSigno(d){ return (d > 0 ? "+" : "") + d; }
+function u19BioIndiceApp(){
+  var idx = {};
+  state.clients.forEach(function(c){
+    var vs = (typeof u19NombreVariantes === "function") ? u19NombreVariantes(c.name) : [c.name];
+    vs.forEach(function(v){ var k = u19BioNorm(v); if (k && !idx[k]) idx[k] = c; });
+  });
+  return idx;
+}
+/* Empareja el título de una fila de Notion con un cliente de la app:
+   igual, o uno empieza por el otro («camila munoz kotty» ↔ «camila munoz»). */
+function u19BioClienteDeNotion(nombreNotion, idx){
+  var n = u19BioNorm(nombreNotion); if (!n) return null;
+  if (idx[n]) return idx[n];
+  var mejor = null;
+  Object.keys(idx).forEach(function(k){
+    if (k.length < 6 || n.length < 6) return;
+    if (n.indexOf(k) === 0 || k.indexOf(n) === 0){ if (!mejor || k.length > mejor.k.length) mejor = { k: k, c: idx[k] }; }
+  });
+  return mejor ? mejor.c : null;
+}
+
+function u19PlantelBioPedir(){
+  if (typeof u19DashUrl !== "function" || !u19DashUrl("bio_todas")) return;
+  var m = _bioVentanaMeses;
+  if (_plantelBio.cargando) return;
+  if (_plantelBio.filas && _plantelBio.meses === m && (Date.now() - _plantelBio.at) < 30 * 60 * 1000) return;
+  _plantelBio = { at: Date.now(), meses: m, filas: null, cargando: true, error: "" };
+  fetch(u19DashUrl("bio_todas") + "&meses=" + m).then(function(r){ return r.json(); }).then(function(d){
+    if (!d || d.error) throw new Error((d && d.error) || "sin respuesta");
+    _plantelBio = { at: Date.now(), meses: m, filas: Array.isArray(d.filas) ? d.filas : [], cargando: false, error: "" };
+  }).catch(function(e){
+    _plantelBio = { at: Date.now(), meses: m, filas: [], cargando: false, error: String((e && e.message) || e || "sin respuesta") };
+  }).then(function(){ u19PlantelBioRepintar(); });
+}
+/* Repinta solo lo que depende de estos datos: la tarjeta del plantel y
+   los chips de Clientes. No vuelve a renderizar la vista entera, para
+   no borrar lo que el usuario esté escribiendo. */
+function u19PlantelBioRepintar(){
+  var el = document.getElementById("plantel-bio");
+  if (el) el.innerHTML = u19PlantelBioInnerHTML();
+  var chips = document.querySelectorAll(".cl-bio[data-cid]");
+  for (var i = 0; i < chips.length; i++){
+    var c = getClient(chips[i].getAttribute("data-cid"));
+    chips[i].innerHTML = c ? u19BioChipCliente(c) : "";
+  }
+}
+window.u19BioVentana = function(m){
+  _bioVentanaMeses = [3, 6, 12].indexOf(Number(m)) >= 0 ? Number(m) : 3;
+  var act = document.querySelector(".view.active");
+  if (act && act.id === "view-ficha"){ renderFicha(); return; }
+  u19PlantelBioPedir();
+  u19PlantelBioRepintar();
+};
+window.u19PlantelBioRecargar = function(){
+  _plantelBio = { at: 0, meses: 0, filas: null, cargando: false, error: "" };
+  u19PlantelBioPedir(); u19PlantelBioRepintar();
+};
+function u19BioVentanaHTML(){
+  return '<span class="bio-vent" role="group" aria-label="Ventana de tendencia">' + [3, 6, 12].map(function(m){
+    return '<button type="button" class="' + (m === _bioVentanaMeses ? "active" : "") + '" onclick="u19BioVentana(' + m + ')">' + m + ' m</button>';
+  }).join("") + '</span>';
+}
+
+/* Una fila por persona: primera y última medición de la ventana, cambio
+   y lectura. Mejora: baja ≥1 punto de grasa, o sube ≥0,5 kg de músculo
+   sin subir grasa. Empeora: sube ≥1 punto de grasa. Se estanca: nada de
+   eso en 8 semanas o más. En curso: todavía no pasaron 8 semanas. */
+function u19PlantelBioAnalisis(){
+  if (_plantelBioAn.res && _plantelBioAn.at === _plantelBio.at && _plantelBioAn.meses === _plantelBio.meses) return _plantelBioAn.res;
+  var filas = _plantelBio.filas || [];
+  var idx = u19BioIndiceApp();
+  var porNombre = {};
+  filas.forEach(function(f){
+    if (!f || !f.fecha || f.peso_kg == null) return;
+    var k = u19BioNorm(f.cliente); if (!k) return;
+    (porNombre[k] = porNombre[k] || { nombre: f.cliente, filas: [] }).filas.push(f);
+  });
+  var hoy = Date.now(), personas = [], vistos = {};
+  Object.keys(porNombre).forEach(function(k){
+    var g = porNombre[k];
+    g.filas.sort(function(a, b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });
+    var pri = g.filas[0], ult = g.filas[g.filas.length - 1], n = g.filas.length;
+    var dias = Math.round((Date.parse(ult.fecha) - Date.parse(pri.fecha)) / 86400000);
+    var desdeUlt = Math.round((hoy - Date.parse(ult.fecha)) / 86400000);
+    var dP = n > 1 ? +(ult.peso_kg - pri.peso_kg).toFixed(1) : null;
+    var dG = (n > 1 && ult.grasa_pct != null && pri.grasa_pct != null) ? +(ult.grasa_pct - pri.grasa_pct).toFixed(1) : null;
+    var dM = (n > 1 && ult.musculo_kg != null && pri.musculo_kg != null) ? +(ult.musculo_kg - pri.musculo_kg).toFixed(1) : null;
+    var estado;
+    if (n < 2) estado = "una";
+    else if ((dG != null && dG <= -1) || (dM != null && dM >= 0.5 && (dG == null || dG <= 0.3))) estado = "mejora";
+    else if (dG != null && dG >= 1) estado = "empeora";
+    else if (dias >= 56) estado = "estable";
+    else estado = "curso";
+    var c = u19BioClienteDeNotion(g.nombre, idx);
+    if (c) vistos[c.id] = true;
+    personas.push({ nombre: g.nombre, c: c, n: n, pri: pri, ult: ult, dias: dias, desdeUlt: desdeUlt,
+                    dP: dP, dG: dG, dM: dM, estado: estado, sinMedir: desdeUlt >= 56 });
+  });
+  var orden = { empeora: 0, estable: 1, una: 2, curso: 3, mejora: 4 };
+  personas.sort(function(a, b){
+    return (orden[a.estado] - orden[b.estado]) || (String(a.ult.fecha) < String(b.ult.fecha) ? 1 : -1);
+  });
+  var sinBio = state.clients.filter(function(c){
+    return !vistos[c.id] && (typeof u19ClienteActivo !== "function" || u19ClienteActivo(c));
+  });
+  var res = { personas: personas, sinBio: sinBio, total: filas.length };
+  _plantelBioAn = { at: _plantelBio.at, meses: _plantelBio.meses, res: res };
+  return res;
+}
+var BIO_ESTADOS = {
+  mejora:  { t: "mejora",        col: "var(--success)", chip: "▼ mejora" },
+  empeora: { t: "sube grasa",    col: "var(--danger)",  chip: "▲ sube grasa" },
+  estable: { t: "se estanca",    col: "#d97706",        chip: "► se estanca" },
+  una:     { t: "1 medición",    col: "var(--muted)",   chip: "● 1 medición" },
+  curso:   { t: "en curso",      col: "var(--muted)",   chip: "… en curso" }
+};
+function u19BioPersonaDe(c){
+  if (!_plantelBio.filas || !c) return null;
+  var ps = u19PlantelBioAnalisis().personas;
+  for (var i = 0; i < ps.length; i++) if (ps[i].c && String(ps[i].c.id) === String(c.id)) return ps[i];
+  return null;
+}
+/* Chip para la tarjeta de Clientes: la lectura en palabras; las cifras
+   van en el tooltip, para poder enseñar la pantalla sin exponer pesos. */
+function u19BioChipCliente(c){
+  var p = u19BioPersonaDe(c); if (!p) return "";
+  var e = BIO_ESTADOS[p.estado];
+  var ti = rndFdate(p.ult.fecha) + ": " + p.ult.peso_kg + " kg" + (p.ult.grasa_pct != null ? " · " + p.ult.grasa_pct + "% grasa" : "")
+    + (p.dP != null ? " · " + u19BioSigno(p.dP) + " kg" + (p.dG != null ? " y " + u19BioSigno(p.dG) + " pts de grasa" : "") + " en " + p.dias + " días" : "");
+  var s = '<span class="u-chip" style="color:' + e.col + ';" title="' + escapeAttr(ti) + '">' + e.chip + '</span>';
+  if (p.sinMedir) s += '<span class="u-chip" style="color:#d97706;" title="Última bioimpedancia hace ' + p.desdeUlt + ' días">⚖ ' + Math.round(p.desdeUlt / 7) + ' sem sin medirse</span>';
+  return s;
+}
+function u19BioDeltaHTML(d, u, buenoSiBaja){
+  if (d == null) return "";
+  var col = "var(--muted)";
+  if (buenoSiBaja === true)  col = d <= -0.3 ? "var(--success)" : (d >= 0.3 ? "var(--danger)" : "var(--muted)");
+  if (buenoSiBaja === false) col = d >= 0.3 ? "var(--success)" : (d <= -0.3 ? "var(--danger)" : "var(--muted)");
+  return '<span class="pb-d" style="color:' + col + ';">' + u19BioSigno(d) + u + '</span>';
+}
+
+/* Contenido de la tarjeta «Composición del plantel» (Rendimiento → Plantel). */
+function u19PlantelBioInnerHTML(){
+  var cab = function(sub){
+    return '<div class="fin-g-t"><div>Composición del plantel <span>' + sub + '</span></div>' + u19BioVentanaHTML() + '</div>';
+  };
+  var envoltura = function(inner){ return '<div class="card" style="margin-bottom:1rem;"><div class="card-main">' + inner + '</div></div>'; };
+  if (!(typeof u19DashUrl === "function" && u19DashUrl("bio_todas")))
+    return envoltura(cab("Notion") + '<p class="text-xs text-muted" style="line-height:1.5;">Aquí verás quién mejora, quién se estanca y quién no se mide, con las bioimpedancias que el bot guarda en Notion. Falta configurar el puente en ⚙ Ajustes → Puente con Notion.</p>');
+  if (_plantelBio.cargando || !_plantelBio.filas)
+    return envoltura(cab("últimos " + _bioVentanaMeses + " meses") + '<p class="text-xs text-muted">⏳ Cargando desde Notion…</p>');
+  if (_plantelBio.error)
+    return envoltura(cab("Notion") + '<p class="text-xs" style="color:var(--danger);">✗ ' + escapeHtml(_plantelBio.error)
+      + (/bio_todas|Notion no respondio|resumen/.test(_plantelBio.error) ? '' : '')
+      + '</p><p class="text-xs text-muted" style="line-height:1.5;">Si el puente responde a lo demás pero no a esto, le falta la versión con <span class="kbd">bio_todas</span>: hay que publicar la versión nueva del script.</p>'
+      + '<button class="btn btn-ghost btn-sm" onclick="u19PlantelBioRecargar()">↻ Reintentar</button>');
+  var an = u19PlantelBioAnalisis();
+  var ps = an.personas;
+  var cnt = { mejora: 0, empeora: 0, estable: 0, una: 0, curso: 0 }, sinMedir = 0;
+  ps.forEach(function(p){ cnt[p.estado]++; if (p.sinMedir) sinMedir++; });
+  var h = cab("últimos " + _plantelBio.meses + " meses · " + ps.length + " persona" + (ps.length === 1 ? "" : "s") + " · " + an.total + " evaluaciones");
+  if (!ps.length){
+    h += '<p class="text-xs text-muted" style="line-height:1.5;">Ninguna bioimpedancia con fecha en los últimos ' + _plantelBio.meses + ' meses. Prueba con una ventana más larga.</p>';
+    return envoltura(h);
+  }
+  h += '<div class="pb-chips">'
+    + '<span class="pb-chip" style="color:var(--success);"><b>' + cnt.mejora + '</b> mejoran</span>'
+    + '<span class="pb-chip" style="color:#d97706;"><b>' + cnt.estable + '</b> se estancan</span>'
+    + '<span class="pb-chip" style="color:var(--danger);"><b>' + cnt.empeora + '</b> suben grasa</span>'
+    + '<span class="pb-chip"><b>' + cnt.una + '</b> con una sola medición</span>'
+    + '<span class="pb-chip"><b>' + cnt.curso + '</b> en curso (menos de 8 semanas)</span>'
+    + (sinMedir ? '<span class="pb-chip" style="color:#d97706;"><b>' + sinMedir + '</b> llevan 8+ semanas sin medirse</span>' : '')
+    + '</div>';
+  h += '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Persona</th><th>Última</th><th>Peso</th><th>Grasa</th><th>Músculo</th><th>Lectura</th></tr></thead><tbody>';
+  ps.forEach(function(p){
+    var e = BIO_ESTADOS[p.estado];
+    var nombre = p.c
+      ? '<a href="#" onclick="abrirFicha(\'' + p.c.id + '\',\'evaluaciones\');return false;" style="text-decoration:none;font-weight:600;">' + escapeHtml(p.c.name) + '</a>'
+      : '<span style="font-weight:600;" title="No coincide con ningún cliente de la app">' + escapeHtml(p.nombre) + '</span>';
+    h += '<tr><td>' + nombre + '</td>'
+      + '<td>' + rndFdate(p.ult.fecha) + (p.sinMedir ? ' <span class="text-xs" style="color:#d97706;">hace ' + Math.round(p.desdeUlt / 7) + ' sem</span>' : '')
+        + (p.n > 1 ? ' <span class="text-xs text-muted">· ' + p.n + ' med.</span>' : '') + '</td>'
+      + '<td style="white-space:nowrap;">' + p.ult.peso_kg + ' kg' + u19BioDeltaHTML(p.dP, " kg", null) + '</td>'
+      + '<td style="white-space:nowrap;">' + (p.ult.grasa_pct != null ? p.ult.grasa_pct + ' %' : '—') + u19BioDeltaHTML(p.dG, " pts", true) + '</td>'
+      + '<td style="white-space:nowrap;">' + (p.ult.musculo_kg != null ? p.ult.musculo_kg + ' kg' : '—') + u19BioDeltaHTML(p.dM, " kg", false) + '</td>'
+      + '<td><span class="pb-est" style="color:' + e.col + ';">' + e.t + '</span></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="text-xs text-muted" style="margin:.6rem 0 0;line-height:1.5;">Cambios entre la primera y la última medición de la ventana. <b>Mejora</b>: baja 1 punto o más de grasa, o sube 0,5 kg de músculo sin subir grasa. <b>Sube grasa</b>: 1 punto o más. <b>Se estanca</b>: sin cambio en 8 semanas o más. El peso solo se informa: subir o bajar depende del objetivo de cada persona.</p>';
+  if (an.sinBio.length){
+    var lista = an.sinBio.slice(0, 12).map(function(c){
+      return '<a href="#" onclick="abrirFicha(\'' + c.id + '\');return false;" style="text-decoration:none;">' + escapeHtml(c.name || "—") + '</a>';
+    }).join(", ");
+    h += '<p class="text-xs" style="margin:.6rem 0 0;line-height:1.6;"><b style="color:#d97706;">Sin bioimpedancia en la ventana · ' + an.sinBio.length + '</b>: ' + lista
+      + (an.sinBio.length > 12 ? ' y ' + (an.sinBio.length - 12) + ' más' : '') + '.</p>';
+  }
+  return envoltura(h);
+}
+
+/* Tendencia en el Resumen de la ficha: peso y grasa de la ventana elegida.
+   Si en la ventana no hay dos mediciones, se amplía sola (6, 12, todas). */
+function u19FichaTendenciaHTML(c, nEv){
+  if (!nEv || nEv.length < 2) return "";
+  var asc = nEv.slice().reverse();
+  function enVentana(m){
+    var d = new Date(); d.setMonth(d.getMonth() - m);
+    var lim = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    return asc.filter(function(x){ return String(x.fecha).slice(0, 10) >= lim; });
+  }
+  var escalas = [3, 6, 12], pedida = _bioVentanaMeses, usada = pedida, sel = enVentana(usada), todo = false;
+  while (sel.length < 2 && escalas.indexOf(usada) < escalas.length - 1){ usada = escalas[escalas.indexOf(usada) + 1]; sel = enVentana(usada); }
+  if (sel.length < 2){ sel = asc; todo = true; }
+  var pP = sel.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.peso_kg != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.peso_kg) }; });
+  var pG = sel.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.grasa_pct != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.grasa_pct) }; });
+  if (pP.length < 2 && pG.length < 2) return "";
+  var nota = (todo ? "todas las mediciones" : "últimos " + usada + " meses")
+    + ((!todo && usada !== pedida) ? " · en " + pedida + " meses no hay dos" : "") + " · " + sel.length + " mediciones";
+  var h = '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
+    + '<div class="fin-g-t"><div>Tendencia <span>' + escapeHtml(nota) + '</span></div>' + u19BioVentanaHTML() + '</div>'
+    + '<div class="fb-graficos" style="margin-bottom:0;">';
+  if (pP.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Peso <span>' + escapeHtml(u19FichaDelta(pP, " kg")) + '</span></div>' + u19FichaLineaSVG(pP, " kg", "var(--accent)") + '</div>';
+  if (pG.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Grasa corporal <span>' + escapeHtml(u19FichaDelta(pG, " %")) + '</span></div>' + u19FichaLineaSVG(pG, "%", "#f59e0b") + '</div>';
+  return h + '</div></div></div>';
+}
+
 function renderFicha(){
   var c = getClient(_fichaState.clientId);
   var cont = document.getElementById('view-ficha');
@@ -24899,9 +25160,13 @@ function fichaResumen(c){
   var nb = (typeof u19FichaBio === 'function') ? u19FichaBio(c) : null;
   var nEv = nb ? nb.evs : [];
   var hayPuente = (typeof u19DashUrl === 'function') && !!u19DashUrl('bio');
+  var bPrev = null, bPrevFecha = '';
   if (nEv.length && (!inf || String(nEv[0].fecha).slice(0, 10) > bFecha)){
     b = nEv[0].bioimpedancia || {}; bSrc = rndFdate(nEv[0].fecha) + ' · Notion';
+    if (nEv[1]){ bPrev = nEv[1].bioimpedancia || {}; bPrevFecha = nEv[1].fecha; }
   } else if (!inf && !nb && hayPuente){ bSrc = 'cargando de Notion…'; }
+  var dPeso = (bPrev && bPrev.peso_kg != null && b.peso_kg != null) ? +(Number(b.peso_kg) - Number(bPrev.peso_kg)).toFixed(1) : null;
+  var dGrasa = (bPrev && bPrev.grasa_pct != null && b.grasa_pct != null) ? +(Number(b.grasa_pct) - Number(bPrev.grasa_pct)).toFixed(1) : null;
   var d = u19DiasSinReportar(c);
   var rut = state.routines.filter(function(r){ return r.clientId === c.id && r.status !== 'archived'; });
 
@@ -24911,8 +25176,10 @@ function fichaResumen(c){
       + '<div class="u-tile-s">' + (sub || '') + '</div></div>';
   }
   var tiles = '<div class="u-tiles">'
-    + tile('Peso', b.peso_kg != null ? Number(b.peso_kg).toFixed(1) + ' kg' : '—', bSrc)
-    + tile('Grasa', b.grasa_pct != null ? Number(b.grasa_pct).toFixed(1) + ' %' : '—', b.musculo_kg != null ? (Number(b.musculo_kg).toFixed(1) + ' kg músculo') : '')
+    + tile('Peso', b.peso_kg != null ? Number(b.peso_kg).toFixed(1) + ' kg' : '—',
+        bSrc + (dPeso != null ? ' · ' + u19BioSigno(dPeso) + ' kg vs ' + u19FichaFechaCorta(bPrevFecha) : ''))
+    + tile('Grasa', b.grasa_pct != null ? Number(b.grasa_pct).toFixed(1) + ' %' : '—',
+        (dGrasa != null ? u19BioSigno(dGrasa) + ' pts vs anterior · ' : '') + (b.musculo_kg != null ? (Number(b.musculo_kg).toFixed(1) + ' kg músculo') : ''))
     + tile('Simetría', lsi ? ('LSI ' + lsi.lsi.toFixed(0) + '%') : '—',
         lsi ? (lsi.fuente === 'dinamometria' ? 'ActiveForce' : (lsi.fuente === 'manual' ? 'test manual' : 'BlazePod')) : 'sin medir',
         lsi ? (lsi.lsi >= 90 ? 'var(--success)' : (lsi.lsi >= 85 ? '#d97706' : 'var(--danger)')) : '')
@@ -24933,7 +25200,7 @@ function fichaResumen(c){
     return '<button class="u-count" onclick="' + x[2] + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></button>';
   }).join('') + '</div>';
 
-  return tiles + resumenN
+  return tiles + u19FichaTendenciaHTML(c, nEv) + resumenN
     + u19Bloque('Línea de tiempo', u19Timeline(c));
 }
 

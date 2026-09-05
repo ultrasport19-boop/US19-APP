@@ -155,6 +155,7 @@ function doGet(e) {
     if (tipo === 'bio')       return _json(bioDeCliente(
                                   (e.parameter && e.parameter.cliente) || '',
                                   e.parameter && e.parameter.n));
+    if (tipo === 'bio_todas') return _json(bioTodas(e.parameter && e.parameter.meses));
     if (tipo === 'historial') return _json({ historial: [] });   // rellena si llevas historico
     return _json(resumen());
   } catch (err) {
@@ -796,6 +797,45 @@ function bioDeCliente(nombre, limite) {
 }
 
 /* ---------- el roster que consume la app ---------- */
+
+/* ?tipo=bio_todas&meses=N — todas las bioimpedancias con fecha dentro
+   de los ultimos N meses (1..24, por defecto 3), en forma compacta.
+   Una sola peticion para todo el plantel: la app no tiene que preguntar
+   cliente por cliente y el tope diario queda intacto. Las filas sin
+   fecha o sin peso (restos del formato antiguo) se omiten. */
+function bioTodas(meses) {
+  var m = Math.min(Math.max(Number(meses) || 3, 1), 24);
+  var d = new Date(); d.setMonth(d.getMonth() - m);
+  var desde = Utilities.formatDate(d, 'America/Santiago', 'yyyy-MM-dd');
+  var filas = [], cursor = null, paginas = 0;
+  do {
+    var cuerpo = {
+      filter: { property: PB.fecha, date: { on_or_after: desde } },
+      sorts: [{ property: PB.fecha, direction: 'descending' }],
+      page_size: 100
+    };
+    if (cursor) cuerpo.start_cursor = cursor;
+    var r = _notion('databases/' + BIO_DB + '/query', 'post', cuerpo);
+    (r.results || []).forEach(function (pg) {
+      var p = pg.properties || {};
+      var fecha = _val(p, PB.fecha);
+      var peso = _n1(_val(p, PB.peso));
+      if (!fecha || peso == null) return;
+      filas.push({
+        cliente: _val(p, PB.cliente) || '',
+        fecha: fecha,
+        peso_kg: peso,
+        grasa_pct: _n1(_val(p, PB.grasaPct)),
+        musculo_kg: _n1(_val(p, PB.musculo)),
+        esqueletico_kg: _n1(_val(p, PB.esqueletico)),
+        cintura_cm: _n1(_val(p, PB.cintura)),
+        cadera_cm: _n1(_val(p, PB.cadera))
+      });
+    });
+    cursor = r.has_more ? r.next_cursor : null;
+  } while (cursor && ++paginas < 10);
+  return { desde: desde, meses: m, filas: filas };
+}
 
 function rosterClientes() {
   var filas = _todas();
