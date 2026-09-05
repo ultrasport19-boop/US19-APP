@@ -660,6 +660,23 @@ img{max-width:100%;display:block;}
 .cl-bio{display:contents;}
 .rnd-pane > #plantel-bio > .card{margin-top:0 !important;}
 
+/* ---- batería de pruebas ---- */
+.bat-perfil{display:flex;gap:.5rem;margin-bottom:.9rem;}
+.bat-perfil button{flex:1;padding:.55rem .6rem;border:1px solid var(--border);background:none;color:var(--muted);border-radius:var(--radius-lg);font-weight:800;cursor:pointer;font-family:inherit;font-size:.9rem;display:flex;flex-direction:column;align-items:center;gap:.1rem;}
+.bat-perfil button small{font-weight:500;font-size:.7rem;color:var(--muted);}
+.bat-perfil button.active{border-color:var(--accent);color:var(--accent);background:rgba(168,209,57,.08);}
+.bat-perfil button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.bat-disp{font-size:.6rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:4px;padding:.05rem .35rem;border:1px solid var(--border);color:var(--muted);margin-left:.35rem;vertical-align:1px;white-space:nowrap;}
+
+.fb-graficos.fb-3{grid-template-columns:repeat(3,1fr);}
+@media (max-width:900px){.fb-graficos.fb-3{grid-template-columns:1fr 1fr;}}
+@media (max-width:600px){.fb-graficos.fb-3{grid-template-columns:1fr;}}
+.bk-chips{display:flex;flex-wrap:wrap;gap:.4rem;margin:.1rem 0 .9rem;}
+.bk-chip{display:inline-flex;align-items:baseline;gap:.35rem;border:1px solid var(--border);border-radius:8px;padding:.3rem .55rem;font-size:.8rem;background:var(--surface-2);}
+.bk-chip b{font-variant-numeric:tabular-nums;}
+.bk-l{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
+.bk-d{font-size:.7rem;font-weight:700;}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -22653,6 +22670,19 @@ function u19SerieLSI(c){
       detalle: (e.resumen && e.resumen.fuerza_max != null) ? (e.resumen.fuerza_max.toFixed(0) + " N") : ""
     });
   });
+  (c.pruebas || []).forEach(function(p){
+    if (!p.d || p.d.lsi == null) return;
+    var esBp = p.disp === "blazepod";
+    out.push({
+      fecha: p.fecha || "", lsi: Number(p.d.lsi),
+      pct: +Math.abs(100 - Number(p.d.lsi)).toFixed(1),
+      fuente: esBp ? "blazepod" : "dinamometria",
+      etiqueta: (esBp ? "BlazePod · " : "ActivForce · ") + ((typeof u19BateriaMov === "function") ? u19BateriaMov(p) : p.prueba),
+      nivel: p.d.nivel || (p.d.lsi >= 90 ? "ok" : (p.d.lsi >= 85 ? "vigilar" : "deficit")),
+      deficitLado: p.d.deficitLado || null, dirigido: !!(p.v && p.v.afectado),
+      detalle: p.d.principal || ""
+    });
+  });
   out.sort(function(a, b){
     if (a.fecha !== b.fecha) return String(a.fecha) < String(b.fecha) ? -1 : 1;
     /* A igual fecha manda la dinamometria: mide la fuerza que el
@@ -24661,6 +24691,11 @@ function u19Timeline(c){
     add(e2.fecha, 'Composición', 'Bioimpedancia · Notion',
       (b2.peso_kg != null ? b2.peso_kg + ' kg' : '') + (b2.grasa_pct != null ? ' · ' + b2.grasa_pct + '% grasa' : ''), '#0e5132');
   });
+  (c.pruebas || []).forEach(function(p){
+    var cat = (typeof u19BateriaCat === 'function') ? u19BateriaCat(p.prueba) : null;
+    add(p.fecha, 'Prueba', (cat ? cat.nombre : p.prueba) + ((p.v || {}).mov ? ' · ' + u19BateriaMov(p) : ''),
+      ((p.d || {}).principal || '') + ((p.d || {}).lsi != null ? ' · LSI ' + p.d.lsi + '%' : ''), '#0891b2');
+  });
   (c.rendimiento || []).forEach(function(r){
     var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
     var peor = cand.length ? cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0] : null;
@@ -24841,20 +24876,13 @@ function u19FichaBioBloque(c){
       + '. Si allá figura con otro nombre, edita el nombre aquí para que coincida.</p>', recargar);
 
   var asc = evs.slice().reverse();
-  var h = "";
-  var pPeso = asc.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.peso_kg != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.peso_kg) }; });
-  var pGrasa = asc.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.grasa_pct != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.grasa_pct) }; });
-  if (pPeso.length > 1 || pGrasa.length > 1){
-    h += '<div class="fb-graficos">';
-    if (pPeso.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Peso <span>' + escapeHtml(u19FichaDelta(pPeso, " kg")) + '</span></div>' + u19FichaLineaSVG(pPeso, " kg", "var(--accent)") + '</div>';
-    if (pGrasa.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Grasa corporal <span>' + escapeHtml(u19FichaDelta(pGrasa, " %")) + '</span></div>' + u19FichaLineaSVG(pGrasa, "%", "#f59e0b") + '</div>';
-    h += '</div>';
-  }
-  h += '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Fecha</th><th>Peso</th><th>Grasa</th><th>Músculo</th><th>Cintura</th><th>Cadera</th></tr></thead><tbody>'
+  var h = u19BioGraficosHTML(asc);
+  h += '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Fecha</th><th>Peso</th><th>Grasa</th><th>Músculo</th><th>M. esquelético</th><th>Visceral</th><th>Cintura</th><th>Cadera</th></tr></thead><tbody>'
     + evs.map(function(x){
         var b = x.bioimpedancia || {}, ci = x.circunferencias_cm || {};
         return '<tr><td>' + rndFdate(x.fecha) + (x.momento ? ' <span class="text-muted text-xs">' + escapeHtml(String(x.momento)) + '</span>' : '') + '</td>'
           + '<td>' + u19FichaNum(b.peso_kg, " kg") + '</td><td>' + u19FichaNum(b.grasa_pct, " %") + '</td><td>' + u19FichaNum(b.musculo_kg, " kg") + '</td>'
+          + '<td>' + u19FichaNum(b.masa_esqueletica_kg, " kg") + '</td><td>' + u19FichaNum(b.grasa_visceral_grado, "") + '</td>'
           + '<td>' + u19FichaNum(ci.cintura, " cm") + '</td><td>' + u19FichaNum(ci.cadera, " cm") + '</td></tr>';
       }).join("")
     + '</tbody></table></div>'
@@ -25084,8 +25112,67 @@ function u19PlantelBioInnerHTML(){
 
 /* Tendencia en el Resumen de la ficha: peso y grasa de la ventana elegida.
    Si en la ventana no hay dos mediciones, se amplía sola (6, 12, todas). */
+/* Series y parámetros clave de la bioimpedancia. «dir» dice hacia dónde
+   es bueno moverse: 1 subir (músculo), -1 bajar (grasa, visceral,
+   cintura), 0 solo informa (peso, agua, IMC, TMB). */
+var BIO_SERIES = [
+  { k: "peso_kg",              t: "Peso",                u: " kg", col: "var(--accent)", dir: 0 },
+  { k: "grasa_pct",            t: "Grasa corporal",      u: "%",   col: "#f59e0b",       dir: -1 },
+  { k: "musculo_kg",           t: "Masa muscular",       u: " kg", col: "#38bdf8",       dir: 1 },
+  { k: "masa_esqueletica_kg",  t: "Músculo esquelético", u: " kg", col: "#818cf8",       dir: 1 },
+  { k: "grasa_visceral_grado", t: "Grasa visceral",      u: "",    col: "#f87171",       dir: -1 },
+  { k: "cintura",              t: "Cintura",             u: " cm", col: "#c084fc",       dir: -1, circ: true }
+];
+var BIO_CLAVES = [
+  { k: "musculo_kg",           t: "Masa muscular",       u: " kg",   dir: 1 },
+  { k: "masa_esqueletica_kg",  t: "Músculo esquelético", u: " kg",   dir: 1 },
+  { k: "grasa_kg",             t: "Grasa",               u: " kg",   dir: -1 },
+  { k: "grasa_visceral_grado", t: "Grasa visceral",      u: "",      dir: -1 },
+  { k: "peso_sin_grasa_kg",    t: "Masa libre de grasa", u: " kg",   dir: 1 },
+  { k: "agua_kg",              t: "Agua corporal",       u: " kg",   dir: 0 },
+  { k: "imc",                  t: "IMC",                 u: "",      dir: 0 },
+  { k: "tmb_kcal",             t: "TMB",                 u: " kcal", dir: 0 },
+  { k: "cintura",              t: "Cintura",             u: " cm",   dir: -1, circ: true },
+  { k: "cadera",               t: "Cadera",              u: " cm",   dir: 0,  circ: true }
+];
+function u19BioValor(x, s){
+  var src = s.circ ? (x.circunferencias_cm || {}) : (x.bioimpedancia || {});
+  var v = src[s.k];
+  return (v == null || v === "" || isNaN(Number(v))) ? null : Number(v);
+}
+function u19BioColorDelta(d, dir){
+  if (d == null || !dir || Math.abs(d) < 0.05) return "var(--muted)";
+  return (d * dir > 0) ? "var(--success)" : "var(--danger)";
+}
+/* Tarjetas de línea para cada serie con dos o más valores. */
+function u19BioGraficosHTML(asc){
+  var tarjetas = [];
+  BIO_SERIES.forEach(function(s){
+    var p = asc.filter(function(x){ return u19BioValor(x, s) != null; }).map(function(x){ return { f: x.fecha, v: u19BioValor(x, s) }; });
+    if (p.length < 2) return;
+    var d = +(p[p.length - 1].v - p[0].v).toFixed(1);
+    tarjetas.push('<div class="fin-g"><div class="fin-g-t">' + escapeHtml(s.t) + ' <span style="color:' + u19BioColorDelta(d, s.dir) + ';">' + escapeHtml(u19FichaDelta(p, s.u)) + '</span></div>'
+      + u19FichaLineaSVG(p, s.u, s.col) + '</div>');
+  });
+  if (!tarjetas.length) return "";
+  return '<div class="fb-graficos' + (tarjetas.length > 2 ? ' fb-3' : '') + '">' + tarjetas.join("") + '</div>';
+}
+/* Chips con la última medición y el cambio respecto de la anterior. */
+function u19BioClavesHTML(ult, prev){
+  if (!ult) return "";
+  var chips = [];
+  BIO_CLAVES.forEach(function(s){
+    var v = u19BioValor(ult, s); if (v == null) return;
+    var pv = prev ? u19BioValor(prev, s) : null;
+    var d = pv == null ? null : +(v - pv).toFixed(1);
+    chips.push('<span class="bk-chip" title="' + escapeAttr(s.t + (d != null ? ' · cambio respecto de la medición anterior' : '')) + '"><span class="bk-l">' + escapeHtml(s.t) + '</span><b>' + v + escapeHtml(s.u) + '</b>'
+      + (d != null ? '<span class="bk-d" style="color:' + u19BioColorDelta(d, s.dir) + ';">' + (d > 0 ? '+' : '') + d + '</span>' : '') + '</span>');
+  });
+  return chips.length ? '<div class="bk-chips">' + chips.join("") + '</div>' : "";
+}
+
 function u19FichaTendenciaHTML(c, nEv){
-  if (!nEv || nEv.length < 2) return "";
+  if (!nEv || !nEv.length) return "";
   var asc = nEv.slice().reverse();
   function enVentana(m){
     var d = new Date(); d.setMonth(d.getMonth() - m);
@@ -25095,17 +25182,352 @@ function u19FichaTendenciaHTML(c, nEv){
   var escalas = [3, 6, 12], pedida = _bioVentanaMeses, usada = pedida, sel = enVentana(usada), todo = false;
   while (sel.length < 2 && escalas.indexOf(usada) < escalas.length - 1){ usada = escalas[escalas.indexOf(usada) + 1]; sel = enVentana(usada); }
   if (sel.length < 2){ sel = asc; todo = true; }
-  var pP = sel.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.peso_kg != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.peso_kg) }; });
-  var pG = sel.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.grasa_pct != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.grasa_pct) }; });
-  if (pP.length < 2 && pG.length < 2) return "";
-  var nota = (todo ? "todas las mediciones" : "últimos " + usada + " meses")
-    + ((!todo && usada !== pedida) ? " · en " + pedida + " meses no hay dos" : "") + " · " + sel.length + " mediciones";
+  var claves = u19BioClavesHTML(nEv[0], nEv[1] || null);
+  var graficos = sel.length >= 2 ? u19BioGraficosHTML(sel) : "";
+  if (!claves && !graficos) return "";
+  var nota = nEv.length < 2 ? "una sola medición"
+    : (todo ? "todas las mediciones" : "últimos " + usada + " meses") + ((!todo && usada !== pedida) ? " · en " + pedida + " meses no hay dos" : "") + " · " + sel.length + " mediciones";
   var h = '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
-    + '<div class="fin-g-t"><div>Tendencia <span>' + escapeHtml(nota) + '</span></div>' + u19BioVentanaHTML() + '</div>'
-    + '<div class="fb-graficos" style="margin-bottom:0;">';
-  if (pP.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Peso <span>' + escapeHtml(u19FichaDelta(pP, " kg")) + '</span></div>' + u19FichaLineaSVG(pP, " kg", "var(--accent)") + '</div>';
-  if (pG.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Grasa corporal <span>' + escapeHtml(u19FichaDelta(pG, " %")) + '</span></div>' + u19FichaLineaSVG(pG, "%", "#f59e0b") + '</div>';
-  return h + '</div></div></div>';
+    + '<div class="fin-g-t"><div>Composición y tendencia <span>' + escapeHtml(nota) + '</span></div>' + u19BioVentanaHTML() + '</div>';
+  if (claves) h += '<div class="text-xs text-muted" style="margin:.2rem 0 .4rem;">Última medición ' + rndFdate(nEv[0].fecha) + (nEv[1] ? ' · cambio respecto del ' + rndFdate(nEv[1].fecha) : '') + '</div>' + claves;
+  if (graficos) h += graficos.replace('class="fb-graficos', 'style="margin-bottom:0;" class="fb-graficos');
+  return h + '</div></div>';
+}
+
+/* ============================================================
+   BATERÍA DE PRUEBAS · ActivForce 2 y BlazePod (sep 2026)
+   Pruebas con ingreso numérico, guiadas por un catálogo: cada una
+   declara a qué perfil sirve (paciente en rehabilitación o atleta),
+   con qué aparato se mide, qué campos pide y qué deriva (LSI, ratios,
+   déficit de ROM, toques por minuto…). Se guardan en c.pruebas[] con
+   fecha, y las que producen LSI o fuerza alimentan la misma serie que
+   ya usan la ficha, el criterio de alta y el plantel.
+   ============================================================ */
+var BAT_MOVS_FZA = [
+  ["rodilla_ext", "Extensión de rodilla (cuádriceps)"], ["rodilla_flex", "Flexión de rodilla (isquiotibiales)"],
+  ["hombro_ri", "Rotación interna de hombro"], ["hombro_re", "Rotación externa de hombro"],
+  ["cadera_abd", "Abducción de cadera"], ["cadera_add", "Aducción de cadera"], ["cadera_flex", "Flexión de cadera"],
+  ["otro", "Otro movimiento (indícalo en notas)"]
+];
+var BAT_MOVS_ROM = [
+  ["rodilla_flex", "Flexión de rodilla"], ["rodilla_ext", "Extensión de rodilla"],
+  ["hombro_flex", "Flexión de hombro"], ["hombro_abd", "Abducción de hombro"],
+  ["hombro_re", "Rotación externa de hombro"], ["hombro_ri", "Rotación interna de hombro"],
+  ["cadera_flex", "Flexión de cadera"], ["cadera_abd", "Abducción de cadera"],
+  ["tobillo_df", "Dorsiflexión de tobillo"], ["otro", "Otro movimiento (indícalo en notas)"]
+];
+var BAT_LADOS = [["izq", "Izquierdo"], ["der", "Derecho"]];
+var BAT_UNIDADES = [["kg", "kg (kgf)"], ["lb", "lb"], ["N", "N (newton)"]];
+
+function batNum(x){ var n = parseFloat(x); return isFinite(n) ? n : null; }
+function batN(v, u){ v = batNum(v); if (v == null) return null; return u === "lb" ? v * 4.44822 : (u === "N" ? v : v * 9.80665); }
+function batKgf(v, u){ var n = batN(v, u); return n == null ? null : n / 9.80665; }
+function batR(x, d){ var f = Math.pow(10, d == null ? 1 : d); return Math.round(x * f) / f; }
+function batLado(v){ return v === "izq" ? "izquierdo" : (v === "der" ? "derecho" : "—"); }
+function batNivel(lsi){ return lsi == null ? null : (lsi >= 90 ? "ok" : (lsi >= 85 ? "vigilar" : "deficit")); }
+function batNivelTxt(lsi){ return lsi == null ? "" : (lsi >= 90 ? "simetría adecuada" : (lsi >= 85 ? "vigilar" : "déficit lateral")); }
+/* LSI = lado afectado / lado sano cuando se declara; si no, menor / mayor. */
+function batLSI(izq, der, afectado){
+  izq = batNum(izq); der = batNum(der);
+  if (izq == null || der == null || izq <= 0 || der <= 0) return null;
+  var lsi = afectado === "izq" ? izq / der * 100 : (afectado === "der" ? der / izq * 100 : Math.min(izq, der) / Math.max(izq, der) * 100);
+  return batR(lsi, 1);
+}
+function batDeficitLado(izq, der){ izq = batNum(izq); der = batNum(der); if (izq == null || der == null || izq === der) return null; return izq < der ? "izq" : "der"; }
+function batOpt(lista, k){ for (var i = 0; i < lista.length; i++) if (lista[i][0] === k) return lista[i][1]; return k || "—"; }
+
+function batCamposFuerza(pesoReq){
+  return [
+    { k: "mov", l: "Movimiento", t: "sel", opts: BAT_MOVS_FZA, req: true },
+    { k: "unidad", l: "Unidad de fuerza", t: "unidad" },
+    { k: "izq", l: "Fuerza máxima izquierda", t: "num", req: true, ph: "ej. 42.5" },
+    { k: "der", l: "Fuerza máxima derecha", t: "num", req: true, ph: "ej. 45.0" },
+    { k: "afectado", l: "Lado lesionado (criterio clínico)", t: "sel", opts: [["", "Ninguno: se compara menor / mayor"], ["izq", "Izquierdo"], ["der", "Derecho"]] },
+    { k: "peso", l: "Peso corporal (kg)" + (pesoReq ? "" : " · opcional, da el ratio fuerza/peso"), t: "num", req: !!pesoReq, pre: "peso", ph: "ej. 72" }
+  ];
+}
+function batCalcFuerza(v){
+  var lsi = batLSI(v.izq, v.der, v.afectado);
+  var out = { principal: v.izq + " / " + v.der + " " + (v.unidad || "kg") + " (izq / der)", lineas: [], lsi: lsi, nivel: batNivel(lsi),
+              deficitLado: batDeficitLado(v.izq, v.der), fuerzaN: Math.max(batN(v.izq, v.unidad) || 0, batN(v.der, v.unidad) || 0) || null };
+  if (lsi != null) out.lineas.push("LSI " + lsi + " % · " + batNivelTxt(lsi) + (v.afectado ? " (" + batLado(v.afectado) + " / sano)" : ""));
+  if (batNum(v.peso)){
+    var ri = batKgf(v.izq, v.unidad) / v.peso, rd = batKgf(v.der, v.unidad) / v.peso;
+    out.ratioPeso = batR(Math.max(ri, rd), 2);
+    out.lineas.push("fuerza/peso " + ri.toFixed(2) + " · " + rd.toFixed(2) + " kgf por kg (izq · der)");
+  }
+  return out;
+}
+
+var BAT_CATALOGO = [
+  /* ---- ActivForce 2 ---- */
+  { id: "af_rom", disp: "activforce", perfil: ["paciente"], nombre: "Rango de movimiento (goniometría digital)",
+    obj: "Movilidad activa y pasiva de la articulación, comparada con el lado sano.",
+    campos: [
+      { k: "mov", l: "Movimiento", t: "sel", opts: BAT_MOVS_ROM, req: true },
+      { k: "lado", l: "Lado evaluado", t: "sel", opts: BAT_LADOS, req: true },
+      { k: "activo", l: "ROM activo (°)", t: "num", req: true, ph: "ej. 118" },
+      { k: "pasivo", l: "ROM pasivo (°)", t: "num", ph: "ej. 126" },
+      { k: "sano", l: "ROM activo del lado sano (°)", t: "num", ph: "ej. 135" }
+    ],
+    calc: function(v){
+      var out = { principal: v.activo + "° activo" + (v.pasivo != null ? " · " + v.pasivo + "° pasivo" : "") + " · " + batLado(v.lado), lineas: [] };
+      if (batNum(v.sano) && v.sano > 0){ out.deficitRom = batR((1 - v.activo / v.sano) * 100, 1); out.lineas.push("déficit de " + out.deficitRom + " % frente al lado sano (" + v.sano + "°)"); }
+      if (batNum(v.pasivo) != null && v.pasivo - v.activo >= 10) out.lineas.push("brecha activo/pasivo de " + batR(v.pasivo - v.activo, 0) + "°: falta control activo");
+      return out;
+    } },
+  { id: "af_fuerza", disp: "activforce", perfil: ["paciente", "atleta"], nombre: "Fuerza isométrica máxima (peak force) con LSI",
+    obj: "Fuerza máxima de cada lado en un movimiento; el índice de simetría (LSI) compara ambos lados y es el criterio de alta.",
+    campos: batCamposFuerza(false), calc: batCalcFuerza },
+  { id: "af_ratio_peso", disp: "activforce", perfil: ["atleta"], nombre: "Ratio fuerza / peso corporal",
+    obj: "Fuerza isométrica máxima estandarizada por la masa del atleta (kgf por kg).",
+    campos: batCamposFuerza(true), calc: batCalcFuerza },
+  { id: "af_ratio_hq", disp: "activforce", perfil: ["atleta"], nombre: "Ratio isquiotibiales / cuádriceps (H/Q)",
+    obj: "Equilibrio agonista/antagonista de rodilla. Bajo 0,60 sugiere desbalance; se calcula por lado.",
+    campos: [
+      { k: "unidad", l: "Unidad de fuerza", t: "unidad" },
+      { k: "cuad_izq", l: "Cuádriceps izquierdo", t: "num", ph: "ej. 48" }, { k: "isq_izq", l: "Isquiotibiales izquierdo", t: "num", ph: "ej. 31" },
+      { k: "cuad_der", l: "Cuádriceps derecho", t: "num", ph: "ej. 50" }, { k: "isq_der", l: "Isquiotibiales derecho", t: "num", ph: "ej. 33" }
+    ],
+    calc: function(v){
+      var hi = (batNum(v.cuad_izq) && batNum(v.isq_izq)) ? batR(v.isq_izq / v.cuad_izq, 2) : null;
+      var hd = (batNum(v.cuad_der) && batNum(v.isq_der)) ? batR(v.isq_der / v.cuad_der, 2) : null;
+      if (hi == null && hd == null) return null;
+      var out = { principal: "H/Q " + (hi != null ? hi.toFixed(2) : "—") + " · " + (hd != null ? hd.toFixed(2) : "—") + " (izq · der)", lineas: [], hqIzq: hi, hqDer: hd,
+                  fuerzaN: Math.max(batN(v.cuad_izq, v.unidad) || 0, batN(v.cuad_der, v.unidad) || 0) || null };
+      [["izq", hi], ["der", hd]].forEach(function(x){ if (x[1] != null && x[1] < 0.6) out.lineas.push("lado " + batLado(x[0]) + " bajo 0,60: isquiotibiales débiles frente al cuádriceps"); });
+      if (!out.lineas.length) out.lineas.push("ambos lados en rango (0,60 o más)");
+      var lsi = batLSI(v.cuad_izq, v.cuad_der, ""); if (lsi != null){ out.lsi = lsi; out.nivel = batNivel(lsi); out.deficitLado = batDeficitLado(v.cuad_izq, v.cuad_der); out.lineas.push("LSI de cuádriceps " + lsi + " %"); }
+      return out;
+    } },
+  { id: "af_fatiga", disp: "activforce", perfil: ["atleta"], nombre: "Resistencia / fatiga (fuerza media sostenida 10–15 s)",
+    obj: "Fuerza media que se sostiene durante la contracción; con el pico, cuánto se conserva.",
+    campos: [
+      { k: "mov", l: "Movimiento", t: "sel", opts: BAT_MOVS_FZA, req: true },
+      { k: "lado", l: "Lado", t: "sel", opts: BAT_LADOS, req: true },
+      { k: "unidad", l: "Unidad de fuerza", t: "unidad" },
+      { k: "media", l: "Fuerza media", t: "num", req: true, ph: "ej. 36" },
+      { k: "pico", l: "Fuerza pico (opcional)", t: "num", ph: "ej. 45" },
+      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "10 a 15" }
+    ],
+    calc: function(v){
+      var out = { principal: v.media + " " + (v.unidad || "kg") + " de media en " + v.dur + " s · " + batLado(v.lado), lineas: [], fuerzaN: batN(v.pico != null ? v.pico : v.media, v.unidad) };
+      if (batNum(v.pico) && v.pico > 0){ out.mantiene = batR(v.media / v.pico * 100, 0); out.lineas.push("mantiene el " + out.mantiene + " % del pico" + (out.mantiene < 70 ? ": fatiga marcada" : "")); }
+      return out;
+    } },
+  /* ---- BlazePod ---- */
+  { id: "bp_plank_reach", disp: "blazepod", perfil: ["paciente"], nombre: "Plank & Reach (core y control postural)",
+    obj: "Toques con las manos desde plancha: estabilidad del tronco y reacción de extremidad superior.",
+    campos: [
+      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 30" },
+      { k: "aciertos", l: "Aciertos (toques)", t: "num", req: true, ph: "ej. 22" },
+      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 780" }
+    ],
+    calc: function(v){
+      var xmin = batR(v.aciertos / v.dur * 60, 1);
+      return { principal: v.aciertos + " toques en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) };
+    } },
+  { id: "bp_reaccion_simple", disp: "blazepod", perfil: ["paciente"], nombre: "Tiempo de reacción simple",
+    obj: "Apagar el pod lo antes posible desde una posición estática: velocidad de procesamiento y motora base.",
+    campos: [
+      { k: "ms", l: "Reacción media (ms)", t: "num", req: true, ph: "ej. 620" },
+      { k: "mejor", l: "Mejor reacción (ms)", t: "num", ph: "ej. 540" },
+      { k: "aciertos", l: "Aciertos", t: "num", req: true, ph: "ej. 20" },
+      { k: "pods", l: "Pods usados", t: "num", ph: "ej. 2" },
+      { k: "lado", l: "Extremidad", t: "sel", opts: [["", "Ambas / no aplica"], ["izq", "Izquierda"], ["der", "Derecha"]] }
+    ],
+    calc: function(v){ return { principal: v.ms + " ms de media" + (batNum(v.mejor) ? " · mejor " + v.mejor + " ms" : "") + " · " + v.aciertos + " aciertos" + (v.lado ? " · " + batLado(v.lado) : ""), lineas: [], ms: batNum(v.ms) }; } },
+  { id: "bp_weight_shift", disp: "blazepod", perfil: ["paciente"], nombre: "Weight shifting / balance dinámico (semicírculo)",
+    obj: "Toques en semicírculo apoyado en una pierna: transferencia de peso, equilibrio unipodal y propiocepción, lado a lado.",
+    campos: [
+      { k: "dur", l: "Duración por lado (s)", t: "num", req: true, ph: "ej. 30" },
+      { k: "ac_izq", l: "Aciertos apoyo izquierdo", t: "num", req: true, ph: "ej. 18" },
+      { k: "ac_der", l: "Aciertos apoyo derecho", t: "num", req: true, ph: "ej. 21" },
+      { k: "ms_izq", l: "Reacción media izq (ms)", t: "num", ph: "ej. 910" },
+      { k: "ms_der", l: "Reacción media der (ms)", t: "num", ph: "ej. 840" },
+      { k: "afectado", l: "Lado lesionado (criterio clínico)", t: "sel", opts: [["", "Ninguno: se compara menor / mayor"], ["izq", "Izquierdo"], ["der", "Derecho"]] }
+    ],
+    calc: function(v){
+      var lsiHits = batLSI(v.ac_izq, v.ac_der, v.afectado);
+      /* En reacción, menos milisegundos es mejor: se invierte el cociente. */
+      var lsiMs = (batNum(v.ms_izq) && batNum(v.ms_der)) ? batLSI(v.ms_der, v.ms_izq, v.afectado === "izq" ? "der" : (v.afectado === "der" ? "izq" : "")) : null;
+      var lsi = [lsiHits, lsiMs].filter(function(x){ return x != null; }).sort(function(a, b){ return a - b; })[0];
+      var out = { principal: v.ac_izq + " / " + v.ac_der + " toques (izq / der) en " + v.dur + " s", lineas: [], lsi: lsi == null ? null : lsi, nivel: batNivel(lsi), deficitLado: batDeficitLado(v.ac_izq, v.ac_der), ms: (batNum(v.ms_izq) && batNum(v.ms_der)) ? batR((v.ms_izq + v.ms_der) / 2, 0) : (batNum(v.ms_izq) || batNum(v.ms_der) || null) };
+      if (lsiHits != null) out.lineas.push("LSI de toques " + lsiHits + " %");
+      if (lsiMs != null) out.lineas.push("LSI de reacción " + lsiMs + " %");
+      if (lsi != null) out.lineas.push(batNivelTxt(lsi));
+      return out;
+    } },
+  { id: "bp_5_10_5", disp: "blazepod", perfil: ["atleta"], nombre: "5-10-5 Pro Agility",
+    obj: "Agilidad, aceleración lateral y cambio de dirección. Se mide saliendo hacia cada lado.",
+    campos: [
+      { k: "t_der", l: "Tiempo saliendo a la derecha (s)", t: "num", req: true, ph: "ej. 4.85" },
+      { k: "t_izq", l: "Tiempo saliendo a la izquierda (s)", t: "num", ph: "ej. 4.98" }
+    ],
+    calc: function(v){
+      var ts = [v.t_der, v.t_izq].map(batNum).filter(function(x){ return x != null && x > 0; });
+      var out = { principal: "mejor " + Math.min.apply(null, ts).toFixed(2) + " s", lineas: [], tiempo: Math.min.apply(null, ts) };
+      if (ts.length === 2){ var asim = batR(Math.abs(v.t_der - v.t_izq) / Math.max(v.t_der, v.t_izq) * 100, 1); out.asimetria = asim; out.lineas.push("asimetría entre salidas " + asim + " %" + (asim >= 10 ? ": dominancia marcada" : "")); }
+      return out;
+    } },
+  { id: "bp_4x10", disp: "blazepod", perfil: ["atleta"], nombre: "4×10 Shuttle (aceleración y frenado)",
+    obj: "Aceleración lineal, frenado excéntrico y reacción direccional en cuatro tramos de 10 m.",
+    campos: [
+      { k: "t", l: "Tiempo total (s)", t: "num", req: true, ph: "ej. 9.40" },
+      { k: "aciertos", l: "Pods apagados (opcional)", t: "num", ph: "ej. 4" }
+    ],
+    calc: function(v){ return { principal: Number(v.t).toFixed(2) + " s", lineas: [], tiempo: batNum(v.t) }; } },
+  { id: "bp_speed_box", disp: "blazepod", perfil: ["atleta"], nombre: "Speed Box (footwork en espacio reducido)",
+    obj: "Coordinación de pies y frecuencia de pasos en un cuadrado de pods.",
+    campos: [
+      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 20" },
+      { k: "aciertos", l: "Aciertos (toques)", t: "num", req: true, ph: "ej. 34" },
+      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 560" }
+    ],
+    calc: function(v){ var xmin = batR(v.aciertos / v.dur * 60, 1); return { principal: v.aciertos + " toques en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) }; } }
+];
+function u19BateriaCat(id){ for (var i = 0; i < BAT_CATALOGO.length; i++) if (BAT_CATALOGO[i].id === id) return BAT_CATALOGO[i]; return null; }
+function u19BateriaPerfil(c){ return (typeof getClientType === "function" && getClientType(c) === "rehab") ? "paciente" : "atleta"; }
+function u19BateriaMov(p){
+  var v = p.v || {};
+  if (!v.mov) return (u19BateriaCat(p.prueba) || {}).nombre || p.prueba;
+  var lista = p.prueba === "af_rom" ? BAT_MOVS_ROM : BAT_MOVS_FZA;
+  return batOpt(lista, v.mov);
+}
+
+/* ---- Formulario ---- */
+var _batForm = { perfil: "atleta", prueba: "" };
+function u19BateriaSelectHTML(perfil, actual){
+  var h = '<select id="bat-prueba">';
+  ["activforce", "blazepod"].forEach(function(d){
+    var lista = BAT_CATALOGO.filter(function(t){ return t.disp === d && t.perfil.indexOf(perfil) >= 0; });
+    if (!lista.length) return;
+    h += '<optgroup label="' + (d === "activforce" ? "ActivForce 2" : "BlazePod") + '">';
+    lista.forEach(function(t){ h += '<option value="' + t.id + '"' + (t.id === actual ? ' selected' : '') + '>' + escapeHtml(t.nombre) + '</option>'; });
+    h += '</optgroup>';
+  });
+  return h + '</select>';
+}
+function u19BateriaCamposHTML(cat, c){
+  if (!cat) return '';
+  var pesoBio = null;
+  try { var nb = (typeof u19FichaBio === "function") ? u19FichaBio(c) : null; if (nb && nb.evs[0] && nb.evs[0].bioimpedancia) pesoBio = nb.evs[0].bioimpedancia.peso_kg; } catch (e){}
+  return cat.campos.map(function(f){
+    var id = 'bat-f-' + f.k, inner;
+    if (f.t === "sel") inner = '<select id="' + id + '">' + f.opts.map(function(o){ return '<option value="' + escapeAttr(o[0]) + '">' + escapeHtml(o[1]) + '</option>'; }).join('') + '</select>';
+    else if (f.t === "unidad") inner = '<select id="' + id + '">' + BAT_UNIDADES.map(function(o){ return '<option value="' + o[0] + '">' + escapeHtml(o[1]) + '</option>'; }).join('') + '</select>';
+    else inner = '<input type="number" step="any" inputmode="decimal" id="' + id + '" placeholder="' + escapeAttr(f.ph || '') + '"' + (f.pre === "peso" && pesoBio != null ? ' value="' + escapeAttr(String(pesoBio)) + '"' : '') + '>';
+    return '<div class="form-row"><label class="form-label">' + escapeHtml(f.l) + (f.req ? ' *' : '') + '</label>' + inner + '</div>';
+  }).join('');
+}
+function u19BateriaPintarCampos(c){
+  var cat = u19BateriaCat(_batForm.prueba);
+  var obj = document.getElementById("bat-obj"), box = document.getElementById("bat-campos");
+  if (obj) obj.innerHTML = cat ? escapeHtml(cat.obj) : '';
+  if (box) box.innerHTML = u19BateriaCamposHTML(cat, c);
+}
+window.u19BateriaAbrir = function(clientId, pruebaId){
+  var c = getClient(clientId); if (!c) return;
+  _batForm.perfil = u19BateriaPerfil(c);
+  var lista = BAT_CATALOGO.filter(function(t){ return t.perfil.indexOf(_batForm.perfil) >= 0; });
+  _batForm.prueba = (pruebaId && u19BateriaCat(pruebaId)) ? pruebaId : (lista[0] ? lista[0].id : "");
+  var hoy = new Date().toISOString().slice(0, 10);
+  var body = '<div class="bat-perfil">'
+    + '<button type="button" data-perfil="paciente" class="' + (_batForm.perfil === "paciente" ? "active" : "") + '">🩹 Paciente <small>rehabilitación</small></button>'
+    + '<button type="button" data-perfil="atleta" class="' + (_batForm.perfil === "atleta" ? "active" : "") + '">🏃 Atleta <small>rendimiento</small></button></div>'
+    + '<div class="form-grid cols-2">'
+    + '<div class="form-row"><label class="form-label">Prueba</label><span id="bat-sel-wrap">' + u19BateriaSelectHTML(_batForm.perfil, _batForm.prueba) + '</span></div>'
+    + '<div class="form-row"><label class="form-label">Fecha</label><input type="date" id="bat-fecha" value="' + hoy + '"></div>'
+    + '</div>'
+    + '<p class="text-xs text-muted" id="bat-obj" style="margin:-.3rem 0 .8rem;line-height:1.5;"></p>'
+    + '<div class="form-grid cols-2" id="bat-campos"></div>'
+    + '<div class="form-row"><label class="form-label">Notas (montaje, consigna, observaciones)</label><textarea id="bat-notas" style="min-height:56px;"></textarea></div>';
+  openModal({
+    title: "🧪 Registrar prueba · " + (c.name || ""),
+    large: true,
+    bodyHtml: body,
+    footer: [
+      { label: "Cancelar", cls: "btn-ghost" },
+      { label: "Guardar prueba", cls: "btn-primary", onClick: function(){
+        var cat = u19BateriaCat(_batForm.prueba); if (!cat){ toast("Elige una prueba", "warn"); return; }
+        var v = {}, faltan = [];
+        cat.campos.forEach(function(f){
+          var el = document.getElementById("bat-f-" + f.k); if (!el) return;
+          var val = f.t === "num" ? batNum(el.value) : el.value;
+          if (f.req && (val == null || val === "")) faltan.push(f.l.replace(/ \*$/, ""));
+          v[f.k] = val;
+        });
+        if (faltan.length){ toast("Falta: " + faltan.join(", "), "warn"); return; }
+        var d = null;
+        try { d = cat.calc(v); } catch (e){ d = null; }
+        if (!d){ toast("Con esos valores no se puede calcular la prueba: revisa los números", "warn"); return; }
+        if (!Array.isArray(c.pruebas)) c.pruebas = [];
+        c.pruebas.push({ id: genId(), fecha: document.getElementById("bat-fecha").value || hoy, perfil: _batForm.perfil, prueba: cat.id,
+                         disp: cat.disp, v: v, d: d, notas: (document.getElementById("bat-notas").value || "").trim(), createdAt: Date.now() });
+        saveState();
+        closeModal();
+        toast("Prueba guardada en la ficha de " + (c.name || "") + " ✓", "success");
+        var vf = document.getElementById("view-ficha");
+        if (vf && vf.classList.contains("active")){ _fichaState.tab = "evaluaciones"; renderFicha(); }
+      } }
+    ],
+    bodyMount: function(){
+      u19BateriaPintarCampos(c);
+      var bind = function(){
+        var sel = document.getElementById("bat-prueba");
+        if (sel) sel.addEventListener("change", function(){ _batForm.prueba = this.value; u19BateriaPintarCampos(c); });
+      };
+      bind();
+      var btns = document.querySelectorAll(".bat-perfil button");
+      for (var i = 0; i < btns.length; i++) btns[i].addEventListener("click", function(){
+        _batForm.perfil = this.getAttribute("data-perfil");
+        for (var j = 0; j < btns.length; j++) btns[j].classList.toggle("active", btns[j] === this);
+        var lista = BAT_CATALOGO.filter(function(t){ return t.perfil.indexOf(_batForm.perfil) >= 0; });
+        if (!lista.some(function(t){ return t.id === _batForm.prueba; })) _batForm.prueba = lista[0] ? lista[0].id : "";
+        var w = document.getElementById("bat-sel-wrap"); if (w) w.innerHTML = u19BateriaSelectHTML(_batForm.perfil, _batForm.prueba);
+        bind(); u19BateriaPintarCampos(c);
+      });
+    }
+  });
+};
+window.u19BateriaBorrar = function(clientId, id){
+  var c = getClient(clientId); if (!c || !Array.isArray(c.pruebas)) return;
+  if (!window.confirm("¿Borrar esta prueba de la ficha?")) return;
+  c.pruebas = c.pruebas.filter(function(p){ return p.id !== id; });
+  saveState(); renderFicha(); toast("Prueba borrada", "success");
+};
+
+/* ---- Bloque en Evaluaciones ---- */
+function u19BateriaBloque(c){
+  var titulo = "Batería de pruebas · ActivForce 2 y BlazePod";
+  var accion = '<button class="btn btn-primary btn-sm" onclick="u19BateriaAbrir(\'' + c.id + '\')">+ Registrar prueba</button>';
+  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; });
+  if (!ps.length)
+    return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Perfil <b>' + (u19BateriaPerfil(c) === "paciente" ? "paciente" : "atleta") + '</b>. '
+      + 'ROM y fuerza isométrica con LSI en ActivForce; reacción, balance y agilidad en BlazePod. Cada prueba se guarda con fecha para comparar la evolución, y las que dan LSI entran en el criterio de alta.</p>', accion);
+  var h = '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Fecha</th><th>Prueba</th><th>Resultado</th><th>Lectura</th><th></th></tr></thead><tbody>';
+  ps.forEach(function(p){
+    var cat = u19BateriaCat(p.prueba) || { nombre: p.prueba, disp: p.disp };
+    var d = p.d || {};
+    /* La misma prueba (y movimiento) anterior, para decir si mejora. */
+    var prev = null;
+    for (var i = 0; i < ps.length; i++){ var q = ps[i]; if (q === p || q.prueba !== p.prueba || String(q.fecha) >= String(p.fecha)) continue; if ((q.v || {}).mov !== (p.v || {}).mov) continue; if (!prev || String(q.fecha) > String(prev.fecha)) prev = q; }
+    var lectura = (d.lineas || []).slice();
+    if (prev && prev.d && d.lsi != null && prev.d.lsi != null) lectura.push('<b style="color:' + (d.lsi >= prev.d.lsi ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.lsi - prev.d.lsi, 1) + ' pts de LSI</b> vs ' + rndFdate(prev.fecha));
+    else if (prev && prev.d && d.tiempo != null && prev.d.tiempo != null) lectura.push('<b style="color:' + (d.tiempo <= prev.d.tiempo ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.tiempo - prev.d.tiempo, 2) + ' s</b> vs ' + rndFdate(prev.fecha));
+    else if (prev && prev.d && d.porMin != null && prev.d.porMin != null) lectura.push('<b style="color:' + (d.porMin >= prev.d.porMin ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.porMin - prev.d.porMin, 1) + '/min</b> vs ' + rndFdate(prev.fecha));
+    var lsiHtml = d.lsi != null ? ' <span class="pb-est" style="color:' + (d.nivel === "ok" ? "var(--success)" : (d.nivel === "vigilar" ? "#d97706" : "var(--danger)")) + ';">LSI ' + d.lsi + ' %</span>' : '';
+    h += '<tr><td style="white-space:nowrap;">' + rndFdate(p.fecha) + '</td>'
+      + '<td><b>' + escapeHtml(cat.nombre) + '</b><span class="bat-disp">' + (cat.disp === "blazepod" ? "BlazePod" : "ActivForce") + '</span>'
+        + ((p.v || {}).mov ? '<div class="text-xs text-muted">' + escapeHtml(u19BateriaMov(p)) + '</div>' : '') + '</td>'
+      + '<td>' + escapeHtml(d.principal || '—') + lsiHtml + '</td>'
+      + '<td class="text-xs" style="line-height:1.5;">' + (lectura.length ? lectura.map(function(x){ return /^<b/.test(x) ? x : escapeHtml(x); }).join('<br>') : '<span class="text-muted">—</span>')
+        + (p.notas ? '<div class="text-muted">' + escapeHtml(p.notas) + '</div>' : '') + '</td>'
+      + '<td style="text-align:right;"><button class="btn btn-ghost btn-sm" onclick="u19BateriaBorrar(\'' + c.id + '\',\'' + p.id + '\')" title="Borrar">🗑</button></td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="text-xs text-muted" style="margin:.6rem 0 0;line-height:1.5;">LSI 90 % o más: simetría adecuada · 85–89 %: vigilar · bajo 85 %: déficit lateral. Cuando declaras el lado lesionado, el LSI es afectado / sano; si no, menor / mayor.</p>';
+  return u19Bloque(titulo, h, accion);
 }
 
 function renderFicha(){
@@ -25194,7 +25616,8 @@ function fichaResumen(c){
     ['Sesiones reportadas', (c.progressions || []).length, "abrirFicha('" + c.id + "','entrenamiento')"],
     ['Rutinas activas', rut.length, "abrirFicha('" + c.id + "','entrenamiento')"],
     ['Registros de dolor', (c.painLog || []).length, "abrirFicha('" + c.id + "','clinico')"],
-    ['Bioimpedancias en Notion', nb ? nEv.length : (hayPuente ? '…' : '–'), "abrirFicha('" + c.id + "','evaluaciones')"]
+    ['Bioimpedancias en Notion', nb ? nEv.length : (hayPuente ? '…' : '–'), "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Pruebas ActivForce · BlazePod', (c.pruebas || []).length, "abrirFicha('" + c.id + "','evaluaciones')"]
   ];
   var resumenN = '<div class="u-counts">' + conteos.map(function(x){
     return '<button class="u-count" onclick="' + x[2] + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></button>';
@@ -25208,6 +25631,7 @@ function fichaEvaluaciones(c){
   var serie = (typeof u19SerieLSI === 'function') ? u19SerieLSI(c) : [];
   var out = '';
   out += u19FichaBioBloque(c);
+  out += u19BateriaBloque(c);
 
   if (serie.length){
     var filas = serie.slice().reverse().map(function(p){
@@ -25516,16 +25940,22 @@ function u19SerieBio(c, campo){
   }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
 }
 function u19SerieRnd(c){
-  return (c && c.rendimiento || []).map(function(r){
+  var base = (c && c.rendimiento || []).map(function(r){
     var v = r.resumen && r.resumen.reaccion_prom;
     return (v == null || !r.fecha) ? null : { f: r.fecha, v: Number(v) };
-  }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
+  }).filter(Boolean);
+  var bat = (c && c.pruebas || []).filter(function(p){ return p.fecha && p.disp === "blazepod" && p.d && p.d.ms != null; })
+    .map(function(p){ return { f: p.fecha, v: Number(p.d.ms) }; });
+  return base.concat(bat).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
 }
 function u19SerieFrz(c){
-  return (c && c.fuerza || []).map(function(x){
+  var base = (c && c.fuerza || []).map(function(x){
     var v = x.resumen && x.resumen.fuerza_max;
     return (v == null || !x.fecha) ? null : { f: x.fecha, v: Number(v) };
-  }).filter(Boolean).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
+  }).filter(Boolean);
+  var bat = (c && c.pruebas || []).filter(function(p){ return p.fecha && p.d && p.d.fuerzaN != null; })
+    .map(function(p){ return { f: p.fecha, v: Number(p.d.fuerzaN) }; });
+  return base.concat(bat).sort(function(a, b){ return a.f < b.f ? -1 : 1; });
 }
 function u19SerieLsiPuntos(c){
   var s = (typeof u19SerieLSI === 'function') ? u19SerieLSI(c) : [];
