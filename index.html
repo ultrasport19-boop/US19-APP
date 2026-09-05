@@ -677,6 +677,15 @@ img{max-width:100%;display:block;}
 .bk-l{font-size:.62rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);}
 .bk-d{font-size:.7rem;font-weight:700;}
 
+.bat-tests{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin:0 0 .7rem;}
+@media (max-width:600px){.bat-tests{grid-template-columns:1fr;}}
+.bat-test{text-align:left;border:1px solid var(--border);border-radius:10px;padding:.5rem .65rem;background:var(--surface-2);color:var(--text);cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:.15rem;}
+.bat-test b{font-size:.8rem;line-height:1.25;}
+.bat-test span{font-size:.68rem;color:var(--muted);line-height:1.35;}
+.bat-test:hover{border-color:var(--accent);}
+.bat-test.active{border-color:var(--accent);background:rgba(168,209,57,.08);box-shadow:inset 0 0 0 1px var(--accent);}
+.bat-test:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -4380,6 +4389,45 @@ window.importClientesNotion = async function(){
         nuevos++;
       }
     });
+    /* Los inactivos también viajan, marcados (activo === false): así el
+       apartado «Inactivos» de Clientes muestra a todos los de Notion y no
+       solo a los que alguna vez fueron activos aquí. Nunca cuentan en
+       Finanzas ni en el plantel. Los que en Notion no tienen estado de
+       membresía llegan igual, con notionEstado vacío. */
+    var inactivosLista = lista.filter(function(x){ return x && x.activo !== true && (x.nombre || x.name); });
+    var inactNuevos = 0;
+    inactivosLista.forEach(function(x){
+      var nombre = String(x.nombre || x.name || "").trim();
+      var tel = String(x.whatsapp || x.phone || "").trim();
+      var telKey = tel.replace(/[^0-9]/g,"").slice(-8);
+      var ex = null;
+      for (var i2=0;i2<state.clients.length;i2++){
+        var c2 = state.clients[i2];
+        if (x.id && c2.notionId && c2.notionId === x.id){ ex = c2; break; }
+        if (telKey && c2.phone && String(c2.phone).replace(/[^0-9]/g,"").slice(-8) === telKey){ ex = c2; break; }
+        if (nombre && String(c2.name||"").trim().toLowerCase() === nombre.toLowerCase()){ ex = c2; break; }
+      }
+      var fin2 = _impFechaISO(x.termino_plan);
+      var monto2 = (typeof x.monto === "number") ? x.monto : null;
+      if (ex){
+        if (x.id) ex.notionId = x.id;
+        if (tel && !ex.phone) ex.phone = _impTelFmt(tel);
+        if (fin2 && !ex.planEndDate) ex.planEndDate = fin2;
+        if (x.plan && !ex.notionPlan) ex.notionPlan = x.plan;
+        ex.notionEstado = x.estado || "";
+        if (ex.activo !== false){ ex.activo = false; dados_baja++; }
+      } else {
+        state.clients.push({
+          id: genId(), name: nombre, rut: "", phone: _impTelFmt(tel), email: x.email || "",
+          goal: "", notes: "", type: "gym", reevalDate: "", planEndDate: fin2 || "",
+          targetWeight: "", targetDate: "", planPrice: monto2,
+          notionId: x.id || "", notionPlan: x.plan || "", notionEstado: x.estado || "",
+          activo: false, createdAt: Date.now()
+        });
+        _impEnriquecer(state.clients[state.clients.length - 1], x);
+        inactNuevos++;
+      }
+    });
     /* El espejo del caso anterior: alguien desactivado en Notion seguia
        contando como activo aqui para siempre, inflando el ingreso. Solo se
        tocan los que vinieron de Notion alguna vez (tienen notionId). */
@@ -4391,13 +4439,14 @@ window.importClientesNotion = async function(){
     });
 
     saveState();
-    _clientFilter = "notion";
+    _clientFilter = "";
     renderClients();
 
     var msg = "Notion: " + activos.length + " activos · " + nuevos + " nuevos";
     if (renovados) msg += " · " + renovados + (renovados === 1 ? " renovación" : " renovaciones");
     if (precios) msg += " · " + precios + " precio" + (precios === 1 ? "" : "s");
     if (dados_baja) msg += " · " + dados_baja + " dado" + (dados_baja === 1 ? "" : "s") + " de baja";
+    if (inactNuevos) msg += " · " + inactNuevos + " inactivo" + (inactNuevos === 1 ? "" : "s") + " traído" + (inactNuevos === 1 ? "" : "s") + " al apartado Inactivos";
     toast(msg, "success");
 
     /* Con renovaciones, se detalla que cambio: es la diferencia entre
@@ -21685,8 +21734,13 @@ function renderRendimiento(){
     +'<b>Informes</b> incluirá el anexo de rendimiento al final, con el mismo folio y la misma firma.</p>'
     +'<div id="rnd-attach-state" class="text-xs" style="margin-top:.3rem;"></div></div></div>';
 
+  var cBateria = '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">🧪 Pruebas específicas · ActivForce 2 y BlazePod</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;margin:.2rem 0 .6rem;">ROM, fuerza isométrica con LSI, ratio fuerza/peso, H/Q, fatiga, Plank &amp; Reach, reacción simple, weight shifting, 5-10-5, 4×10 y Speed Box. '
+    + 'Se registran con números (sin captura) y quedan en la ficha del deportista, pestaña Evaluaciones; las que dan LSI entran en el criterio de alta y en el plantel.</p>'
+    + '<div id="rnd-bat-lista"></div>'
+    + '<button class="btn btn-primary btn-sm" onclick="u19BateriaDesdeRnd()">+ Registrar prueba</button></div></div>';
   var evalHtml = '<div class="rnd-2col">'
-    + '<div>' + cDep + cCaptura
+    + '<div>' + cDep + cBateria + cCaptura
     +   '<details class="u-acc"><summary>Carga manual por aparato'
     +     '<span>si prefieres procesar un aparato por separado</span></summary>'
     +     '<div class="u-acc-body">' + cPromptBP + cSesiones + cFuerza + cMontaje + '</div>'
@@ -21747,8 +21801,11 @@ function renderRendimiento(){
         if(String(list[i].id)===this.value){ _rndState.nombre=list[i].nombre; _rndState.rut=list[i].rut||""; _rndState.phone=list[i].phone||""; break; }
       }
       rndPintarSetupDiff();   // el aviso de montaje depende del cliente elegido
+      if (typeof u19RndBateriaPintar === "function") u19RndBateriaPintar();
     });
+    if (typeof u19RndBateriaPintar === "function") u19RndBateriaPintar();
   });
+  if (typeof u19RndBateriaPintar === "function") u19RndBateriaPintar();
   if(_rndState.metrics){ rndEditorRender(); rndPintarAnalisis(); }
 }
 
@@ -25479,17 +25536,29 @@ function u19BateriaMov(p){
 
 /* ---- Formulario ---- */
 var _batForm = { perfil: "atleta", prueba: "" };
+/* Las pruebas se eligen en tarjetas, agrupadas por aparato: se ve qué
+   mide cada una sin abrir nada. */
 function u19BateriaSelectHTML(perfil, actual){
-  var h = '<select id="bat-prueba">';
+  var h = '';
   ["activforce", "blazepod"].forEach(function(d){
     var lista = BAT_CATALOGO.filter(function(t){ return t.disp === d && t.perfil.indexOf(perfil) >= 0; });
     if (!lista.length) return;
-    h += '<optgroup label="' + (d === "activforce" ? "ActivForce 2" : "BlazePod") + '">';
-    lista.forEach(function(t){ h += '<option value="' + t.id + '"' + (t.id === actual ? ' selected' : '') + '>' + escapeHtml(t.nombre) + '</option>'; });
-    h += '</optgroup>';
+    h += '<div class="set-sub">' + (d === "activforce" ? "ActivForce 2 · dinamometría e inclinometría" : "BlazePod · reacción, balance y agilidad") + '</div><div class="bat-tests">';
+    lista.forEach(function(t){
+      h += '<button type="button" class="bat-test' + (t.id === actual ? ' active' : '') + '" data-id="' + t.id + '" onclick="u19BateriaElegir(\'' + t.id + '\')">'
+        + '<b>' + escapeHtml(t.nombre) + '</b><span>' + escapeHtml(t.obj) + '</span></button>';
+    });
+    h += '</div>';
   });
-  return h + '</select>';
+  return h;
 }
+window.u19BateriaElegir = function(id){
+  if (!u19BateriaCat(id)) return;
+  _batForm.prueba = id;
+  var bs = document.querySelectorAll(".bat-test");
+  for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("active", bs[i].getAttribute("data-id") === id);
+  u19BateriaPintarCampos(getClient(_batForm.clientId));
+};
 function u19BateriaCamposHTML(cat, c){
   if (!cat) return '';
   var pesoBio = null;
@@ -25511,17 +25580,17 @@ function u19BateriaPintarCampos(c){
 window.u19BateriaAbrir = function(clientId, pruebaId){
   var c = getClient(clientId); if (!c) return;
   _batForm.perfil = u19BateriaPerfil(c);
+  _batForm.clientId = c.id;
   var lista = BAT_CATALOGO.filter(function(t){ return t.perfil.indexOf(_batForm.perfil) >= 0; });
   _batForm.prueba = (pruebaId && u19BateriaCat(pruebaId)) ? pruebaId : (lista[0] ? lista[0].id : "");
   var hoy = new Date().toISOString().slice(0, 10);
   var body = '<div class="bat-perfil">'
     + '<button type="button" data-perfil="paciente" class="' + (_batForm.perfil === "paciente" ? "active" : "") + '">🩹 Paciente <small>rehabilitación</small></button>'
     + '<button type="button" data-perfil="atleta" class="' + (_batForm.perfil === "atleta" ? "active" : "") + '">🏃 Atleta <small>rendimiento</small></button></div>'
-    + '<div class="form-grid cols-2">'
-    + '<div class="form-row"><label class="form-label">Prueba</label><span id="bat-sel-wrap">' + u19BateriaSelectHTML(_batForm.perfil, _batForm.prueba) + '</span></div>'
-    + '<div class="form-row"><label class="form-label">Fecha</label><input type="date" id="bat-fecha" value="' + hoy + '"></div>'
-    + '</div>'
-    + '<p class="text-xs text-muted" id="bat-obj" style="margin:-.3rem 0 .8rem;line-height:1.5;"></p>'
+    + '<div class="form-grid cols-2"><div class="form-row"><label class="form-label">Fecha</label><input type="date" id="bat-fecha" value="' + hoy + '"></div></div>'
+    + '<label class="form-label">Prueba</label><div id="bat-sel-wrap">' + u19BateriaSelectHTML(_batForm.perfil, _batForm.prueba) + '</div>'
+    + '<p class="text-xs text-muted" id="bat-obj" style="display:none;"></p>'
+    + '<label class="form-label" style="margin-top:.4rem;">Valores</label>'
     + '<div class="form-grid cols-2" id="bat-campos"></div>'
     + '<div class="form-row"><label class="form-label">Notas (montaje, consigna, observaciones)</label><textarea id="bat-notas" style="min-height:56px;"></textarea></div>';
   openModal({
@@ -25551,6 +25620,7 @@ window.u19BateriaAbrir = function(clientId, pruebaId){
         toast("Prueba guardada en la ficha de " + (c.name || "") + " ✓", "success");
         var vf = document.getElementById("view-ficha");
         if (vf && vf.classList.contains("active")){ _fichaState.tab = "evaluaciones"; renderFicha(); }
+        if (typeof u19RndBateriaPintar === "function") u19RndBateriaPintar();
       } }
     ],
     bodyMount: function(){
@@ -25577,6 +25647,36 @@ window.u19BateriaBorrar = function(clientId, id){
   if (!window.confirm("¿Borrar esta prueba de la ficha?")) return;
   c.pruebas = c.pruebas.filter(function(p){ return p.id !== id; });
   saveState(); renderFicha(); toast("Prueba borrada", "success");
+};
+
+/* ---- En Rendimiento: el deportista elegido arriba y sus últimas pruebas ---- */
+function u19RndClienteApp(){
+  var c = (typeof getClient === "function") ? getClient(_rndState.clientId) : null;
+  if (c) return c;
+  if (!_rndState.nombre || typeof u19BioClienteDeNotion !== "function") return null;
+  return u19BioClienteDeNotion(_rndState.nombre, u19BioIndiceApp()) || null;
+}
+function u19RndBateriaPintar(){
+  var el = document.getElementById("rnd-bat-lista"); if (!el) return;
+  var c = u19RndClienteApp();
+  if (!c){ el.innerHTML = '<p class="text-xs text-muted" style="margin:0 0 .6rem;line-height:1.5;">Elige un deportista arriba para ver y registrar sus pruebas. Si viene de Notion y aún no está en la app, impórtalo en Clientes.</p>'; return; }
+  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; }).slice(0, 5);
+  var h = '<div class="text-xs text-muted" style="margin:0 0 .5rem;">' + escapeHtml(c.name || "") + ' · ' + (c.pruebas || []).length + ' prueba' + ((c.pruebas || []).length === 1 ? '' : 's')
+    + ' · <a href="#" onclick="abrirFicha(\'' + c.id + '\',\'evaluaciones\');return false;">ver todas en su ficha</a></div>';
+  if (ps.length){
+    h += '<div class="u19-scrollx"><table class="u-tbl"><tbody>' + ps.map(function(p){
+      var cat = u19BateriaCat(p.prueba) || { nombre: p.prueba };
+      var d = p.d || {};
+      return '<tr><td style="white-space:nowrap;">' + rndFdate(p.fecha) + '</td><td>' + escapeHtml(cat.nombre) + ((p.v || {}).mov ? '<div class="text-xs text-muted">' + escapeHtml(u19BateriaMov(p)) + '</div>' : '') + '</td>'
+        + '<td>' + escapeHtml(d.principal || '—') + (d.lsi != null ? ' <span class="pb-est" style="color:' + (d.nivel === "ok" ? "var(--success)" : (d.nivel === "vigilar" ? "#d97706" : "var(--danger)")) + ';">LSI ' + d.lsi + ' %</span>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  }
+  el.innerHTML = h;
+}
+window.u19BateriaDesdeRnd = function(){
+  var c = u19RndClienteApp();
+  if (!c){ toast("Elige primero el deportista (arriba). Si viene de Notion y no está en la app, impórtalo en Clientes.", "warn"); return; }
+  u19BateriaAbrir(String(c.id));
 };
 
 /* ---- Bloque en Evaluaciones ---- */
@@ -25629,6 +25729,7 @@ function renderFicha(){
     + '<div class="u-fh-act">'
     +   (c.phone ? '<button class="btn btn-ghost btn-sm" onclick="sendClientSummary(\'' + c.id + '\')" title="Resumen semanal por WhatsApp">📊</button>' : '')
     +   '<button class="btn btn-ghost btn-sm" onclick="u19ExportarCliente(\'' + c.id + '\')" title="Descargar todos sus datos">⬇</button>'
+    +   '<button class="btn btn-secondary btn-sm" onclick="u19BateriaAbrir(\'' + c.id + '\')" title="Registrar una prueba de ActivForce 2 o BlazePod">🧪 Prueba</button>'
     +   '<button class="btn btn-secondary btn-sm" onclick="openClientForm(\'' + c.id + '\')">Editar</button>'
     +   '<button class="btn btn-ghost btn-sm" onclick="u19BorrarDatosCliente(\'' + c.id + '\')" title="Eliminar todo lo que la app guarda de esta persona" style="color:var(--danger);">🗑</button>'
     + '</div></div>';
