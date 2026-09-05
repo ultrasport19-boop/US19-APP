@@ -641,6 +641,12 @@ img{max-width:100%;display:block;}
 .set-btns{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
 @media (max-width:520px){.set-btns{grid-template-columns:1fr;}}
 
+.fb-graficos{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin:.2rem 0 .9rem;}
+@media (max-width:600px){.fb-graficos{grid-template-columns:1fr;}}
+.fb-fuente{font-size:.72rem;color:var(--muted);margin:.5rem 0 0;line-height:1.5;}
+/* Dentro de un contenedor con scroll lateral, la cabecera pegajosa global se quedaria a media tabla. */
+.u19-scrollx .u-tbl thead th{position:static;}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -24598,6 +24604,15 @@ function u19Timeline(c){
     add(i.fecha, 'Composición', 'Informe de composición corporal',
       (b.peso_kg != null ? b.peso_kg + ' kg' : '') + (b.grasa_pct != null ? ' · ' + b.grasa_pct + '% grasa' : ''), '#0e5132');
   });
+  var _fInf = {};
+  (c.informes || []).forEach(function(i){ _fInf[String(i.fecha || '').slice(0, 10)] = 1; });
+  var _nb = (typeof u19FichaBio === 'function') ? u19FichaBio(c) : null;
+  (_nb ? _nb.evs : []).forEach(function(e2){
+    if (_fInf[String(e2.fecha || '').slice(0, 10)]) return;
+    var b2 = e2.bioimpedancia || {};
+    add(e2.fecha, 'Composición', 'Bioimpedancia · Notion',
+      (b2.peso_kg != null ? b2.peso_kg + ' kg' : '') + (b2.grasa_pct != null ? ' · ' + b2.grasa_pct + '% grasa' : ''), '#0e5132');
+  });
   (c.rendimiento || []).forEach(function(r){
     var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
     var peor = cand.length ? cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0] : null;
@@ -24674,12 +24689,138 @@ window.abrirFicha = function(clientId, tab){
   renderFicha();
 };
 
+/* ============================================================
+   FICHA · BIOIMPEDANCIAS DESDE NOTION (sep 2026)
+   La ficha solo leía c.informes (los documentos generados en la app),
+   así que un cliente con diez bioimpedancias en Notion salía «sin
+   informes». Ahora la ficha pide al puente las últimas 10 evaluaciones
+   (tipo=bio, el mismo endpoint que usa Informes → Traer de Notion),
+   las guarda en caché 5 minutos y vuelve a pintar una sola vez.
+   Con eso las cifras del resumen, la línea de tiempo y la pestaña
+   Evaluaciones leen de Notion sin que nada salga del navegador.
+   ============================================================ */
+var _fichaBio = {};   /* clientId → { at, cargando, evs (de más nueva a más vieja), cliente, error } */
+
+function u19FichaBioPedir(c){
+  if (!c || !c.name) return;
+  if (typeof u19DashUrl !== "function" || !u19DashUrl("bio")) return;   /* sin puente: nada que pedir */
+  var e = _fichaBio[c.id];
+  if (e && (e.cargando || (Date.now() - e.at < 5 * 60 * 1000))) return;
+  _fichaBio[c.id] = { cargando: true, at: Date.now(), evs: [] };
+  u19BioNotionPedir(c.name, 10).then(function(resp){
+    var evs = (resp && Array.isArray(resp.evaluaciones)) ? resp.evaluaciones.filter(function(x){ return x && x.fecha; }) : [];
+    evs.sort(function(a, b){ return String(a.fecha) < String(b.fecha) ? 1 : (String(a.fecha) > String(b.fecha) ? -1 : 0); });
+    _fichaBio[c.id] = { at: Date.now(), evs: evs, cliente: (resp && resp.cliente) || null,
+                        error: (resp && resp.error) ? String(resp.error) : "" };
+  }).catch(function(err){
+    _fichaBio[c.id] = { at: Date.now(), evs: [], error: String((err && err.message) || err || "sin respuesta") };
+  }).then(function(){
+    var v = document.getElementById("view-ficha");
+    if (v && v.classList.contains("active") && String(_fichaState.clientId) === String(c.id)) renderFicha();
+  });
+}
+function u19FichaBio(c){
+  var e = c ? _fichaBio[c.id] : null;
+  return (e && !e.cargando) ? e : null;
+}
+window.u19FichaBioRecargar = function(id){
+  delete _fichaBio[id];
+  var c = getClient(id);
+  if (c){ u19FichaBioPedir(c); renderFicha(); }
+};
+/* Lleva a Informes con este cliente ya elegido; «Traer de Notion» queda a un clic. */
+window.u19FichaAInformes = function(id){
+  var c = getClient(id); if (!c) return;
+  _infState.clientId = String(c.id); _infState.nombre = c.name || "";
+  _infState.rut = c.rut || ""; _infState.phone = c.phone || "";
+  showView("informes");
+};
+
+function u19FichaFechaCorta(f){
+  var s = String(f || "").slice(0, 10).split("-");
+  return s.length === 3 ? s[2] + "/" + s[1] + "/" + s[0].slice(2) : String(f || "");
+}
+function u19FichaNum(v, u){ return (v == null || v === "") ? "—" : (Number(v) + u); }
+function u19FichaDelta(p, u){
+  var d = Math.round((p[p.length - 1].v - p[0].v) * 10) / 10;
+  return (d > 0 ? "+" : "") + d + u + " desde " + u19FichaFechaCorta(p[0].f);
+}
+
+/* Línea de evolución: puntos [{f, v}] de más antiguo a más nuevo. */
+function u19FichaLineaSVG(puntos, unidad, color){
+  var W = 320, H = 96, pl = 30, pr = 30, pt = 18, pb = 20;
+  var vs = puntos.map(function(p){ return p.v; });
+  var min = Math.min.apply(null, vs), max = Math.max.apply(null, vs);
+  if (max === min){ max += 1; min -= 1; }
+  var pad = (max - min) * 0.18; min -= pad; max += pad;
+  var n = puntos.length;
+  function x(i){ return pl + (n === 1 ? (W - pl - pr) / 2 : i * (W - pl - pr) / (n - 1)); }
+  function y(v){ return pt + (max - v) / (max - min) * (H - pt - pb); }
+  var s = '<svg viewBox="0 0 ' + W + ' ' + H + '" style="width:100%;height:auto;display:block;overflow:visible;">';
+  for (var g = 0; g < 3; g++){
+    var gy = pt + g * (H - pt - pb) / 2;
+    s += '<line x1="' + pl + '" x2="' + (W - pr) + '" y1="' + gy.toFixed(1) + '" y2="' + gy.toFixed(1) + '" stroke="var(--border)" stroke-width="1"/>';
+  }
+  var d = puntos.map(function(p, i){ return (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.v).toFixed(1); }).join(" ");
+  s += '<path d="' + d + ' L' + x(n - 1).toFixed(1) + ' ' + (H - pb) + ' L' + x(0).toFixed(1) + ' ' + (H - pb) + ' Z" fill="' + color + '" opacity=".12"/>';
+  s += '<path d="' + d + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+  puntos.forEach(function(p, i){
+    var ult = i === n - 1;
+    s += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="' + (ult ? 4 : 3) + '" fill="' + (ult ? color : "var(--surface-1)")
+      + '" stroke="' + color + '" stroke-width="2"><title>' + escapeAttr(rndFdate(p.f) + ": " + p.v + unidad) + '</title></circle>';
+    if (i === 0 || ult)
+      s += '<text x="' + x(i).toFixed(1) + '" y="' + (y(p.v) - 8).toFixed(1) + '" text-anchor="' + (n === 1 ? "middle" : (i === 0 ? "start" : "end"))
+        + '" font-size="10" font-weight="800" fill="' + (ult ? color : "var(--text)") + '">' + p.v + unidad + '</text>';
+  });
+  s += '<text x="' + x(0).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="' + (n > 1 ? "start" : "middle") + '" font-size="8.5" fill="var(--muted)">' + escapeHtml(u19FichaFechaCorta(puntos[0].f)) + '</text>';
+  if (n > 1) s += '<text x="' + x(n - 1).toFixed(1) + '" y="' + (H - 5) + '" text-anchor="end" font-size="8.5" fill="var(--muted)">' + escapeHtml(u19FichaFechaCorta(puntos[n - 1].f)) + '</text>';
+  return s + "</svg>";
+}
+
+/* Bloque de la pestaña Evaluaciones. */
+function u19FichaBioBloque(c){
+  var titulo = "Bioimpedancias · Notion";
+  var recargar = '<button class="btn btn-ghost btn-sm" onclick="u19FichaBioRecargar(\'' + c.id + '\')">↻ Recargar</button>';
+  if (!(typeof u19DashUrl === "function" && u19DashUrl("bio")))
+    return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Aquí aparecen las bioimpedancias que el bot guarda en Notion cuando mandas la foto de Fitdays por WhatsApp. Falta configurar el puente en ⚙ Ajustes → Puente con Notion.</p>');
+  var e = _fichaBio[c.id];
+  if (!e || e.cargando) return u19Bloque(titulo, '<p class="text-xs text-muted">⏳ Cargando desde Notion…</p>');
+  if (e.error) return u19Bloque(titulo, '<p class="text-xs" style="color:var(--danger);">✗ ' + escapeHtml(e.error) + '</p>', recargar);
+  var evs = e.evs;
+  if (!evs.length)
+    return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Notion no tiene bioimpedancias a nombre de «' + escapeHtml(c.name || "") + '». Si allá figura con otro nombre, edita el nombre aquí para que coincida.</p>', recargar);
+
+  var asc = evs.slice().reverse();
+  var h = "";
+  var pPeso = asc.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.peso_kg != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.peso_kg) }; });
+  var pGrasa = asc.filter(function(x){ return x.bioimpedancia && x.bioimpedancia.grasa_pct != null; }).map(function(x){ return { f: x.fecha, v: Number(x.bioimpedancia.grasa_pct) }; });
+  if (pPeso.length > 1 || pGrasa.length > 1){
+    h += '<div class="fb-graficos">';
+    if (pPeso.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Peso <span>' + escapeHtml(u19FichaDelta(pPeso, " kg")) + '</span></div>' + u19FichaLineaSVG(pPeso, " kg", "var(--accent)") + '</div>';
+    if (pGrasa.length > 1) h += '<div class="fin-g"><div class="fin-g-t">Grasa corporal <span>' + escapeHtml(u19FichaDelta(pGrasa, " %")) + '</span></div>' + u19FichaLineaSVG(pGrasa, "%", "#f59e0b") + '</div>';
+    h += '</div>';
+  }
+  h += '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Fecha</th><th>Peso</th><th>Grasa</th><th>Músculo</th><th>Cintura</th><th>Cadera</th></tr></thead><tbody>'
+    + evs.map(function(x){
+        var b = x.bioimpedancia || {}, ci = x.circunferencias_cm || {};
+        return '<tr><td>' + rndFdate(x.fecha) + (x.momento ? ' <span class="text-muted text-xs">' + escapeHtml(String(x.momento)) + '</span>' : '') + '</td>'
+          + '<td>' + u19FichaNum(b.peso_kg, " kg") + '</td><td>' + u19FichaNum(b.grasa_pct, " %") + '</td><td>' + u19FichaNum(b.musculo_kg, " kg") + '</td>'
+          + '<td>' + u19FichaNum(ci.cintura, " cm") + '</td><td>' + u19FichaNum(ci.cadera, " cm") + '</td></tr>';
+      }).join("")
+    + '</tbody></table></div>'
+    + '<p class="fb-fuente">' + (evs.length >= 10 ? "Últimas 10 evaluaciones. " : evs.length + " evaluación" + (evs.length === 1 ? "" : "es") + ". ")
+    + 'Las guarda el bot cuando mandas la foto de Fitdays por WhatsApp. Para el documento comparativo, genera el informe.</p>';
+  return u19Bloque(titulo, h,
+    '<span style="display:flex;gap:.3rem;">' + recargar + '<button class="btn btn-primary btn-sm" onclick="u19FichaAInformes(\'' + c.id + '\')">Generar informe →</button></span>');
+}
+
 function renderFicha(){
   var c = getClient(_fichaState.clientId);
   var cont = document.getElementById('view-ficha');
   if (!cont) return;
   if (!c){ cont.innerHTML = '<div class="empty-state"><h3>Cliente no encontrado</h3>'
     + '<button class="btn btn-primary" onclick="showView(\'clients\')">Volver a Clientes</button></div>'; return; }
+  u19FichaBioPedir(c);   /* trae de Notion (con caché) y repinta cuando llega */
 
   var tabs = [['resumen', 'Resumen'], ['evaluaciones', 'Evaluaciones'], ['entrenamiento', 'Entrenamiento'], ['clinico', 'Clínico']];
   var h = '<div class="u-fh">'
@@ -24718,6 +24859,16 @@ function fichaResumen(c){
   var lsi = (typeof u19UltimoLSI === 'function') ? u19UltimoLSI(c) : null;
   var inf = u19UltimoInforme(c);
   var b = (inf && inf.payload && inf.payload.ev2 && inf.payload.ev2.bioimpedancia) || {};
+  var bFecha = inf ? String(inf.fecha || '').slice(0, 10) : '';
+  var bSrc = inf ? rndFdate(inf.fecha) : 'sin informes';
+  /* Si Notion tiene una bioimpedancia más nueva que el último informe
+     local (o no hay informe), las cifras salen de ahí. */
+  var nb = (typeof u19FichaBio === 'function') ? u19FichaBio(c) : null;
+  var nEv = nb ? nb.evs : [];
+  var hayPuente = (typeof u19DashUrl === 'function') && !!u19DashUrl('bio');
+  if (nEv.length && (!inf || String(nEv[0].fecha).slice(0, 10) > bFecha)){
+    b = nEv[0].bioimpedancia || {}; bSrc = rndFdate(nEv[0].fecha) + ' · Notion';
+  } else if (!inf && !nb && hayPuente){ bSrc = 'cargando de Notion…'; }
   var d = u19DiasSinReportar(c);
   var rut = state.routines.filter(function(r){ return r.clientId === c.id && r.status !== 'archived'; });
 
@@ -24727,8 +24878,8 @@ function fichaResumen(c){
       + '<div class="u-tile-s">' + (sub || '') + '</div></div>';
   }
   var tiles = '<div class="u-tiles">'
-    + tile('Peso', b.peso_kg != null ? b.peso_kg.toFixed(1) + ' kg' : '—', inf ? rndFdate(inf.fecha) : 'sin informes')
-    + tile('Grasa', b.grasa_pct != null ? b.grasa_pct.toFixed(1) + ' %' : '—', b.musculo_kg != null ? (b.musculo_kg.toFixed(1) + ' kg músculo') : '')
+    + tile('Peso', b.peso_kg != null ? Number(b.peso_kg).toFixed(1) + ' kg' : '—', bSrc)
+    + tile('Grasa', b.grasa_pct != null ? Number(b.grasa_pct).toFixed(1) + ' %' : '—', b.musculo_kg != null ? (Number(b.musculo_kg).toFixed(1) + ' kg músculo') : '')
     + tile('Simetría', lsi ? ('LSI ' + lsi.lsi.toFixed(0) + '%') : '—',
         lsi ? (lsi.fuente === 'dinamometria' ? 'ActiveForce' : (lsi.fuente === 'manual' ? 'test manual' : 'BlazePod')) : 'sin medir',
         lsi ? (lsi.lsi >= 90 ? 'var(--success)' : (lsi.lsi >= 85 ? '#d97706' : 'var(--danger)')) : '')
@@ -24742,7 +24893,8 @@ function fichaResumen(c){
     ['Dinamometrías', (c.fuerza || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
     ['Sesiones reportadas', (c.progressions || []).length, "abrirFicha('" + c.id + "','entrenamiento')"],
     ['Rutinas activas', rut.length, "abrirFicha('" + c.id + "','entrenamiento')"],
-    ['Registros de dolor', (c.painLog || []).length, "abrirFicha('" + c.id + "','clinico')"]
+    ['Registros de dolor', (c.painLog || []).length, "abrirFicha('" + c.id + "','clinico')"],
+    ['Bioimpedancias en Notion', nb ? nEv.length : (hayPuente ? '…' : '–'), "abrirFicha('" + c.id + "','evaluaciones')"]
   ];
   var resumenN = '<div class="u-counts">' + conteos.map(function(x){
     return '<button class="u-count" onclick="' + x[2] + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></button>';
@@ -24755,6 +24907,7 @@ function fichaResumen(c){
 function fichaEvaluaciones(c){
   var serie = (typeof u19SerieLSI === 'function') ? u19SerieLSI(c) : [];
   var out = '';
+  out += u19FichaBioBloque(c);
 
   if (serie.length){
     var filas = serie.slice().reverse().map(function(p){
