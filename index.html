@@ -24768,9 +24768,10 @@ function fichaEvaluaciones(c){
       '<button class="btn btn-ghost btn-sm" onclick="u19HistorialRendimiento(\'' + c.id + '\')">Ver curva</button>');
   }
 
-  function lista(titulo, arr, fn, vacio, accion){
+  function lista(titulo, arr, fn, vacio, accion, cab){
     if (!arr || !arr.length) return u19Bloque(titulo, '<p class="text-xs text-muted">' + vacio + '</p>', accion);
-    return u19Bloque(titulo, '<table class="u-tbl"><tbody>'
+    var head = cab ? '<thead><tr>' + cab.map(function(x){ return '<th>' + x + '</th>'; }).join('') + '</tr></thead>' : '';
+    return u19Bloque(titulo, '<table class="u-tbl">' + head + '<tbody>'
       + arr.slice().reverse().map(fn).join('') + '</tbody></table>', accion);
   }
   out += lista('Composición corporal', c.informes, function(i){
@@ -24779,7 +24780,7 @@ function fichaEvaluaciones(c){
       + '<td>' + (b.peso_kg != null ? b.peso_kg + ' kg' : '—') + '</td>'
       + '<td>' + (b.grasa_pct != null ? b.grasa_pct + '% grasa' : '—') + '</td>'
       + '<td>' + (b.musculo_kg != null ? b.musculo_kg + ' kg músculo' : '—') + '</td></tr>';
-  }, 'Sin informes guardados. Genera uno en Informes y pulsa «Guardar en historial».');
+  }, 'Sin informes guardados. Genera uno en Informes y pulsa «Guardar en historial».', null, ['Fecha', 'Peso', 'Grasa', 'Músculo']);
 
   out += lista('Rendimiento · BlazePod', c.rendimiento, function(r){
     var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
@@ -24788,14 +24789,14 @@ function fichaEvaluaciones(c){
       + '<td>' + ((r.resumen && r.resumen.reaccion_prom != null) ? r.resumen.reaccion_prom + ' ms' : '—') + '</td>'
       + '<td>' + (peor ? 'LSI ' + peor.lsi.toFixed(0) + '%' : '—') + '</td>'
       + '<td class="text-muted">' + escapeHtml(rndSetupTxt(r.setup) || '') + '</td></tr>';
-  }, 'Sin evaluaciones de BlazePod guardadas.');
+  }, 'Sin evaluaciones de BlazePod guardadas.', null, ['Fecha', 'Reacción media', 'Simetría', 'Montaje']);
 
   out += lista('Fuerza · ActiveForce', c.fuerza, function(f){
     return '<tr><td>' + rndFdate(f.fecha) + '</td>'
       + '<td>' + ((f.resumen && f.resumen.fuerza_max != null) ? f.resumen.fuerza_max.toFixed(0) + ' N' : '—') + '</td>'
       + '<td>' + (f.peor ? 'LSI ' + f.peor.lsi.toFixed(0) + '%' : '—') + '</td>'
       + '<td class="text-muted">' + escapeHtml(f.peor ? f.peor.nombre : '') + '</td></tr>';
-  }, 'Sin dinamometrías guardadas.');
+  }, 'Sin dinamometrías guardadas.', null, ['Fecha', 'Fuerza máx.', 'Simetría', 'Movimiento']);
 
   return out + '<button class="btn btn-primary" onclick="showView(\'rendimiento\')">Nueva evaluación →</button>';
 }
@@ -24804,7 +24805,7 @@ function fichaEntrenamiento(c){
   var rut = state.routines.filter(function(r){ return r.clientId === c.id; });
   var out = '';
   if (rut.length){
-    out += u19Bloque('Rutinas', '<table class="u-tbl"><tbody>' + rut.map(function(r){
+    out += u19Bloque('Rutinas', '<table class="u-tbl"><thead><tr><th>Rutina</th><th>Duración</th><th>Estado</th><th></th></tr></thead><tbody>' + rut.map(function(r){
       return '<tr><td><b>' + escapeHtml(r.name || 'Sin nombre') + '</b></td>'
         + '<td>' + (r.weeks || '—') + ' sem</td>'
         + '<td>' + (r.status === 'archived' ? '<span class="text-muted">archivada</span>' : '<span style="color:var(--success)">activa</span>') + '</td>'
@@ -24816,7 +24817,7 @@ function fichaEntrenamiento(c){
   }
   var pr = c.progressions || [];
   if (pr.length){
-    out += u19Bloque('Sesiones reportadas', '<table class="u-tbl"><tbody>' + pr.slice().reverse().slice(0, 15).map(function(x){
+    out += u19Bloque('Sesiones reportadas', '<table class="u-tbl"><thead><tr><th>Fecha</th><th>Rutina</th><th>Cumplimiento</th><th></th></tr></thead><tbody>' + pr.slice().reverse().slice(0, 15).map(function(x){
       return '<tr><td>' + rndFdate(x.fecha) + '</td>'
         + '<td>' + escapeHtml(x.rutinaNombre || '—') + '</td>'
         + '<td>' + (x.cumplimiento != null ? x.cumplimiento + '%' : '—') + '</td>'
@@ -24843,7 +24844,7 @@ function fichaClinico(c){
 
   var pl = c.painLog || [];
   out += u19Bloque('Registro de dolor', pl.length
-    ? '<table class="u-tbl"><tbody>' + pl.slice().reverse().slice(0, 12).map(function(x){
+    ? '<table class="u-tbl"><thead><tr><th>Fecha</th><th>Dolor</th><th>Nota</th></tr></thead><tbody>' + pl.slice().reverse().slice(0, 12).map(function(x){
         var eva = x.eva != null ? x.eva : (x.valor != null ? x.valor : null);
         var col = eva == null ? '' : (eva <= 2 ? 'var(--success)' : (eva <= 5 ? '#d97706' : 'var(--danger)'));
         return '<tr><td>' + rndFdate(x.date || x.fecha) + '</td>'
