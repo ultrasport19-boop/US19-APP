@@ -25455,74 +25455,65 @@ var BAT_CATALOGO = [
       return out;
     } },
   /* ---- BlazePod ---- */
-  { id: "bp_beep", disp: "blazepod", perfil: ["atleta"], orden: 10, nombre: "BlazePod Beep Test (resistencia intermitente)",
-    obj: "Prueba por defecto de la app BlazePod: carreras de ida y vuelta al ritmo de los pods hasta no llegar a tiempo. Anota el nivel y las lanzaderas que marca la app.",
+  { id: "bp_beep", disp: "blazepod", perfil: ["atleta"], orden: 10, nombre: "BlazePod Beep Test",
+    obj: "Montaje de la app: 2 pods a 20 m. Ida y vuelta llegando justo cuando el pod se enciende; 21 niveles con ritmo creciente; elimina al 2.º fallo. Resistencia y velocidad sostenida.",
     campos: [
-      { k: "nivel", l: "Nivel alcanzado", t: "num", req: true, ph: "ej. 9" },
-      { k: "lanz", l: "Lanzaderas completadas", t: "num", req: true, ph: "ej. 62" },
-      { k: "dist", l: "Distancia total (m)", t: "num", ph: "ej. 1240" },
-      { k: "dur", l: "Duración (s)", t: "num", ph: "ej. 540" },
+      { k: "nivel", l: "Nivel alcanzado (1–21)", t: "num", req: true, ph: "ej. 9" },
+      { k: "toques", l: "Toques (lanzaderas) completados", t: "num", req: true, ph: "ej. 62" },
+      { k: "fallos", l: "Fallos (miss hits)", t: "num", ph: "ej. 2" },
       { k: "vo2", l: "VO2max estimado (ml/kg/min), si la app lo da", t: "num", ph: "ej. 44.5" }
     ],
     calc: function(v){
-      var out = { principal: "nivel " + v.nivel + " · " + v.lanz + " lanzaderas" + (batNum(v.dist) ? " · " + v.dist + " m" : ""), lineas: [], nivelBeep: batNum(v.nivel), lanzaderas: batNum(v.lanz) };
+      var m = batNum(v.toques) != null ? v.toques * 20 : null;
+      var out = { principal: "nivel " + v.nivel + " · " + v.toques + " lanzaderas" + (m != null ? " · " + m + " m" : ""), lineas: [], nivelTest: batNum(v.nivel), toques: batNum(v.toques) };
       if (batNum(v.vo2)) out.lineas.push("VO2max estimado " + v.vo2 + " ml/kg/min");
-      if (batNum(v.dur) && batNum(v.dist)) out.lineas.push("velocidad media " + batR(v.dist / v.dur * 3.6, 1) + " km/h");
       return out;
     } },
   { id: "bp_agility_t", disp: "blazepod", perfil: ["atleta"], orden: 11, nombre: "BlazePod Agility T Test",
-    obj: "Prueba por defecto de la app BlazePod: recorrido en T con sprint, desplazamiento lateral y carrera atrás. Menos segundos es mejor.",
+    obj: "Montaje de la app: 4 pods en T (10 m hasta el centro, 5 m a cada lado), 5 toques: sprint al centro, lateral a la derecha, lateral a la izquierda, centro y carrera atrás a la salida. Sin cruzar piernas. Menos segundos es mejor.",
     campos: [
-      { k: "t1", l: "Tiempo intento 1 (s)", t: "num", req: true, ph: "ej. 10.4" },
-      { k: "t2", l: "Tiempo intento 2 (s)", t: "num", ph: "ej. 10.1" },
-      { k: "errores", l: "Pods fallados", t: "num", ph: "ej. 0" }
+      { k: "t1", l: "Tiempo total intento 1 (s)", t: "num", req: true, ph: "ej. 10.4" },
+      { k: "t2", l: "Tiempo total intento 2 (s)", t: "num", ph: "ej. 10.1" },
+      { k: "fallos", l: "Fallos (miss hits)", t: "num", ph: "ej. 0" }
     ],
     calc: function(v){
       var ts = [v.t1, v.t2].map(batNum).filter(function(x){ return x != null && x > 0; });
       var mejor = Math.min.apply(null, ts);
       var out = { principal: "mejor " + mejor.toFixed(2) + " s" + (ts.length > 1 ? " (" + ts.map(function(x){ return x.toFixed(2); }).join(" · ") + ")" : ""), lineas: [], tiempo: mejor };
-      if (batNum(v.errores)) out.lineas.push(v.errores + " pod" + (v.errores === 1 ? "" : "s") + " fallado" + (v.errores === 1 ? "" : "s"));
+      if (batNum(v.fallos)) out.lineas.push(v.fallos + " fallo" + (v.fallos === 1 ? "" : "s"));
       return out;
     } },
-  { id: "bp_plyo_box", disp: "blazepod", perfil: ["atleta", "paciente"], orden: 23, nombre: "Plyo Box Jump Test (potencia reactiva)",
-    obj: "Prueba por defecto de la app BlazePod: saltos al cajón apagando el pod. Toques por minuto y reacción.",
+  { id: "bp_plyo_box", disp: "blazepod", perfil: ["atleta", "paciente"], orden: 23, nombre: "Plyo Box Jump Test",
+    obj: "Montaje de la app: pod verde a la altura de la cabeza sobre el cajón y pod rojo en el suelo a 2 m. Saltar al cajón, tocar, bajar y tocar; 12 niveles con ritmo creciente; elimina al 3.er fallo. Usa siempre el mismo cajón.",
     campos: [
-      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 30" },
-      { k: "aciertos", l: "Saltos / toques", t: "num", req: true, ph: "ej. 18" },
-      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 690" },
-      { k: "alto", l: "Altura del cajón (cm)", t: "num", ph: "ej. 45" }
+      { k: "nivel", l: "Nivel alcanzado (1–12)", t: "num", req: true, ph: "ej. 7" },
+      { k: "toques", l: "Toques completados", t: "num", req: true, ph: "ej. 34" },
+      { k: "alto", l: "Altura del cajón (cm)", t: "num", ph: "ej. 45" },
+      { k: "fallos", l: "Fallos (miss hits)", t: "num", ph: "ej. 3" }
     ],
     calc: function(v){
-      var xmin = batR(v.aciertos / v.dur * 60, 1);
-      return { principal: v.aciertos + " saltos en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : "") + (batNum(v.alto) ? " · cajón " + v.alto + " cm" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) };
+      return { principal: "nivel " + v.nivel + " · " + v.toques + " toques" + (batNum(v.alto) ? " · cajón " + v.alto + " cm" : ""), lineas: [], nivelTest: batNum(v.nivel), toques: batNum(v.toques) };
     } },
-  { id: "bp_ak_pendulum", disp: "blazepod", perfil: ["paciente", "atleta"], orden: 31, nombre: "AK Pendulum Test (péndulo lateral)",
-    obj: "Prueba por defecto de la app BlazePod: desplazamiento lateral de péndulo entre pods. Control de cambio de dirección; si lo haces por lado, entrega LSI.",
+  { id: "bp_ak_pendulum", disp: "blazepod", perfil: ["paciente", "atleta"], orden: 31, nombre: "AK Pendulum Test",
+    obj: "Montaje de la app: 5 pods en línea (5 m entre los cuatro primeros, el último a 10 m). Recorrido péndulo de 7 toques con giros de 180° y sprint final. Agilidad y potencia; menos segundos es mejor.",
     campos: [
-      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 30" },
-      { k: "aciertos", l: "Toques totales", t: "num", req: true, ph: "ej. 26" },
-      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 820" },
-      { k: "ac_izq", l: "Toques saliendo a la izquierda (opcional)", t: "num", ph: "ej. 13" },
-      { k: "ac_der", l: "Toques saliendo a la derecha (opcional)", t: "num", ph: "ej. 13" },
-      { k: "afectado", l: "Lado lesionado (criterio clínico)", t: "sel", opts: [["", "Ninguno: se compara menor / mayor"], ["izq", "Izquierdo"], ["der", "Derecho"]] }
+      { k: "t1", l: "Tiempo total intento 1 (s)", t: "num", req: true, ph: "ej. 14.2" },
+      { k: "t2", l: "Tiempo total intento 2 (s)", t: "num", ph: "ej. 13.9" }
     ],
     calc: function(v){
-      var xmin = batR(v.aciertos / v.dur * 60, 1);
-      var out = { principal: v.aciertos + " toques en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) };
-      var lsi = batLSI(v.ac_izq, v.ac_der, v.afectado);
-      if (lsi != null){ out.lsi = lsi; out.nivel = batNivel(lsi); out.deficitLado = batDeficitLado(v.ac_izq, v.ac_der); out.lineas.push("LSI " + lsi + " % · " + batNivelTxt(lsi)); }
-      return out;
+      var ts = [v.t1, v.t2].map(batNum).filter(function(x){ return x != null && x > 0; });
+      var mejor = Math.min.apply(null, ts);
+      return { principal: "mejor " + mejor.toFixed(2) + " s" + (ts.length > 1 ? " (" + ts.map(function(x){ return x.toFixed(2); }).join(" · ") + ")" : ""), lineas: [], tiempo: mejor };
     } },
-  { id: "bp_plank_reach", disp: "blazepod", perfil: ["paciente", "atleta"], orden: 30, nombre: "Plank and Reach Test (core y control postural)",
-    obj: "Toques con las manos desde plancha: estabilidad del tronco y reacción de extremidad superior.",
+  { id: "bp_plank_reach", disp: "blazepod", perfil: ["paciente", "atleta"], orden: 30, nombre: "Plank and Reach Test",
+    obj: "Montaje de la app: 2 pods rojos elevados a la altura del hombro y 2 verdes en el suelo frente a los pies, en plancha completa. Tocar cada pod antes de 1,75 s; 12 niveles; elimina al 3.er fallo. Core, resistencia y control.",
     campos: [
-      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 30" },
-      { k: "aciertos", l: "Aciertos (toques)", t: "num", req: true, ph: "ej. 22" },
-      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 780" }
+      { k: "nivel", l: "Nivel alcanzado (1–12)", t: "num", req: true, ph: "ej. 6" },
+      { k: "toques", l: "Toques completados", t: "num", req: true, ph: "ej. 28" },
+      { k: "fallos", l: "Fallos (miss hits)", t: "num", ph: "ej. 3" }
     ],
     calc: function(v){
-      var xmin = batR(v.aciertos / v.dur * 60, 1);
-      return { principal: v.aciertos + " toques en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) };
+      return { principal: "nivel " + v.nivel + " · " + v.toques + " toques", lineas: [], nivelTest: batNum(v.nivel), toques: batNum(v.toques) };
     } },
   { id: "bp_reaccion_simple", disp: "blazepod", perfil: ["paciente"], orden: 40, nombre: "Tiempo de reacción simple",
     obj: "Apagar el pod lo antes posible desde una posición estática: velocidad de procesamiento y motora base.",
@@ -25556,10 +25547,10 @@ var BAT_CATALOGO = [
       return out;
     } },
   { id: "bp_5_10_5", disp: "blazepod", perfil: ["atleta"], orden: 21, nombre: "5-10-5 Pro Agility Test",
-    obj: "Agilidad, aceleración lateral y cambio de dirección. Se mide saliendo hacia cada lado.",
+    obj: "Montaje de la app: 3 pods en línea a 5 m. Desde el centro: 5 m al pod derecho, 10 m al izquierdo y 5 m de vuelta al centro (3 toques). Aceleración y frenado; menos segundos es mejor.",
     campos: [
-      { k: "t_der", l: "Tiempo saliendo a la derecha (s)", t: "num", req: true, ph: "ej. 4.85" },
-      { k: "t_izq", l: "Tiempo saliendo a la izquierda (s)", t: "num", ph: "ej. 4.98" }
+      { k: "t_der", l: "Tiempo total (s) · patrón de la app, sale a la derecha", t: "num", req: true, ph: "ej. 4.85" },
+      { k: "t_izq", l: "Tiempo saliendo a la izquierda (s) · espejo, opcional", t: "num", ph: "ej. 4.98" }
     ],
     calc: function(v){
       var ts = [v.t_der, v.t_izq].map(batNum).filter(function(x){ return x != null && x > 0; });
@@ -25567,21 +25558,31 @@ var BAT_CATALOGO = [
       if (ts.length === 2){ var asim = batR(Math.abs(v.t_der - v.t_izq) / Math.max(v.t_der, v.t_izq) * 100, 1); out.asimetria = asim; out.lineas.push("asimetría entre salidas " + asim + " %" + (asim >= 10 ? ": dominancia marcada" : "")); }
       return out;
     } },
-  { id: "bp_4x10", disp: "blazepod", perfil: ["atleta"], orden: 22, nombre: "4×10 Shuttle Test (aceleración y frenado)",
-    obj: "Aceleración lineal, frenado excéntrico y reacción direccional en cuatro tramos de 10 m.",
+  { id: "bp_4x10", disp: "blazepod", perfil: ["atleta"], orden: 22, nombre: "4×10 Shuttle Test",
+    obj: "Montaje de la app: 2 pods a 10 m, 4 toques (ida, vuelta, ida, vuelta). Acelerar y frenar encadenado; menos segundos es mejor.",
     campos: [
       { k: "t", l: "Tiempo total (s)", t: "num", req: true, ph: "ej. 9.40" },
-      { k: "aciertos", l: "Pods apagados (opcional)", t: "num", ph: "ej. 4" }
+      { k: "t2", l: "Tiempo intento 2 (s)", t: "num", ph: "ej. 9.25" }
     ],
-    calc: function(v){ return { principal: Number(v.t).toFixed(2) + " s", lineas: [], tiempo: batNum(v.t) }; } },
-  { id: "bp_speed_box", disp: "blazepod", perfil: ["atleta"], orden: 20, nombre: "Speed Box Test (footwork en espacio reducido)",
-    obj: "Coordinación de pies y frecuencia de pasos en un cuadrado de pods.",
+    calc: function(v){
+      var ts = [v.t, v.t2].map(batNum).filter(function(x){ return x != null && x > 0; });
+      var mejor = Math.min.apply(null, ts);
+      return { principal: "mejor " + mejor.toFixed(2) + " s" + (ts.length > 1 ? " (" + ts.map(function(x){ return x.toFixed(2); }).join(" · ") + ")" : ""), lineas: [], tiempo: mejor };
+    } },
+  { id: "bp_speed_box", disp: "blazepod", perfil: ["atleta"], orden: 20, nombre: "Speed Box Test",
+    obj: "Montaje de la app: 4 pods en cuadrado de 10 m y uno al centro; apagar los 5 lo más rápido posible. 3 ciclos con 20 s de descanso; cuenta el mejor. Velocidad y toma de decisión.",
     campos: [
-      { k: "dur", l: "Duración (s)", t: "num", req: true, ph: "ej. 20" },
-      { k: "aciertos", l: "Aciertos (toques)", t: "num", req: true, ph: "ej. 34" },
-      { k: "ms", l: "Reacción media (ms)", t: "num", ph: "ej. 560" }
+      { k: "c1", l: "Ciclo 1 (s)", t: "num", req: true, ph: "ej. 8.4" },
+      { k: "c2", l: "Ciclo 2 (s)", t: "num", ph: "ej. 8.1" },
+      { k: "c3", l: "Ciclo 3 (s)", t: "num", ph: "ej. 8.6" }
     ],
-    calc: function(v){ var xmin = batR(v.aciertos / v.dur * 60, 1); return { principal: v.aciertos + " toques en " + v.dur + " s (" + xmin + "/min)" + (batNum(v.ms) ? " · " + v.ms + " ms" : ""), lineas: [], porMin: xmin, ms: batNum(v.ms) }; } }
+    calc: function(v){
+      var ts = [v.c1, v.c2, v.c3].map(batNum).filter(function(x){ return x != null && x > 0; });
+      var mejor = Math.min.apply(null, ts), prom = ts.reduce(function(s, x){ return s + x; }, 0) / ts.length;
+      var out = { principal: "mejor " + mejor.toFixed(2) + " s" + (ts.length > 1 ? " · " + ts.length + " ciclos (" + ts.map(function(x){ return x.toFixed(2); }).join(" · ") + ")" : ""), lineas: [], tiempo: mejor };
+      if (ts.length > 1) out.lineas.push("promedio " + prom.toFixed(2) + " s · caída del mejor al peor " + batR((Math.max.apply(null, ts) - mejor) / mejor * 100, 0) + " %");
+      return out;
+    } }
 ];
 function u19BateriaCat(id){ for (var i = 0; i < BAT_CATALOGO.length; i++) if (BAT_CATALOGO[i].id === id) return BAT_CATALOGO[i]; return null; }
 function u19BateriaPerfil(c){ return (typeof getClientType === "function" && getClientType(c) === "rehab") ? "paciente" : "atleta"; }
@@ -25756,6 +25757,7 @@ function u19BateriaBloque(c){
     var lectura = (d.lineas || []).slice();
     if (prev && prev.d && d.lsi != null && prev.d.lsi != null) lectura.push('<b style="color:' + (d.lsi >= prev.d.lsi ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.lsi - prev.d.lsi, 1) + ' pts de LSI</b> vs ' + rndFdate(prev.fecha));
     else if (prev && prev.d && d.tiempo != null && prev.d.tiempo != null) lectura.push('<b style="color:' + (d.tiempo <= prev.d.tiempo ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.tiempo - prev.d.tiempo, 2) + ' s</b> vs ' + rndFdate(prev.fecha));
+    else if (prev && prev.d && d.nivelTest != null && prev.d.nivelTest != null) lectura.push('<b style="color:' + (d.nivelTest >= prev.d.nivelTest ? 'var(--success)' : 'var(--danger)') + ';">' + (d.nivelTest - prev.d.nivelTest > 0 ? '+' : '') + (d.nivelTest - prev.d.nivelTest) + ' nivel' + (Math.abs(d.nivelTest - prev.d.nivelTest) === 1 ? '' : 'es') + '</b> vs ' + rndFdate(prev.fecha));
     else if (prev && prev.d && d.porMin != null && prev.d.porMin != null) lectura.push('<b style="color:' + (d.porMin >= prev.d.porMin ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.porMin - prev.d.porMin, 1) + '/min</b> vs ' + rndFdate(prev.fecha));
     var lsiHtml = d.lsi != null ? ' <span class="pb-est" style="color:' + (d.nivel === "ok" ? "var(--success)" : (d.nivel === "vigilar" ? "#d97706" : "var(--danger)")) + ';">LSI ' + d.lsi + ' %</span>' : '';
     h += '<tr><td style="white-space:nowrap;">' + rndFdate(p.fecha) + '</td>'
