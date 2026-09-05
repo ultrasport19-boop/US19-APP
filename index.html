@@ -3951,6 +3951,7 @@ function renderDashboard(){
   html += u19PanelOperativoHTML();
   html += '<div class="dash-2col">' + u19SemanaHTML() + buildPriorityTodayHtml() + '</div>';
   html += u19DashCitasHTML();
+  html += '<div id="dash-retencion">' + ((typeof u19DashRetencionInnerHTML === "function") ? u19DashRetencionInnerHTML() : '') + '</div>';
   html += buildBackupBannerHtml();
 
   var _dashSec = buildAlertsHtml() + buildClinicalInboxHtml() + buildRutHygieneHtml() + buildReactivationHtml();
@@ -3978,6 +3979,8 @@ function renderDashboard(){
   }
 
   document.getElementById("view-dashboard").innerHTML = html;
+  /* La tarjeta de retencion necesita las bioimpedancias del plantel (cache de 30 min). */
+  if (typeof u19PlantelBioPedir === "function") u19PlantelBioPedir();
 }
 
 function statCard(label, value, extra){
@@ -20957,10 +20960,39 @@ function _cus19Import(){
     window.addEventListener("load", function(){
       navigator.serviceWorker.register("sw.js").then(function(reg){
         console.log("US19 SW registrado:", reg.scope);
+        /* Version nueva: el SW hace skipWaiting + claim, asi que en cuanto
+           cambia el controlador ya hay codigo nuevo esperando una recarga.
+           Antes habia que recargar dos veces sin saber que habia cambio. */
+        var habiaControlador = !!navigator.serviceWorker.controller;
+        navigator.serviceWorker.addEventListener("controllerchange", function(){
+          if (!habiaControlador){ habiaControlador = true; return; }   /* primera instalacion: nada que avisar */
+          mostrarAvisoVersion();
+        });
+        setInterval(function(){ try { reg.update(); } catch(e){} }, 30 * 60 * 1000);
       }).catch(function(err){
         console.warn("US19 SW no se pudo registrar:", err);
       });
     });
+  }
+
+  // --- Aviso de version nueva (una barra arriba, un toque para recargar) ---
+  function mostrarAvisoVersion(){
+    if (document.getElementById("us19-nueva-version")) return;
+    var bar = document.createElement("div");
+    bar.id = "us19-nueva-version";
+    bar.setAttribute("role", "status");
+    var s = bar.style;
+    s.position = "fixed"; s.left = "50%"; s.top = "12px"; s.transform = "translateX(-50%)"; s.zIndex = "10000";
+    s.display = "flex"; s.gap = "10px"; s.alignItems = "center"; s.maxWidth = "calc(100vw - 24px)";
+    s.padding = "10px 14px"; s.borderRadius = "12px"; s.background = "#0b1014"; s.color = "#fff";
+    s.font = "600 13px/1.3 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
+    s.boxShadow = "0 8px 24px rgba(0,0,0,.45)"; s.border = "1px solid rgba(255,255,255,.12)";
+    bar.innerHTML = '<span>Hay una versi\u00f3n nueva de la app</span>'
+      + '<button type="button" id="us19-nv-ok" style="border:0;border-radius:999px;padding:7px 12px;background:#E21C25;color:#fff;font:inherit;cursor:pointer;">Actualizar</button>'
+      + '<button type="button" id="us19-nv-no" title="M\u00e1s tarde" style="border:0;background:transparent;color:#9aa6b0;font:inherit;cursor:pointer;padding:4px;">\u2715</button>';
+    document.body.appendChild(bar);
+    document.getElementById("us19-nv-ok").addEventListener("click", function(){ location.reload(); });
+    document.getElementById("us19-nv-no").addEventListener("click", function(){ bar.remove(); });
   }
 
   // --- Botón discreto "Instalar app": solo aparece si el navegador ofrece instalar ---
@@ -25119,6 +25151,8 @@ function u19PlantelBioPedir(){
 function u19PlantelBioRepintar(){
   var el = document.getElementById("plantel-bio");
   if (el) el.innerHTML = u19PlantelBioInnerHTML();
+  var ret = document.getElementById("dash-retencion");
+  if (ret) ret.innerHTML = u19DashRetencionInnerHTML();
   var chips = document.querySelectorAll(".cl-bio[data-cid]");
   for (var i = 0; i < chips.length; i++){
     var c = getClient(chips[i].getAttribute("data-cid"));
@@ -25188,6 +25222,101 @@ function u19PlantelBioAnalisis(){
   _plantelBioAn = { at: _plantelBio.at, meses: _plantelBio.meses, res: res };
   return res;
 }
+/* ---- Panel · Retención: viene poco y su composición no mejora ----
+   Cruza las reservas de 30 días que trae Notion (notionReservas30, con el
+   plan 2x = 8 sesiones esperadas, 3x = 12) con el análisis del plantel.
+   Entra quien tiene menos de la mitad de las sesiones esperadas Y además
+   sube grasa, se estanca o lleva 8+ semanas sin medirse. */
+function u19DashRetencionInnerHTML(){
+  if (!(typeof u19DashUrl === "function" && u19DashUrl("bio_todas"))) return "";
+  if (_plantelBio.cargando || !_plantelBio.filas || _plantelBio.error) return "";
+  var an = u19PlantelBioAnalisis(), filas = [], conDato = 0;
+  an.personas.forEach(function(p){
+    if (!p.c || (typeof u19ClienteActivo === "function" && !u19ClienteActivo(p.c))) return;
+    if (p.c.notionReservas30 == null || p.c.notionReservas30 === "") return;
+    conDato++;
+    var r30 = Number(p.c.notionReservas30), esperado = /3x/i.test(p.c.notionPlan || "") ? 12 : 8;
+    var mal = p.estado === "empeora" || p.estado === "estable" || p.sinMedir;
+    if (r30 < esperado / 2 && mal) filas.push({ p: p, r30: r30, esperado: esperado });
+  });
+  if (!conDato) return "";
+  var orden = { empeora: 0, estable: 1, una: 2, curso: 3, mejora: 4 };
+  filas.sort(function(a, b){ return (orden[a.p.estado] - orden[b.p.estado]) || (a.r30 - b.r30); });
+  var h = '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
+    + '<div class="fin-g-t"><div>Retención <span>viene poco y su composición no mejora · ' + escapeHtml(String(_plantelBio.meses)) + ' meses</span></div></div>';
+  if (!filas.length){
+    return h + '<p class="text-xs text-muted" style="margin:0;line-height:1.5;">Nadie combina pocas sesiones (menos de la mitad de su plan en 30 días) con una composición que sube grasa, se estanca o lleva 8+ semanas sin medirse. Revisa el plantel en Finanzas para el detalle.</p></div></div>';
+  }
+  h += '<div class="u19-scrollx"><table class="u-tbl"><thead><tr><th>Persona</th><th>Sesiones 30 d</th><th>Composición</th><th>Última bio</th><th></th></tr></thead><tbody>';
+  filas.forEach(function(f){
+    var p = f.p, e = BIO_ESTADOS[p.estado] || { col: "var(--muted)", chip: p.estado };
+    var tel = String(p.c.phone || "").replace(/[^\d+]/g, "").replace(/^\+/, "");
+    h += '<tr><td><a href="#" onclick="abrirFicha(\'' + p.c.id + '\',\'evaluaciones\');return false;" style="text-decoration:none;font-weight:600;">' + escapeHtml(p.c.name) + '</a>'
+      + (p.c.notionPlan ? '<div class="text-xs text-muted">' + escapeHtml(p.c.notionPlan) + '</div>' : '') + '</td>'
+      + '<td><b style="color:var(--danger);">' + f.r30 + '</b> <span class="text-xs text-muted">de ' + f.esperado + ' esperadas</span></td>'
+      + '<td><span class="pb-est" style="color:' + e.col + ';">' + e.chip + '</span>'
+      + (p.dG != null ? ' <span class="text-xs text-muted">' + u19BioSigno(p.dG) + ' pts grasa</span>' : '') + '</td>'
+      + '<td>' + rndFdate(p.ult.fecha) + (p.sinMedir ? ' <span class="text-xs" style="color:#d97706;">hace ' + Math.round(p.desdeUlt / 7) + ' sem</span>' : '') + '</td>'
+      + '<td style="text-align:right;white-space:nowrap;">' + (tel ? '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="https://wa.me/' + escapeAttr(tel) + '">WhatsApp</a>' : '') + '</td></tr>';
+  });
+  h += '</tbody></table></div>';
+  h += '<p class="text-xs text-muted" style="margin:.6rem 0 0;line-height:1.5;">Sesiones: reservas de los últimos 30 días según Notion. Esperadas: 8 con plan 2x/semana, 12 con 3x. Es una lista para conversar, no un juicio.</p>';
+  return h + '</div></div>';
+}
+
+/* ---- Informe imprimible del plantel (PDF desde el navegador) ---- */
+window.u19PlantelInforme = function(){
+  if (!_plantelBio.filas || !_plantelBio.filas.length){ toast("Todavía no hay datos del plantel cargados", "warn"); return; }
+  var an = u19PlantelBioAnalisis(), ps = an.personas;
+  var w = window.open("", "_blank");
+  if (!w){ toast("El navegador bloqueó la ventana del informe: permite ventanas emergentes para esta app", "error"); return; }
+  var cnt = { mejora: 0, empeora: 0, estable: 0, una: 0, curso: 0 }, sinMedir = 0, dG = [], dM = [], dP = [];
+  ps.forEach(function(p){ cnt[p.estado]++; if (p.sinMedir) sinMedir++; if (p.dG != null) dG.push(p.dG); if (p.dM != null) dM.push(p.dM); if (p.dP != null) dP.push(p.dP); });
+  function prom(a){ return a.length ? (a.reduce(function(s, x){ return s + x; }, 0) / a.length) : null; }
+  function fmt(x, u, d){ return x == null ? "—" : (x > 0 ? "+" : "") + x.toFixed(d == null ? 1 : d) + (u || ""); }
+  var hoyISO = (typeof u19HoyISO === "function") ? u19HoyISO() : new Date().toISOString().slice(0, 10);
+  var kpi = function(l, v, s, col){ return '<div class="k"><div class="kl">' + l + '</div><div class="kv"' + (col ? ' style="color:' + col + '"' : '') + '>' + v + '</div><div class="ks">' + (s || '') + '</div></div>'; };
+  var pg = prom(dG), pm = prom(dM), pp = prom(dP);
+  var filas = ps.map(function(p){
+    var e = BIO_ESTADOS[p.estado] || { t: p.estado };
+    var col = p.estado === "mejora" ? "#15803d" : (p.estado === "empeora" ? "#b91c1c" : (p.estado === "estable" ? "#b45309" : "#475569"));
+    return '<tr><td><b>' + escapeHtml(p.c ? p.c.name : p.nombre) + '</b></td><td class="num">' + p.n + '</td>'
+      + '<td class="num">' + rndFdate(p.pri.fecha) + '</td><td class="num">' + rndFdate(p.ult.fecha) + (p.sinMedir ? '<div class="sub">hace ' + Math.round(p.desdeUlt / 7) + ' sem</div>' : '') + '</td>'
+      + '<td class="num">' + (p.ult.peso_kg != null ? Number(p.ult.peso_kg).toFixed(1) : '—') + '<div class="sub">' + fmt(p.dP, ' kg') + '</div></td>'
+      + '<td class="num">' + (p.ult.grasa_pct != null ? Number(p.ult.grasa_pct).toFixed(1) + ' %' : '—') + '<div class="sub">' + fmt(p.dG, ' pts') + '</div></td>'
+      + '<td class="num">' + (p.ult.musculo_kg != null ? Number(p.ult.musculo_kg).toFixed(1) : '—') + '<div class="sub">' + fmt(p.dM, ' kg') + '</div></td>'
+      + '<td><b style="color:' + col + '">' + escapeHtml(e.t) + '</b></td></tr>';
+  }).join("");
+  var css = 'body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#15241c;margin:0;padding:24px 28px;font-size:10pt;line-height:1.4;}'
+    + '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0e5132;padding-bottom:10px;margin-bottom:14px;gap:16px;}'
+    + '.brand{font-weight:800;font-size:22pt;letter-spacing:.04em;color:#0e5132;line-height:1;}.tag{font-size:7pt;letter-spacing:.2em;color:#e21c25;font-weight:700;margin-top:3px;}'
+    + '.ttl{font-size:12pt;font-weight:700;color:#334e68;margin-top:6px;}.meta{text-align:right;font-size:8.5pt;color:#627d98;white-space:nowrap;}'
+    + '.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin:10px 0 14px;}.k{border:1px solid #d9e2ec;border-radius:6px;padding:8px 10px;}'
+    + '.kl{font-size:6.5pt;letter-spacing:.12em;text-transform:uppercase;color:#627d98;}.kv{font-size:16pt;font-weight:800;color:#0e5132;line-height:1.1;}.ks{font-size:7.5pt;color:#627d98;}'
+    + 'h2{font-size:10.5pt;text-transform:uppercase;letter-spacing:.04em;color:#0e5132;border-bottom:2px solid #0e5132;padding-bottom:3px;margin:14px 0 8px;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:8.5pt;}th{background:#0e5132;color:#fff;text-align:left;padding:5px 6px;font-size:7pt;letter-spacing:.06em;text-transform:uppercase;}'
+    + 'td{padding:4px 6px;border-top:1px solid #e2e8f0;vertical-align:top;}tr:nth-child(even) td{background:#f4f8f5;}td.num{white-space:nowrap;}.sub{font-size:7pt;color:#627d98;}'
+    + '.leg{background:#f7faf8;border:1px solid #e6ece9;border-left:4px solid #e21c25;border-radius:0 6px 6px 0;padding:8px 12px;font-size:8pt;color:#46544c;margin-top:10px;}'
+    + '.ft{margin-top:14px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;display:flex;justify-content:space-between;}'
+    + 'th,.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{padding:0;}@page{size:A4 landscape;margin:12mm;}}';
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plantel · Ultra-Sport 19 · ' + hoyISO + '</title><style>' + css + '</style></head><body>'
+    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div><div class="ttl">Resumen de composición corporal del plantel · últimos ' + _plantelBio.meses + ' meses</div></div>'
+    + '<div class="meta">Emitido el ' + rndFdate(hoyISO) + '<br>' + ps.length + ' personas · ' + an.total + ' evaluaciones<br>Uso interno</div></div>'
+    + '<div class="kpis">'
+    + kpi('Mejoran', cnt.mejora, 'baja grasa o sube músculo', '#15803d')
+    + kpi('Se estancan', cnt.estable, '8+ semanas sin cambio', '#b45309')
+    + kpi('Suben grasa', cnt.empeora, '≥ 1 punto', '#b91c1c')
+    + kpi('Grasa promedio', fmt(pg, ' pts'), dG.length + ' con dos mediciones', pg != null ? (pg < 0 ? '#15803d' : '#b91c1c') : '')
+    + kpi('Músculo promedio', fmt(pm, ' kg'), dM.length + ' con dos mediciones', pm != null ? (pm > 0 ? '#15803d' : '#b91c1c') : '')
+    + kpi('Sin medirse 8+ sem', sinMedir + (an.sinBio.length ? ' + ' + an.sinBio.length : ''), an.sinBio.length ? an.sinBio.length + ' activos sin ninguna bio' : '', sinMedir ? '#b45309' : '')
+    + '</div>'
+    + '<h2>Personas</h2><table><thead><tr><th>Persona</th><th>N.º</th><th>Primera</th><th>Última</th><th>Peso (Δ)</th><th>Grasa (Δ)</th><th>Músculo (Δ)</th><th>Lectura</th></tr></thead><tbody>' + filas + '</tbody></table>'
+    + '<div class="leg"><b>Cómo leer.</b> Mejora: baja 1 punto o más de grasa, o sube 0,5 kg o más de músculo sin subir grasa. Sube grasa: 1 punto o más. Se estanca: nada de eso en 8 semanas o más. En curso: aún no pasaron 8 semanas. Δ es el cambio entre la primera y la última medición de la ventana. Fuente: bioimpedancia Fitdays registrada en Notion; describe composición corporal y no constituye un diagnóstico.</div>'
+    + '<div class="ft"><span>Ultra-Sport 19 · Diego Valenzuela</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+  toast("Resumen del plantel listo: guárdalo como PDF desde el diálogo de impresión", "success");
+};
 var BIO_ESTADOS = {
   mejora:  { t: "mejora",        col: "var(--success)", chip: "▼ mejora" },
   empeora: { t: "sube grasa",    col: "var(--danger)",  chip: "▲ sube grasa" },
@@ -25222,8 +25351,9 @@ function u19BioDeltaHTML(d, u, buenoSiBaja){
 
 /* Contenido de la tarjeta «Composición del plantel» (Rendimiento → Plantel). */
 function u19PlantelBioInnerHTML(){
-  var cab = function(sub){
-    return '<div class="fin-g-t"><div>Composición del plantel <span>' + sub + '</span></div>' + u19BioVentanaHTML() + '</div>';
+  var cab = function(sub, extra){
+    return '<div class="fin-g-t"><div>Composición del plantel <span>' + sub + '</span></div>'
+      + '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">' + u19BioVentanaHTML() + (extra || '') + '</div></div>';
   };
   var envoltura = function(inner){ return '<div class="card" style="margin-bottom:1rem;"><div class="card-main">' + inner + '</div></div>'; };
   if (!(typeof u19DashUrl === "function" && u19DashUrl("bio_todas")))
@@ -25239,7 +25369,8 @@ function u19PlantelBioInnerHTML(){
   var ps = an.personas;
   var cnt = { mejora: 0, empeora: 0, estable: 0, una: 0, curso: 0 }, sinMedir = 0;
   ps.forEach(function(p){ cnt[p.estado]++; if (p.sinMedir) sinMedir++; });
-  var h = cab("últimos " + _plantelBio.meses + " meses · " + ps.length + " persona" + (ps.length === 1 ? "" : "s") + " · " + an.total + " evaluaciones");
+  var h = cab("últimos " + _plantelBio.meses + " meses · " + ps.length + " persona" + (ps.length === 1 ? "" : "s") + " · " + an.total + " evaluaciones",
+    ps.length ? '<button class="btn btn-ghost btn-sm" onclick="u19PlantelInforme()" title="Resumen imprimible del plantel (guárdalo como PDF)">🖨 Informe</button>' : '');
   if (!ps.length){
     h += '<p class="text-xs text-muted" style="line-height:1.5;">Ninguna bioimpedancia con fecha en los últimos ' + _plantelBio.meses + ' meses. Prueba con una ventana más larga.</p>';
     return envoltura(h);
