@@ -4318,17 +4318,19 @@ function u19BioNotionBuscar(nombre, n){
 
 /* ===DASH_URL_END=== */
 
-window.importClientesNotion = async function(){
+window.importClientesNotion = async function(silencioso){
+  /* silencioso = true: lo llama la app sola al abrir (u19AutoImportarNotion);
+     no cambia de vista, no abre modales y solo avisa si algo cambió. */
   var url = ((typeof settings!=="undefined" && settings.dashApiUrl) || "").trim();
-  if (!url){ toast("Guarda primero tu URL /exec en Finanzas → Conexión con Google Apps Script","warn"); return; }
-  toast("Importando clientes activos desde Notion…");
+  if (!url){ if (!silencioso) toast("Guarda primero tu URL /exec en Finanzas → Conexión con Google Apps Script","warn"); return; }
+  if (!silencioso) toast("Importando clientes activos desde Notion…");
   try {
     var res = await fetch(u19DashUrl("clientes"));
     var data = await res.json();
     var lista = Array.isArray(data) ? data : ((data && Array.isArray(data.clientes)) ? data.clientes : []);
-    if (!lista.length){ toast("Notion no devolvió clientes. Revisa el endpoint ?tipo=clientes","warn"); return; }
+    if (!lista.length){ if (!silencioso) toast("Notion no devolvió clientes. Revisa el endpoint ?tipo=clientes","warn"); return; }
     var activos = lista.filter(function(x){ return x && x.activo === true && (x.nombre || x.name); });
-    if (!activos.length){ toast("No hay clientes con membresía Activa en Notion","warn"); return; }
+    if (!activos.length){ if (!silencioso) toast("No hay clientes con membresía Activa en Notion","warn"); return; }
     var nuevos = 0, actualizados = 0;
     var renovados = 0, precios = 0, dados_baja = 0, cambios = [];
     activos.forEach(function(x){
@@ -4439,19 +4441,21 @@ window.importClientesNotion = async function(){
     });
 
     saveState();
-    _clientFilter = "";
-    renderClients();
+    try { localStorage.setItem("us19_auto_import_at", String(Date.now())); } catch (eAi){}
+    if (silencioso) u19AutoImportRepintar();
+    else { _clientFilter = ""; renderClients(); }
 
     var msg = "Notion: " + activos.length + " activos · " + nuevos + " nuevos";
     if (renovados) msg += " · " + renovados + (renovados === 1 ? " renovación" : " renovaciones");
     if (precios) msg += " · " + precios + " precio" + (precios === 1 ? "" : "s");
     if (dados_baja) msg += " · " + dados_baja + " dado" + (dados_baja === 1 ? "" : "s") + " de baja";
     if (inactNuevos) msg += " · " + inactNuevos + " inactivo" + (inactNuevos === 1 ? "" : "s") + " traído" + (inactNuevos === 1 ? "" : "s") + " al apartado Inactivos";
-    toast(msg, "success");
+    if (!silencioso) toast(msg, "success");
+    else if (nuevos || renovados || precios || dados_baja || inactNuevos) toast("Actualizado desde Notion · " + msg.replace(/^Notion: /, ""), "success");
 
     /* Con renovaciones, se detalla que cambio: es la diferencia entre
        confiar en el numero y poder comprobarlo. */
-    if (cambios.length && typeof openModal === "function"){
+    if (!silencioso && cambios.length && typeof openModal === "function"){
       var filas = cambios.slice(0, 40).map(function(k){
         return '<tr><td>' + escapeHtml(k.n) + '</td>'
           + '<td class="text-xs text-muted">' + escapeHtml(k.de || "sin fecha") + '</td>'
@@ -4469,9 +4473,33 @@ window.importClientesNotion = async function(){
       });
     }
   } catch(e){
-    toast("Error al importar desde Notion: "+((e && e.message) || e),"warn");
+    if (!silencioso) toast("Error al importar desde Notion: "+((e && e.message) || e),"warn");
+    else console.warn("Actualización automática desde Notion:", e);
   }
 };
+/* Actualización automática desde Notion al abrir la app: una vez cada 20 h,
+   en silencio (sin cambiar de vista) y solo si hay puente configurado.
+   Cuesta una llamada al puente por día, contra un tope diario de 500. Un
+   «Importar de Notion» manual también reinicia el reloj. */
+function u19AutoImportRepintar(){
+  try {
+    var v = document.querySelector(".view.active"); if (!v) return;
+    var n = String(v.id || "").replace(/^view-/, "");
+    if (n === "clients") renderClients();
+    else if (n === "dashboard") renderDashboard();
+    else if (n === "finanzas") renderBolsillo();
+    else if (n === "ficha" && typeof renderFicha === "function") renderFicha();
+  } catch (e){}
+}
+function u19AutoImportarNotion(){
+  try {
+    var url = ((typeof settings !== "undefined" && settings.dashApiUrl) || "").trim();
+    if (!url || navigator.onLine === false) return;
+    var ult = parseInt(localStorage.getItem("us19_auto_import_at") || "0", 10) || 0;
+    if (Date.now() - ult < 20 * 3600000) return;
+    setTimeout(function(){ if (typeof importClientesNotion === "function") importClientesNotion(true); }, 4000);
+  } catch (e){}
+}
 /* ===NOTION_ROSTER_END=== */
 
 function clientCardHtml(c){
@@ -15472,7 +15500,8 @@ function u19FinRenovHTML(){
     + '⟳ Actualizar desde Notion</button></div>';
   h += '<p class="text-xs text-muted" style="margin:.3rem 0 .6rem;line-height:1.5;">'
     + 'Las fechas salen de Notion. Si aqui aparece vencido alguien que ya renovo, pulsa '
-    + '<b>Actualizar desde Notion</b>: trae las fechas nuevas y recalcula.</p>';
+    + '<b>Actualizar desde Notion</b>: trae las fechas nuevas y recalcula. '
+    + 'Además, la app se actualiza sola desde Notion una vez al día, al abrirla.</p>';
   h += '<div class="fin-kpis" style="margin-bottom:.6rem;">';
   h += '<div class="fin-k"><span class="fin-k-l">Vencido sin renovar</span><span class="fin-k-v" style="color:var(--danger);">'
     + _finCLP(r.mVenc) + '</span><span class="fin-k-x">' + r.venc.length + ' cliente' + (r.venc.length === 1 ? '' : 's') + '</span></div>';
@@ -20753,7 +20782,7 @@ document.addEventListener("keydown", function(e){
 function u19Arrancar(){
   /* Si el catalogo se mudo a IndexedDB, se recupera antes de pintar nada:
      la Biblioteca y las rutinas lo necesitan ya cargado. */
-  var seguir = function(){ init(); observarAppTop(); };
+  var seguir = function(){ init(); observarAppTop(); if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion(); };
   if (typeof u19RecuperarCatalogo === "function"){
     var t = setTimeout(seguir, 2500);   /* si IndexedDB no responde, se arranca igual */
     u19RecuperarCatalogo().then(function(){ clearTimeout(t); seguir(); },
@@ -25327,11 +25356,105 @@ function u19FichaTendenciaHTML(c, nEv){
   var nota = nEv.length < 2 ? "una sola medición"
     : (todo ? "todas las mediciones" : "últimos " + usada + " meses") + ((!todo && usada !== pedida) ? " · en " + pedida + " meses no hay dos" : "") + " · " + sel.length + " mediciones";
   var h = '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
-    + '<div class="fin-g-t"><div>Composición y tendencia <span>' + escapeHtml(nota) + '</span></div>' + u19BioVentanaHTML() + '</div>';
+    + '<div class="fin-g-t"><div>Composición y tendencia <span>' + escapeHtml(nota) + '</span></div>'
+    + '<div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap;">' + u19BioVentanaHTML()
+    + (sel.length >= 2 ? '<button class="btn btn-ghost btn-sm" onclick="u19TendenciaCompartir(\'' + c.id + '\')" title="Imagen con su tendencia, lista para mandar por WhatsApp">📤 Compartir</button>' : '')
+    + '</div></div>';
   if (claves) h += '<div class="text-xs text-muted" style="margin:.2rem 0 .4rem;">Última medición ' + rndFdate(nEv[0].fecha) + (nEv[1] ? ' · cambio respecto del ' + rndFdate(nEv[1].fecha) : '') + '</div>' + claves;
   if (graficos) h += graficos.replace('class="fb-graficos', 'style="margin-bottom:0;" class="fb-graficos');
   return h + '</div></div>';
 }
+
+/* ---- Compartir la tendencia como imagen (WhatsApp) ----
+   Un SVG propio con colores fijos (los gráficos de la ficha usan variables
+   CSS, que no existen al rasterizar) se pinta en un canvas y sale como PNG
+   de 1080×1350. Si el navegador sabe compartir archivos (Android, iOS), se
+   abre la hoja de compartir; si no, se descarga. Sin librerías. */
+var TEND_SERIES = [
+  { k: "peso_kg",    t: "Peso",           u: " kg", col: "#0e5132", dir: 0 },
+  { k: "grasa_pct",  t: "Grasa corporal", u: " %",  col: "#d97706", dir: -1 },
+  { k: "musculo_kg", t: "Masa muscular",  u: " kg", col: "#0284c7", dir: 1 },
+  { k: "cintura",    t: "Cintura",        u: " cm", col: "#7c3aed", dir: -1, circ: true }
+];
+function u19BioEnVentana(asc, m){
+  var d = new Date(); d.setMonth(d.getMonth() - m);
+  var lim = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  return asc.filter(function(x){ return String(x.fecha).slice(0, 10) >= lim; });
+}
+function u19TendenciaSVG(c, sel, nota){
+  var W = 1080, H = 1350, s = '';
+  function esc(t){ return String(t == null ? "" : t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  s += '<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="Inter, Segoe UI, Roboto, Helvetica, Arial, sans-serif">';
+  s += '<rect width="' + W + '" height="' + H + '" fill="#f5f7f3"/>';
+  s += '<rect width="' + W + '" height="210" fill="#0e5132"/><rect y="210" width="' + W + '" height="6" fill="#e21c25"/>';
+  s += '<text x="60" y="88" font-size="46" font-weight="800" fill="#ffffff" letter-spacing="2">ULTRA-SPORT 19</text>';
+  s += '<text x="60" y="130" font-size="20" fill="#bfe6d2" letter-spacing="4">TU EVOLUCIÓN · COMPOSICIÓN CORPORAL</text>';
+  s += '<text x="60" y="180" font-size="30" font-weight="700" fill="#ffffff">' + esc(c.name || "") + '</text>';
+  s += '<text x="' + (W - 60) + '" y="180" font-size="20" fill="#bfe6d2" text-anchor="end">' + esc(nota) + '</text>';
+  var series = TEND_SERIES.map(function(sr){
+    var p = sel.filter(function(x){ return u19BioValor(x, sr) != null; }).map(function(x){ return { f: x.fecha, v: u19BioValor(x, sr) }; });
+    return p.length >= 2 ? { sr: sr, p: p } : null;
+  }).filter(Boolean).slice(0, 4);
+  var cardH = series.length > 3 ? 240 : 300, top = 250, gap = 20;
+  series.forEach(function(it, i){
+    var y0 = top + i * (cardH + gap), x0 = 60, cw = W - 120, sr = it.sr, p = it.p, n = p.length;
+    s += '<rect x="' + x0 + '" y="' + y0 + '" width="' + cw + '" height="' + cardH + '" rx="18" fill="#ffffff" stroke="#d3d9d0"/>';
+    var d = +(p[n - 1].v - p[0].v).toFixed(1);
+    var col = (!sr.dir || Math.abs(d) < 0.05) ? "#6b7784" : ((d * sr.dir > 0) ? "#15803d" : "#b91c1c");
+    s += '<text x="' + (x0 + 28) + '" y="' + (y0 + 44) + '" font-size="26" font-weight="700" fill="#101820">' + esc(sr.t) + '</text>';
+    s += '<text x="' + (x0 + cw - 28) + '" y="' + (y0 + 44) + '" font-size="24" font-weight="700" fill="' + col + '" text-anchor="end">' + esc((d > 0 ? "+" : "") + d + sr.u + " desde " + u19FichaFechaCorta(p[0].f)) + '</text>';
+    var gx = x0 + 40, gy = y0 + 80, gw = cw - 80, gh = cardH - 130;
+    var vs = p.map(function(q){ return q.v; }), min = Math.min.apply(null, vs), max = Math.max.apply(null, vs);
+    if (max === min){ max += 1; min -= 1; }
+    var pad = (max - min) * 0.2; min -= pad; max += pad;
+    function X(i){ return gx + i * gw / (n - 1); }
+    function Y(v){ return gy + (max - v) / (max - min) * gh; }
+    for (var g = 0; g < 3; g++){ var yy = gy + g * gh / 2; s += '<line x1="' + gx + '" x2="' + (gx + gw) + '" y1="' + yy.toFixed(1) + '" y2="' + yy.toFixed(1) + '" stroke="#e6ece9" stroke-width="2"/>'; }
+    var path = p.map(function(q, i){ return (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(q.v).toFixed(1); }).join(" ");
+    s += '<path d="' + path + ' L' + X(n - 1).toFixed(1) + ' ' + (gy + gh) + ' L' + X(0).toFixed(1) + ' ' + (gy + gh) + ' Z" fill="' + sr.col + '" opacity=".1"/>';
+    s += '<path d="' + path + '" fill="none" stroke="' + sr.col + '" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>';
+    p.forEach(function(q, i){
+      var ult = i === n - 1, rot = i === 0 || ult || n <= 4, anc = i === 0 ? "start" : (ult ? "end" : "middle");
+      s += '<circle cx="' + X(i).toFixed(1) + '" cy="' + Y(q.v).toFixed(1) + '" r="' + (ult ? 10 : 7) + '" fill="' + (ult ? sr.col : "#ffffff") + '" stroke="' + sr.col + '" stroke-width="4"/>';
+      if (rot) s += '<text x="' + X(i).toFixed(1) + '" y="' + (Y(q.v) - 18).toFixed(1) + '" font-size="20" font-weight="800" text-anchor="' + anc + '" fill="' + (ult ? sr.col : "#101820") + '">' + esc(q.v + sr.u) + '</text>';
+      if (rot) s += '<text x="' + X(i).toFixed(1) + '" y="' + (gy + gh + 30) + '" font-size="17" text-anchor="' + anc + '" fill="#6b7784">' + esc(u19FichaFechaCorta(q.f)) + '</text>';
+    });
+  });
+  s += '<text x="60" y="' + (H - 50) + '" font-size="18" fill="#6b7784">Bioimpedancia Fitdays · ' + sel.length + ' mediciones · generado el ' + esc(rndFdate(u19HoyISO())) + '</text>';
+  s += '<text x="' + (W - 60) + '" y="' + (H - 50) + '" font-size="18" fill="#6b7784" text-anchor="end">Ultra-Sport 19 · Pencahue</text>';
+  return s + '</svg>';
+}
+function u19SvgAPng(svg, w, hh, cb){
+  var canvas = document.createElement("canvas"); canvas.width = w; canvas.height = hh;
+  var ctx = canvas.getContext("2d"); ctx.fillStyle = "#f5f7f3"; ctx.fillRect(0, 0, w, hh);
+  var img = new Image(), url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  img.onload = function(){ ctx.drawImage(img, 0, 0, w, hh); URL.revokeObjectURL(url); canvas.toBlob(function(b){ if (b) cb(b); else toast("No se pudo generar la imagen", "error"); }, "image/png"); };
+  img.onerror = function(){ URL.revokeObjectURL(url); toast("No se pudo generar la imagen", "error"); };
+  img.src = url;
+}
+window.u19TendenciaCompartir = function(id){
+  var c = getClient(id); if (!c) return;
+  var nb = (typeof u19FichaBio === "function") ? u19FichaBio(c) : null, evs = nb ? nb.evs : [];
+  if (!evs || evs.length < 2){ toast("Hacen falta al menos dos bioimpedancias en Notion para dibujar la tendencia", "warn"); return; }
+  var asc = evs.slice().reverse();
+  var escalas = [3, 6, 12], usada = _bioVentanaMeses, sel = u19BioEnVentana(asc, usada), todo = false;
+  while (sel.length < 2 && escalas.indexOf(usada) < escalas.length - 1){ usada = escalas[escalas.indexOf(usada) + 1]; sel = u19BioEnVentana(asc, usada); }
+  if (sel.length < 2){ sel = asc; todo = true; }
+  var nota = todo ? "todas las mediciones" : "últimos " + usada + " meses";
+  u19SvgAPng(u19TendenciaSVG(c, sel, nota), 1080, 1350, function(blob){
+    var nombre = "US19_tendencia_" + ((typeof infSlugName === "function") ? infSlugName(c.name) : "cliente") + "_" + u19HoyISO() + ".png";
+    var descargar = function(){
+      var a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nombre;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+      toast("Imagen descargada: mándasela por WhatsApp", "success");
+    };
+    var file = null; try { file = new File([blob], nombre, { type: "image/png" }); } catch (e){}
+    if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })){
+      navigator.share({ files: [file], title: "Tu evolución · Ultra-Sport 19" }).catch(function(){ descargar(); });
+    } else descargar();
+  });
+};
 
 /* ============================================================
    BATERÍA DE PRUEBAS · ActivForce 2 y BlazePod (sep 2026)
@@ -25742,8 +25865,10 @@ window.u19BateriaDesdeRnd = function(){
 /* ---- Bloque en Evaluaciones ---- */
 function u19BateriaBloque(c){
   var titulo = "Batería de pruebas · ActivForce 2 y BlazePod";
-  var accion = '<button class="btn btn-primary btn-sm" onclick="u19BateriaAbrir(\'' + c.id + '\')">+ Registrar prueba</button>';
   var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; });
+  var accion = '<span style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">'
+    + (ps.length ? '<button class="btn btn-secondary btn-sm" onclick="u19BateriaInforme(\'' + c.id + '\')" title="Informe imprimible (guárdalo como PDF) con todas las pruebas y su evolución">🖨 Informe</button>' : '')
+    + '<button class="btn btn-primary btn-sm" onclick="u19BateriaAbrir(\'' + c.id + '\')">+ Registrar prueba</button></span>';
   if (!ps.length)
     return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Perfil <b>' + (u19BateriaPerfil(c) === "paciente" ? "paciente" : "atleta") + '</b>. '
       + 'ROM y fuerza isométrica con LSI en ActivForce; reacción, balance y agilidad en BlazePod. Cada prueba se guarda con fecha para comparar la evolución, y las que dan LSI entran en el criterio de alta.</p>', accion);
@@ -25772,6 +25897,93 @@ function u19BateriaBloque(c){
   h += '<p class="text-xs text-muted" style="margin:.6rem 0 0;line-height:1.5;">LSI 90 % o más: simetría adecuada · 85–89 %: vigilar · bajo 85 %: déficit lateral. Cuando declaras el lado lesionado, el LSI es afectado / sano; si no, menor / mayor.</p>';
   return u19Bloque(titulo, h, accion);
 }
+
+/* ---- Informe imprimible de la batería (PDF desde el navegador) ----
+   Mismo correlativo de folio que los informes de composición corporal
+   (infNextFolio), misma firma del evaluador y el registro que se haya
+   escrito en Opciones del informe. Se guarda en c.batInformes[] qué folio
+   se emitió y cuándo, para poder rastrearlo. */
+function u19BateriaLectura(p, ps){
+  var d = p.d || {}, prev = null;
+  for (var i = 0; i < ps.length; i++){ var q = ps[i]; if (q === p || q.prueba !== p.prueba || String(q.fecha) >= String(p.fecha)) continue; if ((q.v || {}).mov !== (p.v || {}).mov) continue; if (!prev || String(q.fecha) > String(prev.fecha)) prev = q; }
+  var out = { lineas: (d.lineas || []).slice(), cambio: "", mejora: null, prev: prev };
+  if (prev && prev.d){
+    var pd = prev.d;
+    if (d.lsi != null && pd.lsi != null){ out.cambio = (d.lsi - pd.lsi > 0 ? "+" : "") + batR(d.lsi - pd.lsi, 1) + " pts de LSI"; out.mejora = d.lsi >= pd.lsi; }
+    else if (d.tiempo != null && pd.tiempo != null){ out.cambio = (d.tiempo - pd.tiempo > 0 ? "+" : "") + batR(d.tiempo - pd.tiempo, 2) + " s"; out.mejora = d.tiempo <= pd.tiempo; }
+    else if (d.nivelTest != null && pd.nivelTest != null){ var dn = d.nivelTest - pd.nivelTest; out.cambio = (dn > 0 ? "+" : "") + dn + " nivel" + (Math.abs(dn) === 1 ? "" : "es"); out.mejora = dn >= 0; }
+    else if (d.porMin != null && pd.porMin != null){ out.cambio = (d.porMin - pd.porMin > 0 ? "+" : "") + batR(d.porMin - pd.porMin, 1) + "/min"; out.mejora = d.porMin >= pd.porMin; }
+    if (out.cambio) out.cambio += " vs " + rndFdate(prev.fecha);
+  }
+  return out;
+}
+function u19HoyISO(){ var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+window.u19BateriaInforme = function(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(a.fecha) + a.createdAt) < (String(b.fecha) + b.createdAt) ? -1 : 1; });
+  if (!ps.length){ toast("Esta persona aún no tiene pruebas registradas", "warn"); return; }
+  var w = window.open("", "_blank");
+  if (!w){ toast("El navegador bloqueó la ventana del informe: permite ventanas emergentes para esta app", "error"); return; }
+  var folio = (typeof infNextFolio === "function") ? infNextFolio() : "";
+  var hoyISO = u19HoyISO();
+  c.batInformes = c.batInformes || []; c.batInformes.push({ folio: folio, fecha: hoyISO, n: ps.length }); saveState();
+  var perfil = u19BateriaPerfil(c) === "paciente" ? "Paciente en rehabilitación" : "Atleta";
+  var lic = (typeof _infOpts !== "undefined" && _infOpts.opts && _infOpts.opts.licencia) ? String(_infOpts.opts.licencia).trim() : "";
+  var firma = (typeof _infOpts !== "undefined" && _infOpts.firmas && _infOpts.firmas.evaluador) ? _infOpts.firmas.evaluador : "";
+  function chipLSI(d){
+    if (d.lsi == null) return "";
+    var t = d.nivel === "ok" ? ["#15803d", "simetría adecuada"] : (d.nivel === "vigilar" ? ["#b45309", "vigilar"] : ["#b91c1c", "asimetría marcada"]);
+    return ' <span class="chip" style="background:' + t[0] + '">LSI ' + d.lsi + ' % · ' + t[1] + '</span>';
+  }
+  var grupos = {}, orden = [];
+  ps.forEach(function(p){ var k = p.prueba + "|" + ((p.v || {}).mov || ""); if (!grupos[k]){ grupos[k] = []; orden.push(k); } grupos[k].push(p); });
+  var resumen = orden.map(function(k){
+    var g = grupos[k], ult = g[g.length - 1], cat = u19BateriaCat(ult.prueba) || { nombre: ult.prueba, disp: ult.disp }, l = u19BateriaLectura(ult, ps);
+    return '<tr><td><b>' + escapeHtml(cat.nombre) + '</b><div class="sub">' + (cat.disp === "blazepod" ? "BlazePod" : "ActivForce 2") + ((ult.v || {}).mov ? ' · ' + escapeHtml(u19BateriaMov(ult)) : '') + '</div></td>'
+      + '<td class="num">' + rndFdate(ult.fecha) + '</td>'
+      + '<td>' + escapeHtml((ult.d || {}).principal || "—") + chipLSI(ult.d || {}) + '</td>'
+      + '<td>' + (l.cambio ? '<b style="color:' + (l.mejora ? "#15803d" : "#b91c1c") + '">' + escapeHtml(l.cambio) + '</b>' : '<span class="sub">primera medición</span>') + '</td>'
+      + '<td class="num">' + g.length + '</td></tr>';
+  }).join("");
+  var hist = ps.slice().reverse().map(function(p){
+    var cat = u19BateriaCat(p.prueba) || { nombre: p.prueba, disp: p.disp }, l = u19BateriaLectura(p, ps), d = p.d || {};
+    return '<tr><td class="num">' + rndFdate(p.fecha) + '</td>'
+      + '<td><b>' + escapeHtml(cat.nombre) + '</b>' + ((p.v || {}).mov ? '<div class="sub">' + escapeHtml(u19BateriaMov(p)) + '</div>' : '') + '</td>'
+      + '<td>' + escapeHtml(d.principal || "—") + chipLSI(d) + '</td>'
+      + '<td>' + l.lineas.map(escapeHtml).concat(l.cambio ? ['<b style="color:' + (l.mejora ? "#15803d" : "#b91c1c") + '">' + escapeHtml(l.cambio) + '</b>'] : []).join('<br>')
+        + (p.notas ? '<div class="sub">' + escapeHtml(p.notas) + '</div>' : '') + '</td></tr>';
+  }).join("");
+  var css = 'body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#15241c;margin:0;padding:24px 28px;font-size:10.5pt;line-height:1.4;}'
+    + '.hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0e5132;padding-bottom:10px;margin-bottom:14px;gap:16px;}'
+    + '.brand{font-weight:800;font-size:22pt;letter-spacing:.04em;color:#0e5132;line-height:1;}.tag{font-size:7pt;letter-spacing:.2em;color:#e21c25;font-weight:700;margin-top:3px;}'
+    + '.ttl{font-size:12pt;font-weight:700;color:#334e68;margin-top:6px;}.meta{text-align:right;font-size:8.5pt;color:#627d98;white-space:nowrap;}.meta b{color:#0e5132;font-size:10pt;}'
+    + '.id{display:grid;grid-template-columns:2fr 1.2fr .8fr 1.4fr;gap:10px;background:#0e5132;color:#fff;border-radius:6px;padding:10px 14px;margin-bottom:14px;border-top:3px solid #e21c25;}'
+    + '.id span{display:block;font-size:6.5pt;letter-spacing:.14em;text-transform:uppercase;color:#bfe6d2;}.id b{font-size:10.5pt;}'
+    + 'h2{font-size:10.5pt;text-transform:uppercase;letter-spacing:.04em;color:#0e5132;border-bottom:2px solid #0e5132;padding-bottom:3px;margin:16px 0 8px;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:9pt;}th{background:#0e5132;color:#fff;text-align:left;padding:5px 7px;font-size:7.5pt;letter-spacing:.06em;text-transform:uppercase;}'
+    + 'td{padding:5px 7px;border-top:1px solid #e2e8f0;vertical-align:top;}tr:nth-child(even) td{background:#f4f8f5;}td.num{white-space:nowrap;}'
+    + '.sub{font-size:7.5pt;color:#627d98;}.chip{display:inline-block;color:#fff;font-size:7pt;font-weight:700;border-radius:10px;padding:1px 7px;margin-left:4px;vertical-align:middle;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + '.leg{background:#f7faf8;border:1px solid #e6ece9;border-left:4px solid #e21c25;border-radius:0 6px 6px 0;padding:8px 12px;font-size:8.5pt;color:#46544c;margin-top:10px;}'
+    + '.signs{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:22px;page-break-inside:avoid;}.sign{border:1px solid #d9e2ec;border-radius:6px;padding:12px;text-align:center;}'
+    + '.sign .line{border-top:1px solid #0e5132;margin:52px auto 6px;width:80%;}.sign img{max-height:48px;display:block;margin:0 auto -46px;}.sign b{color:#0e5132;}.sign .sub{display:block;}'
+    + '.ft{margin-top:18px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;display:flex;justify-content:space-between;}'
+    + 'th,.id,.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{padding:0;}@page{size:A4;margin:12mm;}}';
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' + escapeHtml(folio || "Informe") + ' · ' + escapeHtml(c.name || "") + ' · Ultra-Sport 19</title><style>' + css + '</style></head><body>'
+    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div><div class="ttl">Informe de evaluación de rendimiento neuromuscular · ActivForce 2 y BlazePod</div></div>'
+    + '<div class="meta">Folio <b>' + escapeHtml(folio || "—") + '</b><br>Emitido el ' + rndFdate(hoyISO) + '<br>Confidencial</div></div>'
+    + '<div class="id"><div><span>Deportista</span><b>' + escapeHtml(c.name || "—") + '</b></div><div><span>Perfil</span><b>' + perfil + '</b></div>'
+    + '<div><span>Pruebas</span><b>' + ps.length + '</b></div><div><span>Periodo</span><b>' + rndFdate(ps[0].fecha) + (ps.length > 1 ? ' – ' + rndFdate(ps[ps.length - 1].fecha) : '') + '</b></div></div>'
+    + '<h2>A · Estado actual por prueba</h2><table><thead><tr><th>Prueba</th><th>Última</th><th>Resultado</th><th>Cambio</th><th>N.º</th></tr></thead><tbody>' + resumen + '</tbody></table>'
+    + '<h2>B · Historial completo</h2><table><thead><tr><th>Fecha</th><th>Prueba</th><th>Resultado</th><th>Lectura</th></tr></thead><tbody>' + hist + '</tbody></table>'
+    + '<div class="leg"><b>Cómo leer este informe.</b> LSI (índice de simetría entre lados): 90 % o más, simetría adecuada · 85–89 %, vigilar · bajo 85 %, asimetría marcada. En las pruebas de tiempo, menos segundos es mejor; en las de nivel y toques, más es mejor. '
+    + 'Los valores describen el rendimiento medido con ActivForce 2 y BlazePod en las fechas indicadas y sirven para ajustar el entrenamiento; no constituyen un diagnóstico.</div>'
+    + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Diego Valenzuela</b><span class="sub">Interno de Kinesiología · U. de Talca' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Ultra-Sport 19 · Pencahue, Maule</span></div>'
+    + '<div class="sign"><div class="line"></div><b>' + escapeHtml(c.name || "—") + '</b><span class="sub">Deportista · toma conocimiento de sus resultados</span></div></div>'
+    + '<div class="ft"><span>Ultra-Sport 19 · ' + escapeHtml(folio || "") + '</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+  toast("Informe " + (folio || "") + " listo: guárdalo como PDF desde el diálogo de impresión", "success");
+};
 
 function renderFicha(){
   var c = getClient(_fichaState.clientId);
