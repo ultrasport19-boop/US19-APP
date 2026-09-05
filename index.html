@@ -629,6 +629,17 @@ img{max-width:100%;display:block;}
 .dash-panels + .u-acc{margin-top:1rem;}
 #calendly-dash > div:last-child{margin-bottom:0 !important;}
 
+/* ---- Ajustes v2: secciones plegables ---- */
+.set-sec{margin-top:.6rem;}
+.set-sec > summary{font-size:.92rem;}
+.set-sec > summary span{margin-left:auto;text-align:right;}
+.set-sec .u-acc-body{padding-top:.2rem;}
+.set-sub{font-size:.68rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin:.9rem 0 .5rem;}
+.set-sub:first-child{margin-top:0;}
+.set-nota{margin:0 0 .8rem;line-height:1.5;}
+.set-btns{display:grid;grid-template-columns:1fr 1fr;gap:.5rem;}
+@media (max-width:520px){.set-btns{grid-template-columns:1fr;}}
+
 </style>
 <style id="infOptsCss">
 #inf-opts{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px;color:#1e293b;font-size:.85rem;}
@@ -7387,6 +7398,12 @@ function returnToTrainer(){
   showTrainerUI(); showView("dashboard");
 }
 window.returnToTrainer = returnToTrainer;
+/* AJUSTES · v2 (sep 2026)
+   Antes era una sola columna con nueve títulos seguidos y, por un
+   <div class="form-grid"> abierto antes de tiempo, el puente de Apps
+   Script y el respaldo cifrado se pintaban dentro de la rejilla de
+   Bitly. Ahora cada tema es una sección plegable con su estado en el
+   título. Todos los ids, el botón Guardar y bodyMount son los mismos. */
 function openSettings(){
   var env = detectPreviewEnv();
   var bodyHtml = '';
@@ -7395,87 +7412,89 @@ function openSettings(){
     bodyHtml += '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:1rem;"><div class="card-main"><div style="color:var(--warn);font-weight:700;margin-bottom:.3rem;">⚠ Estás en '+escapeHtml(env.label)+'</div><div class="text-xs text-muted">Los enlaces de compartir solo funcionarán cuando publiques esta app en una URL pública (GitHub Pages u otro hosting).</div></div></div>';
   }
 
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">URL pública</h3>';
-  bodyHtml += '<div class="form-row"><input type="url" id="set-base-url" value="'+escapeAttr(settings.baseUrl)+'" placeholder="'+DEFAULT_BASE_URL+'"><div class="field-hint">URL donde está hospedada esta app. Se usa para construir los links de compartir.</div></div>';
+  /* Sección plegable con el estado en el título. */
+  function sec(id, titulo, estado, abierto, inner){
+    return '<details class="u-acc set-sec"' + (abierto ? ' open' : '') + ' id="set-sec-' + id + '"><summary>' + titulo
+      + (estado ? '<span>' + estado + '</span>' : '') + '</summary><div class="u-acc-body">' + inner + '</div></details>';
+  }
+  var sub = function(t){ return '<div class="set-sub">' + t + '</div>'; };
+  var nota = function(t){ return '<p class="text-xs text-muted set-nota">' + t + '</p>'; };
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">☁ GitHub (links cortos · opcional)</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">Configura un Personal Access Token de GitHub para subir las rutinas como archivos JSON. Los links pasan de ~2000 caracteres a ~80. <strong>Cómo obtenerlo:</strong> 1) Ve a <span class="kbd">github.com/settings/tokens/new</span>, 2) Marca el scope <span class="kbd">repo</span>, 3) Copia y pega aquí.</p>';
-  bodyHtml += '<div class="form-grid cols-2">';
-  bodyHtml += formField("Repositorio (owner/name)", '<input type="text" id="set-gh-repo" value="'+escapeAttr(settings.githubRepo)+'" placeholder="usuario/repo">');
-  bodyHtml += formField("Rama", '<input type="text" id="set-gh-branch" value="'+escapeAttr(settings.githubBranch)+'" placeholder="main">');
-  bodyHtml += '</div>';
-  bodyHtml += formField("Token", '<input type="password" id="set-gh-token" value="'+escapeAttr(settings.githubToken)+'" placeholder="ghp_..." autocomplete="new-password">');
-  bodyHtml += '<div style="margin-top:.5rem;"><button class="btn btn-secondary btn-sm" id="btn-gh-test">🔍 Verificar token</button> <span id="gh-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
+  /* --- 1 · Puente con Notion (Apps Script) --- */
+  var sPuente = nota('URL de tu Web App de Google Apps Script. Se usa para sincronizar Finanzas e importar clientes desde Notion.')
+    + '<label class="form-label">URL Apps Script (/exec)</label>'
+    + '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;">'
+    +   '<input type="url" id="set-dash-url" value="'+escapeAttr(settings.dashApiUrl||'')+'" placeholder="https://script.google.com/macros/s/.../exec" style="flex:1;min-width:200px;">'
+    +   '<button class="btn btn-secondary btn-sm" id="btn-verify-dash" type="button">🔌 Verificar</button>'
+    +   '<span id="dash-verify-st" style="font-size:.78rem;"></span>'
+    + '</div>'
+    + '<label class="form-label">Clave del puente (API_CLAVE)</label>'
+    + '<input type="password" id="set-dash-clave" value="'+escapeAttr(settings.dashClave||'')+'" placeholder="la misma que pusiste en Propiedades del script" style="width:100%;margin-bottom:.4rem;" autocomplete="new-password">'
+    + nota('Va aparte de la URL a propósito: si enseñas la /exec en una captura, no lleva la clave dentro. Sin ella el puente no responde a nadie. «Verificar» guarda la URL y la clave si el puente responde.');
+  var ePuente = (settings.dashApiUrl && settings.dashClave) ? 'configurado' : (settings.dashApiUrl ? 'falta la clave' : 'sin configurar');
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">🤖 Claude (análisis automático)</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">Deja que la app lea tus capturas sola, sin copiar y pegar. '
-    + '<b>Dos caminos:</b> por el <b>puente de Apps Script</b> la clave vive en el servidor y nunca baja al navegador — es el recomendado; '
-    + 'en <b>directo</b> la clave se guarda en este navegador, cómodo pero al alcance de cualquier script de la página. '
-    + 'La clave se obtiene en <span class="kbd">console.anthropic.com</span> → API keys.</p>';
-  bodyHtml += formField("Modo", '<select id="set-claude-proxy">'
-    + '<option value="1"' + (settings.claudeProxy ? " selected" : "") + '>Por el puente de Apps Script (recomendado)</option>'
-    + '<option value="0"' + (settings.claudeProxy ? "" : " selected") + '>Directo desde este navegador</option></select>');
-  bodyHtml += formField("Clave de API (solo en modo directo)", '<input type="password" id="set-claude-key" value="'
-    + escapeAttr(settings.claudeKey || "") + '" placeholder="sk-ant-..." autocomplete="new-password">');
-  bodyHtml += formField("Modelo", '<select id="set-claude-modelo">'
-    + CLAUDE_MODELOS.map(function(m){
-        return '<option value="' + m.id + '"' + (settings.claudeModelo === m.id ? " selected" : "") + '>' + escapeHtml(m.nm) + '</option>';
-      }).join("") + '</select>');
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:1rem;line-height:1.5;">'
-    + 'Claude lee de una foto: <b>revisa siempre el JSON</b> antes de generar el informe. Una cifra mal leída llega al documento.</p>';
-  bodyHtml += '<div class="divider"></div>';
+  /* --- 2 · Esta app --- */
+  var sApp = '<label class="form-label">URL pública</label>'
+    + '<div class="form-row"><input type="url" id="set-base-url" value="'+escapeAttr(settings.baseUrl)+'" placeholder="'+DEFAULT_BASE_URL+'"><div class="field-hint">URL donde está hospedada esta app. Se usa para construir los links de compartir.</div></div>';
+  var eApp = escapeHtml(String(settings.baseUrl || DEFAULT_BASE_URL).replace(/^https?:\/\//, '').replace(/\/$/, ''));
 
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">📅 Calendly (citas automáticas)</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">Conecta tu cuenta de Calendly para ver las citas del día en el Panel y cruzarlas con tus clientes. <strong>Cómo obtener el token:</strong> ve a <span class="kbd">calendly.com/app/settings/api</span> → Personal Access Token → Generar token → copia y pega aquí.</p>';
-  bodyHtml += formField("Personal Access Token", '<input type="password" id="set-cal-token" value="'+escapeAttr(settings.calendlyToken)+'" placeholder="eyJraW..." autocomplete="new-password">');
-  bodyHtml += '<hr style="border:none;border-top:1px solid var(--border);margin:1.2rem 0;">';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">⏱ Horas del entrenador</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">La pestaña <strong>Horas</strong> cruza esta configuración con las citas reales de Calendly para calcular costo, ocupación y costo por cliente. Ciclo de pago: <strong>del 16 al 15</strong> del mes siguiente (ambos incluidos); se le paga el 15. Las horas extra se registran desde la pestaña Horas.</p>';
-  bodyHtml += formField("Entrenador", '<input type="text" id="set-hr-entrenador" value="'+escapeAttr(settings.horasEntrenador||"")+'" placeholder="Eric">');
-  bodyHtml += formField("Valor hora líquido (CLP)", '<input type="number" id="set-hr-valor" value="'+escapeAttr(String(settings.horasValorHora||3000))+'">');
-  bodyHtml += formField("Hora de inicio (0-23)", '<input type="number" id="set-hr-ini" value="'+escapeAttr(String(settings.horasInicio||16))+'">');
-  bodyHtml += formField("Hora de término (0-23)", '<input type="number" id="set-hr-termino" value="'+escapeAttr(String(settings.horasTermino||22))+'">');
-  bodyHtml += formField("Días de turno (0=dom ... 6=sáb)", '<input type="text" id="set-hr-dias" value="'+escapeAttr(settings.horasDias||"1,2,3,4,5")+'" placeholder="1,2,3,4,5">');
-  bodyHtml += formField("Capacidad por hora (personas)", '<input type="number" id="set-hr-cap" value="'+escapeAttr(String(settings.horasCapacidad||8))+'">');
-  bodyHtml += formField("Factor bruto (1 = sin retención)", '<input type="number" step="0.0001" id="set-hr-factor" value="'+escapeAttr(String(settings.horasFactorBruto||1))+'">');
-  bodyHtml += formField("URL del Apps Script (webhook Notion)", '<input type="text" id="set-hr-api" value="'+escapeAttr(settings.horasApiUrl||"")+'" placeholder="https://script.google.com/macros/s/.../exec">');
-  bodyHtml += '<div style="margin-top:.5rem;"><button class="btn btn-secondary btn-sm" id="btn-cal-test">🔍 Verificar token</button> <span id="cal-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.2rem;">🔗 Bitly (links cortos · recomendado)</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.8rem;line-height:1.5;">Prioridad más alta que GitHub. Obtén tu token en <span class="kbd">app.bitly.com/settings/api</span>. Genera links como <span class="kbd">bit.ly/XXXXX</span>.</p>';
-  bodyHtml += '<div class="form-grid cols-2">';
-  /* ===APPSSCRIPT FIELD=== */
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.2rem;">⚡ Apps Script · Notion Sync</h3>';
-  bodyHtml += '<p style="font-size:.82rem;color:var(--muted);margin-bottom:.7rem;">URL de tu Web App de Google Apps Script. Se usa para sincronizar Finanzas e importar clientes desde Notion.</p>';
-  bodyHtml += '<label style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem;">URL Apps Script (/exec)</label>';
-  bodyHtml += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1.2rem;">' +
-    '<input type="url" id="set-dash-url" value="'+escapeAttr(settings.dashApiUrl||'')+'" placeholder="https://script.google.com/macros/s/.../exec?clave=..." style="flex:1;min-width:200px;">' +
-    '<button class="btn btn-secondary btn-sm" id="btn-verify-dash" type="button">🔌 Verificar</button>' +
-    '<span id="dash-verify-st" style="font-size:.78rem;"></span>' +
-    '</div>';
-  bodyHtml += '<label style="font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.35rem;">Clave del puente (API_CLAVE)</label>';
-  bodyHtml += '<input type="password" id="set-dash-clave" value="'+escapeAttr(settings.dashClave||'')+'" placeholder="la misma que pusiste en Propiedades del script" style="width:100%;margin-bottom:.4rem;">';
-  bodyHtml += '<p style="font-size:.75rem;color:var(--muted);margin-bottom:1.2rem;line-height:1.5;">Va aparte de la URL a propósito: si enseñas la /exec en una captura, no lleva la clave dentro. Sin ella el puente no responde a nadie.</p>';
-  bodyHtml += u19RespCardHTML();
-  bodyHtml += '<hr style="border-color:rgba(255,255,255,.07);margin:.5rem 0 1.2rem;">';
+  /* --- 3 · Claude --- */
+  var sClaude = nota('Deja que la app lea tus capturas sola, sin copiar y pegar. '
+      + '<b>Dos caminos:</b> por el <b>puente de Apps Script</b> la clave vive en el servidor y nunca baja al navegador — es el recomendado; '
+      + 'en <b>directo</b> la clave se guarda en este navegador, cómodo pero al alcance de cualquier script de la página. '
+      + 'La clave se obtiene en <span class="kbd">console.anthropic.com</span> → API keys.')
+    + '<div class="form-grid cols-2">'
+    + formField("Modo", '<select id="set-claude-proxy">'
+      + '<option value="1"' + (settings.claudeProxy ? " selected" : "") + '>Por el puente de Apps Script (recomendado)</option>'
+      + '<option value="0"' + (settings.claudeProxy ? "" : " selected") + '>Directo desde este navegador</option></select>')
+    + formField("Modelo", '<select id="set-claude-modelo">'
+      + CLAUDE_MODELOS.map(function(m){
+          return '<option value="' + m.id + '"' + (settings.claudeModelo === m.id ? " selected" : "") + '>' + escapeHtml(m.nm) + '</option>';
+        }).join("") + '</select>')
+    + '</div>'
+    + formField("Clave de API (solo en modo directo)", '<input type="password" id="set-claude-key" value="'
+      + escapeAttr(settings.claudeKey || "") + '" placeholder="sk-ant-..." autocomplete="new-password">')
+    + nota('Claude lee de una foto: <b>revisa siempre el JSON</b> antes de generar el informe. Una cifra mal leída llega al documento.');
+  var eClaude = settings.claudeProxy ? 'por el puente' : (settings.claudeKey ? 'directo · clave en este navegador' : 'directo · sin clave');
 
-  bodyHtml += formField("Token de Bitly", '<input type="password" id="set-bt-token" value="'+escapeAttr(settings.bitlyToken)+'" placeholder="Pega tu Bearer Token" autocomplete="new-password">');
-  bodyHtml += formField("Dominio personalizado (opcional)", '<input type="text" id="set-bt-domain" value="'+escapeAttr(settings.bitlyDomain)+'" placeholder="bit.ly o tu dominio">');
-  bodyHtml += '</div>';
+  /* --- 4 · Calendly --- */
+  var sCal = nota('Conecta tu cuenta de Calendly para ver las citas del día en el Panel y cruzarlas con tus clientes. <strong>Cómo obtener el token:</strong> ve a <span class="kbd">calendly.com/app/settings/api</span> → Personal Access Token → Generar token → copia y pega aquí.')
+    + formField("Personal Access Token", '<input type="password" id="set-cal-token" value="'+escapeAttr(settings.calendlyToken)+'" placeholder="eyJraW..." autocomplete="new-password">')
+    + '<div><button class="btn btn-secondary btn-sm" id="btn-cal-test">🔍 Verificar token</button> <span id="cal-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
+  var eCal = settings.calendlyToken ? 'token guardado' : 'sin token';
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">🔄 Sincronización entre dispositivos</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.6rem;line-height:1.5;">Sincroniza tus clientes, rutinas y ejercicios entre todos tus dispositivos usando tu repo de GitHub como almacén. Requiere que GitHub esté configurado arriba con token y permisos de Contents (Read and Write).</p>';
-  bodyHtml += '<div class="form-row"><label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text);">'
-    + '<input type="checkbox" id="set-sync-on" style="width:auto;accent-color:var(--accent);width:22px;height:22px;"'+(settings.syncEnabled?" checked":"")+'>'
-    + ' Activar sincronización automática</label>'
-    + '<div class="field-hint">Al guardar cualquier cambio, los datos se suben a <span class="kbd">sync/state.json</span> en tu repo. Al abrir la app, se descargan. Haz clic en el badge de Sync en el header para forzar una sincronización.</div></div>';
+  /* --- 5 · Horas del entrenador --- */
+  var sHoras = nota('La pestaña <strong>Horas</strong> cruza esta configuración con las citas reales de Calendly para calcular costo, ocupación y costo por cliente. Ciclo de pago: <strong>del 16 al 15</strong> del mes siguiente (ambos incluidos); se le paga el 15. Las horas extra se registran desde la pestaña Horas.')
+    + '<div class="form-grid cols-2">'
+    + formField("Entrenador", '<input type="text" id="set-hr-entrenador" value="'+escapeAttr(settings.horasEntrenador||"")+'" placeholder="Eric">')
+    + formField("Valor hora líquido (CLP)", '<input type="number" id="set-hr-valor" value="'+escapeAttr(String(settings.horasValorHora||3000))+'">')
+    + formField("Hora de inicio (0-23)", '<input type="number" id="set-hr-ini" value="'+escapeAttr(String(settings.horasInicio||16))+'">')
+    + formField("Hora de término (0-23)", '<input type="number" id="set-hr-termino" value="'+escapeAttr(String(settings.horasTermino||22))+'">')
+    + formField("Días de turno (0=dom ... 6=sáb)", '<input type="text" id="set-hr-dias" value="'+escapeAttr(settings.horasDias||"1,2,3,4,5")+'" placeholder="1,2,3,4,5">')
+    + formField("Capacidad por hora (personas)", '<input type="number" id="set-hr-cap" value="'+escapeAttr(String(settings.horasCapacidad||8))+'">')
+    + formField("Factor bruto (1 = sin retención)", '<input type="number" step="0.0001" id="set-hr-factor" value="'+escapeAttr(String(settings.horasFactorBruto||1))+'">')
+    + '</div>'
+    + formField("URL del Apps Script (webhook Notion)", '<input type="text" id="set-hr-api" value="'+escapeAttr(settings.horasApiUrl||"")+'" placeholder="https://script.google.com/macros/s/.../exec">');
+  var eHoras = escapeHtml(settings.horasEntrenador || '—') + ' · $' + Number(settings.horasValorHora || 0).toLocaleString('es-CL') + '/h · ' + (settings.horasInicio || 16) + '–' + (settings.horasTermino || 22) + ' h';
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.2rem;">🔒 Cifrado de datos (privacidad de pacientes)</h3>';
-  bodyHtml += '<p class="text-xs text-muted" style="margin-bottom:.7rem;line-height:1.5;">Cifra la base clínica (nombres, RUT, diagnósticos, banderas rojas) <strong>antes</strong> de subirla a GitHub. Aunque alguien acceda al repositorio, ve solo datos ilegibles. Las rutinas que compartes a pacientes NO se cifran (ellos deben poder abrirlas).</p>';
+  /* --- 6 · Links cortos: Bitly y GitHub --- */
+  var sLinks = sub('🔗 Bitly (recomendado)')
+    + nota('Prioridad más alta que GitHub. Obtén tu token en <span class="kbd">app.bitly.com/settings/api</span>. Genera links como <span class="kbd">bit.ly/XXXXX</span>.')
+    + '<div class="form-grid cols-2">'
+    + formField("Token de Bitly", '<input type="password" id="set-bt-token" value="'+escapeAttr(settings.bitlyToken)+'" placeholder="Pega tu Bearer Token" autocomplete="new-password">')
+    + formField("Dominio personalizado (opcional)", '<input type="text" id="set-bt-domain" value="'+escapeAttr(settings.bitlyDomain)+'" placeholder="bit.ly o tu dominio">')
+    + '</div>'
+    + sub('☁ GitHub (alternativa · también almacén de la sincronización)')
+    + nota('Configura un Personal Access Token de GitHub para subir las rutinas como archivos JSON. Los links pasan de ~2000 caracteres a ~80. <strong>Cómo obtenerlo:</strong> 1) Ve a <span class="kbd">github.com/settings/tokens/new</span>, 2) Marca el scope <span class="kbd">repo</span>, 3) Copia y pega aquí.')
+    + '<div class="form-grid cols-2">'
+    + formField("Repositorio (owner/name)", '<input type="text" id="set-gh-repo" value="'+escapeAttr(settings.githubRepo)+'" placeholder="usuario/repo">')
+    + formField("Rama", '<input type="text" id="set-gh-branch" value="'+escapeAttr(settings.githubBranch)+'" placeholder="main">')
+    + '</div>'
+    + formField("Token", '<input type="password" id="set-gh-token" value="'+escapeAttr(settings.githubToken)+'" placeholder="ghp_..." autocomplete="new-password">')
+    + '<div><button class="btn btn-secondary btn-sm" id="btn-gh-test">🔍 Verificar token</button> <span id="gh-test-result" style="font-size:.8rem;margin-left:.5rem;"></span></div>';
+  var eLinks = settings.bitlyToken ? 'Bitly' + (settings.githubToken ? ' + GitHub' : '') : (settings.githubToken ? 'GitHub' : 'sin acortador · links largos');
+
+  /* --- 7 · Sincronización y cifrado --- */
   var encStatus, encBtns;
   if (!settings.encEnabled){
     encStatus = '<span style="color:var(--warn);">⚠ Datos sin cifrar — legibles por cualquiera con acceso al repositorio.</span>';
@@ -7487,29 +7506,47 @@ function openSettings(){
     encStatus = '<span style="color:var(--warn);">🔒 Cifrado activo · bloqueado en este dispositivo.</span>';
     encBtns = '<button class="btn btn-primary btn-sm" id="btn-enc-unlock">🔓 Desbloquear</button>';
   }
-  bodyHtml += '<div style="background:var(--surface-2);border-radius:8px;padding:.7rem .85rem;">'+encStatus+'<div style="margin-top:.55rem;">'+encBtns+'</div></div>';
+  var sSync = sub('🔄 Sincronización entre dispositivos')
+    + nota('Sincroniza tus clientes, rutinas y ejercicios entre todos tus dispositivos usando tu repo de GitHub como almacén. Requiere que GitHub esté configurado en «Links cortos» con token y permisos de Contents (Read and Write).')
+    + '<div class="form-row"><label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;font-weight:600;color:var(--text);">'
+    + '<input type="checkbox" id="set-sync-on" style="width:auto;accent-color:var(--accent);width:22px;height:22px;"'+(settings.syncEnabled?" checked":"")+'>'
+    + ' Activar sincronización automática</label>'
+    + '<div class="field-hint">Al guardar cualquier cambio, los datos se suben a <span class="kbd">sync/state.json</span> en tu repo. Al abrir la app, se descargan. Haz clic en el badge de Sync en el header para forzar una sincronización.</div></div>'
+    + sub('🔒 Cifrado de datos (privacidad de pacientes)')
+    + nota('Cifra la base clínica (nombres, RUT, diagnósticos, banderas rojas) <strong>antes</strong> de subirla a GitHub. Aunque alguien acceda al repositorio, ve solo datos ilegibles. Las rutinas que compartes a pacientes NO se cifran (ellos deben poder abrirlas).')
+    + '<div style="background:var(--surface-2);border-radius:8px;padding:.7rem .85rem;">'+encStatus+'<div style="margin-top:.55rem;">'+encBtns+'</div></div>';
+  var eSync = (settings.syncEnabled ? 'sincronización activa' : 'sin sincronizar') + ' · ' + (settings.encEnabled ? 'cifrado' : 'sin cifrar');
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.2rem;margin-bottom:.6rem;">Datos</h3>';
-  bodyHtml += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">';
-  bodyHtml += '<button class="btn btn-secondary" id="btn-export">Exportar respaldo</button>';
-  bodyHtml += '<button class="btn btn-secondary" id="btn-import">Importar respaldo</button>';
-  bodyHtml += '<button class="btn btn-secondary" id="btn-export-csv">Exportar CSV métricas</button>';
-  bodyHtml += '<button class="btn btn-ghost" id="btn-clean-gifs">Limpiar GIFs pesados</button>';
-  bodyHtml += '<button class="btn btn-danger" id="btn-wipe">Borrar todo</button>';
-  bodyHtml += '</div>';
-  bodyHtml += '<input type="file" id="import-file" accept=".json,application/json" style="display:none;">';
-
+  /* --- 8 · Datos: respaldo cifrado, exportar, importar, limpiar --- */
+  var sDatos = u19RespCardHTML()
+    + sub('Respaldo simple y mantenimiento')
+    + '<div class="set-btns">'
+    + '<button class="btn btn-secondary" id="btn-export">Exportar respaldo</button>'
+    + '<button class="btn btn-secondary" id="btn-import">Importar respaldo</button>'
+    + '<button class="btn btn-secondary" id="btn-export-csv">Exportar CSV métricas</button>'
+    + '<button class="btn btn-ghost" id="btn-clean-gifs">Limpiar GIFs pesados</button>'
+    + '<button class="btn btn-danger" id="btn-wipe">Borrar todo</button>'
+    + '</div>'
+    + '<input type="file" id="import-file" accept=".json,application/json" style="display:none;">';
   /* Cuanto espacio queda: la nota de abajo ya hablaba de localStorage
      sin decir nunca cuanto se estaba usando. */
-  try { bodyHtml += u19EspacioHTML(); } catch(_e){}
+  try { sDatos += u19EspacioHTML(); } catch(_e){}
+  var eDatos = (function(){ var d = (typeof u19RespDias === "function") ? u19RespDias() : null;
+    return d == null ? 'nunca respaldado' : (d === 0 ? 'respaldo de hoy' : 'respaldo hace ' + d + ' día' + (d === 1 ? '' : 's')); })();
 
-  bodyHtml += '<div class="divider"></div>';
-  bodyHtml += '<div class="text-xs text-muted" style="text-align:center;">';
+  bodyHtml += sec('puente', '🔌 Puente con Notion (Apps Script)', ePuente, true, sPuente)
+    + sec('app', '🌐 Esta app', eApp, false, sApp)
+    + sec('claude', '🤖 Claude (lectura de capturas)', eClaude, false, sClaude)
+    + sec('cal', '📅 Calendly (citas)', eCal, false, sCal)
+    + sec('horas', '⏱ Horas del entrenador', eHoras, false, sHoras)
+    + sec('links', '🔗 Links cortos', eLinks, false, sLinks)
+    + sec('sync', '🔄 Sincronización y cifrado', eSync, false, sSync)
+    + sec('datos', '💾 Datos y respaldos', eDatos, false, sDatos);
+
+  bodyHtml += '<div class="text-xs text-muted" style="text-align:center;margin-top:1.2rem;">';
   bodyHtml += '<strong style="color:var(--accent);font-family:var(--font-display);letter-spacing:.04em;">ULTRA-SPORT 19</strong> · v1.0<br>';
   bodyHtml += 'Datos almacenados en este navegador (localStorage)';
   bodyHtml += '</div>';
-
   openModal({
     title: "Ajustes",
     large: true,
