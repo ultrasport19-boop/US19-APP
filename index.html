@@ -4220,6 +4220,37 @@ function u19BioNotionPedir(nombre, n){
           + "&n=" + (Number(n) || 2);
   return fetch(url).then(function(r){ return r.json(); });
 }
+/* Variantes de un nombre para buscarlo en Notion: tal cual, sin apodos
+   entre parentesis ni comillas, y nombre + primer apellido. En Notion
+   una persona puede estar como «Camila Muñoz KOTTY» y en la app como
+   «Camila Muñoz ( Kotty)»: la busqueda parcial del puente no lo salva. */
+function u19NombreVariantes(nombre){
+  var out = [];
+  function add(x){ x = String(x || "").replace(/\s+/g, " ").trim(); if (x && out.indexOf(x) < 0) out.push(x); }
+  var s = String(nombre || "");
+  add(s);
+  var limpio = s.replace(/\([^)]*\)/g, " ").replace(/["“”«»']/g, " ");
+  add(limpio);
+  var partes = limpio.replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  if (partes.length > 2) add(partes[0] + " " + partes[1]);
+  return out;
+}
+/* Pide al puente probando las variantes en orden; se queda con la
+   primera que devuelva evaluaciones con fecha. */
+function u19BioNotionBuscar(nombre, n){
+  var vs = u19NombreVariantes(nombre), i = 0;
+  function intento(){
+    if (i >= vs.length) return Promise.resolve({ cliente: { nombre: nombre }, evaluaciones: [], probados: vs.slice() });
+    var v = vs[i++];
+    return u19BioNotionPedir(v, n).then(function(resp){
+      if (resp && resp.error) return resp;
+      var evs = (resp && Array.isArray(resp.evaluaciones)) ? resp.evaluaciones.filter(function(e){ return e && e.fecha; }) : [];
+      if (evs.length){ resp.evaluaciones = evs; resp.nombreUsado = v; resp.probados = vs.slice(0, i); return resp; }
+      return intento();
+    });
+  }
+  return intento();
+}
 /* ===BIONOTION_END=== */
 
 /* ===DASH_URL_END=== */
@@ -17928,7 +17959,7 @@ window.u19BioTraerNotion = function(){
   if (!nombre){ di("Elige primero el cliente.", "var(--warn)"); return; }
 
   di("Buscando « " + nombre + " » en Notion\u2026", "var(--muted)");
-  u19BioNotionPedir(nombre, 2).then(function(resp){
+  u19BioNotionBuscar(nombre, 2).then(function(resp){
     var r = u19BioNotionPartir(resp);
     if (r.error){ di(r.error, "var(--danger)"); return; }
 
@@ -24707,10 +24738,10 @@ function u19FichaBioPedir(c){
   var e = _fichaBio[c.id];
   if (e && (e.cargando || (Date.now() - e.at < 5 * 60 * 1000))) return;
   _fichaBio[c.id] = { cargando: true, at: Date.now(), evs: [] };
-  u19BioNotionPedir(c.name, 10).then(function(resp){
+  u19BioNotionBuscar(c.name, 10).then(function(resp){
     var evs = (resp && Array.isArray(resp.evaluaciones)) ? resp.evaluaciones.filter(function(x){ return x && x.fecha; }) : [];
     evs.sort(function(a, b){ return String(a.fecha) < String(b.fecha) ? 1 : (String(a.fecha) > String(b.fecha) ? -1 : 0); });
-    _fichaBio[c.id] = { at: Date.now(), evs: evs, cliente: (resp && resp.cliente) || null,
+    _fichaBio[c.id] = { at: Date.now(), evs: evs, cliente: (resp && resp.cliente) || null, probados: (resp && resp.probados) || [],
                         error: (resp && resp.error) ? String(resp.error) : "" };
   }).catch(function(err){
     _fichaBio[c.id] = { at: Date.now(), evs: [], error: String((err && err.message) || err || "sin respuesta") };
@@ -24788,7 +24819,9 @@ function u19FichaBioBloque(c){
   if (e.error) return u19Bloque(titulo, '<p class="text-xs" style="color:var(--danger);">✗ ' + escapeHtml(e.error) + '</p>', recargar);
   var evs = e.evs;
   if (!evs.length)
-    return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Notion no tiene bioimpedancias a nombre de «' + escapeHtml(c.name || "") + '». Si allá figura con otro nombre, edita el nombre aquí para que coincida.</p>', recargar);
+    return u19Bloque(titulo, '<p class="text-xs text-muted" style="line-height:1.5;">Notion no tiene bioimpedancias a nombre de '
+      + (e.probados && e.probados.length ? e.probados.map(function(x){ return '«' + escapeHtml(x) + '»'; }).join(' ni ') : '«' + escapeHtml(c.name || "") + '»')
+      + '. Si allá figura con otro nombre, edita el nombre aquí para que coincida.</p>', recargar);
 
   var asc = evs.slice().reverse();
   var h = "";
