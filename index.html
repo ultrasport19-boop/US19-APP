@@ -4033,6 +4033,34 @@ function clientTypeBadge(typeId){
 }
 var _clientFilter = "";
 
+/* Salud de datos: los campos que el asistente de WhatsApp necesita y que,
+   si estan vacios, lo dejan sin poder actuar sobre ese cliente.
+   No consulta nada: mira los clientes que ya estan en memoria, asi que
+   funciona sin conexion y sin gastar cuota de Notion.
+
+   El telefono compartido no es un error de tipeo: son familias. Pero el
+   bot identifica a la gente POR el telefono, asi que cuando dos clientes
+   activos comparten numero el bot no puede saber cual de los dos escribe. */
+function u19SaludDatos(lista){
+  var usos = {};
+  lista.forEach(function(c){
+    var t = String(c.phone || "").replace(/[^0-9]/g, "");
+    if (t) usos[t] = (usos[t] || 0) + 1;
+  });
+  var mapa = {}, total = 0, resumen = { sinTel:0, compartido:0, sinPlan:0, sinMonto:0, sinFecha:0 };
+  lista.forEach(function(c){
+    var motivos = [];
+    var t = String(c.phone || "").replace(/[^0-9]/g, "");
+    if (!t){ motivos.push("sin WhatsApp"); resumen.sinTel++; }
+    else if (usos[t] > 1){ motivos.push("WhatsApp compartido con " + (usos[t] - 1) + " cliente(s)"); resumen.compartido++; }
+    if (!c.plan){ motivos.push("sin plan"); resumen.sinPlan++; }
+    if (!c.planPrice){ motivos.push("sin monto"); resumen.sinMonto++; }
+    if (!c.planEndDate){ motivos.push("sin fecha de termino"); resumen.sinFecha++; }
+    if (motivos.length){ mapa[c.id] = motivos; total++; }
+  });
+  return { mapa: mapa, total: total, resumen: resumen };
+}
+
 function renderClients(){
   u19PlantelBioPedir();   /* composición del plantel para los chips (con caché de 30 min) */
   var html = '';
@@ -4074,6 +4102,7 @@ function renderClients(){
     if (getClientType(c)!=="rehab" && !_hasRoutine[c.id]) noRoutineCount++;
     if (_cliPlanVencido(c)) expiredCount++;
   });
+  var _salud = u19SaludDatos(state.clients.filter(_cliActivo));
 
   // Filter bar
   html += '<div class="cat-bar">';
@@ -4083,6 +4112,7 @@ function renderClients(){
   if (notionCount) html += '<span class="cat-pill'+(_clientFilter==="notion"?" active":"")+'" onclick="filterClients(\'notion\')"><span class="cat-icon">🟢</span>Activos Notion<span class="cat-count">'+notionCount+'</span></span>';
   if (noRoutineCount) html += '<span class="cat-pill'+(_clientFilter==="noroutine"?" active":"")+'" onclick="filterClients(\'noroutine\')"><span class="cat-icon">🚫</span>Sin rutina<span class="cat-count">'+noRoutineCount+'</span></span>';
   if (expiredCount) html += '<span class="cat-pill'+(_clientFilter==="expired"?" active":"")+'" onclick="filterClients(\'expired\')"><span class="cat-icon">💳</span>Plan vencido<span class="cat-count">'+expiredCount+'</span></span>';
+  if (_salud.total) html += '<span class="cat-pill'+(_clientFilter==="salud"?" active":"")+'" onclick="filterClients(\'salud\')" title="Clientes activos a los que les falta algun dato que el asistente necesita"><span class="cat-icon">🩺</span>Salud de datos<span class="cat-count">'+_salud.total+'</span></span>';
   if (inactivosN) html += '<span class="cat-pill'+(_clientFilter==="inactivos"?" active":"")+'" onclick="filterClients(\'inactivos\')" title="Dados de baja en Notion o con plan vencido hace más de 30 días"><span class="cat-icon">💤</span>Inactivos<span class="cat-count">'+inactivosN+'</span></span>';
   html += '</div>';
   html += '<div class="cl-leyenda"><span><i style="background:var(--success);"></i>plan al día</span>'
@@ -4105,8 +4135,23 @@ function renderClients(){
       if (_clientFilter==="notion") return !!c.notionId;
       if (_clientFilter==="noroutine") return getClientType(c)!=="rehab" && !_hasRoutine[c.id];
       if (_clientFilter==="expired") return _cliPlanVencido(c);
+      if (_clientFilter==="salud") return !!_salud.mapa[c.id];
       return getClientType(c)===_clientFilter;
     });
+    if (_clientFilter==="salud" && filtered.length){
+      html += '<div class="card" style="margin-bottom:1rem;">';
+      html += '<p class="text-sm" style="margin:0 0 .6rem;"><strong>Qué le falta a cada uno.</strong> '
+           +  'Son los datos que el asistente de WhatsApp necesita: sin ellos no puede escribirle, cobrarle ni avisarle.</p>';
+      html += '<ul class="text-sm" style="margin:0;padding-left:1.1rem;">';
+      filtered.forEach(function(c){
+        html += '<li style="margin:.25rem 0;"><strong>' + escapeHtml(c.name || "(sin nombre)") + '</strong> — '
+             +  escapeHtml((Array.isArray(_salud.mapa[c.id]) ? _salud.mapa[c.id] : []).join(" · ")) + '</li>';
+      });
+      html += '</ul>';
+      html += '<p class="text-muted text-sm" style="margin:.7rem 0 0;">Un WhatsApp compartido no es un error: son familias. '
+           +  'Pero el asistente identifica a la gente por el número, así que no puede saber cuál de ellos le escribe.</p>';
+      html += '</div>';
+    }
     if (!filtered.length) html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">Sin clientes en este grupo.</p>';
     else { html += '<div class="cl-grid">'; for (var i=0;i<filtered.length;i++) html += clientCardHtml(filtered[i]); html += '</div>'; }
   } else {
