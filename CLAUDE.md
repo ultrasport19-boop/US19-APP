@@ -5,10 +5,12 @@ PWA de un solo archivo. Sin build, sin dependencias, sin servidor.
 
 ## Trampas de este código
 
-**El hoisting no cruza bloques `<script>`.** Hay cinco. Una función declarada en el
-bloque 5 no existe cuando corre el bloque 1. Por eso el arranque va dentro de
-`DOMContentLoaded` y no al vuelo. Esto ya provocó una vez que el Panel saliera en blanco
-en producción, y ninguna suite lo vio porque `eval` aplana los bloques.
+**El hoisting no cruza bloques `<script>`.** Hay **tres** (verificado el 6-sep-2026:
+7 aperturas `<script>` en el archivo, pero 4 son texto dentro de cadenas — las ventanas
+de impresión — y solo hay 3 `</script>` de verdad). Una función declarada en el bloque 3
+no existe cuando corre el bloque 1. Por eso el arranque va dentro de `DOMContentLoaded`
+y no al vuelo. Esto ya provocó una vez que el Panel saliera en blanco en producción, y
+ninguna suite lo vio porque `eval` aplana los bloques.
 
 **Vídeo contra imagen.** Tres ayudantes: `isVideoUrl`, `mediaThumb`, `mediaPlayer`.
 En **listados siempre `mediaThumb`**, que pinta el póster `.jpg`. `mediaPlayer` (que sí
@@ -34,13 +36,26 @@ en cada recarga, en silencio.
 
 ## Las pruebas
 
-28 suites, ~1.400 comprobaciones. Viven fuera del repo, en el scratchpad de la sesión.
-Cada una hace `eval` de un trozo de `index.html` entre marcadores `/* ===XXX_END=== */`.
-Si mueves código, comprueba que los cortes sigan encontrando lo que buscan: una suite que
-se salta un bloque **pasa en verde sin probar nada**.
+Están **en el repositorio**, en `tools/`. Antes vivían en el scratchpad de la sesión y se
+perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 
-Las suites no pueden ver los bugs de arranque (el `eval` aplana los bloques). Para eso
-hay que abrir la app en un navegador de verdad.
+| Comando | Qué comprueba |
+|---|---|
+| `node tools/validar_bloques.js index.html` | Sintaxis de cada bloque `<script>` por separado |
+| `node tools/pruebas.js` | Estructura, vídeo/imagen, lista blanca de `loadSettings`, guardas, secretos |
+| `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
+| `sh tools/instalar_hook.sh` | Deja los dos primeros corriendo en cada commit |
+
+**La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
+pasa en verde.** Si renombras `mediaThumb`, la prueba no se salta silenciosamente: aborta
+diciendo que la función no existe. Ese era el fallo del banco anterior. Está verificado
+con tres mutantes (meter `<video>` en `mediaThumb`, sacar una clave de la lista blanca,
+renombrar una función): los tres se detectan.
+
+`pruebas.js` **no puede ver los fallos de arranque**, porque evalúa trozos sueltos y eso
+aplana los bloques. Para eso está `humo.js`, que pulsa las 9 pestañas en un navegador real
+y comprueba que cada una se hace visible y pinta contenido. Playwright es opcional y no es
+dependencia de la app: sin él, `--pegar` da el código para pegar en la consola (F12).
 
 ## Seguridad, tal como quedó
 
