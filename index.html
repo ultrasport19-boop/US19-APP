@@ -4053,7 +4053,11 @@ function u19SaludDatos(lista){
     var t = String(c.phone || "").replace(/[^0-9]/g, "");
     if (!t){ motivos.push("sin WhatsApp"); resumen.sinTel++; }
     else if (usos[t] > 1){ motivos.push("WhatsApp compartido con " + (usos[t] - 1) + " cliente(s)"); resumen.compartido++; }
-    if (!c.plan){ motivos.push("sin plan"); resumen.sinPlan++; }
+    /* El plan de verdad viene de Notion en notionPlan; c.plan es un campo
+       antiguo que casi nadie tiene lleno. Leer c.plan marcaba como "sin plan"
+       a clientes que si lo tienen en Notion. */
+    var _plan = String(c.notionPlan || c.plan || "").trim();
+    if (!_plan){ motivos.push("sin plan"); resumen.sinPlan++; }
     if (!c.planPrice){ motivos.push("sin monto"); resumen.sinMonto++; }
     if (!c.planEndDate){ motivos.push("sin fecha de termino"); resumen.sinFecha++; }
     if (motivos.length){ mapa[c.id] = motivos; total++; }
