@@ -1197,7 +1197,11 @@ img{max-width:100%;display:block;}
 @media (max-width:640px){
   .circ-row{grid-template-columns:1.4rem 40px minmax(0,1fr) auto;}
   .circ-row .circ-nota{grid-column:2 / -1;}
+  .circ-row .circ-acc{grid-column:1 / -1;justify-content:flex-end;flex-wrap:wrap;}
+  .cl-top{flex-wrap:wrap;}
+  .pz-tools{order:3;flex-basis:100%;margin-left:0;justify-content:flex-start;}
 }
+.pz-one-media .pz-vacio{aspect-ratio:1;max-height:40vh;}
 /* ---------- Circuito en vivo ---------- */
 .circ-live{position:fixed;inset:0;z-index:9000;background:#070b0f;color:#f1f5f9;display:flex;flex-direction:column;font-family:var(--font-body);}
 .circ-live[hidden]{display:none;}
@@ -7989,7 +7993,9 @@ function showClientView(shareData){
     var dayLabel = (r.dayLabels && r.dayLabels[di]) ? r.dayLabels[di] : DAY_NAMES[di];
     var _isToday = (di === getTodayDayIdx());
     html += '<div class="day-section'+(_isToday?' today-section':'')+'" id="day-section-'+di+'">';
-    html += '<div class="day-section-header"><h3>'+escapeHtml(dayLabel)+(_isToday?' <span class="badge green">HOY</span>':'')+'</h3><span class="badge teal">⏱ ~'+fmtDuration(dayDur)+'</span></div>';
+    html += '<div class="day-section-header"><h3>'+escapeHtml(dayLabel)+(_isToday?' <span class="badge green">HOY</span>':'')+'</h3>'
+      + '<span style="display:inline-flex;gap:.4rem;align-items:center;flex-wrap:wrap;"><span class="badge teal">⏱ ~'+fmtDuration(dayDur)+'</span>'
+      + '<button class="btn btn-primary btn-sm" onclick="rutinaEnVivoCompartida('+di+')" title="Seguir este día con cronómetro: series, descansos y pitidos">▶ En vivo</button></span></div>';
     for (var ei=0; ei<day.exercises.length; ei++){
       html += buildExerciseBlock(shareData, r, di, ei, progress);
     }
@@ -8005,6 +8011,7 @@ function showClientView(shareData){
   html += '<div class="client-action-bar">'
     +'<button class="btn btn-secondary" onclick="saveSessionToHistory()">💾 Guardar sesión</button>'
     +'<button class="btn btn-primary" onclick="openClientProgressShare()">📤 Enviar progreso</button>'
+    +'<button class="btn btn-secondary" onclick="pizarraRutinaCompartida()" title="Los ejercicios en movimiento, grandes">🎞 Ver en movimiento</button>'
     +'<button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>'
     +'<button class="btn btn-danger" onclick="openResetProgressModal()">🔄 Reiniciar</button>'
     +'</div>';
@@ -13396,8 +13403,9 @@ function pzMedia(url){
   if (isVideoUrl(url)) return '<video class="pz-media" src="' + escapeAttr(url) + '" poster="' + escapeAttr(posterUrl(url)) + '" autoplay loop muted playsinline preload="metadata"></video>';
   return '<img class="pz-media" src="' + escapeAttr(url) + '" alt="" loading="lazy">';
 }
+var _pzFichas = null;
 function pzItemDeFila(ex){
-  var e = getExercise(ex.exerciseId), partes = [];
+  var e = (_pzFichas && _pzFichas[ex.exerciseId]) ? _pzFichas[ex.exerciseId] : getExercise(ex.exerciseId), partes = [];
   if (ex.sets || ex.reps) partes.push((ex.sets || "?") + " × " + (ex.reps || "?"));
   if (ex.weight) partes.push(ex.weight + (/[a-z%]/i.test(String(ex.weight)) ? "" : " kg"));
   if (ex.rest) partes.push("descanso " + ex.rest);
@@ -13510,6 +13518,23 @@ window.pizarraRutina = function(id){
   var cl = getClient(r.clientId);
   pizarraAbrir({ titulo: r.name || "Rutina", subtitulo: cl ? cl.name : "", secciones: pzSeccionesDeRutina(r).filter(function(s){ return s.items.length; }) });
 };
+/* Desde el enlace del socio: los ejercicios vienen en el enlace, no en la biblioteca. */
+function pzMapaCompartido(sd){
+  var m = {};
+  (sd && Array.isArray(sd.exercises) ? sd.exercises : []).forEach(function(e){ if (e && e.id) m[e.id] = e; });
+  return m;
+}
+window.pizarraRutinaCompartida = function(){
+  var sd = _clientShareData; if (!sd || !sd.routine) return;
+  _pzFichas = pzMapaCompartido(sd);
+  var secs = pzSeccionesDeRutina(sd.routine).filter(function(s){ return s.items.length; });
+  _pzFichas = null;
+  pizarraAbrir({ titulo: sd.routine.name || "Rutina", subtitulo: sd.client ? sd.client.name : "", secciones: secs, inicial: 0 });
+};
+window.rutinaEnVivoCompartida = function(di){
+  var sd = _clientShareData; if (!sd || !sd.routine) return;
+  rutinaEnVivo(sd.routine, di, pzMapaCompartido(sd), sd.client ? sd.client.name : "");
+};
 window.pizarraDiaBuilder = function(){
   var r = _builderRoutine; if (!r) return;
   var cl = getClient(r.clientId);
@@ -13534,30 +13559,35 @@ window.pizarraCircuito = function(id){ pizarraCircuitoObj(circGet(id)); };
 /* Seguir un día de rutina con el cronómetro: cada serie se marca hecha (o se
    cuenta sola si va por tiempo), el descanso corre solo y suena al acabar.
    Mismo motor de tiempo que los circuitos, otro plan: serie → descanso → serie. */
-var _rl = null;
+var _rl = null, _rlFichas = null;
+/* Fuera de la app (enlace del socio) los ejercicios no están en state.exercises:
+   vienen en el enlace, y se resuelven desde ese mapa. */
+function rlEx(id){ return (_rlFichas && _rlFichas[id]) ? _rlFichas[id] : getExercise(id); }
 function rlEsTiempo(reps){ return /\d\s*(s|seg|sec|min|')/i.test(String(reps || "")); }
 function rlPlan(r, dayIdx){
   var day = (r.days || [])[dayIdx], plan = [];
   if (!day) return plan;
   var filas = (day.exercises || []).filter(function(ex){ return ex && ex.exerciseId; });
   filas.forEach(function(ex, i){
-    var e = getExercise(ex.exerciseId), sets = Math.max(1, parseInt(ex.sets, 10) || 1), rest = parseRestTime(ex.rest);
+    var e = rlEx(ex.exerciseId), sets = Math.max(1, parseInt(ex.sets, 10) || 1), rest = parseRestTime(ex.rest);
     for (var s = 1; s <= sets; s++){
       plan.push({ tipo: "serie", ex: ex, e: e, serie: s, series: sets, idx: i, total: filas.length,
                   dur: rlEsTiempo(ex.reps) ? Math.max(1, parseWorkTime(ex.reps)) : 0 });
       var ultima = (i === filas.length - 1 && s === sets);
-      if (!ultima && rest > 0) plan.push({ tipo: "descanso", dur: rest, ex: ex, e: e, idx: i, siguiente: (s < sets) ? { ex: ex, e: e, serie: s + 1 } : { ex: filas[i + 1], e: getExercise(filas[i + 1].exerciseId), serie: 1 } });
+      if (!ultima && rest > 0) plan.push({ tipo: "descanso", dur: rest, ex: ex, e: e, idx: i, siguiente: (s < sets) ? { ex: ex, e: e, serie: s + 1 } : { ex: filas[i + 1], e: rlEx(filas[i + 1].exerciseId), serie: 1 } });
     }
   });
   plan.push({ tipo: "fin", dur: 0 });
   return plan;
 }
-window.rutinaEnVivo = function(r, dayIdx){
+window.rutinaEnVivo = function(r, dayIdx, fichas, nombreCliente){
   if (!r) return;
+  _rlFichas = fichas || null;
   var plan = rlPlan(r, dayIdx);
   if (plan.length < 2){ toast("Este día no tiene ejercicios", "warn"); return; }
   var cl = getClient(r.clientId);
-  _rl = { r: r, dia: dayIdx, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), timer: null, ultimoSeg: -1, inicio: Date.now(), titulo: (r.name || "Rutina") + " · " + (DAY_NAMES[dayIdx] || ""), sub: cl ? cl.name : "" };
+  _rl = { r: r, dia: dayIdx, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), timer: null, ultimoSeg: -1, inicio: Date.now(),
+          titulo: (r.name || "Rutina") + " · " + (DAY_NAMES[dayIdx] || ""), sub: nombreCliente || (cl ? cl.name : ""), cronoDesde: 0, cronoIdx: -1, cronoTimer: null };
   var ov = document.getElementById("rutina-live");
   ov.hidden = false; document.body.classList.add("circ-live-open");
   document.addEventListener("keydown", rlTeclas);
@@ -13589,7 +13619,8 @@ function rlPintar(){
   } else if (p.tipo === "serie"){
     var e = p.e, gif = e && e.gif ? e.gif : "";
     html += '<div class="cl-fase">' + escapeHtml((e ? e.name : "Ejercicio") + " · serie " + p.serie + " de " + p.series) + '</div>'
-      + (p.dur ? '<div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>' : '<div class="cl-timer" style="font-size:clamp(2.6rem,9vw,5rem);">' + escapeHtml(p.ex.reps || "") + (p.ex.reps && !rlEsTiempo(p.ex.reps) ? ' <span style="font-size:.4em;">reps</span>' : '') + '</div>')
+      + (p.dur ? '<div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>' : '<div class="cl-timer" style="font-size:clamp(2.6rem,9vw,5rem);">' + escapeHtml(p.ex.reps || "") + (p.ex.reps && !rlEsTiempo(p.ex.reps) ? ' <span style="font-size:.4em;">reps</span>' : '') + '</div>'
+          + '<div class="cl-sig" id="cl-crono" title="Tiempo que llevas en esta serie">⏱ ' + circFmt(L.cronoIdx === L.i ? (Date.now() - L.cronoDesde) / 1000 : 0) + '</div>')
       + '<div class="cl-est">' + escapeHtml(rlDetalle(p)) + '</div>'
       + (p.ex.notes ? '<div class="cl-sig">' + escapeHtml(p.ex.notes) + '</div>' : '')
       + (gif ? '<div class="cl-media">' + pzMedia(gif) + '</div>' : '')
@@ -13611,6 +13642,13 @@ function rlPintar(){
     + '<button class="btn btn-ghost" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
     + '</div>';
   ov.innerHTML = html;
+  /* Serie por repeticiones: cuenta hacia arriba para ver cuánto llevas. */
+  if (p.tipo === "serie" && !p.dur){
+    if (L.cronoIdx !== L.i){ L.cronoIdx = L.i; L.cronoDesde = Date.now(); }
+    if (!L.cronoTimer) L.cronoTimer = setInterval(function(){
+      var el = document.getElementById("cl-crono"); if (el && _rl) el.textContent = "⏱ " + circFmt((Date.now() - _rl.cronoDesde) / 1000);
+    }, 500);
+  } else if (L.cronoTimer){ clearInterval(L.cronoTimer); L.cronoTimer = null; }
   /* El descanso arranca solo. */
   if (p.tipo === "descanso" && !L.corriendo && L.restante === p.dur) rlToggle();
 }
@@ -13666,7 +13704,8 @@ window.rlSalir = function(){
   clearInterval(L.timer); circWakeOff();
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch(e){}
   document.removeEventListener("keydown", rlTeclas);
-  _rl = null;
+  if (L.cronoTimer) clearInterval(L.cronoTimer);
+  _rl = null; _rlFichas = null;
   var ov = document.getElementById("rutina-live"); ov.hidden = true; ov.innerHTML = ""; ov.className = "circ-live";
   if (!_live && !_pz) document.body.classList.remove("circ-live-open");
 };
@@ -15738,6 +15777,17 @@ window.globalSearch = function(q){
       res.push('<div class="gs-item" onclick="closeGSearch();circEditar(\'' + c.id + '\')"><span class="badge muted">Circuito</span> ' + escapeHtml(c.nombre||"Sin nombre")
         + (c.grupo ? ' <span class="text-muted" style="font-size:.72rem;">' + escapeHtml(c.grupo) + '</span>' : '')
         + ' <span class="text-muted" style="font-size:.72rem;">' + (c.estaciones||[]).length + ' est.</span></div>');
+    });
+  }
+  var protHits = (state.protocols || []).filter(function(p){
+    var nom = musNorm((p.name||"") + " " + (p.region||"") + " " + (p.patologia||""));
+    return busqCoincide(nom + " " + musNorm((p.segment||"") + " " + (p.description||"")), q_, nom);
+  });
+  if (protHits.length){
+    res.push('<div class="gs-head">Protocolos · ' + protHits.length + '</div>');
+    protHits.slice(0, 4).forEach(function(p){
+      res.push('<div class="gs-item" onclick="closeGSearch();showView(\'rehab\');_rehabState.openId=\'' + p.id + '\';_rehabState.activePhase=0;renderRehab();"><span class="badge muted">Protocolo</span> ' + escapeHtml(p.name||"")
+        + (p.region ? ' <span class="text-muted" style="font-size:.72rem;">' + escapeHtml(p.region) + '</span>' : '') + '</div>');
     });
   }
   /* Consultas sobre las evaluaciones, no solo nombres. */
