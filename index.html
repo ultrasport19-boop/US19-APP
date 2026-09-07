@@ -1230,6 +1230,36 @@ body.circ-live-open{overflow:hidden;}
 .circ-live.f-fin .cl-fase,.circ-live.f-fin .cl-timer{color:var(--success);}
 .circ-live.f-cambio .cl-bar span{background:var(--warn);}
 .circ-live.f-descanso .cl-bar span{background:#5cc8e8;}
+.circ-mapa{position:relative;width:100%;background:radial-gradient(circle at 1px 1px, rgba(255,255,255,.07) 1px, transparent 1px) 0 0/28px 28px, var(--surface-2);border:1px solid var(--border);border-radius:12px;overflow:hidden;user-select:none;-webkit-user-select:none;}
+.circ-mapa .cm-svg{position:absolute;inset:0;width:100%;height:100%;color:var(--muted);pointer-events:none;}
+.cm-est{position:absolute;width:14%;min-width:84px;max-width:150px;transform:translate(-50%,-50%);background:var(--surface-1);border:2px solid var(--accent);border-radius:12px;padding:.35rem;text-align:center;box-shadow:var(--shadow);touch-action:none;cursor:grab;}
+.cm-est.drag{cursor:grabbing;z-index:5;box-shadow:var(--shadow-lg);}
+.cm-est.on{outline:3px solid #fff;outline-offset:2px;}
+.cm-est.libre{opacity:.5;}
+.cm-num{position:absolute;top:-12px;left:-12px;width:26px;height:26px;border-radius:50%;color:#0b1014;font-family:var(--font-display);font-size:1.05rem;display:flex;align-items:center;justify-content:center;border:2px solid var(--surface-1);}
+.cm-img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;background:#000;display:block;}
+.cm-vacio{display:flex;align-items:center;justify-content:center;background:var(--surface-3);color:var(--muted);font-size:1.4rem;}
+.cm-nom{font-weight:800;font-size:.72rem;line-height:1.15;margin-top:.3rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.cm-nota{font-size:.62rem;color:var(--muted);margin-top:.15rem;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.cm-grupo{margin-top:.25rem;font-family:var(--font-display);font-size:1rem;color:var(--accent);letter-spacing:.04em;}
+.cm-grupo.libre{color:var(--muted);font-family:var(--font-body);font-size:.7rem;}
+.cm-vacio-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.9rem;padding:1rem;text-align:center;}
+.circ-mapa-tools{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;}
+.circ-buscar{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;}
+.circ-buscar input{flex:1 1 220px;}
+.circ-res{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:.5rem;}
+.cr-item{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.35rem;cursor:pointer;text-align:center;}
+.cr-item:hover,.cr-item:focus-visible{border-color:var(--accent);outline:none;}
+.cr-item img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;background:#000;display:block;}
+.cr-item .cr-n{font-size:.7rem;font-weight:700;margin-top:.25rem;line-height:1.15;}
+.cr-item .cr-m{font-size:.62rem;color:var(--muted);}
+.circ-live .cm-est{cursor:default;}
+.cl-mapa{width:min(96vw,calc((100vh - 250px) * 1.78));margin-top:.5rem;}
+.cl-mapa .cm-est{min-width:96px;max-width:200px;width:16%;}
+.cl-mapa .cm-nom{font-size:clamp(.72rem,1.4vw,1rem);}
+.cl-mapa .cm-grupo{font-size:clamp(1rem,2.2vw,1.6rem);}
+.cl-mapa-min{width:min(72vw,calc((100vh - 430px) * 1.78));margin-top:.3rem;}
+.cl-mapa-min .cm-est{min-width:72px;max-width:120px;width:12%;}
 </style>
 
 <div class="toast-wrap" id="toast-wrap"></div>
@@ -13208,7 +13238,7 @@ function circGet(id){
   return null;
 }
 function circNuevo(){
-  return { id: genId(), nombre: "", grupo: "", notas: "", modo: "rotacion", grupos: 4, rondas: 1,
+  return { id: genId(), nombre: "", grupo: "", notas: "", modo: "rotacion", grupos: 4, rondas: 1, ratio: "16:9",
            trabajo: 40, cambio: 15, descansoRonda: 60, estaciones: [], createdAt: Date.now(), updatedAt: Date.now() };
 }
 function circNum(v, def){ var x = parseInt(v, 10); return (isNaN(x) || x < 0) ? def : x; }
@@ -13238,6 +13268,178 @@ function circGrupoEn(c, s, t){
   if (!N) return -1;
   var g = ((s - t) % N + N) % N;
   return g < G ? g : -1;
+}
+
+/* ---------- mapa de estaciones ---------- */
+/* Cada estación tiene una posición (x, y) como fracción del plano de la sala.
+   Si no la tiene, se coloca sola en un círculo (estación 1 arriba, sentido
+   horario). Las flechas van de cada estación a la siguiente: es el sentido en
+   que rotan los grupos. El mismo mapa se dibuja en el editor (arrastrable),
+   en vivo (con el grupo de cada estación) y en la hoja impresa (SVG). */
+var CIRC_COLORES = ["#a8d139", "#5cc8e8", "#f59e0b", "#ef4444", "#a78bfa", "#f472b6", "#34d399", "#fb923c"];
+function circRatio(c){
+  var r = { "16:9": 16 / 9, "4:3": 4 / 3, "2:1": 2 }[c && c.ratio] || 16 / 9;
+  return r;
+}
+function circPosAuto(i, N, forma){
+  if (forma === "filas"){
+    var cols = Math.min(N, 4), filas = Math.ceil(N / cols), col = i % cols, fila = Math.floor(i / cols);
+    return { x: (col + 0.5) / cols * 0.84 + 0.08, y: filas === 1 ? 0.5 : (fila + 0.5) / filas * 0.76 + 0.12 };
+  }
+  var a = -Math.PI / 2 + 2 * Math.PI * i / Math.max(1, N);
+  return { x: 0.5 + 0.40 * Math.cos(a), y: 0.5 + 0.36 * Math.sin(a) };
+}
+function circPos(c, i){
+  var s = c.estaciones[i];
+  if (s && typeof s.x === "number" && typeof s.y === "number") return { x: s.x, y: s.y };
+  return circPosAuto(i, c.estaciones.length, "circulo");
+}
+function circAutoLayout(c, forma){
+  c.estaciones.forEach(function(s, i){ var p = circPosAuto(i, c.estaciones.length, forma); s.x = p.x; s.y = p.y; });
+}
+function circColocarNueva(c){
+  var i = c.estaciones.length - 1; if (i < 0) return;
+  var p = circPosAuto(i, c.estaciones.length, "circulo");
+  c.estaciones[i].x = p.x; c.estaciones[i].y = p.y;
+}
+function circNorm(s){
+  s = String(s || "").toLowerCase();
+  try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch(e){}
+  return s;
+}
+function circMapaFlechasSvg(c, H, opts){
+  var N = c.estaciones.length; if (N < 2) return "";
+  var svg = '<defs><marker id="cm-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>';
+  for (var i = 0; i < N; i++){
+    var j = (i + 1) % N, a = circPos(c, i), b = circPos(c, j);
+    var x1 = a.x * 1000, y1 = a.y * H, x2 = b.x * 1000, y2 = b.y * H, dx = x2 - x1, dy = y2 - y1, L = Math.sqrt(dx * dx + dy * dy) || 1;
+    var r = 78; if (L < r * 2 + 10) continue;
+    var ux = dx / L, uy = dy / L, act = (opts && opts.activa === i);
+    svg += '<line x1="' + (x1 + ux * r).toFixed(1) + '" y1="' + (y1 + uy * r).toFixed(1) + '" x2="' + (x2 - ux * r).toFixed(1) + '" y2="' + (y2 - uy * r).toFixed(1)
+      + '" stroke="currentColor" stroke-width="' + (act ? 5 : 3) + '"' + (i === N - 1 ? ' stroke-dasharray="10 8"' : '') + ' marker-end="url(#cm-arr)" opacity="' + (act ? 1 : 0.75) + '"/>';
+  }
+  return svg;
+}
+function circMapaHtml(c, opts){
+  opts = opts || {};
+  var N = c.estaciones.length, ratio = circRatio(c), H = Math.round(1000 / ratio);
+  var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';">'
+    + '<svg class="cm-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">' + circMapaFlechasSvg(c, H, opts) + '</svg>';
+  c.estaciones.forEach(function(s, i){
+    var pos = circPos(c, i), gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
+    var g = (opts.turno != null) ? circGrupoEn(c, i, opts.turno) : null;
+    html += '<div class="cm-est' + (opts.activa === i ? ' on' : '') + (g != null && g < 0 ? ' libre' : '') + '" data-i="' + i + '" style="left:' + (pos.x * 100).toFixed(2) + '%;top:' + (pos.y * 100).toFixed(2) + '%;border-color:' + col + ';">'
+      + '<span class="cm-num" style="background:' + col + ';">' + (i + 1) + '</span>'
+      + (gif ? mediaThumb(gif, 'class="cm-img" loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
+      + '<div class="cm-nom">' + escapeHtml(circEstacionNombre(s)) + '</div>'
+      + (s.nota && !opts.compacto ? '<div class="cm-nota">' + escapeHtml(s.nota) + '</div>' : '')
+      + (g != null ? '<div class="cm-grupo' + (g < 0 ? ' libre' : '') + '">' + (g >= 0 ? 'Grupo ' + (g + 1) : 'libre') + '</div>' : '')
+      + '</div>';
+  });
+  if (!N) html += '<div class="cm-vacio-msg">Busca un ejercicio abajo o añade una estación libre: irán apareciendo aquí, en el mapa de la sala, y las puedes arrastrar hasta donde van de verdad.</div>';
+  return html + '</div>';
+}
+/* Arrastre de estaciones en el editor (ratón y dedo). */
+function circMapaMontar(box){
+  if (!box || box._montado) return;
+  box._montado = true;
+  var arr = null;
+  box.addEventListener("pointerdown", function(ev){
+    var card = ev.target.closest ? ev.target.closest(".cm-est") : null;
+    if (!card || !_circEdit) return;
+    var mapa = card.parentNode, r = mapa.getBoundingClientRect();
+    arr = { i: parseInt(card.getAttribute("data-i"), 10), r: r, card: card, mapa: mapa, movio: false };
+    try { card.setPointerCapture(ev.pointerId); } catch(e){}
+    card.classList.add("drag");
+    ev.preventDefault();
+  });
+  box.addEventListener("pointermove", function(ev){
+    if (!arr || !_circEdit) return;
+    var s = _circEdit.estaciones[arr.i]; if (!s) return;
+    var x = (ev.clientX - arr.r.left) / arr.r.width, y = (ev.clientY - arr.r.top) / arr.r.height;
+    s.x = Math.min(0.94, Math.max(0.06, x)); s.y = Math.min(0.9, Math.max(0.1, y));
+    arr.card.style.left = (s.x * 100).toFixed(2) + "%"; arr.card.style.top = (s.y * 100).toFixed(2) + "%";
+    arr.movio = true;
+    var svg = arr.mapa.querySelector("svg.cm-svg");
+    if (svg) svg.innerHTML = circMapaFlechasSvg(_circEdit, Math.round(1000 / circRatio(_circEdit)), {});
+  });
+  var fin = function(){ if (!arr) return; arr.card.classList.remove("drag"); arr = null; };
+  box.addEventListener("pointerup", fin);
+  box.addEventListener("pointercancel", fin);
+}
+function circPintarMapa(){
+  var box = document.getElementById("circ-mapa-box");
+  if (box && _circEdit) box.innerHTML = circMapaHtml(_circEdit, {});
+}
+window.circOrdenar = function(forma){
+  if (!_circEdit) return;
+  circAutoLayout(_circEdit, forma);
+  circPintarMapa();
+};
+window.circRatioCambiar = function(v){
+  if (!_circEdit) return;
+  _circEdit.ratio = v;
+  circPintarMapa();
+};
+/* Buscador sin ventanas: escribe, toca, y la estación aparece en el mapa. */
+window.circBuscar = function(q){
+  var box = document.getElementById("circ-res"); if (!box) return;
+  var nq = circNorm(q).trim(), lista = [];
+  if (!nq){
+    var ids = _libRecientes().concat(Object.keys(_libFavs())), vistos = {};
+    ids.forEach(function(id){ if (vistos[id]) return; vistos[id] = 1; var e = getExercise(id); if (e && lista.length < 12) lista.push(e); });
+    if (!lista.length){ box.innerHTML = '<p class="text-xs text-muted" style="margin:.2rem 0;">Escribe para buscar en la biblioteca. Cuando tengas favoritos y recientes, aparecerán aquí sin buscar.</p>'; return; }
+  } else {
+    var toks = nq.split(/\s+/);
+    for (var i = 0; i < state.exercises.length && lista.length < 12; i++){
+      var e = state.exercises[i], t = circNorm((e.name || "") + " " + (e.muscle || "") + " " + (e.equipment || "")), ok = true;
+      for (var k = 0; k < toks.length; k++) if (t.indexOf(toks[k]) < 0){ ok = false; break; }
+      if (ok) lista.push(e);
+    }
+  }
+  var html = "";
+  lista.forEach(function(e){
+    html += '<div class="cr-item" tabindex="0" role="button" onclick="circAddDesde(\'' + e.id + '\')" onkeydown="if(event.key===\'Enter\')circAddDesde(\'' + e.id + '\')" title="Añadir como estación">'
+      + (e.gif ? mediaThumb(e.gif, 'loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
+      + '<div class="cr-n">' + escapeHtml(e.name || "") + '</div><div class="cr-m">' + escapeHtml(e.muscle || "") + '</div></div>';
+  });
+  if (nq && !lista.length){
+    html = '<div style="grid-column:1/-1;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"><span class="text-xs text-muted">Nada con «' + escapeHtml(q) + '» en la biblioteca.</span>'
+      + '<button class="btn btn-secondary btn-sm" onclick="circAddLibreCon(document.getElementById(\'circ-q\').value)">+ Añadir «' + escapeHtml(q) + '» como estación libre</button></div>';
+  }
+  box.innerHTML = html;
+};
+window.circAddDesde = function(exId){
+  if (!_circEdit) return;
+  var e = getExercise(exId); if (!e) return;
+  _circEdit.estaciones.push({ id: genId(), exerciseId: exId, nombre: e.name || "", nota: "" });
+  circColocarNueva(_circEdit);
+  circPintarEstaciones();
+  if (typeof libRegistrarReciente === "function"){ try { libRegistrarReciente(exId); } catch(err){} }
+};
+window.circAddLibreCon = function(nombre){
+  if (!_circEdit) return;
+  nombre = String(nombre || "").trim();
+  _circEdit.estaciones.push({ id: genId(), exerciseId: "", nombre: nombre, nota: "" });
+  circColocarNueva(_circEdit);
+  circPintarEstaciones();
+  var q = document.getElementById("circ-q"); if (q){ q.value = ""; circBuscar(""); }
+};
+/* El mapa en la hoja impresa, como SVG con las imágenes. */
+function circMapaSvgImprimir(c){
+  var ratio = circRatio(c), H = Math.round(1000 / ratio);
+  var svg = '<svg viewBox="0 0 1000 ' + H + '" width="100%" style="border:1px solid #bbb;border-radius:8px;background:#fafafa;color:#555;display:block;">' + circMapaFlechasSvg(c, H, {});
+  c.estaciones.forEach(function(s, i){
+    var p = circPos(c, i), x = p.x * 1000, y = p.y * H, gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
+    var img = gif ? (typeof isVideoUrl === "function" && isVideoUrl(gif) && typeof posterUrl === "function" ? posterUrl(gif) : gif) : "";
+    svg += '<g><rect x="' + (x - 65) + '" y="' + (y - 72) + '" width="130" height="144" rx="10" fill="#fff" stroke="' + col + '" stroke-width="3"/>'
+      + (img ? '<image href="' + escapeAttr(img) + '" x="' + (x - 57) + '" y="' + (y - 64) + '" width="114" height="80" preserveAspectRatio="xMidYMid slice"/>' : '')
+      + '<circle cx="' + (x - 65) + '" cy="' + (y - 72) + '" r="16" fill="' + col + '" stroke="#333"/><text x="' + (x - 65) + '" y="' + (y - 66) + '" text-anchor="middle" font-size="17" font-weight="bold" font-family="Arial">' + (i + 1) + '</text>'
+      + '<text x="' + x + '" y="' + (y + 36) + '" text-anchor="middle" font-size="13" font-weight="bold" font-family="Arial" fill="#111">' + escapeHtml(circEstacionNombre(s).slice(0, 22)) + '</text>'
+      + (s.nota ? '<text x="' + x + '" y="' + (y + 56) + '" text-anchor="middle" font-size="10" font-family="Arial" fill="#444">' + escapeHtml(s.nota.slice(0, 32)) + '</text>' : '')
+      + '</g>';
+  });
+  return svg + '</svg>';
 }
 
 /* ---------- lista ---------- */
@@ -13345,6 +13547,25 @@ function circEditorHtml(){
     + formField("Notas / objetivo", '<input type="text" data-k="notas" value="' + escapeAttr(c.notas || "") + '" placeholder="Objetivo de la clase, materiales, adaptaciones">')
     + '</div>';
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
+    + '<div class="card-title">🗺 Mapa de estaciones</div>'
+    + '<div class="circ-mapa-tools"><span class="text-xs text-muted">Arrastra cada estación hasta donde va en la sala. Las flechas marcan el sentido en que rotan los grupos.</span>'
+    + '<span style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
+    + '<select id="circ-ratio" onchange="circRatioCambiar(this.value)" title="Forma de la sala">'
+      + '<option value="16:9"' + ((c.ratio || "16:9") === "16:9" ? ' selected' : '') + '>Sala 16:9</option>'
+      + '<option value="4:3"' + (c.ratio === "4:3" ? ' selected' : '') + '>Sala 4:3</option>'
+      + '<option value="2:1"' + (c.ratio === "2:1" ? ' selected' : '') + '>Sala alargada 2:1</option></select>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'circulo\')">◯ En círculo</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'filas\')">▦ En filas</button></span></div>'
+    + '<div id="circ-mapa-box">' + circMapaHtml(c, {}) + '</div>'
+    + '</div></div>';
+  html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
+    + '<div class="card-title">🔎 Añadir ejercicios</div>'
+    + '<div class="circ-buscar"><input type="text" id="circ-q" placeholder="Busca en la biblioteca: plancha, salto, cuerda, balón…" oninput="circBuscar(this.value)" autocomplete="off">'
+    + '<button class="btn btn-secondary btn-sm" onclick="circAddLibreCon(document.getElementById(\'circ-q\').value)">+ Estación libre</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circAddBiblioteca()" title="Selector completo, con filtros por tipo, patrón y material">Toda la biblioteca</button></div>'
+    + '<div id="circ-res" class="circ-res"></div>'
+    + '</div></div>';
+  html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
     + '<div class="card-title" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">📍 Estaciones'
     + '<span style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap;">'
     + '<button class="btn btn-secondary btn-sm" onclick="circAddBiblioteca()">+ Desde la biblioteca</button>'
@@ -13360,7 +13581,9 @@ function circEditorMontar(){
   var meta = document.getElementById("circ-meta");
   if (meta) meta.addEventListener("input", circCampo);
   if (meta) meta.addEventListener("change", circCampo);
+  circMapaMontar(document.getElementById("circ-mapa-box"));
   circPintarEstaciones();
+  circBuscar("");
 }
 function circCampo(ev){
   var el = ev.target, k = el.getAttribute("data-k");
@@ -13394,7 +13617,9 @@ function circPintarEstaciones(){
     var el = ev.target, i = parseInt(el.getAttribute("data-i"), 10), k = el.getAttribute("data-k");
     if (isNaN(i) || !k || !_circEdit.estaciones[i]) return;
     _circEdit.estaciones[i][k] = el.value;
+    if (k === "nombre") circPintarMapa();
   };
+  circPintarMapa();
   circPintarResumen();
 }
 function circPintarResumen(){
@@ -13427,6 +13652,7 @@ function circPintarResumen(){
 window.circAddLibre = function(){
   if (!_circEdit) return;
   _circEdit.estaciones.push({ id: genId(), exerciseId: "", nombre: "", nota: "" });
+  circColocarNueva(_circEdit);
   circPintarEstaciones();
   var inputs = document.querySelectorAll('#circ-estaciones input[data-k="nombre"]');
   if (inputs.length) inputs[inputs.length - 1].focus();
@@ -13436,6 +13662,7 @@ window.circAddBiblioteca = function(){
   openExercisePicker(function(exId){
     var e = getExercise(exId);
     _circEdit.estaciones.push({ id: genId(), exerciseId: exId, nombre: e ? e.name : "", nota: "" });
+    circColocarNueva(_circEdit);
     circPintarEstaciones();
   }, { multi: true });
 };
@@ -13486,6 +13713,7 @@ window.circImprimir = function(id){
     + (c.modo !== "secuencia" ? '<span>Grupos: ' + G + '</span>' : '')
     + '<span>Vueltas: ' + R + '</span><span>Trabajo: ' + circNum(c.trabajo, 40) + ' s</span><span>Cambio: ' + circNum(c.cambio, 15) + ' s</span>'
     + '<span>Descanso entre vueltas: ' + circNum(c.descansoRonda, 60) + ' s</span><span>Duración: ' + circFmt(circDuracion(c)) + '</span></div>'
+    + '<h2>Mapa de la sala</h2>' + circMapaSvgImprimir(c)
     + '<h2>Estaciones</h2><table><thead><tr><th style="width:36px">#</th><th>Estación</th><th>Consigna</th><th style="width:22%">Observaciones</th></tr></thead><tbody>';
   c.estaciones.forEach(function(s, i){
     doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b></td><td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
@@ -13558,25 +13786,20 @@ function circLivePintar(){
     + '<div class="cl-fase">' + escapeHtml(etiqueta) + '</div>'
     + '<div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>';
   if (p.tipo === "fin"){
-    html += '<div class="cl-est">' + escapeHtml(c.nombre || "") + '</div><div class="cl-sig">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + '</div>';
+    html += '<div class="cl-est">' + escapeHtml(c.nombre || "") + '</div><div class="cl-sig">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + '</div>'
+      + circMapaHtml(c, { compacto: true, clase: "cl-mapa cl-mapa-min" });
   } else if (c.modo === "secuencia"){
-    var estActual = p.tipo === "trabajo" ? c.estaciones[p.estacion] : c.estaciones[(p.tipo === "listos") ? 0 : (p.estacion + 1) % N];
+    var idxActual = p.tipo === "trabajo" ? p.estacion : (p.tipo === "listos" ? 0 : (p.estacion + 1) % N);
+    var estActual = c.estaciones[idxActual];
     var sig = p.tipo === "trabajo" ? c.estaciones[(p.estacion + 1) % N] : null;
-    var gif = circGifDe(estActual);
     html += '<div class="cl-est">' + (p.tipo === "trabajo" ? '' : 'Prepara: ') + escapeHtml(circEstacionNombre(estActual)) + '</div>'
       + (estActual.nota ? '<div class="cl-sig">' + escapeHtml(estActual.nota) + '</div>' : '')
-      + (gif ? '<div class="cl-media">' + mediaThumb(gif, 'alt=""') + '</div>' : '')
-      + (sig && (p.estacion < N - 1 || p.ronda < R - 1) ? '<div class="cl-sig">Siguiente: ' + escapeHtml(circEstacionNombre(sig)) + '</div>' : '');
+      + (sig && (p.estacion < N - 1 || p.ronda < R - 1) ? '<div class="cl-sig">Siguiente: ' + escapeHtml(circEstacionNombre(sig)) + '</div>' : '')
+      + circMapaHtml(c, { activa: idxActual, compacto: true, clase: "cl-mapa cl-mapa-min" });
   } else {
     var tv = Math.min(circLiveTurnoVisible(), R * N - 1);
-    html += '<div class="cl-sig">' + (p.tipo === "trabajo" ? "Cada grupo en su estación" : (p.tipo === "listos" ? "Posiciones de salida" : "Así quedan al cambiar")) + '</div><div class="cl-grid">';
-    for (var s = 0; s < N; s++){
-      var g = circGrupoEn(c, s, tv), est = c.estaciones[s];
-      html += '<div class="cl-cell' + (g >= 0 ? ' on' : '') + '"><div class="n">Estación ' + (s + 1) + '</div><div class="e">' + escapeHtml(circEstacionNombre(est)) + '</div>'
-        + (est.nota ? '<div class="n" style="text-transform:none;letter-spacing:0;margin-top:.15rem;">' + escapeHtml(est.nota) + '</div>' : '')
-        + '<div class="g' + (g >= 0 ? '' : ' libre') + '">' + (g >= 0 ? 'Grupo ' + (g + 1) : 'libre') + '</div></div>';
-    }
-    html += '</div>';
+    html += '<div class="cl-sig">' + (p.tipo === "trabajo" ? "Cada grupo en su estación" : (p.tipo === "listos" ? "Posiciones de salida" : "Así quedan al cambiar")) + '</div>'
+      + circMapaHtml(c, { turno: tv, compacto: true, clase: "cl-mapa" });
   }
   html += '</div><div class="cl-bar"><span id="cl-bar"></span></div>';
   html += '<div class="cl-ctrl">'
@@ -18306,6 +18529,25 @@ function u19AccCache(){
   } catch (e){ return null; }
 }
 
+/* Lo mismo pero sin caducar, para poder seguir mostrando lo ultimo bueno
+   cuando el puente no responde. Nunca se presenta como fresco: quien lo use
+   tiene que decir de cuando es. */
+function u19AccCacheViejo(){
+  try {
+    var c = JSON.parse(localStorage.getItem(ACC_KEY) || "null");
+    if (!c || !c.ts) return null;
+    return { datos: c.datos, minutos: Math.round((Date.now() - c.ts) / 60000) };
+  } catch (e){ return null; }
+}
+
+function u19AccEdadTxt(min){
+  if (min < 1) return "recien leido";
+  if (min < 60) return "hace " + min + " min";
+  var h = Math.round(min / 60);
+  if (h < 24) return "hace " + h + " h";
+  return "hace " + Math.round(h / 24) + " dia(s)";
+}
+
 function u19AccPedir(){
   var url = (typeof u19DashUrl === "function") ? u19DashUrl("pendientes") : "";
   if (!url) return Promise.reject(new Error(
@@ -18436,7 +18678,11 @@ function u19AccCuerpoHTML(d){
 }
 
 function u19AccionesHTML(){
-  var d = u19AccCache();
+  var viejo = u19AccCacheViejo();
+  var d = u19AccCache() || (viejo && viejo.datos) || null;
+  /* Se lee sola al abrir. Antes habia que acordarse de pulsar el boton, y
+     mientras tanto la pantalla mostraba una lista vieja como si fuera de hoy. */
+  setTimeout(function(){ if (typeof u19AccLeer === "function") u19AccLeer(true); }, 60);
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
   h += '<div style="display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;">'
     + '<div class="card-title" style="margin:0;">\u{2705} Esperando tu visto bueno</div>';
@@ -18449,23 +18695,31 @@ function u19AccionesHTML(){
     + 'plantillas y sus límites. Puedes desmarcar en Notion antes de que corra.</p>';
   h += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">'
     + '<button class="btn btn-primary btn-sm" type="button" onclick="u19AccLeer()">⟳ Ver pendientes</button>'
-    + '<span id="acc-msg" style="font-size:.78rem;"></span></div>';
+    + '<span id="acc-msg" style="font-size:.78rem;">'
+    + (viejo ? '<span style="color:var(--muted);">Datos ' + escapeHtml(u19AccEdadTxt(viejo.minutos)) + ', actualizando…</span>' : '')
+    + '</span></div>';
   h += '<div id="acc-cuerpo">' + (d ? u19AccCuerpoHTML(d) : '') + '</div>';
   h += '</div></div>';
   return h;
 }
 
-window.u19AccLeer = function(){
+window.u19AccLeer = function(auto){
   var m = document.getElementById("acc-msg");
   function di(t, col){ if (m) m.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>'; }
-  di("Leyendo…", "var(--muted)");
+  if (!auto) di("Leyendo…", "var(--muted)");
   u19AccPedir().then(function(d){
     var c = document.getElementById("acc-cuerpo");
     if (c) c.innerHTML = u19AccCuerpoHTML(d);
     var n = u19Lista(d.reactivacion).length + u19Lista(d.ingreso).length;
     di(n ? n + " acción(es) esperando · aprobar todo costaría " + u19PesosResp(d.costos.total)
-         : "Nada pendiente", n ? "var(--warn)" : "var(--success)");
-  }).catch(function(e){ di((e && e.message) || String(e), "var(--danger)"); });
+         : "Nada pendiente · al día de hoy", n ? "var(--warn)" : "var(--success)");
+  }).catch(function(e){
+    /* No se borra lo que ya estaba: se avisa de que es viejo. Una lista vieja
+       rotulada como vieja sirve; rotulada como de hoy, engaña. */
+    var v = u19AccCacheViejo();
+    di("No se pudo actualizar (" + ((e && e.message) || String(e)) + ")"
+       + (v ? " · lo que ves es de " + u19AccEdadTxt(v.minutos) : ""), "var(--danger)");
+  });
 };
 /* ===ACCIONES_END=== */
 
