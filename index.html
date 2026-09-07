@@ -8664,7 +8664,9 @@ function showProgressReport(data){
   html += '<div class="text-sm text-muted">Enviado: '+(data.sentAt?fmtDate(data.sentAt):"—")+'</div></div></div>';
 
   html += '<div style="display:flex;gap:.5rem;margin-bottom:1rem;flex-wrap:wrap;">';
-  html += '<button class="btn btn-ghost" onclick="returnToTrainer()">← Volver al panel</button>';
+  /* Solo para el entrenador previsualizando: a un socio le abriria la
+     pantalla neutra y le invitaria a seguir tocando. */
+  if (u19CandadoOk()) html += '<button class="btn btn-ghost" onclick="returnToTrainer()">← Volver al panel</button>';
   html += '<button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>';
   html += '<button class="btn btn-primary" id="u19-btn-guardar-prog" onclick="u19GuardarProgresionRecibida()" title="Guarda reps, peso, RPE y EVA de cada serie en el historial del cliente">💾 Guardar en el historial</button>';
   html += '</div>';
@@ -9931,7 +9933,7 @@ function showErrorView(message){
   v.innerHTML = '<div class="empty-state">'
     + '<h3 style="color:var(--danger);">No se pudo cargar</h3>'
     + '<p>'+escapeHtml(message||"")+'</p>'
-    + '<button class="btn btn-primary" style="margin-top:1rem;" onclick="returnToTrainer()">Ir al panel</button>'
+    + (u19CandadoOk() ? '<button class="btn btn-primary" style="margin-top:1rem;" onclick="returnToTrainer()">Ir al panel</button>' : '')
     + '</div>';
 }
 
