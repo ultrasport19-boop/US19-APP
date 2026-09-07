@@ -522,6 +522,8 @@ img{max-width:100%;display:block;}
 .exercise-row .ex-thumb-mini img,.exercise-row .ex-thumb-mini video{width:100%;height:100%;object-fit:cover;display:block;}
 .exercise-row .ex-name small .pat{color:#8fd0ee;font-weight:700;}
 .rb-patrones{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-top:.35rem;}
+.rb-patrones .rb-enfoque{width:auto;min-width:0;font-size:.7rem;padding:.22rem .4rem;border-radius:999px;background:var(--surface-2);}
+.cat-chip.terap.on{background:rgba(226,28,37,.16);color:#ff8a8f;border-color:rgba(226,28,37,.5);}
 /* Móvil: dos tarjetas por fila y filtros sin fijar (la pantalla es corta).
    Va al final del bloque para ganar a las reglas base de la rejilla. */
 @media (max-width:640px){
@@ -3462,6 +3464,10 @@ function loadState(){
       state.protocols = Array.isArray(parsed.protocols) ? parsed.protocols : [];
       state.trash = Array.isArray(parsed.trash) ? parsed.trash : [];
       state.horasExtra = Array.isArray(parsed.horasExtra) ? parsed.horasExtra : [];
+      /* Favoritos y recientes de la biblioteca: en el estado desde el 6-sep-2026,
+         así viajan con la sincronización y con el respaldo. */
+      state.libFav = (parsed.libFav && typeof parsed.libFav === "object" && !Array.isArray(parsed.libFav)) ? parsed.libFav : {};
+      state.libRec = Array.isArray(parsed.libRec) ? parsed.libRec : [];
     } else {
       state.clients = SEED_DATA.clients || [];
       state.routines = SEED_DATA.routines || [];
@@ -3469,6 +3475,7 @@ function loadState(){
       state.protocols = SEED_DATA.protocols || [];
       state.trash = [];
       state.horasExtra = [];
+      state.libFav = {}; state.libRec = [];
       try { localStorage.setItem(APP_KEY + "_seedver", String(SEED_VERSION)); } catch(e){}
       saveState();
     }
@@ -3489,6 +3496,25 @@ function loadState(){
         console.log("GIFs auto-reparados: US19-MEDIA -> US19-APP/videos (jsDelivr)");
       }
     } catch(eFix){ console.error("Auto-reparación de GIFs falló:", eFix); }
+    /* Migración única: los favoritos y recientes que vivían en localStorage
+       (biblioteca v3, unas horas) pasan al estado y las claves viejas se borran. */
+    try {
+      var _lf = localStorage.getItem("us19_lib_fav"), _lr = localStorage.getItem("us19_lib_rec");
+      if (_lf || _lr){
+        if (!state.libFav || typeof state.libFav !== "object") state.libFav = {};
+        if (!Array.isArray(state.libRec)) state.libRec = [];
+        var _fo = JSON.parse(_lf || "{}"), _fk = Object.keys(_fo || {});
+        for (var _fi = 0; _fi < _fk.length; _fi++) state.libFav[_fk[_fi]] = 1;
+        var _ra = JSON.parse(_lr || "[]");
+        if (Array.isArray(_ra)){
+          var _rr = _ra.slice();
+          for (var _ri = 0; _ri < state.libRec.length; _ri++) if (_rr.indexOf(state.libRec[_ri]) < 0) _rr.push(state.libRec[_ri]);
+          state.libRec = _rr.slice(0, 30);
+        }
+        localStorage.removeItem("us19_lib_fav"); localStorage.removeItem("us19_lib_rec");
+        saveState();
+      }
+    } catch(eLib){}
     var _migTerap = applyTerapDefaults();
     var _migContr = applyContrDefaults();
     if (_migTerap || _migContr) saveState();
@@ -5071,7 +5097,12 @@ function renderBuilder(){
   document.getElementById("rb-weeks").addEventListener("input", function(){ _builderRoutine.weeks = parseInt(this.value,10) || 4; });
   document.getElementById("rb-start").addEventListener("change", function(){ _builderRoutine.startDate = this.value; });
   document.getElementById("rb-status").addEventListener("change", function(){ _builderRoutine.status = this.value; });
-  document.getElementById("rb-category").addEventListener("change", function(){ _builderRoutine.category = this.value; });
+  document.getElementById("rb-category").addEventListener("change", function(){
+    _builderRoutine.category = this.value;
+    /* El enfoque automático sale de la categoría: que la línea de equilibrio lo refleje al momento. */
+    var vol = document.getElementById("rb-volume");
+    if (vol) vol.innerHTML = buildVolumeBadges(_builderRoutine);
+  });
   document.getElementById("rb-notes").addEventListener("input", function(){ _builderRoutine.notes = this.value; });
   document.getElementById("rb-weeks").addEventListener("change", function(){ renderBuilder(); });
   var _wkInputs = document.querySelectorAll(".rb-weeknote");
@@ -5194,12 +5225,14 @@ function updateDayDurationBadge(){
 }
 
 function addExerciseToDay(){
+  /* En una rutina terapéutica el selector abre ya en «Terapéuticos». */
+  var perfil = libPerfilEquilibrio(_builderRoutine);
   openExercisePicker(function(exId){
     var d = _builderRoutine.days[_builderActiveDay];
     d.exercises.push({ exerciseId: exId, sets:"3", reps:"10", weight:"", rest:"60s", notes:"" });
     renderDayPanel();
     updateDayTabBadge();
-  }, { multi:true });
+  }, { multi:true, terap: perfil.terap, preset: perfil.terap ? { cat:"(terap)" } : null });
 }
 
 function changeExercise(idx){
@@ -5509,6 +5542,10 @@ function musBadges(e){
 
 /* Selector de ejercicio. opts.multi: no cierra al elegir, cuenta lo añadido y
    ofrece «Listo»; es el modo del editor de rutinas (toca, toca, toca, listo). */
+/* Selector de ejercicio.
+   opts.multi:  no cierra al elegir, cuenta lo añadido y ofrece «Listo» (editor de rutinas).
+   opts.preset: filtros con los que abre, p. ej. { cat:"(terap)" } en una rutina terapéutica.
+   opts.terap:  la rutina es terapéutica; el texto de ayuda lo dice. */
 function openExercisePicker(onPick, opts){
   opts = opts || {};
   var multi = !!opts.multi;
@@ -5517,6 +5554,7 @@ function openExercisePicker(onPick, opts){
   var muscles = Object.keys(muscleSet).sort();
   var uso = _libUsoRutinas();
   var f = { q:"", cat:"", pat:"", muscle:"", niv:"" };
+  if (opts.preset){ for (var pk in opts.preset) if (opts.preset.hasOwnProperty(pk) && pk in f) f[pk] = opts.preset[pk]; }
   var EP_TANDA = 80, visibles = EP_TANDA, anadidos = 0;
 
   var bodyHtml =
@@ -5524,16 +5562,16 @@ function openExercisePicker(onPick, opts){
     + '<div class="lib-tools" style="grid-template-columns:minmax(200px,2fr) repeat(3,minmax(120px,1fr));margin-bottom:.5rem;">'
     + '<div class="lib-search"><span class="lib-search-ico">⌕</span><input type="text" id="ep-search" placeholder="Buscar… (Enter elige el primero)" autocomplete="off"></div>'
     + '<select id="ep-pat"><option value="">Todos los patrones</option>'
-    + LIB_PATS.map(function(p){ return '<option value="' + escapeAttr(p) + '">' + escapeHtml(p) + '</option>'; }).join("")
+    + LIB_PATS.map(function(p){ return '<option value="' + escapeAttr(p) + '"' + (f.pat === p ? ' selected' : '') + '>' + escapeHtml(p) + '</option>'; }).join("")
     + '</select>'
     + '<select id="ep-muscle"><option value="">Todos los músculos</option>'
     + '<optgroup label="Grupo general">'
-    + muscles.map(function(m){ return '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>'; }).join("")
+    + muscles.map(function(m){ return '<option value="' + escapeAttr(m) + '"' + (f.muscle === m ? ' selected' : '') + '>' + escapeHtml(m) + '</option>'; }).join("")
     + '</optgroup>'
-    + musOptionsHtml("")
+    + musOptionsHtml(f.muscle)
     + '<optgroup label="🩺 Terapéuticos (rehab)">'
-    + '<option value="terap:">Terapéuticos — todos</option>'
-    + TERAP_ZONES.map(function(z){ return '<option value="terap:' + escapeAttr(z) + '">Terapéutico — ' + escapeHtml(z) + '</option>'; }).join("")
+    + '<option value="terap:"' + (f.muscle === "terap:" ? ' selected' : '') + '>Terapéuticos — todos</option>'
+    + TERAP_ZONES.map(function(z){ return '<option value="terap:' + escapeAttr(z) + '"' + (f.muscle === "terap:" + z ? ' selected' : '') + '>Terapéutico — ' + escapeHtml(z) + '</option>'; }).join("")
     + '</optgroup>'
     + '<optgroup label="⚡ Tipo de contracción">'
     + '<option value="contr:">Contracción — todas</option>'
@@ -5541,14 +5579,14 @@ function openExercisePicker(onPick, opts){
     + '</optgroup>'
     + '</select>'
     + '<select id="ep-niv"><option value="">Cualquier nivel</option>'
-    + LIB_NIVELES.map(function(n){ return '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + '</option>'; }).join("")
+    + LIB_NIVELES.map(function(n){ return '<option value="' + escapeAttr(n) + '"' + (f.niv === n ? ' selected' : '') + '>' + escapeHtml(n) + '</option>'; }).join("")
     + '</select>'
     + '</div>'
     + '<div class="text-xs text-muted" id="ep-count" style="margin-bottom:.4rem;"></div>'
     + '<div id="ep-list" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;"></div>';
 
   openModal({
-    title: multi ? "Añadir ejercicios al día" : "Elegir ejercicio",
+    title: multi ? (opts.terap ? "Añadir ejercicios · rutina terapéutica" : "Añadir ejercicios al día") : "Elegir ejercicio",
     large: true,
     bodyHtml: bodyHtml,
     footer: multi
@@ -5566,9 +5604,10 @@ function openExercisePicker(onPick, opts){
         if (q && !musHit(_libHay(e), q)) return false;
         return true;
       }
-      function pintarChips(catN, total, favN, recN){
+      function pintarChips(catN, total, favN, recN, terapN){
         var box = document.getElementById("ep-cats");
         var h = '<button type="button" class="cat-chip' + (f.cat ? '' : ' on') + '" data-cat="">Todos <span class="n">' + total + '</span></button>';
+        if (terapN || f.cat === "(terap)") h += '<button type="button" class="cat-chip terap' + (f.cat === "(terap)" ? ' on' : '') + '" data-cat="(terap)" title="Ejercicios con etiqueta terapéutica (zona a proteger)">🩺 Terapéuticos <span class="n">' + terapN + '</span></button>';
         if (favN || f.cat === "(fav)") h += '<button type="button" class="cat-chip fav' + (f.cat === "(fav)" ? ' on' : '') + '" data-cat="(fav)">★ Favoritos <span class="n">' + favN + '</span></button>';
         if (recN || f.cat === "(rec)") h += '<button type="button" class="cat-chip' + (f.cat === "(rec)" ? ' on' : '') + '" data-cat="(rec)" title="Los últimos que elegiste">🕒 Recientes <span class="n">' + recN + '</span></button>';
         for (var i = 0; i < LIB_CATS.length; i++){
@@ -5599,16 +5638,19 @@ function openExercisePicker(onPick, opts){
       function refresh(){
         var q = musNorm(f.q.trim());
         var base = state.exercises.filter(function(e){ return pasaSinCat(e, q); });
-        var catN = {}, favN = 0, recN = 0;
+        var catN = {}, favN = 0, recN = 0, terapN = 0;
         base.forEach(function(e){
           var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1;
           if (libEsFav(e.id)) favN++;
           if (recIdx[e.id] !== undefined) recN++;
+          if (e.terap) terapN++;
         });
-        pintarChips(catN, base.length, favN, recN);
+        pintarChips(catN, base.length, favN, recN, terapN);
+        var especial = f.cat === "(fav)" || f.cat === "(rec)" || f.cat === "(terap)";
         var filtered = base.filter(function(e){
           if (f.cat === "(fav)") return libEsFav(e.id);
           if (f.cat === "(rec)") return recIdx[e.id] !== undefined;
+          if (f.cat === "(terap)") return !!e.terap;
           return !f.cat || libTaxDe(e).cat === f.cat;
         }).sort(function(a, b){
           if (f.cat === "(rec)") return recIdx[a.id] - recIdx[b.id];
@@ -5617,9 +5659,12 @@ function openExercisePicker(onPick, opts){
           return (a.name||"").localeCompare(b.name||"");
         });
         var cnt = document.getElementById("ep-count");
-        if (cnt) cnt.innerHTML = '<b>' + filtered.length + '</b> ejercicios' + (q === "" && !f.cat && filtered.length ? ' · primero los que ya usas en rutinas' : '') + (multi ? ' · toca para añadir, se queda abierto' : '');
+        if (cnt) cnt.innerHTML = '<b>' + filtered.length + '</b> ejercicios'
+          + (q === "" && !f.cat && filtered.length ? ' · primero los que ya usas en rutinas' : '')
+          + (opts.terap ? ' · rutina terapéutica: conviene quedarse en los de etiqueta terapéutica o de nivel principiante' : '')
+          + (multi ? ' · toca para añadir, se queda abierto' : '');
         if (!filtered.length){
-          list.innerHTML = '<p class="text-muted text-sm" style="padding:1rem;text-align:center;">Sin resultados.</p>';
+          list.innerHTML = '<p class="text-muted text-sm" style="padding:1rem;text-align:center;">Sin resultados.' + (f.cat === "(terap)" ? ' Los ejercicios terapéuticos se marcan en el formulario, en «Categoría terapéutica».' : '') + '</p>';
           return;
         }
         var hasta = Math.min(visibles, filtered.length);
@@ -5631,7 +5676,7 @@ function openExercisePicker(onPick, opts){
               + '<span class="ep-name">' + escapeHtml(e.name) + '</span>'
               + '<span class="ep-sub">' + libMusLinea(e) + (e.equipment ? ' <span>· ' + escapeHtml(e.equipment) + '</span>' : '') + '</span>'
             + '</span>'
-            + '<span class="ep-tags">' + libTagsHtml(e, { sinCat: !!f.cat && f.cat !== "(fav)" && f.cat !== "(rec)" }) + libNivDots(t.niv) + (uso[e.id] ? '<span class="badge teal">📋 ' + uso[e.id] + '</span>' : '') + '</span>'
+            + '<span class="ep-tags">' + libTagsHtml(e, { sinCat: !!f.cat && !especial }) + libNivDots(t.niv) + (uso[e.id] ? '<span class="badge teal">📋 ' + uso[e.id] + '</span>' : '') + '</span>'
             + '<span class="ep-fav' + (fav ? ' on' : '') + '" data-fav="' + id + '" title="' + (fav ? 'Quitar de favoritos' : 'Marcar favorito') + '">' + (fav ? '★' : '☆') + '</span>'
             + (multi ? '<span class="ep-add">+</span>' : '')
             + '</button>';
@@ -6541,26 +6586,31 @@ function _libPasaSinCat(e, q){
   if (q && !musHit(_libHay(e), q)) return false;
   return true;
 }
-/* Favoritos y recientes viven en el navegador, no en el estado: no se
-   sincronizan ni se respaldan, son un atajo de trabajo de este equipo. */
+/* Favoritos y recientes viven en el estado: se sincronizan entre dispositivos
+   y van en el respaldo. Diego lo pidió el 6-sep. */
 function _libFavs(){
-  try { var o = JSON.parse(localStorage.getItem("us19_lib_fav") || "{}"); return (o && typeof o === "object") ? o : {}; } catch(e){ return {}; }
+  if (!state.libFav || typeof state.libFav !== "object" || Array.isArray(state.libFav)) state.libFav = {};
+  return state.libFav;
 }
 function libEsFav(id){ return !!_libFavs()[id]; }
 function libToggleFav(id){
   var o = _libFavs();
   if (o[id]) delete o[id]; else o[id] = 1;
-  try { localStorage.setItem("us19_lib_fav", JSON.stringify(o)); } catch(e){}
+  saveState();
+  if (typeof scheduleSyncUpload === "function") scheduleSyncUpload();
   return !!o[id];
 }
 function _libRecientes(){
-  try { var a = JSON.parse(localStorage.getItem("us19_lib_rec") || "[]"); return Array.isArray(a) ? a : []; } catch(e){ return []; }
+  if (!Array.isArray(state.libRec)) state.libRec = [];
+  return state.libRec;
 }
 function libRegistrarReciente(id){
   var a = _libRecientes().filter(function(x){ return x !== id; });
   a.unshift(id);
   if (a.length > 30) a.length = 30;
-  try { localStorage.setItem("us19_lib_rec", JSON.stringify(a)); } catch(e){}
+  state.libRec = a;
+  saveState();
+  if (typeof scheduleSyncUpload === "function") scheduleSyncUpload();
 }
 /* Series por patrón de una lista de ejercicios de rutina ({exerciseId, sets}). */
 function libPatronesDe(lista){
@@ -6571,6 +6621,81 @@ function libPatronesDe(lista){
     pat[p] = (pat[p]||0) + (parseInt(x.sets,10)||0);
   });
   return pat;
+}
+/* Contra qué se mide el equilibrio. r.enfoque manda; si es «auto» sale de la
+   categoría de la rutina. Una rutina de piernas no debe quejarse de que le
+   falta tracción, y una terapéutica se mira con otros ojos. */
+var LIB_ENFOQUES = [
+  ["auto",        "Automático"],
+  ["equilibrada", "Equilibrada"],
+  ["empuje",      "Solo empuje"],
+  ["traccion",    "Solo tracción"],
+  ["superior",    "Tren superior"],
+  ["inferior",    "Tren inferior"],
+  ["core",        "Core"],
+  ["terap",       "Terapéutica"],
+  ["silencio",    "Sin avisos"]
+];
+function libPerfilEquilibrio(r){
+  var e = (r && r.enfoque) || "auto", auto = false;
+  if (e === "auto"){
+    auto = true;
+    var c = (r && r.category) || "";
+    if (c === "rehab" || c === "rehabilitacion") e = "terap";
+    else if (c === "upper") e = "superior";
+    else if (c === "lower") e = "inferior";
+    else if (c === "core") e = "core";
+    else if (c === "hiit" || c === "cardio" || c === "movilidad") e = "silencio";
+    else e = "equilibrada";
+  }
+  var P = {
+    equilibrada: { nombre:"Equilibrada",   pushPull:true,  piernas:true,  core:true },
+    empuje:      { nombre:"Solo empuje",   pushPull:false, piernas:false, core:true },
+    traccion:    { nombre:"Solo tracción", pushPull:false, piernas:false, core:true },
+    superior:    { nombre:"Tren superior", pushPull:true,  piernas:false, core:true },
+    inferior:    { nombre:"Tren inferior", pushPull:false, piernas:true,  core:true },
+    core:        { nombre:"Core",          pushPull:false, piernas:false, core:false },
+    terap:       { nombre:"Terapéutica",   terap:true },
+    silencio:    { nombre:"Sin avisos",    silencio:true }
+  };
+  var p = P[e] || P.equilibrada;
+  return { id:e, auto:auto, nombre:p.nombre, pushPull:!!p.pushPull, piernas:!!p.piernas, core:!!p.core, terap:!!p.terap, silencio:!!p.silencio };
+}
+function libEnfoqueSelectHtml(r){
+  var perfil = libPerfilEquilibrio(r), h = '<select class="rb-enfoque" onchange="libEnfoqueCambiado(this.value)" title="Contra qué se mide el equilibrio de la rutina">';
+  for (var i = 0; i < LIB_ENFOQUES.length; i++){
+    var id = LIB_ENFOQUES[i][0], lab = LIB_ENFOQUES[i][1];
+    if (id === "auto") lab += ": " + perfil.nombre;
+    h += '<option value="' + id + '"' + (((r && r.enfoque) || "auto") === id ? ' selected' : '') + '>' + escapeHtml(lab) + '</option>';
+  }
+  return h + '</select>';
+}
+window.libEnfoqueCambiado = function(v){
+  if (!_builderRoutine) return;
+  _builderRoutine.enfoque = v;
+  var vol = document.getElementById("rb-volume");
+  if (vol) vol.innerHTML = buildVolumeBadges(_builderRoutine);
+};
+/* Resumen de una rutina terapéutica: cuántos llevan etiqueta terapéutica, en
+   qué zonas, y cuáles son de carga alta. Vocabulario de sala, no clínico. */
+function libResumenTerapeutico(r){
+  var tot = 0, conT = 0, zonas = {}, altas = [];
+  ((r&&r.days)||[]).forEach(function(d){
+    ((d&&d.exercises)||[]).forEach(function(x){
+      var def = getExercise(x.exerciseId); if (!def) return;
+      tot++;
+      if (def.terap){ conT++; zonas[def.terap] = (zonas[def.terap]||0) + 1; }
+      var t = libTaxDe(def);
+      if (t.niv === "Avanzado" || t.cat === "Pliometría" || t.cat === "Halterofilia" || t.cat === "Strongman") altas.push(def.name);
+    });
+  });
+  var zk = Object.keys(zonas), h = '<span class="badge terap">🩺 Rutina terapéutica</span>';
+  if (!tot) return h;
+  h += '<span class="text-xs">' + conT + ' de ' + tot + ' con etiqueta terapéutica' + (zk.length ? ' · ' + zk.map(function(z){ return escapeHtml(z) + ' ' + zonas[z]; }).join(', ') : '') + '</span>';
+  if (altas.length) h += '<span class="text-xs" style="color:var(--warn);">⚠ carga alta: ' + escapeHtml(altas.slice(0, 3).join(', ')) + (altas.length > 3 ? ' y ' + (altas.length - 3) + ' más' : '') + '</span>';
+  else h += '<span class="text-xs" style="color:var(--success);">✓ sin ejercicios de carga alta</span>';
+  if (!conT) h += '<span class="text-xs" style="color:var(--warn);">⚠ ninguno lleva etiqueta terapéutica: se pone en el formulario del ejercicio, en «Categoría terapéutica»</span>';
+  return h;
 }
 function libPatronesBadges(pat){
   var orden = ["Empuje","Tracción","Sentadilla","Bisagra","Zancada","Core","Accesorio"], h = '';
@@ -8531,6 +8656,8 @@ function exportBackup(){
     exercises: state.exercises,
     protocols: state.protocols || [],
     horasExtra: state.horasExtra || [],
+    libFav: state.libFav || {},
+    libRec: state.libRec || [],
     reports: (typeof loadReports === "function" ? loadReports() : []),
     settings: settings,
     dashboard: (function(){ try { return localStorage.getItem("us19_dashboard_v5"); } catch(e){ return null; } })()
@@ -8568,6 +8695,8 @@ function importBackup(file){
       if (Array.isArray(data.exercises)) state.exercises = data.exercises;
       if (Array.isArray(data.protocols)) state.protocols = data.protocols;
       if (Array.isArray(data.horasExtra)) state.horasExtra = data.horasExtra;
+      if (data.libFav && typeof data.libFav === "object" && !Array.isArray(data.libFav)) state.libFav = data.libFav;
+      if (Array.isArray(data.libRec)) state.libRec = data.libRec;
       if (Array.isArray(data.reports) && typeof saveReports === "function") { try { saveReports(data.reports); } catch(e){} }
       if (data.settings && typeof data.settings === "object") { try { Object.keys(data.settings).forEach(function(k){ settings[k] = data.settings[k]; }); if (typeof saveSettings === "function") saveSettings(); } catch(e){} }
       if (typeof data.dashboard === "string" && data.dashboard) { try { localStorage.setItem("us19_dashboard_v5", data.dashboard); } catch(e){} }
@@ -8599,6 +8728,7 @@ function wipeAll(){
   if (!confirm("¿Borrar TODOS los datos (clientes, rutinas, ejercicios)? Esta acción no se puede deshacer.")) return;
   if (!confirm("Confirma una vez más: ¿realmente quieres borrar todo?")) return;
   state.clients = []; state.routines = []; state.exercises = []; state.protocols = [];
+  state.libFav = {}; state.libRec = [];
   state.exercises = (SEED_DATA.exercises || []).slice();
   saveState();
   closeModal();
@@ -9211,7 +9341,9 @@ function buildSyncPayload(){
     clients: state.clients,
     routines: state.routines,
     exercises: state.exercises,
-    protocols: state.protocols
+    protocols: state.protocols,
+    libFav: state.libFav || {},
+    libRec: state.libRec || []
   };
 }
 
@@ -9346,6 +9478,8 @@ function syncDownload(){
         if (Array.isArray(data.routines)) state.routines = data.routines;
         if (Array.isArray(data.exercises)) state.exercises = data.exercises;
         if (Array.isArray(data.protocols)) state.protocols = data.protocols;
+        if (data.libFav && typeof data.libFav === "object" && !Array.isArray(data.libFav)) state.libFav = data.libFav;
+        if (Array.isArray(data.libRec)) state.libRec = data.libRec;
         try { localStorage.setItem(APP_KEY, JSON.stringify(state)); } catch(e){}
         updateSyncBadge("synced","Sincronizado ↓");
         setTimeout(function(){ updateSyncBadge("idle"); }, 4000);
@@ -12293,26 +12427,41 @@ function buildVolumeBadges(r){
     var pd = libPatronesDe((d&&d.exercises)||[]);
     Object.keys(pd).forEach(function(k){ pat[k] = (pat[k]||0) + pd[k]; });
   });
-  var pk = Object.keys(pat);
-  if (pk.length){
-    html += '<div class="rb-patrones"><span class="text-xs text-muted">Patrones:</span>' + libPatronesBadges(pat);
-    /* Avisos estrictos, a petición de Diego (6-sep): 30 % de diferencia ya avisa. */
-    var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0, sen = pat["Sentadilla"]||0, zan = pat["Zancada"]||0,
-        bis = pat["Bisagra"]||0, core = pat["Core"]||0, acc = pat["Accesorio"]||0, total = 0;
-    pk.forEach(function(k){ total += pat[k]; });
-    if (emp && tra && Math.max(emp,tra) > Math.min(emp,tra) * 1.3) avisos.push('empuje y tracción descompensados (' + emp + ' / ' + tra + ')');
-    if (emp && !tra) avisos.push('solo empuje, nada de tracción');
-    if (!emp && tra) avisos.push('solo tracción, nada de empuje');
-    if ((sen + zan) > 0 && !bis) avisos.push('rodilla sin bisagra de cadera');
-    if (bis > 0 && !(sen + zan)) avisos.push('bisagra sin trabajo de rodilla');
-    if ((sen + zan) && bis && Math.max(sen + zan, bis) > Math.min(sen + zan, bis) * 1.3) avisos.push('rodilla y bisagra descompensadas (' + (sen + zan) + ' / ' + bis + ')');
-    if (sen >= 6 && !zan) avisos.push('todo bilateral, sin trabajo unilateral');
-    if (total >= 10 && !core) avisos.push('sin core');
-    if (acc > total * 0.3) avisos.push('demasiado accesorio (' + acc + ' de ' + total + ')');
-    if (avisos.length) html += '<span class="text-xs" style="color:var(--warn);" title="Orientativo: cada objetivo tiene su reparto">⚠ ' + escapeHtml(avisos.join(' · ')) + '</span>';
-    else html += '<span class="text-xs" style="color:var(--success);">✓ equilibrada</span>';
-    html += '</div>';
+  var pk = Object.keys(pat), perfil = libPerfilEquilibrio(r);
+  html += '<div class="rb-patrones">' + libEnfoqueSelectHtml(r);
+  if (perfil.terap){
+    html += libResumenTerapeutico(r);
+  } else if (pk.length){
+    html += libPatronesBadges(pat);
+    if (!perfil.silencio){
+      /* Avisos estrictos, a petición de Diego (6-sep): 30 % de diferencia ya avisa,
+         y «sin core» no espera a un mínimo de series. Cada perfil mira solo lo suyo. */
+      var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0, sen = pat["Sentadilla"]||0, zan = pat["Zancada"]||0,
+          bis = pat["Bisagra"]||0, core = pat["Core"]||0, acc = pat["Accesorio"]||0, total = 0;
+      pk.forEach(function(k){ total += pat[k]; });
+      if (perfil.pushPull){
+        if (emp && tra && Math.max(emp,tra) > Math.min(emp,tra) * 1.3) avisos.push('empuje y tracción descompensados (' + emp + ' / ' + tra + ')');
+        if (emp && !tra) avisos.push('solo empuje, nada de tracción');
+        if (!emp && tra) avisos.push('solo tracción, nada de empuje');
+      }
+      if (perfil.id === "empuje" && tra > emp) avisos.push('más tracción que empuje en una rutina de empuje');
+      if (perfil.id === "traccion" && emp > tra) avisos.push('más empuje que tracción en una rutina de tracción');
+      if (perfil.piernas){
+        if ((sen + zan) > 0 && !bis) avisos.push('rodilla sin bisagra de cadera');
+        if (bis > 0 && !(sen + zan)) avisos.push('bisagra sin trabajo de rodilla');
+        if ((sen + zan) && bis && Math.max(sen + zan, bis) > Math.min(sen + zan, bis) * 1.3) avisos.push('rodilla y bisagra descompensadas (' + (sen + zan) + ' / ' + bis + ')');
+        if (sen >= 6 && !zan) avisos.push('todo bilateral, sin trabajo unilateral');
+      }
+      if (perfil.id === "superior" && (sen + zan + bis) > 0) avisos.push('hay pierna en una rutina de tren superior');
+      if (perfil.id === "inferior" && (emp + tra) > 0) avisos.push('hay empuje o tracción en una rutina de tren inferior');
+      if (perfil.core && total > 0 && !core) avisos.push('sin core');
+      if (perfil.id === "core" && !core) avisos.push('una rutina de core sin core');
+      if (acc > total * 0.3) avisos.push('demasiado accesorio (' + acc + ' de ' + total + ')');
+      if (avisos.length) html += '<span class="text-xs" style="color:var(--warn);" title="Orientativo: medido contra el enfoque elegido">⚠ ' + escapeHtml(avisos.join(' · ')) + '</span>';
+      else html += '<span class="text-xs" style="color:var(--success);">✓ ' + (perfil.id === "equilibrada" ? 'equilibrada' : 'en línea con el enfoque') + '</span>';
+    }
   }
+  html += '</div>';
   return html;
 }
 
