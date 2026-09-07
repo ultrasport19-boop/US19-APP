@@ -438,6 +438,25 @@ img{max-width:100%;display:block;}
 .lib-vista button{background:var(--surface-3);border:0;color:var(--muted);padding:.45rem .6rem;cursor:pointer;font-size:.9rem;line-height:1;}
 .lib-vista button.on{background:rgba(168,209,57,.18);color:var(--accent);}
 .lib-status{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 .8rem;min-height:1.4rem;}
+.lib-sticky{position:sticky;top:0;z-index:5;background:var(--bg);padding-top:.4rem;margin-top:-.4rem;}
+.cat-chip.fav.on{background:rgba(234,179,8,.16);color:#fde68a;border-color:rgba(234,179,8,.5);}
+.exc-acts .btn.fav{color:var(--muted);}
+.exc-acts .btn.fav.on{color:#fde68a;border-color:rgba(234,179,8,.5);}
+.ep-row .ep-fav{flex:0 0 auto;font-size:1.05rem;color:var(--muted);padding:.2rem .35rem;border-radius:var(--radius-sm);}
+.ep-row .ep-fav:hover{background:var(--surface-3);color:var(--text);}
+.ep-row .ep-fav.on{color:#fde68a;}
+.ep-row .ep-add{flex:0 0 auto;width:1.6rem;height:1.6rem;border-radius:50%;background:rgba(168,209,57,.16);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:800;}
+.ep-row.ok{border-color:var(--accent);background:rgba(168,209,57,.12);}
+@media (max-width:640px){
+  .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;}
+  .exc-body{padding:.5rem .55rem .5rem;gap:.28rem;}
+  .exc-title{font-size:.82rem;}
+  .exc-mus{font-size:.7rem;}
+  .exc-mus span{display:none;}
+  .exc-tags .badge{font-size:.6rem;padding:.15rem .4rem;}
+  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}
+  .lib-sticky{position:static;}
+}
 .lib-count{font-size:.78rem;color:var(--muted);margin:0;font-variant-numeric:tabular-nums;}
 .lib-count b{color:var(--text);}
 .lib-clear{background:transparent;border:0;color:var(--accent);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;padding:.2rem .4rem;border-radius:var(--radius-sm);}
@@ -5094,6 +5113,7 @@ function renderDayPanel(){
   html += '<h3 style="font-family:var(--font-display);letter-spacing:.04em;font-size:1.3rem;">'+DAY_NAMES[dayIdx]+'</h3>';
   html += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">';
   html += '<span class="badge teal">⏱ '+fmtDuration(dur)+'</span>';
+  html += '<span id="day-patrones" style="display:inline-flex;gap:.3rem;flex-wrap:wrap;">' + libPatronesBadges(libPatronesDe(day.exercises)) + '</span>';
   html += '<button class="btn btn-secondary btn-sm" onclick="addExerciseToDay()">+ Ejercicio</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="copyDayTo()" title="Copiar los ejercicios de este día a otro día">⧉ Copiar día</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="clearDay()">Vaciar día</button>';
@@ -5157,6 +5177,8 @@ function updateDayDurationBadge(){
   var dur = calculateDayDuration(day);
   var head = document.querySelector("#day-panel .day-header .badge.teal");
   if (head) head.textContent = "⏱ " + fmtDuration(dur);
+  var dp = document.getElementById("day-patrones");
+  if (dp) dp.innerHTML = libPatronesBadges(libPatronesDe(day.exercises));
   var stats = document.querySelectorAll(".card-sub .badge.teal");
   if (stats.length >= 3){
     var total = calculateRoutineDuration(_builderRoutine);
@@ -5174,7 +5196,7 @@ function addExerciseToDay(){
     d.exercises.push({ exerciseId: exId, sets:"3", reps:"10", weight:"", rest:"60s", notes:"" });
     renderDayPanel();
     updateDayTabBadge();
-  });
+  }, { multi:true });
 }
 
 function changeExercise(idx){
@@ -5482,18 +5504,22 @@ function musBadges(e){
   return h;
 }
 
-function openExercisePicker(onPick){
+/* Selector de ejercicio. opts.multi: no cierra al elegir, cuenta lo añadido y
+   ofrece «Listo»; es el modo del editor de rutinas (toca, toca, toca, listo). */
+function openExercisePicker(onPick, opts){
+  opts = opts || {};
+  var multi = !!opts.multi;
   var muscleSet = {};
   state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; });
   var muscles = Object.keys(muscleSet).sort();
   var uso = _libUsoRutinas();
   var f = { q:"", cat:"", pat:"", muscle:"", niv:"" };
-  var EP_TANDA = 80, visibles = EP_TANDA;
+  var EP_TANDA = 80, visibles = EP_TANDA, anadidos = 0;
 
   var bodyHtml =
     '<div class="lib-cats" id="ep-cats" style="margin-bottom:.5rem;"></div>'
     + '<div class="lib-tools" style="grid-template-columns:minmax(200px,2fr) repeat(3,minmax(120px,1fr));margin-bottom:.5rem;">'
-    + '<div class="lib-search"><span class="lib-search-ico">⌕</span><input type="text" id="ep-search" placeholder="Buscar ejercicio…" autocomplete="off"></div>'
+    + '<div class="lib-search"><span class="lib-search-ico">⌕</span><input type="text" id="ep-search" placeholder="Buscar… (Enter elige el primero)" autocomplete="off"></div>'
     + '<select id="ep-pat"><option value="">Todos los patrones</option>'
     + LIB_PATS.map(function(p){ return '<option value="' + escapeAttr(p) + '">' + escapeHtml(p) + '</option>'; }).join("")
     + '</select>'
@@ -5519,12 +5545,16 @@ function openExercisePicker(onPick){
     + '<div id="ep-list" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;"></div>';
 
   openModal({
-    title: "Elegir ejercicio",
+    title: multi ? "Añadir ejercicios al día" : "Elegir ejercicio",
     large: true,
     bodyHtml: bodyHtml,
-    footer: [{ label:"Cancelar", cls:"btn-ghost" }],
+    footer: multi
+      ? [{ label:"Listo", cls:"btn-primary", id:"ep-listo" }]
+      : [{ label:"Cancelar", cls:"btn-ghost" }],
     bodyMount: function(){
       var list = document.getElementById("ep-list");
+      var recientes = _libRecientes(), recIdx = {};
+      recientes.forEach(function(id, i){ recIdx[id] = i; });
       function pasaSinCat(e, q){
         var t = libTaxDe(e);
         if (f.pat && t.pat !== f.pat) return false;
@@ -5533,9 +5563,11 @@ function openExercisePicker(onPick){
         if (q && !musHit(_libHay(e), q)) return false;
         return true;
       }
-      function pintarChips(catN, total){
+      function pintarChips(catN, total, favN, recN){
         var box = document.getElementById("ep-cats");
         var h = '<button type="button" class="cat-chip' + (f.cat ? '' : ' on') + '" data-cat="">Todos <span class="n">' + total + '</span></button>';
+        if (favN || f.cat === "(fav)") h += '<button type="button" class="cat-chip fav' + (f.cat === "(fav)" ? ' on' : '') + '" data-cat="(fav)">★ Favoritos <span class="n">' + favN + '</span></button>';
+        if (recN || f.cat === "(rec)") h += '<button type="button" class="cat-chip' + (f.cat === "(rec)" ? ' on' : '') + '" data-cat="(rec)" title="Los últimos que elegiste">🕒 Recientes <span class="n">' + recN + '</span></button>';
         for (var i = 0; i < LIB_CATS.length; i++){
           var cn = LIB_CATS[i][0];
           if (!catN[cn] && f.cat !== cn) continue;
@@ -5550,61 +5582,91 @@ function openExercisePicker(onPick){
           });
         }
       }
+      function elegir(id){
+        libRegistrarReciente(id);
+        if (!multi){ closeModal(); onPick(id); return; }
+        onPick(id);
+        anadidos++;
+        var b = document.getElementById("ep-listo");
+        if (b) b.textContent = "Listo · " + anadidos + " añadido" + (anadidos === 1 ? "" : "s");
+        var row = list.querySelector('.ep-row[data-id="' + id + '"]');
+        if (row){ row.classList.add("ok"); setTimeout(function(){ row.classList.remove("ok"); }, 900); }
+        toast("Añadido al día", "success");
+      }
       function refresh(){
         var q = musNorm(f.q.trim());
         var base = state.exercises.filter(function(e){ return pasaSinCat(e, q); });
-        var catN = {};
-        base.forEach(function(e){ var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1; });
-        pintarChips(catN, base.length);
-        var filtered = base.filter(function(e){ return !f.cat || libTaxDe(e).cat === f.cat; })
-          .sort(function(a, b){
-            var d = (uso[b.id]||0) - (uso[a.id]||0);
-            if (q === "" && d) return d;   /* sin búsqueda, primero lo que ya usas */
-            return (a.name||"").localeCompare(b.name||"");
-          });
+        var catN = {}, favN = 0, recN = 0;
+        base.forEach(function(e){
+          var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1;
+          if (libEsFav(e.id)) favN++;
+          if (recIdx[e.id] !== undefined) recN++;
+        });
+        pintarChips(catN, base.length, favN, recN);
+        var filtered = base.filter(function(e){
+          if (f.cat === "(fav)") return libEsFav(e.id);
+          if (f.cat === "(rec)") return recIdx[e.id] !== undefined;
+          return !f.cat || libTaxDe(e).cat === f.cat;
+        }).sort(function(a, b){
+          if (f.cat === "(rec)") return recIdx[a.id] - recIdx[b.id];
+          var d = (uso[b.id]||0) - (uso[a.id]||0);
+          if (q === "" && d) return d;   /* sin búsqueda, primero lo que ya usas */
+          return (a.name||"").localeCompare(b.name||"");
+        });
         var cnt = document.getElementById("ep-count");
-        if (cnt) cnt.innerHTML = '<b>' + filtered.length + '</b> ejercicios' + (q === "" && filtered.length ? ' · primero los que ya usas en rutinas' : '');
+        if (cnt) cnt.innerHTML = '<b>' + filtered.length + '</b> ejercicios' + (q === "" && !f.cat && filtered.length ? ' · primero los que ya usas en rutinas' : '') + (multi ? ' · toca para añadir, se queda abierto' : '');
         if (!filtered.length){
           list.innerHTML = '<p class="text-muted text-sm" style="padding:1rem;text-align:center;">Sin resultados.</p>';
           return;
         }
         var hasta = Math.min(visibles, filtered.length);
         list.innerHTML = filtered.slice(0, hasta).map(function(e){
-          var t = libTaxDe(e), id = escapeAttr(e.id);
+          var t = libTaxDe(e), id = escapeAttr(e.id), fav = libEsFav(e.id);
           return '<button type="button" class="ep-row" data-id="' + id + '">'
             + '<span class="ep-thumb" data-prev="' + id + '" title="Ver en grande">' + libThumbHtml(e, 'alt="" loading="lazy"') + '</span>'
             + '<span class="ep-main">'
               + '<span class="ep-name">' + escapeHtml(e.name) + '</span>'
               + '<span class="ep-sub">' + libMusLinea(e) + (e.equipment ? ' <span>· ' + escapeHtml(e.equipment) + '</span>' : '') + '</span>'
             + '</span>'
-            + '<span class="ep-tags">' + libTagsHtml(e, { sinCat: !!f.cat }) + libNivDots(t.niv) + (uso[e.id] ? '<span class="badge teal">📋 ' + uso[e.id] + '</span>' : '') + '</span>'
+            + '<span class="ep-tags">' + libTagsHtml(e, { sinCat: !!f.cat && f.cat !== "(fav)" && f.cat !== "(rec)" }) + libNivDots(t.niv) + (uso[e.id] ? '<span class="badge teal">📋 ' + uso[e.id] + '</span>' : '') + '</span>'
+            + '<span class="ep-fav' + (fav ? ' on' : '') + '" data-fav="' + id + '" title="' + (fav ? 'Quitar de favoritos' : 'Marcar favorito') + '">' + (fav ? '★' : '☆') + '</span>'
+            + (multi ? '<span class="ep-add">+</span>' : '')
             + '</button>';
         }).join("")
         + (hasta < filtered.length ? '<button type="button" class="btn btn-secondary btn-sm" id="ep-mas" style="align-self:center;margin:.4rem 0;">Mostrar ' + Math.min(EP_TANDA, filtered.length - hasta) + ' más</button>' : '');
         var items = list.querySelectorAll(".ep-row");
         for (var i = 0; i < items.length; i++){
-          items[i].addEventListener("click", function(){
-            var id = this.getAttribute("data-id");
-            closeModal();
-            onPick(id);
-          });
+          items[i].addEventListener("click", function(){ elegir(this.getAttribute("data-id")); });
         }
         var prevs = list.querySelectorAll("[data-prev]");
         for (var p = 0; p < prevs.length; p++){
-          prevs[p].addEventListener("click", function(ev){
+          prevs[p].addEventListener("click", function(ev){ ev.stopPropagation(); showExercisePreview(this.getAttribute("data-prev")); });
+        }
+        var favs = list.querySelectorAll("[data-fav]");
+        for (var g = 0; g < favs.length; g++){
+          favs[g].addEventListener("click", function(ev){
             ev.stopPropagation();
-            showExercisePreview(this.getAttribute("data-prev"));
+            var on = libToggleFav(this.getAttribute("data-fav"));
+            this.textContent = on ? "★" : "☆"; this.className = "ep-fav" + (on ? " on" : "");
           });
         }
         var mas = document.getElementById("ep-mas");
         if (mas) mas.addEventListener("click", function(){ visibles += EP_TANDA; refresh(); });
       }
-      document.getElementById("ep-search").addEventListener("input", function(){ f.q = this.value; visibles = EP_TANDA; refresh(); });
+      var search = document.getElementById("ep-search");
+      search.addEventListener("input", function(){ f.q = this.value; visibles = EP_TANDA; refresh(); });
+      /* Enter elige el primero de la lista: escribir «remo» y Enter, sin ratón. */
+      search.addEventListener("keydown", function(ev){
+        if (ev.key !== "Enter") return;
+        ev.preventDefault();
+        var first = list.querySelector(".ep-row");
+        if (first) elegir(first.getAttribute("data-id"));
+      });
       document.getElementById("ep-pat").addEventListener("change", function(){ f.pat = this.value; visibles = EP_TANDA; refresh(); });
       document.getElementById("ep-muscle").addEventListener("change", function(){ f.muscle = this.value; visibles = EP_TANDA; refresh(); });
       document.getElementById("ep-niv").addEventListener("change", function(){ f.niv = this.value; visibles = EP_TANDA; refresh(); });
       refresh();
-      setTimeout(function(){ var s = document.getElementById("ep-search"); if (s) s.focus(); }, 50);
+      setTimeout(function(){ search.focus(); }, 50);
     }
   });
 }
@@ -6476,6 +6538,42 @@ function _libPasaSinCat(e, q){
   if (q && !musHit(_libHay(e), q)) return false;
   return true;
 }
+/* Favoritos y recientes viven en el navegador, no en el estado: no se
+   sincronizan ni se respaldan, son un atajo de trabajo de este equipo. */
+function _libFavs(){
+  try { var o = JSON.parse(localStorage.getItem("us19_lib_fav") || "{}"); return (o && typeof o === "object") ? o : {}; } catch(e){ return {}; }
+}
+function libEsFav(id){ return !!_libFavs()[id]; }
+function libToggleFav(id){
+  var o = _libFavs();
+  if (o[id]) delete o[id]; else o[id] = 1;
+  try { localStorage.setItem("us19_lib_fav", JSON.stringify(o)); } catch(e){}
+  return !!o[id];
+}
+function _libRecientes(){
+  try { var a = JSON.parse(localStorage.getItem("us19_lib_rec") || "[]"); return Array.isArray(a) ? a : []; } catch(e){ return []; }
+}
+function libRegistrarReciente(id){
+  var a = _libRecientes().filter(function(x){ return x !== id; });
+  a.unshift(id);
+  if (a.length > 30) a.length = 30;
+  try { localStorage.setItem("us19_lib_rec", JSON.stringify(a)); } catch(e){}
+}
+/* Series por patrón de una lista de ejercicios de rutina ({exerciseId, sets}). */
+function libPatronesDe(lista){
+  var pat = {};
+  (lista || []).forEach(function(x){
+    var def = getExercise(x.exerciseId); if (!def) return;
+    var p = libTaxDe(def).pat; if (!p || p === "Locomoción") return;
+    pat[p] = (pat[p]||0) + (parseInt(x.sets,10)||0);
+  });
+  return pat;
+}
+function libPatronesBadges(pat){
+  var orden = ["Empuje","Tracción","Sentadilla","Bisagra","Zancada","Core","Accesorio"], h = '';
+  orden.forEach(function(k){ if (pat[k]) h += '<span class="badge pat">' + k + ' ' + pat[k] + '</span>'; });
+  return h;
+}
 function _libUsoRutinas(){
   var uso = {};
   state.routines.forEach(function(r){
@@ -6504,6 +6602,8 @@ function renderLibrary(){
   html += '<button class="btn btn-ghost" onclick="openDedupeModal()">🧹 Duplicados</button>';
   html += '</div></div>';
 
+  /* Chips, filtros y recuento se quedan arriba al bajar por 2.000 tarjetas. */
+  html += '<div class="lib-sticky">';
   html += '<div class="lib-cats" id="lib-cats"></div>';
 
   html += '<div class="lib-tools">';
@@ -6559,6 +6659,7 @@ function renderLibrary(){
   html += '</div>';
 
   html += '<div class="lib-status"><div id="lib-count" class="lib-count"></div><button type="button" id="lib-clear" class="lib-clear" hidden>Limpiar filtros</button></div>';
+  html += '</div>';
   html += '<div id="lib-grid"></div>';
   document.getElementById("view-library").innerHTML = html;
 
@@ -6611,10 +6712,12 @@ function _libSetVista(v){
   renderLibraryGrid();
 }
 /* Los chips se repintan en cada filtrado: sus recuentos dependen del resto. */
-function _libPintarChips(catN, total, sinN){
+function _libPintarChips(catN, total, sinN, favN, recN){
   var box = document.getElementById("lib-cats");
   if (!box) return;
   var h = '<button type="button" class="cat-chip' + (_libFilter.cat ? '' : ' on') + '" data-cat="">Todos <span class="n">' + total + '</span></button>';
+  if (favN || _libFilter.cat === "(fav)") h += '<button type="button" class="cat-chip fav' + (_libFilter.cat === "(fav)" ? ' on' : '') + '" data-cat="(fav)" title="Los que marcaste con la estrella">★ Favoritos <span class="n">' + (favN||0) + '</span></button>';
+  if (recN || _libFilter.cat === "(rec)") h += '<button type="button" class="cat-chip' + (_libFilter.cat === "(rec)" ? ' on' : '') + '" data-cat="(rec)" title="Los últimos que pusiste en una rutina">🕒 Recientes <span class="n">' + (recN||0) + '</span></button>';
   for (var i = 0; i < LIB_CATS.length; i++){
     var cn = LIB_CATS[i][0];
     if (!catN[cn] && _libFilter.cat !== cn) continue;
@@ -6640,7 +6743,7 @@ function u19LibContador(n){
   if (!el) return;
   var f = [];
   if (_libFilter.search) f.push('«' + escapeHtml(_libFilter.search) + '»');
-  if (_libFilter.cat) f.push(_libFilter.cat === "(sin)" ? 'sin clasificar' : escapeHtml(_libFilter.cat));
+  if (_libFilter.cat) f.push(_libFilter.cat === "(sin)" ? 'sin clasificar' : _libFilter.cat === "(fav)" ? 'favoritos' : _libFilter.cat === "(rec)" ? 'recientes' : escapeHtml(_libFilter.cat));
   if (_libFilter.pat) f.push(escapeHtml(_libFilter.pat));
   var m = _libFilter.muscle;
   if (m === "terap:") f.push('terapéuticos');
@@ -6666,17 +6769,26 @@ function renderLibraryGrid(){
   var uso = _libUsoRutinas();
 
   var base = state.exercises.filter(function(e){ return _libPasaSinCat(e, q); });
-  var catN = {}, sinN = 0;
-  base.forEach(function(e){ var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1; else sinN++; });
-  _libPintarChips(catN, base.length, sinN);
+  var favs = _libFavs(), rec = _libRecientes(), recIdx = {};
+  rec.forEach(function(id, i){ recIdx[id] = i; });
+  var catN = {}, sinN = 0, favN = 0, recN = 0;
+  base.forEach(function(e){
+    var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1; else sinN++;
+    if (favs[e.id]) favN++;
+    if (recIdx[e.id] !== undefined) recN++;
+  });
+  _libPintarChips(catN, base.length, sinN, favN, recN);
 
   var filtered = base.filter(function(e){
+    if (_libFilter.cat === "(fav)") return !!favs[e.id];
+    if (_libFilter.cat === "(rec)") return recIdx[e.id] !== undefined;
     var c = libTaxDe(e).cat;
     if (_libFilter.cat === "(sin)") return !c;
     return !_libFilter.cat || c === _libFilter.cat;
   });
   var sort = _libFilter.sort;
   filtered.sort(function(a, b){
+    if (_libFilter.cat === "(rec)") return recIdx[a.id] - recIdx[b.id];
     if (sort === "uso"){ var d = (uso[b.id]||0) - (uso[a.id]||0); if (d) return d; }
     if (sort === "nivel"){ var dn = (LIB_NIV_ORD[libTaxDe(a).niv]||9) - (LIB_NIV_ORD[libTaxDe(b).niv]||9); if (dn) return dn; }
     return (a.name||"").localeCompare(b.name||"");
@@ -6703,7 +6815,9 @@ function libCardHtml(e, uso){
   var id = escapeAttr(e.id);
   var esVideo = libTieneMedia(e) && typeof isVideoUrl === "function" && isVideoUrl(e.gif);
   var lista = _libVista === "lista";
+  var fav = libEsFav(e.id);
   var acts = '<div class="exc-acts">'
+    + '<button class="btn btn-ghost btn-sm x fav' + (fav ? ' on' : '') + '" onclick="libFavTarjeta(this,\'' + id + '\')" title="' + (fav ? 'Quitar de favoritos' : 'Marcar favorito') + '">' + (fav ? '★' : '☆') + '</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="u19Sustitutos(\'' + id + '\')" title="Alternativas con el mismo patrón y músculo">⇄ Sustitutos</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="openExerciseForm(\'' + id + '\')">Editar</button>'
     + '<button class="btn btn-ghost btn-sm x" onclick="deleteExercise(\'' + id + '\')" title="Eliminar">🗑</button>'
@@ -6759,6 +6873,18 @@ function _libPintarMas(grid, filtered){
   }
 }
 window.libVerMas = function(){ _libVisibles += LIB_TANDA; renderLibraryGrid(); };
+window.libFavTarjeta = function(btn, id){
+  var on = libToggleFav(id);
+  btn.textContent = on ? "★" : "☆"; btn.title = on ? "Quitar de favoritos" : "Marcar favorito";
+  btn.className = "btn btn-ghost btn-sm x fav" + (on ? " on" : "");
+  /* Si se está mirando la lista de favoritos, que se actualice; si no, ni se mueve la rejilla. */
+  if (_libFilter.cat === "(fav)") renderLibraryGrid();
+  else { var q = musNorm((_libFilter.search||"").trim()); var base = state.exercises.filter(function(e){ return _libPasaSinCat(e, q); });
+    var favs = _libFavs(), recIdx = {}; _libRecientes().forEach(function(x, i){ recIdx[x] = i; });
+    var catN = {}, sinN = 0, favN = 0, recN = 0;
+    base.forEach(function(e){ var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c]||0) + 1; else sinN++; if (favs[e.id]) favN++; if (recIdx[e.id] !== undefined) recN++; });
+    _libPintarChips(catN, base.length, sinN, favN, recN); }
+};
 
 function openExerciseForm(id){
   var ex = id ? getExercise(id) : null;
@@ -6894,8 +7020,14 @@ function openExerciseForm(id){
           cat: document.getElementById("ef-cat").value,
           niv: document.getElementById("ef-niv").value,
           pat: document.getElementById("ef-pat").value,
-          /* Si se eligió algo a mano, el importador del catálogo ya no lo pisa. */
-          taxManual: !!(document.getElementById("ef-cat").value || document.getElementById("ef-niv").value || document.getElementById("ef-pat").value),
+          /* Fijado a mano = distinto de lo que ya tenía la ficha. Guardar sin tocar
+             los selectores no cuenta: si contara, corregir una descripción del
+             catálogo dejaría esa ficha fuera de las reparaciones para siempre. */
+          taxManual: (function(){
+            var c = document.getElementById("ef-cat").value, v = document.getElementById("ef-niv").value, p = document.getElementById("ef-pat").value;
+            if (!ex) return !!(c || v || p);
+            return !!ex.taxManual || c !== (ex.cat||"") || v !== (ex.niv||"") || p !== (ex.pat||"");
+          })(),
           desc: document.getElementById("ef-desc").value.trim(),
           gif: gif
         };
@@ -12155,23 +12287,27 @@ function buildVolumeBadges(r){
      bisagra, zancada y core. Es lo primero que mira un ojo entrenado. */
   var pat = {};
   ((r&&r.days)||[]).forEach(function(d){
-    ((d&&d.exercises)||[]).forEach(function(x){
-      var def = getExercise(x.exerciseId); if (!def) return;
-      var p = libTaxDe(def).pat; if (!p || p === "Locomoción") return;
-      pat[p] = (pat[p]||0) + (parseInt(x.sets,10)||0);
-    });
+    var pd = libPatronesDe((d&&d.exercises)||[]);
+    Object.keys(pd).forEach(function(k){ pat[k] = (pat[k]||0) + pd[k]; });
   });
-  var ordenPat = ["Empuje","Tracción","Sentadilla","Bisagra","Zancada","Core","Accesorio"];
-  var pk = ordenPat.filter(function(k){ return pat[k]; });
+  var pk = Object.keys(pat);
   if (pk.length){
-    html += '<div class="rb-patrones"><span class="text-xs text-muted">Patrones:</span>';
-    pk.forEach(function(k){ html += '<span class="badge pat">' + k + ' ' + pat[k] + '</span>'; });
-    var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0;
-    if (emp && tra && Math.max(emp,tra) > Math.min(emp,tra) * 1.6) avisos.push('empuje y tracción descompensados');
+    html += '<div class="rb-patrones"><span class="text-xs text-muted">Patrones:</span>' + libPatronesBadges(pat);
+    /* Avisos estrictos, a petición de Diego (6-sep): 30 % de diferencia ya avisa. */
+    var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0, sen = pat["Sentadilla"]||0, zan = pat["Zancada"]||0,
+        bis = pat["Bisagra"]||0, core = pat["Core"]||0, acc = pat["Accesorio"]||0, total = 0;
+    pk.forEach(function(k){ total += pat[k]; });
+    if (emp && tra && Math.max(emp,tra) > Math.min(emp,tra) * 1.3) avisos.push('empuje y tracción descompensados (' + emp + ' / ' + tra + ')');
     if (emp && !tra) avisos.push('solo empuje, nada de tracción');
     if (!emp && tra) avisos.push('solo tracción, nada de empuje');
-    if (((pat["Sentadilla"]||0) + (pat["Zancada"]||0)) > 0 && !(pat["Bisagra"]||0)) avisos.push('rodilla sin bisagra de cadera');
+    if ((sen + zan) > 0 && !bis) avisos.push('rodilla sin bisagra de cadera');
+    if (bis > 0 && !(sen + zan)) avisos.push('bisagra sin trabajo de rodilla');
+    if ((sen + zan) && bis && Math.max(sen + zan, bis) > Math.min(sen + zan, bis) * 1.3) avisos.push('rodilla y bisagra descompensadas (' + (sen + zan) + ' / ' + bis + ')');
+    if (sen >= 6 && !zan) avisos.push('todo bilateral, sin trabajo unilateral');
+    if (total >= 10 && !core) avisos.push('sin core');
+    if (acc > total * 0.3) avisos.push('demasiado accesorio (' + acc + ' de ' + total + ')');
     if (avisos.length) html += '<span class="text-xs" style="color:var(--warn);" title="Orientativo: cada objetivo tiene su reparto">⚠ ' + escapeHtml(avisos.join(' · ')) + '</span>';
+    else html += '<span class="text-xs" style="color:var(--success);">✓ equilibrada</span>';
     html += '</div>';
   }
   return html;
