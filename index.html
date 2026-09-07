@@ -1260,10 +1260,39 @@ body.circ-live-open{overflow:hidden;}
 .cl-mapa .cm-grupo{font-size:clamp(1rem,2.2vw,1.6rem);}
 .cl-mapa-min{width:min(72vw,calc((100vh - 430px) * 1.78));margin-top:.3rem;}
 .cl-mapa-min .cm-est{min-width:72px;max-width:120px;width:12%;}
+/* ---------- Pizarra de sesión ---------- */
+.pizarra{position:fixed;inset:0;z-index:9000;background:#070b0f;color:#f1f5f9;display:flex;flex-direction:column;font-family:var(--font-body);}
+.pizarra[hidden]{display:none;}
+.pz-tools{margin-left:auto;display:flex;gap:.25rem;align-items:center;flex-wrap:wrap;}
+.pz-tools .btn.on{background:var(--surface-3);color:var(--accent);}
+.pz-secs{display:flex;gap:.4rem;flex-wrap:wrap;padding:.5rem 1rem;border-bottom:1px solid var(--border);}
+.pz-main{flex:1;overflow:auto;padding:1rem;}
+.pz-grid{display:grid;gap:.8rem;}
+.pz-grid.pz-s{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+.pz-grid.pz-m{grid-template-columns:repeat(auto-fill,minmax(240px,1fr));}
+.pz-grid.pz-l{grid-template-columns:repeat(auto-fill,minmax(340px,1fr));}
+.pz-card{position:relative;background:var(--surface-1);border:1px solid var(--border);border-radius:12px;padding:.5rem;cursor:pointer;}
+.pz-card:hover{border-color:var(--accent);}
+.pz-badge{position:absolute;top:.35rem;left:.35rem;z-index:1;background:var(--accent);color:#0b1014;font-family:var(--font-display);font-size:1.1rem;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.pz-media{width:100%;aspect-ratio:1;object-fit:contain;background:#000;border-radius:8px;display:block;}
+.pz-vacio{display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem;}
+.pz-nom{font-weight:800;margin-top:.4rem;line-height:1.2;}
+.pz-sub{color:var(--muted);font-size:.8rem;}
+.pz-det{color:var(--accent);font-size:.85rem;margin-top:.15rem;font-weight:700;}
+.pz-nota{color:var(--muted);font-size:.8rem;margin-top:.15rem;}
+.pz-one{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:1.2rem;align-items:center;max-width:1200px;margin:0 auto;}
+.pz-one-media .pz-media{aspect-ratio:auto;max-height:68vh;width:100%;}
+.pz-num{color:var(--muted);font-size:.85rem;}
+.pz-one-nom{font-size:clamp(1.4rem,3.5vw,2.4rem);font-weight:800;line-height:1.1;margin:.2rem 0;}
+.pz-one .pz-det{font-size:clamp(1rem,2vw,1.4rem);}
+.pz-one .pz-nota{font-size:clamp(.9rem,1.6vw,1.1rem);}
+.pz-vacio-msg{color:var(--muted);text-align:center;padding:2rem;}
+@media (max-width:760px){.pz-one{grid-template-columns:1fr;}.pz-one-media .pz-media{max-height:45vh;}}
 </style>
 
 <div class="toast-wrap" id="toast-wrap"></div>
 <div id="circ-live" class="circ-live" hidden></div>
+<div id="pizarra" class="pizarra" hidden></div>
 
 <script>
 "use strict";
@@ -4266,6 +4295,7 @@ function routineCardHtml(r){
     + '<div class="card-actions">'
       + '<button class="btn btn-secondary btn-sm" onclick="openRoutineBuilder(\''+r.id+'\')">Editar</button>'
       + '<button class="btn btn-primary btn-sm" onclick="openShareModal(\''+r.id+'\')">Compartir</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="pizarraRutina(\''+r.id+'\')" title="Pizarra: la sesión en movimiento">🎞</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="duplicateRoutine(\''+r.id+'\')" title="Duplicar">⎘</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="deleteRoutine(\''+r.id+'\')" title="Eliminar">🗑</button>'
     + '</div>'
@@ -4524,7 +4554,15 @@ function u19DashUrl(tipo, url, clave){
   clave = String(clave != null ? clave
           : ((typeof settings !== "undefined" && settings.dashClave) || "")).trim();
   var q = [];
-  if (clave) q.push("k=" + encodeURIComponent(clave));
+  /* La misma clave con los dos nombres a proposito. El puente la espera como
+     «k»; el asistente, que es quien sirve tipo=clientes y tipo=historial, la
+     espera como «clave». Mandar solo una de las dos dejaba al otro lado
+     devolviendo clave_invalida, y el sintoma era un panel de Retencion vacio
+     sin ningun error a la vista. Un parametro de sobra no molesta a nadie. */
+  if (clave){
+    q.push("k=" + encodeURIComponent(clave));
+    q.push("clave=" + encodeURIComponent(clave));
+  }
   if (tipo)  q.push("tipo=" + encodeURIComponent(tipo));
   if (!q.length) return url;
   return url + (url.indexOf("?") >= 0 ? "&" : "?") + q.join("&");
@@ -5247,6 +5285,7 @@ function renderDayPanel(){
   html += '<span class="badge teal">⏱ '+fmtDuration(dur)+'</span>';
   html += '<span id="day-patrones" style="display:inline-flex;gap:.3rem;flex-wrap:wrap;">' + libPatronesBadges(libPatronesDe(day.exercises)) + '</span>';
   html += '<button class="btn btn-secondary btn-sm" onclick="addExerciseToDay()">+ Ejercicio</button>';
+  if (day.exercises.length) html += '<button class="btn btn-secondary btn-sm" onclick="pizarraDiaBuilder()" title="Ver la sesión en movimiento, para planificarla o mostrarla">🎞 Pizarra</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="copyDayTo()" title="Copiar los ejercicios de este día a otro día">⧉ Copiar día</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="clearDay()">Vaciar día</button>';
   html += '</div></div>';
@@ -10176,6 +10215,7 @@ function renderPhasePanel(){
   html += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">';
   html += '<button class="btn btn-secondary btn-sm" onclick="addExerciseToPhase()">+ Ejercicio</button>';
   if (phase.exercises && phase.exercises.length){
+    html += '<button class="btn btn-secondary btn-sm" onclick="pizarraProtocolo(\''+p.id+'\','+idx+')" title="Ver la fase en movimiento, para planificarla o mostrarla">🎞 Pizarra</button>';
     html += '<button class="btn btn-primary btn-sm" onclick="openPhaseShareModal(\''+p.id+'\','+idx+')">📤 Compartir fase</button>';
     html += '<button class="btn btn-ghost btn-sm" onclick="clearPhase()">Vaciar fase</button>';
   }
@@ -13213,6 +13253,151 @@ window.deleteAssessment = function(cid, aid){
   saveState(); closeModal(); openClientTracking(cid);
 };
 
+/* --- Pizarra --- */
+/* Pizarra de sesión: los ejercicios elegidos, en movimiento (GIF o vídeo),
+   grandes y todos a la vez, sin cronómetro. Para planificar una sesión y para
+   mostrársela a la persona. Se abre desde un día de rutina, una fase de
+   protocolo o un circuito; arriba se cambia de día o de fase. Dos formas:
+   cuadrícula (todos) y uno a uno (grande, con flechas). */
+var _pz = null;
+var _pzTam = "m";
+try { _pzTam = localStorage.getItem("us19_pizarra_tam") || "m"; } catch(e){}
+function pzMedia(url){
+  if (!url) return '<div class="pz-media pz-vacio">📍</div>';
+  if (isVideoUrl(url)) return '<video class="pz-media" src="' + escapeAttr(url) + '" poster="' + escapeAttr(posterUrl(url)) + '" autoplay loop muted playsinline preload="metadata"></video>';
+  return '<img class="pz-media" src="' + escapeAttr(url) + '" alt="" loading="lazy">';
+}
+function pzItemDeFila(ex){
+  var e = getExercise(ex.exerciseId), partes = [];
+  if (ex.sets || ex.reps) partes.push((ex.sets || "?") + " × " + (ex.reps || "?"));
+  if (ex.weight) partes.push(ex.weight + (/[a-z%]/i.test(String(ex.weight)) ? "" : " kg"));
+  if (ex.rest) partes.push("descanso " + ex.rest);
+  if (ex.rir) partes.push("RIR " + ex.rir);
+  return { nombre: e ? e.name : "Ejercicio desconocido", gif: e ? (e.gif || "") : "", detalle: partes.join(" · "), nota: ex.notes || "",
+           sub: e ? [e.muscle, e.equipment].filter(Boolean).join(" · ") : "" };
+}
+window.pizarraAbrir = function(cfg){
+  if (!cfg || !cfg.secciones || !cfg.secciones.length){ toast("No hay ejercicios que mostrar", "warn"); return; }
+  var ini = cfg.inicial || 0;
+  if (!cfg.secciones[ini] || !cfg.secciones[ini].items.length){
+    ini = -1;
+    for (var k = 0; k < cfg.secciones.length; k++) if (cfg.secciones[k].items.length){ ini = k; break; }
+    if (ini < 0){ toast("No hay ejercicios que mostrar", "warn"); return; }
+  }
+  _pz = { cfg: cfg, sec: ini, modo: "grid", idx: 0 };
+  var ov = document.getElementById("pizarra");
+  ov.hidden = false; document.body.classList.add("circ-live-open");
+  document.addEventListener("keydown", pzTeclas);
+  pzPintar();
+};
+function pzPintar(){
+  var P = _pz; if (!P) return;
+  var ov = document.getElementById("pizarra"), cfg = P.cfg, sec = cfg.secciones[P.sec], items = sec.items;
+  var html = '<div class="cl-top"><span class="cl-nombre">🎞 ' + escapeHtml(cfg.titulo || "Pizarra") + '</span>'
+    + (cfg.subtitulo ? '<span class="cl-grupo">' + escapeHtml(cfg.subtitulo) + '</span>' : '')
+    + '<span class="cl-grupo">' + items.length + ' ejercicio' + (items.length === 1 ? '' : 's') + '</span>'
+    + '<span class="pz-tools">'
+    + '<button class="btn btn-ghost btn-sm' + (P.modo === "grid" ? ' on' : '') + '" onclick="pzModo(\'grid\')" title="Todos a la vez">▦ Todos</button>'
+    + '<button class="btn btn-ghost btn-sm' + (P.modo === "uno" ? ' on' : '') + '" onclick="pzModo(\'uno\')" title="Uno a uno, grande">▭ Uno a uno</button>'
+    + '<button class="btn btn-ghost btn-sm' + (_pzTam === "s" ? ' on' : '') + '" onclick="pzTam(\'s\')" title="Tarjetas pequeñas">S</button>'
+    + '<button class="btn btn-ghost btn-sm' + (_pzTam === "m" ? ' on' : '') + '" onclick="pzTam(\'m\')" title="Tarjetas medianas">M</button>'
+    + '<button class="btn btn-ghost btn-sm' + (_pzTam === "l" ? ' on' : '') + '" onclick="pzTam(\'l\')" title="Tarjetas grandes">L</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
+    + '</span><button class="btn btn-ghost btn-sm cl-x" onclick="pizarraCerrar()">✕ Salir</button></div>';
+  if (cfg.secciones.length > 1){
+    html += '<div class="pz-secs">';
+    cfg.secciones.forEach(function(s, i){
+      html += '<button class="btn btn-sm ' + (i === P.sec ? 'btn-primary' : 'btn-ghost') + '" onclick="pzSeccion(' + i + ')"' + (s.items.length ? '' : ' disabled') + '>'
+        + escapeHtml(s.nombre) + (s.items.length ? ' · ' + s.items.length : '') + '</button>';
+    });
+    html += '</div>';
+  }
+  html += '<div class="pz-main">';
+  if (!items.length){
+    html += '<div class="pz-vacio-msg">Esta sección no tiene ejercicios.</div>';
+  } else if (P.modo === "uno"){
+    P.idx = Math.min(P.idx, items.length - 1);
+    var it = items[P.idx];
+    html += '<div class="pz-one"><div class="pz-one-media">' + pzMedia(it.gif) + '</div>'
+      + '<div class="pz-one-txt"><div class="pz-num">' + (P.idx + 1) + ' / ' + items.length + '</div>'
+      + '<div class="pz-one-nom">' + escapeHtml(it.nombre) + '</div>'
+      + (it.sub ? '<div class="pz-sub">' + escapeHtml(it.sub) + '</div>' : '')
+      + (it.detalle ? '<div class="pz-det">' + escapeHtml(it.detalle) + '</div>' : '')
+      + (it.nota ? '<div class="pz-nota">' + escapeHtml(it.nota) + '</div>' : '')
+      + '</div></div>';
+  } else {
+    html += '<div class="pz-grid pz-' + _pzTam + '">';
+    items.forEach(function(it, i){
+      html += '<div class="pz-card" onclick="pzVerUno(' + i + ')" title="Ver grande">'
+        + '<span class="pz-badge">' + (i + 1) + '</span>' + pzMedia(it.gif)
+        + '<div class="pz-nom">' + escapeHtml(it.nombre) + '</div>'
+        + (it.detalle ? '<div class="pz-det">' + escapeHtml(it.detalle) + '</div>' : '')
+        + (it.nota ? '<div class="pz-nota">' + escapeHtml(it.nota) + '</div>' : '')
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  if (P.modo === "uno" && items.length){
+    html += '<div class="cl-ctrl"><button class="btn btn-secondary" onclick="pzMover(-1)">◀ Anterior</button>'
+      + '<button class="btn btn-primary big" onclick="pzMover(1)">Siguiente ▶</button></div>';
+  }
+  ov.innerHTML = html;
+}
+window.pzSeccion = function(i){ if (_pz){ _pz.sec = i; _pz.idx = 0; pzPintar(); } };
+window.pzModo = function(m){ if (_pz){ _pz.modo = m; pzPintar(); } };
+window.pzTam = function(t){ _pzTam = t; try { localStorage.setItem("us19_pizarra_tam", t); } catch(e){} pzPintar(); };
+window.pzVerUno = function(i){ if (_pz){ _pz.modo = "uno"; _pz.idx = i; pzPintar(); } };
+window.pzMover = function(d){
+  var P = _pz; if (!P) return;
+  var n = P.cfg.secciones[P.sec].items.length; if (!n) return;
+  P.idx = (P.idx + d + n) % n; pzPintar();
+};
+window.pizarraCerrar = function(){
+  if (!_pz) return;
+  document.removeEventListener("keydown", pzTeclas);
+  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch(e){}
+  _pz = null;
+  var ov = document.getElementById("pizarra"); ov.hidden = true; ov.innerHTML = "";
+  if (!_live) document.body.classList.remove("circ-live-open");
+};
+function pzTeclas(ev){
+  if (!_pz) return;
+  if (ev.key === "Escape") pizarraCerrar();
+  else if (ev.key === "ArrowRight" && _pz.modo === "uno"){ ev.preventDefault(); pzMover(1); }
+  else if (ev.key === "ArrowLeft" && _pz.modo === "uno"){ ev.preventDefault(); pzMover(-1); }
+}
+/* Puertas de entrada: rutina (tarjeta y editor), protocolo (fase) y circuito. */
+function pzSeccionesDeRutina(r){
+  return (r.days || []).map(function(d, i){
+    return { nombre: DAY_NAMES_SHORT[i] || ("Día " + (i + 1)), items: (d.exercises || []).map(pzItemDeFila) };
+  });
+}
+window.pizarraRutina = function(id){
+  var r = getRoutine(id); if (!r) return;
+  var cl = getClient(r.clientId);
+  pizarraAbrir({ titulo: r.name || "Rutina", subtitulo: cl ? cl.name : "", secciones: pzSeccionesDeRutina(r).filter(function(s){ return s.items.length; }) });
+};
+window.pizarraDiaBuilder = function(){
+  var r = _builderRoutine; if (!r) return;
+  var cl = getClient(r.clientId);
+  pizarraAbrir({ titulo: r.name || "Rutina", subtitulo: cl ? cl.name : "", secciones: pzSeccionesDeRutina(r), inicial: _builderActiveDay || 0 });
+};
+window.pizarraProtocolo = function(id, fase){
+  var p = getProtocol(id); if (!p) return;
+  var secs = (p.phases || []).map(function(ph, i){ return { nombre: ph.name || ("Fase " + (i + 1)), items: (ph.exercises || []).map(pzItemDeFila) }; });
+  pizarraAbrir({ titulo: p.name || "Protocolo", subtitulo: p.region || "", secciones: secs, inicial: fase || 0 });
+};
+window.pizarraCircuitoObj = function(c){
+  if (!c) return;
+  var items = (c.estaciones || []).map(function(s, i){
+    return { nombre: "Estación " + (i + 1) + " · " + circEstacionNombre(s), gif: circGifDe(s),
+             detalle: circNum(c.trabajo, 40) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio", nota: s.nota || "" };
+  });
+  pizarraAbrir({ titulo: c.nombre || "Circuito", subtitulo: c.grupo || "", secciones: [{ nombre: "Estaciones", items: items }] });
+};
+window.pizarraCircuito = function(id){ pizarraCircuitoObj(circGet(id)); };
+
 /* --- Circuitos --- */
 /* Circuitos por estaciones para clases y grupos (Diego los usa con niños en
    sus planificaciones de Educación Física). Se arman con ejercicios de la
@@ -13459,6 +13644,7 @@ function circCardHtml(c){
     + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-sm" onclick="circEnVivo(\'' + c.id + '\')" ' + (N ? '' : 'disabled title="Añade estaciones primero"') + '>▶ En vivo</button>'
       + '<button class="btn btn-secondary btn-sm" onclick="circEditar(\'' + c.id + '\')">Editar</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="pizarraCircuito(\'' + c.id + '\')" title="Pizarra: las estaciones en movimiento"' + (N ? '' : ' disabled') + '>🎞</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="circImprimir(\'' + c.id + '\')" title="Hoja de planificación">🖨</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="circDuplicar(\'' + c.id + '\')" title="Duplicar">⎘</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="circBorrar(\'' + c.id + '\')" title="Eliminar">🗑</button>'
@@ -13528,6 +13714,7 @@ function circEditorHtml(){
     + '<h1 class="section-title">' + (_circEditNuevo ? "NUEVO" : "EDITAR") + ' <span class="accent">CIRCUITO</span></h1>'
     + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
     + '<button class="btn btn-ghost" onclick="circVolver()">← Volver</button>'
+    + '<button class="btn btn-secondary" onclick="pizarraCircuitoObj(_circEdit)" title="Las estaciones en movimiento">🎞 Pizarra</button>'
     + '<button class="btn btn-secondary" onclick="circGuardarYImprimir()">🖨 Hoja</button>'
     + '<button class="btn btn-secondary" onclick="circGuardarYVivo()">▶ En vivo</button>'
     + '<button class="btn btn-primary" onclick="circGuardarBtn()">Guardar</button>'
@@ -18112,6 +18299,36 @@ function u19NoShowAvisoMalla(){
     + '</div>';
 }
 
+/* El mensaje que se abre en WhatsApp. Se adapta al motivo pero nunca da por
+   hecho que la persona abandono: pregunta. Y no menciona molestias, dolores
+   ni recuperacion: hasta el 17-dic-2026 eso queda fuera. */
+function u19RetencionMsg(it){
+  var nombre = String((it.c && it.c.name) || "").trim().split(/\s+/)[0] || "";
+  var hola = nombre ? ("Hola " + nombre) : "Hola";
+  var dias = Number(it.dias);
+  var cuerpo;
+  if (dias >= 20)
+    cuerpo = "\u00bfC\u00f3mo has estado? Hace un tiempo que no te vemos por Ultra-Sport 19 "
+           + "y quer\u00eda saber c\u00f3mo vas. Si quieres retomar, dime qu\u00e9 d\u00edas te acomodan y lo vemos.";
+  else if (dias >= 7)
+    cuerpo = "\u00bfTodo bien? Vi que esta semana no alcanzaste a venir. "
+           + "Si quieres, me dices qu\u00e9 d\u00edas te sirven y te dejo las horas coordinadas.";
+  else
+    cuerpo = "\u00bfC\u00f3mo vas? Te vi con menos sesiones de las que trae tu plan este mes. "
+           + "Si quieres ordenar la semana, dime y lo vemos juntos.";
+  return hola + " \ud83d\udc4b " + cuerpo;
+}
+
+/* Sin telefono no se pinta un boton muerto: se dice que falta el dato, que
+   ademas es informacion util (ficha incompleta). */
+function u19RetencionWaHTML(it){
+  var tel = String((it.c && it.c.phone) || "").replace(/[^0-9]/g, "");
+  if (!tel) return '<span class="text-xs text-muted">sin tel\u00e9fono</span>';
+  return '<a class="btn btn-wa btn-sm" target="_blank" rel="noopener" href="https://wa.me/'
+    + escapeAttr(tel) + '?text=' + encodeURIComponent(u19RetencionMsg(it))
+    + '" title="Abre WhatsApp con el mensaje escrito; lo env\u00edas t\u00fa">WhatsApp</a>';
+}
+
 function u19RetencionHTML(){
   var r = u19Retencion();
   if (!r.hayDatos)
@@ -18152,14 +18369,15 @@ function u19RetencionHTML(){
   } else {
     h += '<div class="ml-t">A quién llamar, por orden</div>';
     h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
-      + '<tr><th>Cliente</th><th>Qué pasa</th><th>Al mes</th></tr>';
+      + '<tr><th>Cliente</th><th>Qué pasa</th><th>Al mes</th><th></th></tr>';
     lista.slice(0, 12).forEach(function(it){
       var col = r.fuga.indexOf(it) >= 0 ? "var(--danger)"
               : (r.riesgo.indexOf(it) >= 0 ? "var(--warn)" : "var(--muted)");
       h += '<tr><td style="border-left:3px solid ' + col + ';padding-left:.4rem;">'
         + escapeHtml(it.c.name || "Sin nombre") + '</td>'
         + '<td class="text-xs">' + escapeHtml(it.motivo) + '</td>'
-        + '<td>' + u19PesosResp(it.precio) + '</td></tr>';
+        + '<td>' + u19PesosResp(it.precio) + '</td>'
+        + '<td>' + u19RetencionWaHTML(it) + '</td></tr>';
     });
     h += '</table></div>';
     if (lista.length > 12)
@@ -18171,7 +18389,9 @@ function u19RetencionHTML(){
     + '(4×: 7 y 12 días · 3×: 9 y 15 · 2×: 12 y 20), los mismos números que usa la fórmula '
     + '«Riesgo agenda» de Notion y el aviso de cobros de esta app. Quien entrena en grupo '
     + 'cerrado queda fuera: no reserva por Calendly, así que su ausencia de reservas no dice '
-    + 'nada. El NPS por sí solo no marca a nadie: una nota baja de quien sigue viniendo es ruido.</p>';
+    + 'nada. El NPS por sí solo no marca a nadie: una nota baja de quien sigue viniendo es ruido. '
+    + 'El botón de WhatsApp <b>no envía nada</b>: abre la conversación con el mensaje escrito '
+    + 'para que lo revises y lo mandes tú.</p>';
   h += '</div></div>';
   return h;
 }
@@ -18719,6 +18939,12 @@ window.u19AccLeer = function(auto){
     var v = u19AccCacheViejo();
     di("No se pudo actualizar (" + ((e && e.message) || String(e)) + ")"
        + (v ? " · lo que ves es de " + u19AccEdadTxt(v.minutos) : ""), "var(--danger)");
+    /* Esta lista la propone el bot y viaja por el puente. Si el puente no
+       esta, quien lleva dias sin venir se calcula igual en la app, con el
+       roster ya importado. Vale mas mandarlo alli que dejarlo con un error. */
+    if (m) m.innerHTML += '<br><span class="text-xs" style="color:var(--muted);">'
+      + 'Para ver quién lleva días sin agendar no hace falta el puente: '
+      + '<b>Cartera → Retención</b> lo calcula con los clientes ya importados.</span>';
   });
 };
 /* ===ACCIONES_END=== */
