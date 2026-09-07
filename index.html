@@ -17318,9 +17318,13 @@ function u19NoShows(){
 var RET_AUSENTE = 11;
 var RET_FUGA    = 21;
 
+/* Hasta cuantos dias despues de vencer se sigue considerando recuperable.
+   Mas alla, un «te echamos de menos» suena a spam y no a interes. */
+var RET_VENCIDOS_DIAS = 60;
+
 function u19Retencion(){
-  var out = { fuga: [], riesgo: [], atencion: [], bien: 0, activos: 0,
-              mrrEnJuego: 0, mrr: 0, hayDatos: false };
+  var out = { fuga: [], riesgo: [], atencion: [], vencidos: [], bien: 0, activos: 0,
+              mrrEnJuego: 0, mrr: 0, vencidosCLP: 0, hayDatos: false };
   var esperadas = u19SesionesMes();
 
   (state.clients || []).forEach(function(c){
@@ -17374,6 +17378,28 @@ function u19Retencion(){
     out[nivel === "fuga" ? "fuga" : (nivel === "riesgo" ? "riesgo" : "atencion")].push(it);
     if (nivel !== "atencion") out.mrrEnJuego += precio;
   });
+
+  /* Los que ya no son activos porque se les vencio el plan. El bot los marca
+     Inactivo el mismo dia que vence, sin gracia, asi que caen del panel justo
+     cuando habria que escribirles. Van aparte: no suman al MRR (no estan
+     pagando) y la conversacion con ellos es otra. */
+  (state.clients || []).forEach(function(c){
+    if (!c || c.type === "rehab") return;
+    if (u19ClienteActivo(c)) return;
+    var fin = c.planEndDate || "";
+    if (!fin) return;
+    var venceHace = (typeof daysUntil === "function") ? daysUntil(fin) : null;
+    if (venceHace === null || venceHace > 0) return;          // aun no vence
+    var dv = Math.abs(venceHace);
+    if (dv > RET_VENCIDOS_DIAS) return;                       // demasiado atras
+    var d2 = (typeof u19DiasSinVenir === "function") ? u19DiasSinVenir(c) : null;
+    out.vencidos.push({ c: c, dias: (d2 == null ? dv : d2), diasVencido: dv,
+      precio: u19FinNum(c.planPrice), vencido: true,
+      motivo: "plan vencido hace " + dv + " d\u00eda" + (dv === 1 ? "" : "s")
+              + (d2 != null ? "; sin venir hace " + d2 : "") });
+  });
+  out.vencidos.sort(function(a, b){ return a.diasVencido - b.diasVencido; });
+  out.vencidosCLP = out.vencidos.reduce(function(t, x){ return t + (x.precio || 0); }, 0);
 
   [out.fuga, out.riesgo, out.atencion].forEach(function(l){
     l.sort(function(a, b){ return b.precio - a.precio; });
@@ -18467,7 +18493,13 @@ function u19RetencionMsg(it){
   var hola = nombre ? ("Hola " + nombre) : "Hola";
   var dias = Number(it.dias);
   var cuerpo;
-  if (dias >= 20)
+  /* A uno vencido se le pregunta si vuelve, no como va el mes. Sin mencionar
+     el pago: eso suena a cobro y cierra la conversacion en vez de abrirla. */
+  if (it.vencido)
+    cuerpo = "\u00bfC\u00f3mo has estado? Vi que se te termin\u00f3 el plan y no te hemos "
+           + "visto por ac\u00e1. Si quieres retomar, dime qu\u00e9 d\u00edas te acomodan "
+           + "y lo dejamos listo.";
+  else if (dias >= 20)
     cuerpo = "\u00bfC\u00f3mo has estado? Hace un tiempo que no te vemos por Ultra-Sport 19 "
            + "y quer\u00eda saber c\u00f3mo vas. Si quieres retomar, dime qu\u00e9 d\u00edas te acomodan y lo vemos.";
   else if (dias >= 7)
@@ -18542,6 +18574,30 @@ function u19RetencionHTML(){
     h += '</table></div>';
     if (lista.length > 12)
       h += '<p class="text-xs text-muted" style="margin-top:.4rem;">Y ' + (lista.length - 12) + ' más.</p>';
+  }
+
+  /* Los vencidos, en su propia tabla. Mezclarlos con los activos haria
+     pensar que el «en juego» los incluye, y no: no estan pagando. */
+  if (r.vencidos && r.vencidos.length){
+    h += '<div class="ml-t" style="margin-top:.9rem;">Se les venci\u00f3 y no han vuelto \u00b7 '
+      + r.vencidos.length + '</div>';
+    h += '<p class="text-xs text-muted" style="margin:.2rem 0 .4rem;line-height:1.5;">'
+      + 'El plan les venci\u00f3 hace ' + RET_VENCIDOS_DIAS + ' d\u00edas o menos, as\u00ed que '
+      + 'todav\u00eda es una conversaci\u00f3n natural. <b>No suman al dinero en juego</b>: '
+      + 'ya no est\u00e1n pagando. Recuperarlos valdr\u00eda '
+      + u19PesosResp(r.vencidosCLP) + ' al mes.</p>';
+    h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
+      + '<tr><th>Cliente</th><th>Qué pasa</th><th>Valía</th><th></th></tr>';
+    r.vencidos.slice(0, 12).forEach(function(it){
+      h += '<tr><td style="border-left:3px solid var(--muted);padding-left:.4rem;">'
+        + escapeHtml(it.c.name || "Sin nombre") + '</td>'
+        + '<td class="text-xs">' + escapeHtml(it.motivo) + '</td>'
+        + '<td>' + u19PesosResp(it.precio) + '</td>'
+        + '<td>' + u19RetencionWaHTML(it) + '</td></tr>';
+    });
+    h += '</table></div>';
+    if (r.vencidos.length > 12)
+      h += '<p class="text-xs text-muted" style="margin-top:.4rem;">Y ' + (r.vencidos.length - 12) + ' m\u00e1s.</p>';
   }
 
   h += '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">'
