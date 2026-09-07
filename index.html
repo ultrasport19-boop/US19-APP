@@ -19837,13 +19837,115 @@ window.u19AccAprobar = function(tipo, tarifa){
 function u19AccCuerpoHTML(d){
   if (!d) return '';
   var h = '';
-  h += u19AccListaHTML('reactivacion', 'Reactivación propuesta por el bot', d.reactivacion,
+  h += u19AccListaHTML('reactivacion', 'Propuestas del bot (congeladas hasta que apruebes o descartes)', d.reactivacion,
         (d.tarifas && d.tarifas.marketing) || 78,
-        'El bot ya redactó el mensaje. Es categoría Marketing: el más caro de los dos.');
+        'Esta lista NO rota sola: cada nombre sigue aquí hasta que lo apruebes (el bot le escribe) '
+        + 'o vuelva a agendar. Para ver quién se está yendo hoy, mira la lista de arriba. '
+        + 'Es categoría Marketing: el más caro de los dos.');
   h += u19AccListaHTML('ingreso', 'Altas por aprobar', d.ingreso,
         (d.tarifas && d.tarifas.utility) || 14,
         'Al aprobar, el bot manda la bienvenida con los datos de pago.');
   if (!h) h = '<p class="text-xs text-muted" style="margin:.4rem 0 0;">Nada esperando tu visto bueno.</p>';
+  return h;
+}
+
+/* De cuando son los clientes que hay en memoria. Es la marca que deja
+   importClientesNotion al terminar bien; sin ella, nunca se importo. */
+function u19SemanaEdad(){
+  var t = 0;
+  try { t = parseInt(localStorage.getItem("us19_auto_import_at") || "0", 10) || 0; } catch (e){}
+  if (!t) return null;
+  return Math.round((Date.now() - t) / 60000);
+}
+
+/* Reimporta desde Notion y vuelve a pintar Finanzas. Es lo que hay detras
+   del boton: no hace falta acordarse de que existe el importador. */
+window.u19SemanaRefrescar = function(){
+  var m = document.getElementById("sem-msg");
+  if (m) m.innerHTML = '<span style="color:var(--muted);">Importando desde Notion\u2026</span>';
+  if (typeof importClientesNotion !== "function"){
+    if (m) m.innerHTML = '<span style="color:var(--danger);">Falta el importador.</span>';
+    return;
+  }
+  Promise.resolve(importClientesNotion(true)).then(function(){
+    if (typeof renderFinanzas === "function") renderFinanzas();
+  }).catch(function(e){
+    if (m) m.innerHTML = '<span style="color:var(--danger);">' + escapeHtml((e && e.message) || String(e)) + '</span>';
+  });
+};
+
+/* LA LISTA VIVA. Quien se esta yendo esta semana, calculado ahora con los
+   clientes importados, no con las propuestas del bot. Es la respuesta a
+   «me siguen apareciendo los mismos»: esto rota solo, porque se recalcula
+   cada vez que se pinta. */
+function u19SemanaVivaHTML(){
+  var r = (typeof u19Retencion === "function") ? u19Retencion() : null;
+  var edad = u19SemanaEdad();
+  var h = '<div style="border:1px solid var(--rule);border-radius:6px;padding:.7rem;margin:.2rem 0 .9rem;'
+        + 'background:rgba(255,255,255,.02);">';
+  h += '<div style="display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap;margin-bottom:.35rem;">'
+    + '<b style="font-size:.95rem;">\u23f1 Quién se está yendo esta semana</b>'
+    + '<span class="text-xs text-muted">calculado ahora, con tus clientes importados</span>'
+    + '<span style="margin-left:auto;display:flex;gap:.4rem;align-items:center;">'
+    + '<span id="sem-msg" class="text-xs" style="color:var(--muted);">'
+    + (edad === null ? 'nunca importado' : 'datos ' + escapeHtml(u19AccEdadTxt(edad))) + '</span>'
+    + '<button class="btn btn-secondary btn-sm" type="button" onclick="u19SemanaRefrescar()">\u27f3 Actualizar desde Notion</button>'
+    + '</span></div>';
+
+  if (!r || !r.hayDatos){
+    h += '<p class="text-xs text-muted" style="margin:.3rem 0 0;line-height:1.5;">'
+      + 'Todav\u00eda no hay «\u00daltima reserva» ni «Reservas 30 d\u00edas» en los clientes de la app. '
+      + 'Pulsa <b>Actualizar desde Notion</b>; si sigue vac\u00edo, revisa la URL y la clave en '
+      + 'Finanzas \u2192 Apps Script \u00b7 Notion Sync.</p></div>';
+    return h;
+  }
+
+  /* Regla de Diego (7-sep-2026): un vencido de 7 dias o menos todavia se
+     recupera; que no parezca descartado. Va en ambar y ANTES que los activos
+     en riesgo: dejo de venir y ademas ya no paga, es mas urgente. */
+  var filas = [], recien = [], viejos = [];
+  (r.vencidos || []).forEach(function(it){
+    if (it.diasVencido != null && it.diasVencido <= 7){ it._nivel = 'recien'; recien.push(it); }
+    else { it._nivel = 'vencido'; viejos.push(it); }
+  });
+  r.fuga.forEach(function(it){ it._nivel = 'fuga'; filas.push(it); });
+  recien.forEach(function(it){ filas.push(it); });
+  r.riesgo.forEach(function(it){ it._nivel = 'riesgo'; filas.push(it); });
+  viejos.forEach(function(it){ filas.push(it); });
+
+  if (!filas.length){
+    h += '<div class="fin-estado" style="border-color:var(--success);margin-top:.3rem;">'
+      + 'Nadie se est\u00e1 yendo esta semana. Los ' + r.bien + ' activos vienen al ritmo que pagan.</div></div>';
+    return h;
+  }
+
+  h += '<div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
+    + '<tr><th>Cliente</th><th>Plan</th><th>Sin agendar</th><th>Qu\u00e9 pasa</th><th></th></tr>';
+  filas.slice(0, 20).forEach(function(it){
+    var col = it._nivel === 'fuga' ? 'var(--danger)'
+            : ((it._nivel === 'riesgo' || it._nivel === 'recien') ? 'var(--warn)' : 'var(--muted)');
+    var umb = (typeof u19DiasUmbral === "function") ? u19DiasUmbral(it.c) : null;
+    var dias = (it.dias != null) ? it.dias + ' d' : '\u2014';
+    var tope = umb ? ' <span class="text-muted">/ tolera ' + (it._nivel === 'fuga' ? umb.fuga : umb.aviso) + '</span>' : '';
+    var que = it._nivel === 'recien' ? '<b>reci\u00e9n vencido \u00b7 recuperable</b> \u00b7 ' + escapeHtml(it.motivo)
+            : (it._nivel === 'vencido' ? escapeHtml(it.motivo)
+            : (it._nivel === 'fuga' ? 'se est\u00e1 yendo' : 'en riesgo'));
+    h += '<tr><td style="border-left:3px solid ' + col + ';padding-left:.4rem;"><b>'
+      + escapeHtml(it.c.name || 'Sin nombre') + '</b></td>'
+      + '<td class="text-xs">' + escapeHtml(it.c.notionPlan || '\u2014') + '</td>'
+      + '<td><b>' + dias + '</b>' + tope + '</td>'
+      + '<td class="text-xs">' + que + '</td>'
+      + '<td>' + (typeof u19RetencionWaHTML === "function" ? u19RetencionWaHTML(it) : '') + '</td></tr>';
+  });
+  h += '</table></div>';
+  if (filas.length > 20)
+    h += '<p class="text-xs text-muted" style="margin-top:.4rem;">Y ' + (filas.length - 20) + ' m\u00e1s en Cartera \u2192 Retenci\u00f3n.</p>';
+  h += '<p class="text-xs text-muted" style="margin:.5rem 0 0;line-height:1.5;">'
+    + 'Rojo: pas\u00f3 lo que su plan tolera. \u00c1mbar: pas\u00f3 el aviso, o se le venci\u00f3 el plan hace 7 d\u00edas o menos y '
+    + 'todav\u00eda se recupera. Gris: se le venci\u00f3 hace '
+    + (typeof RET_VENCIDOS_DIAS !== "undefined" ? RET_VENCIDOS_DIAS : 60) + ' d\u00edas o menos. '
+    + 'El bot\u00f3n abre WhatsApp con el mensaje escrito; lo env\u00edas t\u00fa.</p>';
+  h += '</div>';
   return h;
 }
 
@@ -19868,6 +19970,9 @@ function u19AccionesHTML(){
     + '<span id="acc-msg" style="font-size:.78rem;">'
     + (viejo ? '<span style="color:var(--muted);">Datos ' + escapeHtml(u19AccEdadTxt(viejo.minutos)) + ', actualizando…</span>' : '')
     + '</span></div>';
+  /* Primero lo vivo: quien se esta yendo AHORA. Despues, lo que el bot
+     dejo propuesto, que es otra cosa y esta congelado hasta que se apruebe. */
+  h += u19SemanaVivaHTML();
   h += '<div id="acc-cuerpo">' + (d ? u19AccCuerpoHTML(d) : '') + '</div>';
   h += '</div></div>';
   return h;
