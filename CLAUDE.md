@@ -49,6 +49,22 @@ entrada el `us19_catalogo.json` ya ampliado duplica ids en silencio.
 **`(x || [])` no protege de un objeto.** Solo de `null`. Con `localStorage` corrupto,
 `(evs || []).forEach` tumbaba la vista entera. Usar `Array.isArray(x) ? x : []`.
 
+**Circuitos, pizarra y «en vivo» (7-sep-2026)** viven en el bloque 1, justo antes de
+`/* --- Plantillas --- */`, en este orden: Búsqueda (`busqCoincide`, el único motor de
+texto de la app), Pizarra, Rutina en vivo, Día ↔ circuito y Circuitos. `state.circuitos`
+se espeja en **seis** puntos (carga, semilla, respaldo exportar/importar, sincronización
+subir/bajar y borrado total): cualquier dato nuevo del estado va a esos seis sitios o se
+pierde en algún camino. El editor de circuitos va en la vista, no en modal, porque el
+selector de ejercicios ya es un modal. Los enlaces de circuito usan `#circuito/` y `#k/`
+(nube con prefijo `k`); las vistas de quien recibe trabajan con objetos sueltos
+(`circEnVivoObj`, `pizarraCircuitoObj`, `circImprimirObj`), nunca con `circGet`. En el
+enlace del socio los ejercicios viajan como **array** (`findExerciseInShare`); para la
+pizarra y el en vivo se vuelven mapa con `pzMapaCompartido`. La app tiene CSP sin
+`unsafe-eval`: para pasar el humo en navegador se carga como `<script>` servido, no con
+`eval`. Y la trampa que más ha mordido al parchear: una línea que cierra cadena (`…'`)
+a la que se añade otra debajo pierde la comilla final, si no el bloque no parsea.
+`tools/circuitos.js` fija el reparto de grupos, el plan del cronómetro y la búsqueda.
+
 ## Al parchear
 
 - Anclas de coincidencia exacta con `assert count == 1`. Cero o múltiples → abortar.
