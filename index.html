@@ -5232,7 +5232,7 @@ function addExerciseToDay(){
     d.exercises.push({ exerciseId: exId, sets:"3", reps:"10", weight:"", rest:"60s", notes:"" });
     renderDayPanel();
     updateDayTabBadge();
-  }, { multi:true, terap: perfil.terap, preset: perfil.terap ? { cat:"(terap)" } : null });
+  }, { multi:true, terap: perfil.terap, preset: perfil.terap ? { cat:"(terap)", muscle: (_builderRoutine.zonaTerap ? "terap:" + _builderRoutine.zonaTerap : "") } : null });
 }
 
 function changeExercise(idx){
@@ -6668,8 +6668,23 @@ function libEnfoqueSelectHtml(r){
     if (id === "auto") lab += ": " + perfil.nombre;
     h += '<option value="' + id + '"' + (((r && r.enfoque) || "auto") === id ? ' selected' : '') + '>' + escapeHtml(lab) + '</option>';
   }
-  return h + '</select>';
+  h += '</select>';
+  if (perfil.terap){
+    h += '<select class="rb-enfoque" onchange="libZonaTerapCambiada(this.value)" title="Zona a proteger de esta rutina">'
+      + '<option value="">Zona: elige…</option>';
+    for (var z = 0; z < TERAP_ZONES.length; z++){
+      h += '<option value="' + escapeAttr(TERAP_ZONES[z]) + '"' + ((r && r.zonaTerap) === TERAP_ZONES[z] ? ' selected' : '') + '>Zona: ' + escapeHtml(TERAP_ZONES[z]) + '</option>';
+    }
+    h += '</select>';
+  }
+  return h;
 }
+window.libZonaTerapCambiada = function(v){
+  if (!_builderRoutine) return;
+  _builderRoutine.zonaTerap = v;
+  var vol = document.getElementById("rb-volume");
+  if (vol) vol.innerHTML = buildVolumeBadges(_builderRoutine);
+};
 window.libEnfoqueCambiado = function(v){
   if (!_builderRoutine) return;
   _builderRoutine.enfoque = v;
@@ -6679,19 +6694,31 @@ window.libEnfoqueCambiado = function(v){
 /* Resumen de una rutina terapéutica: cuántos llevan etiqueta terapéutica, en
    qué zonas, y cuáles son de carga alta. Vocabulario de sala, no clínico. */
 function libResumenTerapeutico(r){
-  var tot = 0, conT = 0, zonas = {}, altas = [];
+  var zona = (r && r.zonaTerap) || "";
+  var tot = 0, conT = 0, enZona = 0, zonas = {}, otraZona = [], altas = [];
   ((r&&r.days)||[]).forEach(function(d){
     ((d&&d.exercises)||[]).forEach(function(x){
       var def = getExercise(x.exerciseId); if (!def) return;
       tot++;
-      if (def.terap){ conT++; zonas[def.terap] = (zonas[def.terap]||0) + 1; }
+      if (def.terap){
+        conT++; zonas[def.terap] = (zonas[def.terap]||0) + 1;
+        if (zona && def.terap === zona) enZona++;
+        if (zona && def.terap !== zona) otraZona.push(def.name);
+      }
       var t = libTaxDe(def);
-      if (t.niv === "Avanzado" || t.cat === "Pliometría" || t.cat === "Halterofilia" || t.cat === "Strongman") altas.push(def.name);
+      /* Carga alta: lo avanzado, lo explosivo y, desde el 6-sep, también lo
+         intermedio con barra. En una rutina terapéutica eso ya es mucho. */
+      if (t.niv === "Avanzado" || t.cat === "Pliometría" || t.cat === "Halterofilia" || t.cat === "Strongman"
+          || (t.niv === "Intermedio" && def.equipment === "Barra")) altas.push(def.name);
     });
   });
-  var zk = Object.keys(zonas), h = '<span class="badge terap">🩺 Rutina terapéutica</span>';
+  var zk = Object.keys(zonas), h = '<span class="badge terap">🩺 Rutina terapéutica' + (zona ? ' · ' + escapeHtml(zona) : '') + '</span>';
+  if (!zona) h += '<span class="text-xs" style="color:var(--warn);">⚠ elige la zona: el selector abrirá ya filtrado en ella</span>';
   if (!tot) return h;
-  h += '<span class="text-xs">' + conT + ' de ' + tot + ' con etiqueta terapéutica' + (zk.length ? ' · ' + zk.map(function(z){ return escapeHtml(z) + ' ' + zonas[z]; }).join(', ') : '') + '</span>';
+  h += '<span class="text-xs">' + conT + ' de ' + tot + ' con etiqueta terapéutica'
+    + (zona ? ' · ' + enZona + ' de la zona ' + escapeHtml(zona) : (zk.length ? ' · ' + zk.map(function(z){ return escapeHtml(z) + ' ' + zonas[z]; }).join(', ') : ''))
+    + '</span>';
+  if (otraZona.length) h += '<span class="text-xs" style="color:var(--warn);">⚠ de otra zona: ' + escapeHtml(otraZona.slice(0, 3).join(', ')) + (otraZona.length > 3 ? ' y ' + (otraZona.length - 3) + ' más' : '') + '</span>';
   if (altas.length) h += '<span class="text-xs" style="color:var(--warn);">⚠ carga alta: ' + escapeHtml(altas.slice(0, 3).join(', ')) + (altas.length > 3 ? ' y ' + (altas.length - 3) + ' más' : '') + '</span>';
   else h += '<span class="text-xs" style="color:var(--success);">✓ sin ejercicios de carga alta</span>';
   if (!conT) h += '<span class="text-xs" style="color:var(--warn);">⚠ ninguno lleva etiqueta terapéutica: se pone en el formulario del ejercicio, en «Categoría terapéutica»</span>';
@@ -12436,7 +12463,7 @@ function buildVolumeBadges(r){
     if (!perfil.silencio){
       /* Avisos estrictos, a petición de Diego (6-sep): 30 % de diferencia ya avisa,
          y «sin core» no espera a un mínimo de series. Cada perfil mira solo lo suyo. */
-      var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0, sen = pat["Sentadilla"]||0, zan = pat["Zancada"]||0,
+      var avisos = [], infos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0, sen = pat["Sentadilla"]||0, zan = pat["Zancada"]||0,
           bis = pat["Bisagra"]||0, core = pat["Core"]||0, acc = pat["Accesorio"]||0, total = 0;
       pk.forEach(function(k){ total += pat[k]; });
       if (perfil.pushPull){
@@ -12452,13 +12479,15 @@ function buildVolumeBadges(r){
         if ((sen + zan) && bis && Math.max(sen + zan, bis) > Math.min(sen + zan, bis) * 1.3) avisos.push('rodilla y bisagra descompensadas (' + (sen + zan) + ' / ' + bis + ')');
         if (sen >= 6 && !zan) avisos.push('todo bilateral, sin trabajo unilateral');
       }
-      if (perfil.id === "superior" && (sen + zan + bis) > 0) avisos.push('hay pierna en una rutina de tren superior');
-      if (perfil.id === "inferior" && (emp + tra) > 0) avisos.push('hay empuje o tracción en una rutina de tren inferior');
+      /* Un poco de glúteo en un día de tren superior es habitual: se informa, no se avisa. */
+      if (perfil.id === "superior" && (sen + zan + bis) > 0) infos.push('lleva ' + (sen + zan + bis) + ' series de pierna');
+      if (perfil.id === "inferior" && (emp + tra) > 0) infos.push('lleva ' + (emp + tra) + ' series de empuje o tracción');
       if (perfil.core && total > 0 && !core) avisos.push('sin core');
       if (perfil.id === "core" && !core) avisos.push('una rutina de core sin core');
       if (acc > total * 0.3) avisos.push('demasiado accesorio (' + acc + ' de ' + total + ')');
       if (avisos.length) html += '<span class="text-xs" style="color:var(--warn);" title="Orientativo: medido contra el enfoque elegido">⚠ ' + escapeHtml(avisos.join(' · ')) + '</span>';
       else html += '<span class="text-xs" style="color:var(--success);">✓ ' + (perfil.id === "equilibrada" ? 'equilibrada' : 'en línea con el enfoque') + '</span>';
+      if (infos.length) html += '<span class="text-xs text-muted">ℹ ' + escapeHtml(infos.join(' · ')) + '</span>';
     }
   }
   html += '</div>';
