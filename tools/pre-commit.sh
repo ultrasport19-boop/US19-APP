@@ -6,6 +6,7 @@
 #   1. validar_bloques.js - sintaxis de cada bloque <script> por separado.
 #   2. pruebas.js         - banco de pruebas: video, lista blanca, secretos.
 #   3. taxonomia.js       - tipo, patrón y nivel de 22 ejercicios conocidos.
+#   4. circuitos.js       - reparto de grupos, plan del cronómetro y motor de búsqueda.
 RAIZ="$(git rev-parse --show-toplevel)"
 
 if git diff --cached --name-only | grep -q "^index.html$"; then
@@ -18,6 +19,9 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
 
   node "$RAIZ/tools/taxonomia.js" "$RAIZ/index.html" \
     || { echo ""; echo "la clasificación de ejercicios no pasa la prueba: commit cancelado."; exit 1; }
+
+  node "$RAIZ/tools/circuitos.js" "$RAIZ/index.html" \
+    || { echo ""; echo "los circuitos o la búsqueda no pasan la prueba: commit cancelado."; exit 1; }
 
 fi
 exit 0

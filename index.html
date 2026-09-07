@@ -7559,7 +7559,7 @@ function uploadToCloud(data, prefix){
   if (!cfg) return Promise.reject(new Error("GitHub no configurado"));
   var repoFull = (getDerivedRepo() || (cfg.owner + "/" + cfg.repo));
   prefix = prefix || "r";
-  var fileId = (prefix === "p" ? "p" : "r") + "_" + Date.now().toString(36) + "_" + genId();
+  var fileId = (prefix === "p" || prefix === "k" ? prefix : "r") + "_" + Date.now().toString(36) + "_" + genId();
   var path = "data/" + fileId + ".json";
   var json = JSON.stringify(data);
   var b64 = btoa(unescape(encodeURIComponent(json)));
@@ -9760,6 +9760,8 @@ function parseHash(){
   if (!h) return null;
   h = h.replace(/^#/, "");
   if (h.indexOf("cliente/") === 0) return { kind:"cliente", payload: h.slice(8) };
+  if (h.indexOf("circuito/") === 0) return { kind:"circuito", payload: h.slice(9) };
+  if (h.indexOf("k/") === 0) return { kind:"k", payload: h.slice(2) };
   if (h.indexOf("progreso/") === 0) return { kind:"progreso", payload: h.slice(9) };
   if (h.indexOf("r/") === 0) return { kind:"r", payload: h.slice(2) };
   if (h.indexOf("p/") === 0) return { kind:"p", payload: h.slice(2) };
@@ -13778,8 +13780,9 @@ function circEstacionNombre(s){
   return e ? e.name : "Estación";
 }
 function circGifDe(s){
-  var e = s && s.exerciseId ? getExercise(s.exerciseId) : null;
-  return (e && e.gif) ? e.gif : "";
+  if (!s) return "";
+  if (s.exerciseId){ var e = getExercise(s.exerciseId); if (e && e.gif) return e.gif; }
+  return s.gif || s.img || "";   /* estación libre con foto, o estación de un circuito compartido */
 }
 /* Grupo (0…) que ocupa la estación s en el turno t, o -1 si queda libre. */
 function circGruposNombres(c){
@@ -13974,6 +13977,107 @@ function circMapaSvgImprimir(c){
   return svg + '</svg>';
 }
 
+/* ---------- compartir por enlace ---------- */
+/* El enlace lleva el circuito entero con la imagen de cada estación (la URL del
+   GIF, no la foto propia, que pesaría demasiado). Quien lo abre ve el mapa, la
+   lista y la rotación, y puede llevarlo en vivo, verlo en la pizarra o imprimirlo:
+   un colega de Educación Física no necesita cuenta ni biblioteca. */
+var _circCompartido = null;
+function circShareData(c){
+  return { type: "circuito", v: 1, sharedAt: Date.now(),
+    circuito: { nombre: c.nombre || "", grupo: c.grupo || "", notas: c.notas || "", modo: c.modo || "rotacion", grupos: c.grupos, rondas: c.rondas,
+      trabajo: c.trabajo, cambio: c.cambio, descansoRonda: c.descansoRonda, ratio: c.ratio || "16:9", nombresGrupos: c.nombresGrupos || "",
+      estaciones: (c.estaciones || []).map(function(s){
+        var g = circGifDe(s), o = { nombre: circEstacionNombre(s), nota: s.nota || "", x: s.x, y: s.y, trabajo: circNum(s.trabajo, 0) };
+        if (g && g.indexOf("data:") !== 0) o.gif = g;
+        return o;
+      }) } };
+}
+window.openCircShareModal = function(id){
+  var c = circGet(id); if (!c) return;
+  if (!c.estaciones.length){ toast("Añade estaciones antes de compartir", "warn"); return; }
+  var data = circShareData(c), encoded = encodeShareData(data), baseUrl = getAppBaseUrl();
+  var longUrl = baseUrl + "#circuito/" + encoded, currentUrl = longUrl;
+  var conFoto = c.estaciones.some(function(s){ return !s.exerciseId && s.img; });
+  var hasGitHub = !!getGitHubConfig();
+  openModal({
+    title: "Compartir circuito",
+    bodyHtml: '<div id="share-status" class="text-sm text-muted" style="margin-bottom:.5rem;text-align:center;">' + (hasGitHub ? '☁ Subiendo a GitHub para link corto...' : 'Modo link largo (sin GitHub configurado)') + '</div>'
+      + '<div class="share-qr-wrap" id="share-qr"></div><div class="share-link-box" id="share-link-text"></div>'
+      + '<div class="share-grid"><button class="btn btn-secondary" id="btn-copy-link">Copiar link</button><button class="btn btn-wa" id="btn-wa">WhatsApp</button><button class="btn btn-secondary" id="btn-download-qr">Descargar QR</button></div>'
+      + '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">Quien abra el enlace verá el mapa, las estaciones y la rotación, y podrá llevar el circuito en vivo o imprimirlo, sin cuenta ni biblioteca.' + (conFoto ? ' Las fotos propias de las estaciones libres no viajan en el enlace.' : '') + '</p>',
+    footer: [{ label: "Cerrar", cls: "btn-ghost" }],
+    bodyMount: function(){
+      function pintarQr(url){
+        try { document.getElementById("share-qr").innerHTML = generateQrSvg(url, 280).svg; }
+        catch(e){ document.getElementById("share-qr").innerHTML = '<p style="color:#000;padding:1rem;">No se pudo generar el QR (enlace demasiado largo): usa el link.</p>'; }
+        document.getElementById("share-link-text").textContent = url;
+      }
+      function estado(html){ var s = document.getElementById("share-status"); if (s) s.innerHTML = html; }
+      pintarQr(currentUrl);
+      document.getElementById("btn-copy-link").addEventListener("click", function(){ copyToClipboard(currentUrl); });
+      document.getElementById("btn-wa").addEventListener("click", function(){
+        var msg = "Circuito «" + (c.nombre || "") + "» · Ultra-Sport 19\n" + currentUrl;
+        window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank", "noopener");
+      });
+      document.getElementById("btn-download-qr").addEventListener("click", function(){ downloadQrPng(currentUrl, (c.nombre || "circuito") + " - Ultra-Sport 19", 600); });
+      if (hasGitHub){
+        uploadToCloud(data, "k").then(function(res){
+          currentUrl = baseUrl + "#k/" + res.fileId;
+          pintarQr(currentUrl);
+          estado('<span style="color:var(--accent);">☁ Link corto listo · ' + currentUrl.length + ' caracteres</span>');
+        }).catch(function(err){ estado('<span style="color:var(--warn);">No se pudo subir a GitHub (' + escapeHtml(err.message || "error") + '): se usa el link largo</span>'); });
+      } else if (settings.bitlyToken){
+        shortenWithBitly(longUrl).then(function(short){ currentUrl = short; pintarQr(short); estado('<span style="color:var(--accent);">🔗 Link Bitly generado</span>'); }).catch(function(){});
+      }
+    }
+  });
+};
+/* La vista de quien recibe el enlace. Reutiliza el mapa, la pizarra, la hoja y la
+   vista en vivo con un objeto suelto (no está en state.circuitos). */
+function showCircuitoView(data){
+  var src = data.circuito;
+  var c = { id: "compartido", nombre: src.nombre || "Circuito", grupo: src.grupo || "", notas: src.notas || "", modo: src.modo || "rotacion", grupos: src.grupos, rondas: src.rondas,
+            trabajo: src.trabajo, cambio: src.cambio, descansoRonda: src.descansoRonda, ratio: src.ratio || "16:9", nombresGrupos: src.nombresGrupos || "",
+            estaciones: (src.estaciones || []).map(function(s){ return { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" }; }) };
+  _circCompartido = c;
+  hideTrainerUI();
+  showView("client");
+  var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1));
+  var html = '<div class="client-hero"><div class="hero-logo"><img src="' + LOGO_DATA_URI + '" alt=""></div><div style="flex:1;min-width:0;">'
+    + '<div class="hero-sub">CIRCUITO POR ESTACIONES · Ultra-Sport 19</div><h1>' + escapeHtml(c.nombre) + '</h1>'
+    + (c.grupo ? '<div class="hero-meta">' + escapeHtml(c.grupo) + '</div>' : '')
+    + '<div class="text-sm text-muted" style="margin-top:.4rem;">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + ' · ' + circFmt(circDuracion(c)) + ' · ' + (c.modo === "secuencia" ? "una estación tras otra" : G + " grupos que rotan") + '</div>'
+    + '</div></div>';
+  html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">'
+    + '<button class="btn btn-primary" onclick="circEnVivoObj(_circCompartido)">▶ En vivo</button>'
+    + '<button class="btn btn-secondary" onclick="pizarraCircuitoObj(_circCompartido)">🎞 Pizarra</button>'
+    + '<button class="btn btn-secondary" onclick="circImprimirObj(_circCompartido)">🖨 Hoja</button></div>';
+  if (c.notas) html += '<div class="card" style="background:var(--surface-2);margin-bottom:1rem;"><div class="card-main"><div class="card-sub">📝 ' + escapeHtml(c.notas) + '</div></div></div>';
+  html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">🗺 Mapa de la sala</div>' + circMapaHtml(c, {}) + '</div></div>';
+  html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">📍 Estaciones · ' + circNum(c.trabajo, 40) + ' s de trabajo · ' + circNum(c.cambio, 15) + ' s de cambio</div>';
+  c.estaciones.forEach(function(s, i){
+    var g = circGifDe(s);
+    html += '<div class="circ-row" style="grid-template-columns:1.6rem 46px minmax(0,1fr);"><div class="circ-n">' + (i + 1) + '</div>'
+      + (g ? mediaThumb(g, 'class="circ-thumb" loading="lazy" alt=""') : '<div class="circ-thumb-vacio">📍</div>')
+      + '<div><div style="font-weight:700;">' + escapeHtml(circEstacionNombre(s)) + (c.modo === "secuencia" && circNum(s.trabajo, 0) ? ' <span class="text-muted">· ' + circNum(s.trabajo, 0) + ' s</span>' : '') + '</div>'
+      + (s.nota ? '<div class="text-xs text-muted">' + escapeHtml(s.nota) + '</div>' : '') + '</div></div>';
+  });
+  html += '</div></div>';
+  if (c.modo !== "secuencia" && N){
+    html += '<div class="card"><div class="card-main"><div class="card-title">🔁 Rotación</div><div class="circ-rot"><table><thead><tr><th>Turno</th>';
+    for (var s2 = 0; s2 < N; s2++) html += '<th>' + (s2 + 1) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (var t = 0; t < R * N; t++){
+      html += '<tr><td>' + (t + 1) + '</td>';
+      for (var s3 = 0; s3 < N; s3++){ var gg = circGrupoEn(c, s3, t); html += '<td>' + (gg >= 0 ? escapeHtml(circNombreGrupo(c, gg).slice(0, 10)) : '—') + '</td>'; }
+      html += '</tr>';
+    }
+    html += '</tbody></table></div></div></div>';
+  }
+  document.getElementById("view-client").innerHTML = html;
+}
+
 /* ---------- lista ---------- */
 function circCardHtml(c){
   var N = (c.estaciones || []).length, dur = circDuracion(c);
@@ -13986,11 +14090,14 @@ function circCardHtml(c){
         + '<span>🔁 ' + Math.max(1, circNum(c.rondas, 1)) + ' vuelta' + (circNum(c.rondas, 1) === 1 ? '' : 's') + '</span>'
         + '<span>⏱ ' + circFmt(dur) + '</span>'
         + '<span class="badge teal">' + (c.modo === "secuencia" ? "Secuencia" : "Rotación por grupos") + '</span>'
+        + (circSesiones(c).length ? '<span class="badge muted">📒 ' + circSesiones(c).length + ' clase' + (circSesiones(c).length === 1 ? '' : 's') + '</span>' : '')
       + '</div>'
     + '</div>'
     + '<div class="card-actions">'
       + '<button class="btn btn-primary btn-sm" onclick="circEnVivo(\'' + c.id + '\')" ' + (N ? '' : 'disabled title="Añade estaciones primero"') + '>▶ En vivo</button>'
       + '<button class="btn btn-secondary btn-sm" onclick="circEditar(\'' + c.id + '\')">Editar</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="openCircShareModal(\'' + c.id + '\')" title="Compartir por enlace o QR: quien lo abre ve el mapa y puede llevarlo en vivo"' + (N ? '' : ' disabled') + '>📤</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circRegistrarClase(\'' + c.id + '\')" title="Registrar una clase dada con este circuito">📝</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="pizarraCircuito(\'' + c.id + '\')" title="Pizarra: las estaciones en movimiento"' + (N ? '' : ' disabled') + '>🎞</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="circImprimir(\'' + c.id + '\')" title="Hoja de planificación">🖨</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="circDuplicar(\'' + c.id + '\')" title="Duplicar">⎘</button>'
@@ -14004,7 +14111,8 @@ function renderCircuitos(){
   if (_circEdit){ v.innerHTML = circEditorHtml(); circEditorMontar(); return; }
   var l = circLista().slice().sort(function(a, b){ return (b.updatedAt || 0) - (a.updatedAt || 0); });
   var html = '<div class="section-head"><h1 class="section-title">CIRCUITOS <span class="accent">/ CLASES</span></h1>'
-    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button class="btn btn-primary" onclick="circEditar()">+ Nuevo circuito</button></div></div>'
+    + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;"><button class="btn btn-primary" onclick="circEditar()">+ Nuevo circuito</button>'
+    + '<button class="btn btn-secondary" onclick="circPlantillasModal()" title="Circuitos listos de la casa: clase con niños, bloque en grupo, en casa">➕ Desde plantilla</button></div></div>'
     + '<p class="circ-intro">Un circuito es una lista de estaciones con un tiempo de trabajo, un tiempo de cambio y un número de vueltas. '
     + 'Sirve para las clases con niños y para los bloques en grupo del gimnasio: se arma con ejercicios de la biblioteca o con estaciones libres, '
     + 'se imprime como hoja de planificación y se lleva <b>en vivo</b> con un cronómetro a pantalla completa que pita en cada cambio y muestra qué grupo va en cada estación.</p>';
@@ -14016,6 +14124,95 @@ function renderCircuitos(){
     html += '</div>';
   }
   v.innerHTML = html;
+}
+/* ---------- plantillas de circuito de la casa ---------- */
+function circPlantilla(id){
+  var l = (typeof CIRC_PLANTILLAS !== "undefined") ? CIRC_PLANTILLAS : [];
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+window.circPlantillasModal = function(){
+  var l = (typeof CIRC_PLANTILLAS !== "undefined") ? CIRC_PLANTILLAS : [];
+  if (!l.length){ toast("No hay plantillas de circuito", "warn"); return; }
+  var opts = l.map(function(t, i){ return '<option value="' + escapeAttr(t.id) + '"' + (i === 0 ? ' selected' : '') + '>' + (t.icono || "") + ' ' + escapeHtml(t.nombre) + '</option>'; }).join("");
+  openModal({
+    title: "Nuevo circuito desde plantilla",
+    bodyHtml: formField("Plantilla", '<select id="ct-sel" onchange="circPlantillaResumen()">' + opts + '</select>') + '<div id="ct-resumen"></div>',
+    footer: [
+      { label: "Cancelar", cls: "btn-ghost" },
+      { label: "Crear circuito", cls: "btn-primary", onClick: function(){ circDesdePlantilla(document.getElementById("ct-sel").value); } }
+    ]
+  });
+  setTimeout(window.circPlantillaResumen, 0);
+};
+window.circPlantillaResumen = function(){
+  var sel = document.getElementById("ct-sel"), box = document.getElementById("ct-resumen");
+  if (!sel || !box) return;
+  var t = circPlantilla(sel.value); if (!t){ box.innerHTML = ""; return; }
+  var N = t.estaciones.length, R = t.rondas || 1, dur = R * N * (t.trabajo || 40) + R * (N - 1) * (t.cambio || 15) + (R - 1) * (t.descansoRonda || 60);
+  box.innerHTML = '<div class="card" style="background:var(--surface-2);margin:-.2rem 0 .8rem;"><div class="card-main">'
+    + '<div class="card-sub" style="margin-bottom:.4rem;"><span class="badge teal">📍 ' + N + ' estaciones</span><span class="badge teal">🔁 ' + R + ' vuelta' + (R === 1 ? '' : 's') + '</span><span class="badge teal">⏱ ' + circFmt(dur) + '</span><span class="badge teal">' + (t.modo === "secuencia" ? "Secuencia" : "Rotación · " + (t.grupos || 4) + " grupos") + '</span></div>'
+    + '<div class="text-sm" style="line-height:1.45;">' + escapeHtml(t.resumen || "") + '</div>'
+    + '<div class="text-xs text-muted" style="margin-top:.35rem;">' + t.estaciones.map(function(s, i){ var e = s[0] ? getExercise(s[0]) : null; return (i + 1) + '. ' + escapeHtml(e ? e.name : (s[1] || "estación")); }).join(' · ') + '</div>'
+    + '</div></div>';
+};
+window.circDesdePlantilla = function(id){
+  var t = circPlantilla(id); if (!t){ toast("Plantilla no encontrada", "warn"); return; }
+  var ids = t.estaciones.map(function(s){ return s[0]; }).filter(Boolean);
+  var faltaban = (typeof rtAsegurarFichas === "function") ? rtAsegurarFichas(ids) : 0;
+  var c = circNuevo();
+  c.nombre = t.nombre; c.grupo = t.grupo || ""; c.notas = t.notas || ""; c.modo = t.modo || "rotacion";
+  c.grupos = t.grupos || 4; c.rondas = t.rondas || 1; c.trabajo = t.trabajo || 40; c.cambio = t.cambio || 15;
+  c.descansoRonda = t.descansoRonda || 60; c.ratio = t.ratio || "16:9"; c.plantilla = t.id;
+  t.estaciones.forEach(function(s){
+    var e = s[0] ? getExercise(s[0]) : null;
+    c.estaciones.push({ id: genId(), exerciseId: e ? s[0] : "", nombre: e ? e.name : (s[1] || "Estación"), nota: s[2] || "" });
+  });
+  circAutoLayout(c, "circulo");
+  circLista().push(c); saveState();
+  closeModal();
+  circEditar(c.id);
+  toast("Circuito creado desde la plantilla" + (faltaban ? " · " + faltaban + " ejercicios añadidos a la biblioteca" : ""), "success");
+};
+/* ---------- registro de clases ---------- */
+function circSesiones(c){ if (!Array.isArray(c.sesiones)) c.sesiones = []; return c.sesiones; }
+window.circRegistrarClase = function(id){
+  var c = circGet(id); if (!c){ toast("Guarda el circuito antes de registrar una clase", "warn"); return; }
+  var hoy = new Date().toISOString().slice(0, 10);
+  openModal({
+    title: "Registrar clase · " + (c.nombre || "circuito"),
+    bodyHtml: formField("Fecha", '<input type="date" id="cr-fecha" value="' + hoy + '">')
+      + formField("Curso / grupo", '<input type="text" id="cr-curso" value="' + escapeAttr(c.grupo || "") + '" placeholder="Ej: 4.º básico A">')
+      + formField("Asistencia", '<input type="number" id="cr-asis" min="0" max="200" placeholder="cuántos participaron">')
+      + formField("Observaciones", '<textarea id="cr-obs" style="min-height:80px;" placeholder="Qué funcionó, qué cambiar, quién destacó"></textarea>'),
+    footer: [
+      { label: "Cancelar", cls: "btn-ghost" },
+      { label: "Guardar", cls: "btn-primary", onClick: function(){
+        var s = { id: genId(), fecha: document.getElementById("cr-fecha").value || hoy, curso: (document.getElementById("cr-curso").value || "").trim(),
+                  asistencia: circNum(document.getElementById("cr-asis").value, 0), obs: (document.getElementById("cr-obs").value || "").trim(), creadoEl: Date.now() };
+        circSesiones(c).push(s); c.updatedAt = Date.now(); saveState(); closeModal();
+        if (_circEdit && _circEdit.id === c.id) _circEdit.sesiones = JSON.parse(JSON.stringify(c.sesiones));
+        var v = document.getElementById("view-circuitos"); if (v && v.classList.contains("active")) renderCircuitos();
+        toast("Clase registrada", "success");
+      }}
+    ]
+  });
+};
+window.circBorrarSesion = function(cid, sid){
+  var c = circGet(cid); if (!c) return;
+  c.sesiones = circSesiones(c).filter(function(s){ return s.id !== sid; }); saveState();
+  if (_circEdit && _circEdit.id === c.id){ _circEdit.sesiones = JSON.parse(JSON.stringify(c.sesiones)); renderCircuitos(); }
+};
+function circSesionesHtml(c){
+  var l = circSesiones(c).slice().sort(function(a, b){ return (b.fecha || "").localeCompare(a.fecha || ""); });
+  var html = '<div class="card" style="margin-top:1rem;"><div class="card-main">'
+    + '<div class="card-title" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">📒 Clases registradas (' + l.length + ')'
+    + '<span style="margin-left:auto;"><button class="btn btn-secondary btn-sm" onclick="circRegistrarClase(\'' + c.id + '\')"' + (circGet(c.id) ? '' : ' disabled title="Guarda el circuito primero"') + '>+ Registrar clase</button></span></div>';
+  if (!l.length) html += '<p class="text-sm text-muted" style="margin:.4rem 0 0;">Cada vez que des esta clase, anota fecha, curso, asistencia y qué cambiar. Es tu historial de planificación.</p>';
+  else html += '<div class="tbl-wrap" style="margin-top:.5rem;"><table style="min-width:0;"><thead><tr><th>Fecha</th><th>Curso</th><th>Asist.</th><th>Observaciones</th><th></th></tr></thead><tbody>'
+    + l.map(function(s){ return '<tr><td class="mono">' + escapeHtml(s.fecha || "") + '</td><td>' + escapeHtml(s.curso || "") + '</td><td>' + (s.asistencia || "") + '</td><td>' + escapeHtml(s.obs || "") + '</td><td><button class="btn btn-ghost btn-sm" onclick="circBorrarSesion(\'' + c.id + '\',\'' + s.id + '\')" title="Borrar">×</button></td></tr>'; }).join("")
+    + '</tbody></table></div>';
+  return html + '</div></div>';
 }
 window.circDuplicar = function(id){
   var c = circGet(id); if (!c) return;
@@ -14072,6 +14269,7 @@ function circEditorHtml(){
     + '<h1 class="section-title">' + (_circEditNuevo ? "NUEVO" : "EDITAR") + ' <span class="accent">CIRCUITO</span></h1>'
     + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
     + '<button class="btn btn-ghost" onclick="circVolver()">← Volver</button>'
+    + '<button class="btn btn-secondary" onclick="circGuardarYCompartir()" title="Guarda y abre el enlace para compartir">📤 Compartir</button>'
     + '<button class="btn btn-ghost" onclick="circProbarSonido()" title="Suena el silbato y el pitido: para ajustar el volumen antes de la clase">🔔 Probar sonido</button>'
     + '<button class="btn btn-ghost" onclick="rutinaDesdeCircuito()" title="Crea una rutina de un día con las estaciones que vienen de la biblioteca">📋 A rutina</button>'
     + '<button class="btn btn-secondary" onclick="pizarraCircuitoObj(_circEdit)" title="Las estaciones en movimiento">🎞 Pizarra</button>'
@@ -14123,6 +14321,7 @@ function circEditorHtml(){
     + '<div id="circ-resumen" class="circ-resumen"></div>'
     + '<div id="circ-rot" class="circ-rot"></div>'
     + '</div></div>';
+  html += circSesionesHtml(c);
   return html;
 }
 function circEditorMontar(){
@@ -14160,6 +14359,9 @@ function circPintarEstaciones(){
         + (c.modo === "secuencia" ? '<input type="number" min="0" max="3600" class="circ-t" data-i="' + i + '" data-k="trabajo" value="' + (circNum(s.trabajo, 0) > 0 ? circNum(s.trabajo, 0) : "") + '" placeholder="' + circNum(c.trabajo, 40) + ' s" title="Segundos en esta estación; vacío = el tiempo general">' : '')
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',-1)" title="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',1)" title="Bajar"' + (i === c.estaciones.length - 1 ? ' disabled' : '') + '>↓</button>'
+        + (s.exerciseId ? '' : (s.img
+            ? '<button class="btn btn-ghost btn-sm" onclick="circFotoQuitar(' + i + ')" title="Quitar la foto">📷✕</button>'
+            : '<button class="btn btn-ghost btn-sm" onclick="circFoto(' + i + ')" title="Foto de la estación (cámara o galería); se guarda pequeña">📷</button>'))
         + '<button class="btn btn-ghost btn-sm" onclick="circDuplicarEst(' + i + ')" title="Duplicar estación">⎘</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circQuitar(' + i + ')" title="Quitar">×</button>'
       + '</div></div>';
@@ -14234,6 +14436,37 @@ window.circDuplicarEst = function(i){
   var p = circPosAuto(i + 1, _circEdit.estaciones.length, "circulo"); s.x = p.x; s.y = p.y;
   circPintarEstaciones();
 };
+/* Foto para una estación libre: se reduce a 360 px y se guarda como imagen pequeña
+   dentro del circuito (viaja con el respaldo y la sincronización; no con el enlace). */
+window.circFoto = function(i){
+  if (!_circEdit || !_circEdit.estaciones[i]) return;
+  var inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "environment");
+  inp.addEventListener("change", function(){
+    var f = inp.files && inp.files[0]; if (!f) return;
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function(){
+      var lado = 360, esc = Math.min(1, lado / Math.max(img.width, img.height));
+      var cv = document.createElement("canvas"); cv.width = Math.round(img.width * esc); cv.height = Math.round(img.height * esc);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      var data = cv.toDataURL("image/jpeg", 0.72);
+      if (data.length > 160000){ cv.width = Math.round(cv.width * 0.66); cv.height = Math.round(cv.height * 0.66); cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); data = cv.toDataURL("image/jpeg", 0.65); }
+      URL.revokeObjectURL(url);
+      if (!_circEdit || !_circEdit.estaciones[i]) return;
+      _circEdit.estaciones[i].img = data;
+      circPintarEstaciones();
+      toast("Foto guardada (" + Math.round(data.length / 1024) + " KB)", "success");
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); toast("No se pudo leer la imagen", "error"); };
+    img.src = url;
+  });
+  inp.click();
+};
+window.circFotoQuitar = function(i){
+  if (!_circEdit || !_circEdit.estaciones[i]) return;
+  delete _circEdit.estaciones[i].img;
+  circPintarEstaciones();
+};
 window.circQuitar = function(i){
   if (!_circEdit) return;
   _circEdit.estaciones.splice(i, 1);
@@ -14257,11 +14490,13 @@ function circGuardar(silencio){
 }
 window.circGuardarBtn = function(){ if (circGuardar(false)){ _circEdit = null; renderCircuitos(); } };
 window.circGuardarYVivo = function(){ var c = circGuardar(true); if (c){ renderCircuitos(); circEnVivo(c.id); } };
+window.circGuardarYCompartir = function(){ var c = circGuardar(true); if (c){ circPintarEstaciones(); openCircShareModal(c.id); } };
 window.circGuardarYImprimir = function(){ var c = circGuardar(true); if (c){ circPintarEstaciones(); circImprimir(c.id); } };
 
 /* ---------- hoja imprimible ---------- */
-window.circImprimir = function(id){
-  var c = circGet(id); if (!c) return;
+window.circImprimir = function(id){ circImprimirObj(circGet(id)); };
+window.circImprimirObj = function(c){
+  if (!c) return;
   var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1));
   var doc = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + escapeHtml(c.nombre || "Circuito") + '</title>'
     + '<style>body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:22px;font-size:13px}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:18px 0 6px;border-bottom:2px solid #a8d139;padding-bottom:3px}'
@@ -14317,8 +14552,9 @@ function circPlan(c){
   plan.push({ tipo: "fin", dur: 0, turno: turno, ronda: R - 1, estacion: N - 1 });
   return plan;
 }
-window.circEnVivo = function(id){
-  var c = circGet(id); if (!c) return;
+window.circEnVivo = function(id){ circEnVivoObj(circGet(id)); };
+window.circEnVivoObj = function(c){
+  if (!c) return;
   if (!c.estaciones.length){ toast("El circuito no tiene estaciones", "warn"); return; }
   var plan = circPlan(c), total = 0;
   plan.forEach(function(p){ total += p.dur; });
@@ -14369,7 +14605,7 @@ function circLivePintar(){
   html += '<div class="cl-ctrl">'
     + '<button class="btn btn-secondary" onclick="circLiveSalto(-1)" title="Fase anterior">⏮</button>'
     + (p.tipo === "fin"
-        ? '<button class="btn btn-primary big" onclick="circLiveReiniciar()">↺ Otra vez</button>'
+        ? '<button class="btn btn-primary big" onclick="circLiveReiniciar()">↺ Otra vez</button>' + (circGet(c.id) ? '<button class="btn btn-secondary" onclick="circRegistrarClase(\'' + c.id + '\')" title="Fecha, curso, asistencia y observaciones de esta clase">📝 Registrar clase</button>' : '')
         : '<button class="btn btn-primary big" id="cl-play" onclick="circLiveToggle()">' + (L.corriendo ? "⏸ Pausa" : (L.i === 0 && L.restante === p.dur ? "▶ Empezar" : "▶ Seguir")) + '</button>')
     + '<button class="btn btn-secondary" onclick="circLiveSalto(1)" title="Siguiente fase">⏭</button>'
     + '<button class="btn btn-ghost" onclick="circLiveSonido()" title="Sonido: pitido, silbato o nada">' + ({ pitido: "🔊 Pitido", silbato: "📯 Silbato", off: "🔇" }[L.sonido] || "🔊") + '</button>'
@@ -14581,7 +14817,15 @@ var RT_FICHAS = [
   {"id":"us19f0230","name":"Press Pallof","muscle":"Core","equipment":"Polea","desc":"De pie de lado a una polea a la altura del pecho, sujeta el asa con las dos manos pegadas al esternón y aléjate para tensar. Extiende los brazos al frente resistiendo la rotación que tira de ti hacia la polea, mantén un instante y vuelve. Es antirrotación pura, lo mejor para el core. Repite el número de repeticiones deseado y cambia de lado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Pallof_Press.gif","cat":"Fuerza","niv":"Intermedio","mec":"Aislado","pat":"Core"},
   {"id":"us190705","name":"Plancha lateral","muscle":"Core","equipment":"Peso corporal","desc":"Túmbate de lado con las piernas extendidas y una sobre la otra. Coloca el antebrazo en el suelo justo debajo del hombro, con el codo flexionado en un ángulo de 90 grados. Activa el core y levanta las caderas del suelo, formando una línea recta desde la cabeza hasta los pies. Mantén esta posición durante el tiempo deseado. Baja las caderas de vuelta a la posición inicial. Repite del otro lado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/0705-RKjH6Lt.gif","cat":"Fuerza","niv":"Principiante","pat":"Core"},
   {"id":"us196041","name":"Crunch inverso","muscle":"Core","equipment":"Peso corporal","desc":"Túmbate boca arriba con las manos a los costados o bajo los glúteos y las rodillas flexionadas sobre la cadera. Contrae el abdomen inferior llevando las rodillas hacia el pecho y elevando ligeramente la pelvis del suelo. Haz una pausa arriba y desciende despacio sin apoyar del todo. El movimiento nace del abdomen, no del impulso de las piernas. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-core-crunch-inverso.gif","cat":"Fuerza","niv":"Principiante","mec":"Aislado","pat":"Core"},
-  {"id":"us19f0261","name":"Remo en remoergómetro","muscle":"Cardio","equipment":"Máquina de cardio","desc":"Siéntate con los talones apoyados en los pedales y las correas ajustadas. Empieza empujando con las piernas, después inclina el tronco atrás y por último tira con los brazos hasta el abdomen. Vuelve en orden inverso: brazos, tronco y piernas. Trabaja todo el cuerpo sin impacto.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Rowing_Stationary.gif","cat":"Cardio","niv":"Principiante","pat":"Locomoción"}
+  {"id":"us19f0261","name":"Remo en remoergómetro","muscle":"Cardio","equipment":"Máquina de cardio","desc":"Siéntate con los talones apoyados en los pedales y las correas ajustadas. Empieza empujando con las piernas, después inclina el tronco atrás y por último tira con los brazos hasta el abdomen. Vuelve en orden inverso: brazos, tronco y piernas. Trabaja todo el cuerpo sin impacto.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Rowing_Stationary.gif","cat":"Cardio","niv":"Principiante","pat":"Locomoción"},
+  {"id":"us19f0164","name":"Saltos de rana","muscle":"Pierna","equipment":"Peso corporal","desc":"Colócate en cuclillas profundas con los pies algo más anchos que la cadera y las manos apoyadas en el suelo. Da un pequeño salto hacia adelante manteniendo la posición baja y vuelve a apoyar las manos. Avanza la distancia marcada. Combina movilidad de cadera con trabajo de piernas.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Frog_Hops.gif","cat":"Movilidad","niv":"Principiante","mec":"Compuesto"},
+  {"id":"us19f0193","name":"Salto lateral","muscle":"Pierna","equipment":"Peso corporal","desc":"Apoya el peso sobre una pierna con la rodilla ligeramente flexionada. Salta lateralmente lo más lejos posible cayendo sobre la otra pierna, absorbiendo con la rodilla y la cadera, y estabiliza un instante antes de saltar de vuelta. Trabaja la potencia lateral y el control de rodilla.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Lateral_Bound.gif","cat":"Pliometría","niv":"Intermedio","mec":"Compuesto","pat":"Sentadilla"},
+  {"id":"us19f0161","name":"Skipping rápido","muscle":"Pierna","equipment":"Peso corporal","desc":"Corre en el sitio o avanzando llevando la rodilla a la altura de la cadera lo más rápido posible, acompañando con el brazo contrario. Apoya en el metatarso y mantén el tronco erguido. Trabaja durante el tiempo marcado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Fast_Skipping.gif","cat":"Pliometría","niv":"Intermedio","mec":"Compuesto","pat":"Locomoción"},
+  {"id":"us19f0152","name":"Salto con talones al glúteo","muscle":"Pierna","equipment":"Peso corporal","desc":"De pie con los pies a la anchura de la cadera. Salta hacia arriba y, en el aire, lleva los dos talones hacia los glúteos flexionando las rodillas. Aterriza amortiguando y encadena el siguiente salto. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Double_Leg_Butt_Kick.gif","cat":"Pliometría","niv":"Intermedio","mec":"Compuesto","pat":"Sentadilla"},
+  {"id":"us196274","name":"Sentadilla","muscle":"Pierna","equipment":"Peso corporal","desc":"De pie con los pies a la anchura de los hombros y las puntas ligeramente hacia fuera, con los brazos extendidos al frente. Desciende llevando la cadera hacia atrás y flexionando las rodillas, manteniendo el pecho alto y la espalda recta. Baja hasta que los muslos queden paralelos al suelo y sube empujando con los talones. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pierna-sentadilla-03.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Sentadilla"},
+  {"id":"us196377","name":"Flexiones de rodillas","muscle":"Pecho","equipment":"Peso corporal","desc":"Colócate boca abajo apoyando las manos algo más abiertas que los hombros y las rodillas en el suelo, con los tobillos cruzados. Mantén la línea recta desde la cabeza hasta las rodillas, sin romper la cadera. Baja flexionando los codos hasta acercar el pecho al suelo y empuja para subir. Es la progresión previa a la flexión completa. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pecho-flexiones-de-rodillas.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Empuje"},
+  {"id":"us196325","name":"Puente de glúteos","muscle":"Glúteo","equipment":"Peso corporal","desc":"Túmbate boca arriba con las rodillas flexionadas y los pies apoyados a la anchura de las caderas, cerca de los glúteos. Deja los brazos a los costados. Mete ligeramente la pelvis y eleva la cadera empujando con los talones hasta alinear rodillas, cadera y hombros. Aprieta los glúteos un segundo arriba y desciende vértebra a vértebra hasta apoyar. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-gluteo-puente-de-gluteos.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Bisagra"},
+  {"id":"us196526","name":"Superman","muscle":"Espalda","equipment":"Peso corporal","desc":"Túmbate boca abajo en una colchoneta con los brazos extendidos por delante y las piernas estiradas. Activa los glúteos y el abdomen. Eleva simultáneamente brazos y piernas del suelo contrayendo la musculatura de la espalda, manteniendo la mirada hacia el suelo. Mantén la posición un segundo y desciende despacio. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-espalda-superman.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Core"}
 ];
 var RT_PLANTILLAS = [
 {
@@ -15007,6 +15251,160 @@ var RT_PLANTILLAS = [
      "Remate en la remadora: 6 rondas; el descanso es el tramo suave, sin soltar el remo. Si está ocupada, bicicleta con el mismo esquema."
     ]
    ]
+  ]
+ ]
+}
+];
+/* Plantillas de circuito de la casa. Estación: [id de la biblioteca o "", nombre libre, consigna]. */
+var CIRC_PLANTILLAS = [
+{
+ "id": "clase_coordinacion",
+ "nombre": "Coordinación y saltos · clase",
+ "icono": "🐸",
+ "grupo": "",
+ "modo": "rotacion",
+ "grupos": 6,
+ "rondas": 2,
+ "trabajo": 40,
+ "cambio": 15,
+ "descansoRonda": 60,
+ "ratio": "16:9",
+ "notas": "Calentar 5 min antes (trote suave y movilidad). Seis estaciones, seis grupos, todos rotan al pitido.",
+ "resumen": "Seis estaciones sin material para una clase de Educación Física: saltos, carrera en el sitio, escalador y plancha. Seis grupos rotan al silbato; dos vueltas son unos 12 minutos.",
+ "estaciones": [
+  [
+   "us19f0164",
+   "",
+   "Manos al suelo y salta hacia adelante como una rana; aterriza suave."
+  ],
+  [
+   "us196048",
+   "",
+   "Rodillas al pecho alternando; la cadera quieta."
+  ],
+  [
+   "us19f0193",
+   "",
+   "Salta de lado a lado sobre una línea; rodillas blandas."
+  ],
+  [
+   "us196057",
+   "",
+   "Cuerpo recto como una tabla; cuenta en voz alta."
+  ],
+  [
+   "us19f0161",
+   "",
+   "Rodillas arriba y brazos rápidos, en el sitio."
+  ],
+  [
+   "us19f0152",
+   "",
+   "Talones a la cola, sin parar."
+  ]
+ ]
+},
+{
+ "id": "bloque_grupo_8",
+ "nombre": "Bloque en grupo · 8 estaciones",
+ "icono": "🏋️",
+ "grupo": "",
+ "modo": "rotacion",
+ "grupos": 8,
+ "rondas": 3,
+ "trabajo": 40,
+ "cambio": 20,
+ "descansoRonda": 90,
+ "ratio": "2:1",
+ "notas": "Con el material de la casa: una kettlebell, un par de mancuernas y una polea por estación. Tres vueltas.",
+ "resumen": "Ocho estaciones con el material real del gimnasio para un bloque guiado de ocho personas: bisagra, sentadilla, tracción, empuje, zancada, hombro, core y bicicleta. Tres vueltas son unos 25 minutos.",
+ "estaciones": [
+  [
+   "us190549",
+   "",
+   "El impulso sale de la cadera, no de los brazos."
+  ],
+  [
+   "us191760",
+   "",
+   "Talones apoyados y pecho alto."
+  ],
+  [
+   "us196521",
+   "",
+   "Codo pegado al costado; 20 s por lado."
+  ],
+  [
+   "us196407",
+   "",
+   "Omóplatos juntos; sube en arco."
+  ],
+  [
+   "us196256",
+   "",
+   "Paso largo hacia atrás; alterna piernas."
+  ],
+  [
+   "us196534",
+   "",
+   "Codos altos; aguanta un segundo atrás."
+  ],
+  [
+   "us196057",
+   "",
+   "Glúteos y abdomen apretados."
+  ],
+  [
+   "us19f0115",
+   "",
+   "Ritmo fuerte: sin poder hablar seguido."
+  ]
+ ]
+},
+{
+ "id": "casa_sin_material",
+ "nombre": "En casa · sin material",
+ "icono": "🏠",
+ "grupo": "",
+ "modo": "secuencia",
+ "grupos": 1,
+ "rondas": 3,
+ "trabajo": 30,
+ "cambio": 10,
+ "descansoRonda": 60,
+ "ratio": "4:3",
+ "notas": "Para un socio que entrena en casa: 30 s por estación, 10 s para cambiar, tres vueltas.",
+ "resumen": "Seis estaciones con el peso del cuerpo, una tras otra: sentadilla, flexiones de rodillas, puente de glúteos, escalador, superman y plancha. Tres vueltas son unos 14 minutos.",
+ "estaciones": [
+  [
+   "us196274",
+   "",
+   "Pies a la anchura de los hombros; baja controlando."
+  ],
+  [
+   "us196377",
+   "",
+   "Manos algo más abiertas que los hombros."
+  ],
+  [
+   "us196325",
+   "",
+   "Aprieta arriba un segundo."
+  ],
+  [
+   "us196048",
+   "",
+   "Cadera quieta, rodillas al pecho."
+  ],
+  [
+   "us196526",
+   "",
+   "Mirada al suelo; sube pecho y piernas a la vez."
+  ],
+  [
+   "us196057",
+   "",
+   "Cuerpo recto de la cabeza a los talones."
   ]
  ]
 }
@@ -23745,6 +24143,22 @@ function init(){
     } catch(e){
       showErrorView("No se pudo decodificar el enlace: " + e.message);
     }
+  } else if (route.kind === "circuito"){
+    try {
+      var dataC = decodeShareData(route.payload);
+      if (!dataC || !dataC.circuito) throw new Error("Datos inválidos");
+      showCircuitoView(dataC);
+    } catch(e){
+      showErrorView("No se pudo decodificar el circuito: " + e.message);
+    }
+  } else if (route.kind === "k"){
+    showLoadingView("Descargando circuito compartido...");
+    downloadFromCloud(route.payload).then(function(dataK){
+      if (!dataK || !dataK.circuito) throw new Error("Datos inválidos");
+      showCircuitoView(dataK);
+    }).catch(function(err){
+      showErrorView("No se pudo descargar el circuito: " + err.message);
+    });
   } else if (route.kind === "progreso"){
     try {
       var data2 = decodeShareData(route.payload);
