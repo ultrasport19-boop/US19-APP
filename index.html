@@ -4875,7 +4875,9 @@ function u19AutoImportarNotion(){
     var url = ((typeof settings !== "undefined" && settings.dashApiUrl) || "").trim();
     if (!url || navigator.onLine === false) return;
     var ult = parseInt(localStorage.getItem("us19_auto_import_at") || "0", 10) || 0;
-    if (Date.now() - ult < 20 * 3600000) return;
+    /* 6 h y no 20: la lista viva de Finanzas se alimenta de esto y con 20 h
+       un dia entero podia mostrar datos de ayer. */
+    if (Date.now() - ult < 6 * 3600000) return;
     setTimeout(function(){ if (typeof importClientesNotion === "function") importClientesNotion(true); }, 4000);
   } catch (e){}
 }
@@ -19746,11 +19748,23 @@ function u19AccListaHTML(tipo, titulo, items, tarifa, nota){
 
   h += '<div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.6rem;">';
   items.forEach(function(c){
-    h += '<label class="text-xs" style="display:flex;gap:.45rem;align-items:flex-start;">'
+    /* Cuantos dias lleva sin reservar. Mas de 30: la propuesta es antigua y
+       se atenua, para que lo nuevo (si el bot vuelve a proponer) destaque. */
+    var _dUlt = null;
+    if (c.ult){
+      var _m = String(c.ult).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (_m){ var _n = new Date(); _dUlt = Math.round((Date.UTC(_n.getFullYear(), _n.getMonth(), _n.getDate())
+                 - Date.UTC(+_m[1], +_m[2] - 1, +_m[3])) / 86400000); }
+    }
+    var _antigua = (_dUlt !== null && _dUlt > 30);
+    h += '<label class="text-xs" style="display:flex;gap:.45rem;align-items:flex-start;'
+      + (_antigua ? 'opacity:.55;' : '') + '">'
       + '<input type="checkbox" data-acc="' + escapeAttr(tipo) + '" data-acc-id="' + escapeAttr(c.id) + '"'
       + ' data-acc-nombre="' + escapeAttr(c.nombre || '') + '" onchange="u19AccTotal(\'' + escapeAttr(tipo) + '\')" style="margin-top:.15rem;">'
       + '<span style="flex:1;"><b>' + escapeHtml(c.nombre || '—') + '</b>'
-      + (c.ult ? ' <span class="text-muted">· última reserva ' + escapeHtml(c.ult) + '</span>' : '')
+      + (c.ult ? ' <span class="text-muted">· última reserva ' + escapeHtml(c.ult)
+          + (_dUlt !== null ? ' (hace ' + _dUlt + ' d)' : '') + '</span>' : '')
+      + (_antigua ? ' <span class="badge muted" title="Lleva más de 30 días sin reservar; la propuesta es de entonces">antigua</span>' : '')
       + (c.plan ? ' <span class="text-muted">· ' + escapeHtml(c.plan) + '</span>' : '')
       + (c.medio ? ' <span class="text-muted">· ' + escapeHtml(c.medio) + '</span>' : '')
       + (c.mensaje ? '<br><span class="text-muted" style="font-style:italic;">«' + escapeHtml(c.mensaje) + '»</span>' : '')
@@ -19893,6 +19907,13 @@ function u19SemanaVivaHTML(){
     + '</span></div>';
 
   if (!r || !r.hayDatos){
+    /* Sin datos no hay lista. En vez de dejar el boton esperando, se importa
+       sola la primera vez (una por sesion: si falla, no entra en bucle). */
+    if (!window._u19SemanaAutoImp && typeof importClientesNotion === "function"
+        && (settings.dashApiUrl || "").trim()){
+      window._u19SemanaAutoImp = true;
+      setTimeout(function(){ u19SemanaRefrescar(); }, 300);
+    }
     h += '<p class="text-xs text-muted" style="margin:.3rem 0 0;line-height:1.5;">'
       + 'Todav\u00eda no hay «\u00daltima reserva» ni «Reservas 30 d\u00edas» en los clientes de la app. '
       + 'Pulsa <b>Actualizar desde Notion</b>; si sigue vac\u00edo, revisa la URL y la clave en '
