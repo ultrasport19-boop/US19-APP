@@ -1260,6 +1260,14 @@ body.circ-live-open{overflow:hidden;}
 .cl-mapa .cm-grupo{font-size:clamp(1rem,2.2vw,1.6rem);}
 .cl-mapa-min{width:min(72vw,calc((100vh - 430px) * 1.78));margin-top:.3rem;}
 .cl-mapa-min .cm-est{min-width:72px;max-width:120px;width:12%;}
+@media (max-width:480px){
+  .cm-est{min-width:64px;padding:.25rem;}
+  .cm-nom{font-size:.6rem;}
+  .cm-num{width:22px;height:22px;font-size:.9rem;top:-10px;left:-10px;}
+  .cl-mapa .cm-est{min-width:68px;}
+  .cl-mapa .cm-grupo{font-size:.9rem;}
+  .cl-timer{font-size:clamp(4.5rem,26vw,8rem);}
+}
 /* ---------- Pizarra de sesión ---------- */
 .pizarra{position:fixed;inset:0;z-index:9000;background:#070b0f;color:#f1f5f9;display:flex;flex-direction:column;font-family:var(--font-body);}
 .pizarra[hidden]{display:none;}
@@ -3992,6 +4000,10 @@ function showView(name){
     if (!window.confirm("Tienes cambios sin guardar en esta rutina.\n\n¿Salir sin guardar? Usa «Guardar» dentro del editor para conservarlos.")) return;
     _builderSnapshot = null;   // el usuario aceptó descartar los cambios
   }
+  if (_cur && _cur.id === "view-circuitos" && name !== "circuitos" && typeof circHayCambios === "function" && circHayCambios()){
+    if (!window.confirm("Tienes cambios sin guardar en este circuito.\n\n¿Salir sin guardar? Usa «Guardar» dentro del editor para conservarlos.")) return;
+    _circEdit = null;
+  }
   var views = document.querySelectorAll(".view");
   for (var i=0;i<views.length;i++) views[i].classList.remove("active");
   var v = document.getElementById("view-" + name);
@@ -5738,7 +5750,7 @@ function openExercisePicker(onPick, opts){
         if (f.pat && t.pat !== f.pat) return false;
         if (f.niv && t.niv !== f.niv) return false;
         if (f.muscle && !_libMuscleOk(e, f.muscle)) return false;
-        if (q && !musHit(_libHay(e), q)) return false;
+        if (q && !busqCoincide(_libHay(e), q, musNorm((e.name||"") + " " + (e.muscle||"") + " " + (e.equipment||"")))) return false;
         return true;
       }
       function pintarChips(catN, total, favN, recN, terapN){
@@ -6735,7 +6747,7 @@ function _libPasaSinCat(e, q){
   if (_libFilter.niv && t.niv !== _libFilter.niv) return false;
   if (_libFilter.pat && t.pat !== _libFilter.pat) return false;
   if (_libFilter.muscle && !_libMuscleOk(e, _libFilter.muscle)) return false;
-  if (q && !musHit(_libHay(e), q)) return false;
+  if (q && !busqCoincide(_libHay(e), q, musNorm((e.name||"") + " " + (e.muscle||"") + " " + (e.equipment||"")))) return false;
   return true;
 }
 /* Favoritos y recientes viven en el estado: se sincronizan entre dispositivos
@@ -7383,6 +7395,10 @@ function deleteExercise(id){
         /* Que no quede un id muerto en favoritos ni en recientes. */
         if (state.libFav && state.libFav[id]) delete state.libFav[id];
         if (Array.isArray(state.libRec)) state.libRec = state.libRec.filter(function(x){ return x !== id; });
+        /* Las estaciones de circuito que lo usaban se quedan con el nombre, sin id muerto. */
+        if (Array.isArray(state.circuitos)) state.circuitos.forEach(function(c){
+          (c.estaciones || []).forEach(function(s){ if (s.exerciseId === id){ if (!s.nombre) s.nombre = e.name || "Estación"; s.exerciseId = ""; } });
+        });
         saveState();
         closeModal();
         renderLibraryGrid();
@@ -13253,6 +13269,91 @@ window.deleteAssessment = function(cid, aid){
   saveState(); closeModal(); openClientTracking(cid);
 };
 
+/* --- Búsqueda --- */
+/* Un solo motor para la biblioteca, el selector, el buscador de circuitos y
+   el buscador global: sin acentos, por palabras en cualquier orden, con
+   singular y plural, y con sinónimos de gimnasio y de clase («lagartijas»
+   → flexiones, «estocada» → zancada, «saltar» → salto). Cada palabra de la
+   consulta tiene que aparecer, ella o un sinónimo, al inicio de una palabra
+   del texto (así «pino» no encuentra «supino»). busqPuntua ordena: primero
+   lo que empieza igual que la consulta, después lo que la contiene en el
+   nombre, al final lo que solo coincide en la descripción. */
+var BUSQ_SIN = {
+  lagartija: ["flexion"], flexion: ["flexion", "lagartija", "push up"],
+  abdominal: ["abdominal", "crunch"], estocada: ["zancada"], zancada: ["zancada", "estocada", "lunge"],
+  sentadilla: ["sentadilla", "squat"], squat: ["sentadilla"], dominada: ["dominada", "pull up"],
+  jalon: ["jalon", "pulldown"], polea: ["polea", "cable"],
+  salto: ["salto", "saltar", "jump", "pliometr"], saltar: ["salto", "saltar", "jump"],
+  correr: ["carrera", "correr", "trote", "sprint"], carrera: ["carrera", "correr", "trote", "sprint", "cinta"], trote: ["trote", "carrera", "cinta"],
+  cuerda: ["cuerda", "comba"], comba: ["cuerda", "comba"],
+  balon: ["balon", "pelota", "wall ball", "medicinal"], pelota: ["balon", "pelota", "wall ball", "medicinal"],
+  escalador: ["escalador", "mountain"], plancha: ["plancha", "plank"], puente: ["puente", "hip thrust", "elevacion de cadera"],
+  gluteo: ["gluteo", "hip thrust", "puente"], pecho: ["pecho", "press", "aperturas", "flexion"],
+  espalda: ["espalda", "remo", "jalon", "dominada"], hombro: ["hombro", "militar", "elevacion lateral", "elevacion frontal"],
+  pierna: ["pierna", "sentadilla", "zancada", "prensa"], biceps: ["biceps", "curl"], triceps: ["triceps", "extension", "fondos"],
+  fondos: ["fondos", "dips"], core: ["core", "plancha", "abdominal"], equilibrio: ["equilibrio", "balance", "unipodal", "una pierna"],
+  coordinacion: ["coordinacion", "agilidad", "escalera", "cono", "reaccion"], agilidad: ["agilidad", "coordinacion", "cono"],
+  velocidad: ["velocidad", "sprint", "agilidad", "rapid"], movilidad: ["movilidad", "estiramiento"], estiramiento: ["estiramiento", "movilidad"],
+  kettlebell: ["kettlebell", "pesa rusa"], rusa: ["kettlebell", "pesa rusa"], mancuerna: ["mancuerna", "dumbbell"],
+  barra: ["barra", "barbell"], elastico: ["banda", "elastic"], elastica: ["banda", "elastic"], liga: ["banda", "elastic"], banda: ["banda", "elastic"],
+  remo: ["remo", "row"], muerto: ["muerto", "deadlift", "bisagra"], bisagra: ["bisagra", "muerto", "hip thrust"],
+  cardio: ["cardio", "carrera", "bicicleta", "remoergometro", "salto"], bici: ["bicicleta"], bicicleta: ["bicicleta", "bici"],
+  gemelo: ["gemelo", "pantorrilla", "soleo"], pantorrilla: ["pantorrilla", "gemelo"],
+  cadera: ["cadera", "gluteo", "puente"], rodilla: ["rodilla", "sentadilla", "extension de cuadriceps"],
+  cuello: ["cuello", "cervical"], lumbar: ["lumbar", "superman"],
+  nino: ["salto", "carrera", "cuerda", "balon", "coordinacion"], infantil: ["salto", "carrera", "cuerda", "balon", "coordinacion"]
+};
+var _busqCache = { q: null, grupos: [] };
+function busqRaiz(t){
+  if (t.length > 5 && /es$/.test(t) && !/[aeiou]es$/.test(t)) return t.slice(0, -2);   /* flexiones → flexion */
+  if (t.length > 4 && /s$/.test(t) && !/ss$/.test(t)) return t.slice(0, -1);           /* sentadillas → sentadilla; press se queda */
+  return t;
+}
+function busqGrupos(q){
+  var nq = musNorm(q);
+  if (_busqCache.q === nq) return _busqCache.grupos;
+  var grupos = [];
+  nq.split(" ").filter(Boolean).forEach(function(t){
+    var r = busqRaiz(t), propios = [t], sin = [], vistos = {}; vistos[t] = 1;
+    if (r !== t){ vistos[r] = 1; propios.push(r); }
+    (BUSQ_SIN[t] || []).concat(BUSQ_SIN[r] || []).forEach(function(a){ if (a && !vistos[a]){ vistos[a] = 1; sin.push(a); } });
+    /* La palabra escrita (y su raíz) vale en todo el texto; los sinónimos solo en
+       el nombre, si no «lagartijas» → «flexion» engancharía «flexiona los codos». */
+    grupos.push({ propios: propios, sin: sin });
+  });
+  _busqCache = { q: nq, grupos: grupos };
+  return grupos;
+}
+/* hay: texto completo ya normalizado con musNorm; nombre: solo nombre, músculo y
+   material (si falta, se usa hay). */
+function busqCoincide(hay, q, nombre){
+  var grupos = busqGrupos(q);
+  if (!grupos.length) return true;
+  var h = " " + hay, nm = " " + (nombre == null ? hay : nombre);
+  for (var i = 0; i < grupos.length; i++){
+    var g = grupos[i], ok = false, k;
+    for (k = 0; k < g.propios.length && !ok; k++) if (h.indexOf(" " + g.propios[k]) >= 0) ok = true;
+    for (k = 0; k < g.sin.length && !ok; k++) if (nm.indexOf(" " + g.sin[k]) >= 0) ok = true;
+    if (!ok) return false;
+  }
+  return true;
+}
+/* nombre: nombre normalizado; hay: texto completo normalizado. Más es mejor. */
+function busqPuntua(nombre, hay, q){
+  var grupos = busqGrupos(q), p = 0, n = " " + nombre, h = " " + hay;
+  for (var i = 0; i < grupos.length; i++){
+    var g = grupos[i], mejor = 0, alts = g.propios.concat(g.sin);
+    for (var k = 0; k < alts.length; k++){
+      var a = alts[k], propio = k < g.propios.length;
+      if (nombre.indexOf(a) === 0) mejor = Math.max(mejor, propio ? 4 : 3);
+      else if (n.indexOf(" " + a) >= 0) mejor = Math.max(mejor, propio ? 3 : 2);
+      else if (propio && h.indexOf(" " + a) >= 0) mejor = Math.max(mejor, 1);
+    }
+    p += mejor;
+  }
+  return p;
+}
+
 /* --- Pizarra --- */
 /* Pizarra de sesión: los ejercicios elegidos, en movimiento (GIF o vídeo),
    grandes y todos a la vez, sin cronómetro. Para planificar una sesión y para
@@ -13438,6 +13539,14 @@ function circDuracion(c){
   var t = circNum(c.trabajo, 40), cmb = circNum(c.cambio, 15), dr = circNum(c.descansoRonda, 60);
   return R * N * t + R * (N - 1) * cmb + (R - 1) * dr;
 }
+function circMaterial(c){
+  var m = {};
+  (c.estaciones || []).forEach(function(s){
+    var e = s.exerciseId ? getExercise(s.exerciseId) : null;
+    if (e && e.equipment && !/peso corporal/i.test(e.equipment)) m[e.equipment] = (m[e.equipment] || 0) + 1;
+  });
+  return Object.keys(m).sort().map(function(k){ return k + (m[k] > 1 ? " ×" + m[k] : ""); }).join(", ");
+}
 function circEstacionNombre(s){
   if (s.nombre) return s.nombre;
   var e = s.exerciseId ? getExercise(s.exerciseId) : null;
@@ -13448,6 +13557,13 @@ function circGifDe(s){
   return (e && e.gif) ? e.gif : "";
 }
 /* Grupo (0…) que ocupa la estación s en el turno t, o -1 si queda libre. */
+function circGruposNombres(c){
+  return String(c.nombresGrupos || "").split(",").map(function(x){ return x.trim(); }).filter(Boolean);
+}
+function circNombreGrupo(c, g){
+  var l = circGruposNombres(c);
+  return l[g] ? l[g] : "Grupo " + (g + 1);
+}
 function circGrupoEn(c, s, t){
   var N = c.estaciones.length, G = Math.max(1, circNum(c.grupos, N));
   if (!N) return -1;
@@ -13518,7 +13634,7 @@ function circMapaHtml(c, opts){
       + (gif ? mediaThumb(gif, 'class="cm-img" loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
       + '<div class="cm-nom">' + escapeHtml(circEstacionNombre(s)) + '</div>'
       + (s.nota && !opts.compacto ? '<div class="cm-nota">' + escapeHtml(s.nota) + '</div>' : '')
-      + (g != null ? '<div class="cm-grupo' + (g < 0 ? ' libre' : '') + '">' + (g >= 0 ? 'Grupo ' + (g + 1) : 'libre') + '</div>' : '')
+      + (g != null ? '<div class="cm-grupo' + (g < 0 ? ' libre' : '') + '">' + (g >= 0 ? escapeHtml(circNombreGrupo(c, g)) : 'libre') + '</div>' : '')
       + '</div>';
   });
   if (!N) html += '<div class="cm-vacio-msg">Busca un ejercicio abajo o añade una estación libre: irán apareciendo aquí, en el mapa de la sala, y las puedes arrastrar hasta donde van de verdad.</div>';
@@ -13575,12 +13691,15 @@ window.circBuscar = function(q){
     ids.forEach(function(id){ if (vistos[id]) return; vistos[id] = 1; var e = getExercise(id); if (e && lista.length < 12) lista.push(e); });
     if (!lista.length){ box.innerHTML = '<p class="text-xs text-muted" style="margin:.2rem 0;">Escribe para buscar en la biblioteca. Cuando tengas favoritos y recientes, aparecerán aquí sin buscar.</p>'; return; }
   } else {
-    var toks = nq.split(/\s+/);
-    for (var i = 0; i < state.exercises.length && lista.length < 12; i++){
-      var e = state.exercises[i], t = circNorm((e.name || "") + " " + (e.muscle || "") + " " + (e.equipment || "")), ok = true;
-      for (var k = 0; k < toks.length; k++) if (t.indexOf(toks[k]) < 0){ ok = false; break; }
-      if (ok) lista.push(e);
+    var cand = [];
+    for (var i = 0; i < state.exercises.length; i++){
+      var e = state.exercises[i], hay = _libHay(e), nom = musNorm((e.name||"") + " " + (e.muscle||"") + " " + (e.equipment||""));
+      if (!busqCoincide(hay, nq, nom)) continue;
+      cand.push({ e: e, p: busqPuntua(musNorm(e.name), hay, nq) + (e.gif ? 0.5 : 0) });
     }
+    cand.sort(function(a, b){ return (b.p - a.p) || ((a.e.name || "").length - (b.e.name || "").length); });
+    lista = cand.slice(0, 18).map(function(x){ return x.e; });
+    if (cand.length > 18) box.setAttribute("data-mas", String(cand.length - 18)); else box.removeAttribute("data-mas");
   }
   var html = "";
   lista.forEach(function(e){
@@ -13588,6 +13707,9 @@ window.circBuscar = function(q){
       + (e.gif ? mediaThumb(e.gif, 'loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
       + '<div class="cr-n">' + escapeHtml(e.name || "") + '</div><div class="cr-m">' + escapeHtml(e.muscle || "") + '</div></div>';
   });
+  if (nq && lista.length && box.getAttribute("data-mas")){
+    html += '<div class="text-xs text-muted" style="grid-column:1/-1;">Se muestran los 18 más parecidos; hay ' + box.getAttribute("data-mas") + ' más. Afina con otra palabra (material, músculo, patrón).</div>';
+  }
   if (nq && !lista.length){
     html = '<div style="grid-column:1/-1;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;"><span class="text-xs text-muted">Nada con «' + escapeHtml(q) + '» en la biblioteca.</span>'
       + '<button class="btn btn-secondary btn-sm" onclick="circAddLibreCon(document.getElementById(\'circ-q\').value)">+ Añadir «' + escapeHtml(q) + '» como estación libre</button></div>';
@@ -13704,7 +13826,18 @@ window.circEditar = function(id){
   }
   showView("circuitos");
 };
-window.circVolver = function(){ _circEdit = null; renderCircuitos(); };
+function circHayCambios(){
+  if (!_circEdit) return false;
+  var guardado = circGet(_circEdit.id);
+  if (!guardado) return !!((_circEdit.nombre || "").trim() || _circEdit.estaciones.length);
+  var a = JSON.parse(JSON.stringify(_circEdit)), b = JSON.parse(JSON.stringify(guardado));
+  delete a.updatedAt; delete b.updatedAt;
+  return JSON.stringify(a) !== JSON.stringify(b);
+}
+window.circVolver = function(){
+  if (circHayCambios() && !window.confirm("Tienes cambios sin guardar en este circuito.\n\n¿Salir sin guardar?")) return;
+  _circEdit = null; renderCircuitos();
+};
 function circEditorHtml(){
   var c = _circEdit;
   var num = function(k, l, ph, ttl){
@@ -13731,6 +13864,7 @@ function circEditorHtml(){
     + num("trabajo", "Trabajo (s)", "40")
     + num("cambio", "Cambio de estación (s)", "15")
     + num("descansoRonda", "Descanso entre vueltas (s)", "60")
+    + formField("Nombres de los grupos", '<input type="text" data-k="nombresGrupos" value="' + escapeAttr(c.nombresGrupos || "") + '" placeholder="Leones, Tigres, Águilas, Pumas (opcional, separados por coma)">')
     + formField("Notas / objetivo", '<input type="text" data-k="notas" value="' + escapeAttr(c.notas || "") + '" placeholder="Objetivo de la clase, materiales, adaptaciones">')
     + '</div>';
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
@@ -13777,7 +13911,8 @@ function circCampo(ev){
   if (!k || !_circEdit) return;
   if (el.type === "number") _circEdit[k] = circNum(el.value, _circEdit[k]);
   else _circEdit[k] = el.value;
-  if (k === "modo" || k === "grupos" || k === "rondas" || k === "trabajo" || k === "cambio" || k === "descansoRonda") circPintarResumen();
+  if (k === "modo" || k === "grupos" || k === "rondas" || k === "trabajo" || k === "cambio" || k === "descansoRonda" || k === "nombresGrupos") circPintarResumen();
+  if (k === "nombresGrupos") circPintarMapa();
 }
 function circPintarEstaciones(){
   var box = document.getElementById("circ-estaciones");
@@ -13796,6 +13931,7 @@ function circPintarEstaciones(){
       + '<div class="circ-acc">'
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',-1)" title="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',1)" title="Bajar"' + (i === c.estaciones.length - 1 ? ' disabled' : '') + '>↓</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="circDuplicarEst(' + i + ')" title="Duplicar estación">⎘</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circQuitar(' + i + ')" title="Quitar">×</button>'
       + '</div></div>';
   });
@@ -13818,7 +13954,8 @@ function circPintarResumen(){
     + '<span class="badge teal">🔁 ' + R + ' vuelta' + (R === 1 ? '' : 's') + ' · ' + (R * N) + ' turnos</span>'
     + '<span class="badge teal">⏱ ' + circFmt(dur) + ' en total</span>'
     + (c.modo !== "secuencia" ? '<span class="badge teal">👥 ' + G + ' grupos</span>' : '')
-    + (c.modo !== "secuencia" && N && G > N ? '<span class="badge red">Más grupos que estaciones: ' + (G - N) + ' esperan cada turno</span>' : '');
+    + (c.modo !== "secuencia" && N && G > N ? '<span class="badge red">Más grupos que estaciones: ' + (G - N) + ' esperan cada turno</span>' : '')
+    + (N ? '<span class="badge muted" title="Sale de los ejercicios de la biblioteca; las estaciones libres no lo saben">🧰 ' + escapeHtml(circMaterial(c) || "solo peso corporal") + '</span>' : '');
   if (!rot) return;
   if (c.modo === "secuencia" || !N){ rot.innerHTML = ""; return; }
   var html = '<table><thead><tr><th>Turno</th>';
@@ -13829,7 +13966,7 @@ function circPintarResumen(){
     html += '<tr><td>' + (t + 1) + '</td>';
     for (var s2 = 0; s2 < N; s2++){
       var g = circGrupoEn(c, s2, t);
-      html += '<td>' + (g >= 0 ? 'G' + (g + 1) : '<span class="text-muted">—</span>') + '</td>';
+      html += '<td>' + (g >= 0 ? escapeHtml(circNombreGrupo(c, g).slice(0, 10)) : '<span class="text-muted">—</span>') + '</td>';
     }
     html += '</tr>';
   }
@@ -13857,6 +13994,14 @@ window.circMover = function(i, d){
   var l = _circEdit && _circEdit.estaciones; if (!l) return;
   var j = i + d; if (j < 0 || j >= l.length) return;
   var t = l[i]; l[i] = l[j]; l[j] = t;
+  circPintarEstaciones();
+};
+window.circDuplicarEst = function(i){
+  if (!_circEdit || !_circEdit.estaciones[i]) return;
+  var s = JSON.parse(JSON.stringify(_circEdit.estaciones[i])); s.id = genId(); delete s.x; delete s.y;
+  _circEdit.estaciones.splice(i + 1, 0, s);
+  circColocarNueva(_circEdit);
+  var p = circPosAuto(i + 1, _circEdit.estaciones.length, "circulo"); s.x = p.x; s.y = p.y;
   circPintarEstaciones();
 };
 window.circQuitar = function(i){
@@ -13896,6 +14041,7 @@ window.circImprimir = function(id){
     + '<h1>' + escapeHtml(c.nombre || "Circuito") + '</h1>'
     + '<p class="meta">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + 'Fecha: ____ / ____ / ______ · Ultra-Sport 19 · Diego Valenzuela</p>'
     + (c.notas ? '<p><b>Objetivo / notas:</b> ' + escapeHtml(c.notas) + '</p>' : '')
+    + '<p><b>Material:</b> ' + escapeHtml(circMaterial(c) || "solo peso corporal") + (c.estaciones.some(function(s){ return !s.exerciseId; }) ? ' · estaciones libres: anotar aparte' : '') + '</p>'
     + '<div class="kv"><span>Modo: ' + (c.modo === "secuencia" ? "secuencia" : "rotación por grupos") + '</span><span>Estaciones: ' + N + '</span>'
     + (c.modo !== "secuencia" ? '<span>Grupos: ' + G + '</span>' : '')
     + '<span>Vueltas: ' + R + '</span><span>Trabajo: ' + circNum(c.trabajo, 40) + ' s</span><span>Cambio: ' + circNum(c.cambio, 15) + ' s</span>'
@@ -13912,7 +14058,7 @@ window.circImprimir = function(id){
     doc += '</tr></thead><tbody>';
     for (var t = 0; t < R * N; t++){
       doc += '<tr><td>' + (t + 1) + '</td>';
-      for (var s2 = 0; s2 < N; s2++){ var g = circGrupoEn(c, s2, t); doc += '<td>' + (g >= 0 ? 'G' + (g + 1) : '—') + '</td>'; }
+      for (var s2 = 0; s2 < N; s2++){ var g = circGrupoEn(c, s2, t); doc += '<td>' + (g >= 0 ? escapeHtml(circNombreGrupo(c, g)) : '—') + '</td>'; }
       doc += '</tr>';
     }
     doc += '</tbody></table><p style="color:#444;font-size:11px">Cada fila es un turno de ' + circNum(c.trabajo, 40) + ' s; al pitido, cada grupo pasa a la estación siguiente.</p>';
@@ -14920,8 +15066,22 @@ window.globalSearch = function(q){
   }
   var rutHits = state.routines.filter(function(r){ var n = norm(r.name); return toks.length > 0 && toks.every(function(t){ return n.indexOf(t)>=0; }); });
   if (rutHits.length){ res.push('<div class="gs-head">Rutinas · ' + rutHits.length + '</div>'); rutHits.slice(0,5).forEach(function(r){ var cl = getClient(r.clientId); res.push('<div class="gs-item" onclick="gsGoRoutine(\'' + r.id + '\')"><span class="badge muted">Rutina</span> ' + escapeHtml(r.name||'') + (cl ? ' <span class="text-muted" style="font-size:.72rem;">· ' + escapeHtml(cl.name||'') + '</span>' : '') + '</div>'); }); }
-  var ejHits = state.exercises.filter(function(e){ var n = norm(e.name); return toks.length > 0 && toks.every(function(t){ return n.indexOf(t)>=0; }); });
+  var ejHits = state.exercises.filter(function(e){ return busqCoincide(musNorm((e.name||"") + " " + (e.muscle||"") + " " + (e.equipment||"")), q_); })
+    .map(function(e){ var nn = musNorm(e.name); return { e: e, p: busqPuntua(nn, nn + " " + musNorm((e.muscle||"") + " " + (e.equipment||"")), q_) }; })
+    .sort(function(a, b){ return (b.p - a.p) || ((a.e.name||"").length - (b.e.name||"").length); })
+    .map(function(x){ return x.e; });
   if (ejHits.length){ res.push('<div class="gs-head">Ejercicios · ' + ejHits.length + '</div>'); ejHits.slice(0,6).forEach(function(e){ res.push('<div class="gs-item" onclick="gsGoExercise(\'' + e.id + '\')"><span class="badge muted">Ejercicio</span> ' + escapeHtml(e.name||'') + (e.muscle ? ' <span class="text-muted" style="font-size:.72rem;">· ' + escapeHtml(e.muscle) + '</span>' : '') + '</div>'); }); if (ejHits.length > 6) res.push('<div class="gs-item gs-more" onclick="gsGoLibrary()">… y ' + (ejHits.length - 6) + ' más · ver en Biblioteca</div>'); }
+  var circHits = (state.circuitos || []).filter(function(c){
+    return busqCoincide(musNorm((c.nombre||"") + " " + (c.grupo||"") + " " + (c.estaciones||[]).map(function(s){ return s.nombre || ""; }).join(" ")), q_);
+  });
+  if (circHits.length){
+    res.push('<div class="gs-head">Circuitos · ' + circHits.length + '</div>');
+    circHits.slice(0, 4).forEach(function(c){
+      res.push('<div class="gs-item" onclick="closeGSearch();circEditar(\'' + c.id + '\')"><span class="badge muted">Circuito</span> ' + escapeHtml(c.nombre||"Sin nombre")
+        + (c.grupo ? ' <span class="text-muted" style="font-size:.72rem;">' + escapeHtml(c.grupo) + '</span>' : '')
+        + ' <span class="text-muted" style="font-size:.72rem;">' + (c.estaciones||[]).length + ' est.</span></div>');
+    });
+  }
   /* Consultas sobre las evaluaciones, no solo nombres. */
   var grupos = [];
   var consultas = [
