@@ -4130,8 +4130,14 @@ function u19CandadoLanding(){
     + '<h3 style="font-size:1.6rem;margin:0 0 .4rem;">ULTRA-SPORT <span style="color:var(--accent);">19</span></h3>'
     + '<p class="text-muted" style="line-height:1.6;">Si eres socio, abre el enlace que te mandaron por WhatsApp: '
     + 'ahí está tu rutina. Esta dirección, sin ese enlace, no muestra nada más.</p>'
-    + '<p style="margin-top:2.2rem;"><a href="#" class="text-xs text-muted" style="opacity:.6;" '
-    + 'onclick="u19CandadoPedir();return false;">Acceso entrenador</a></p></div>';
+    + '</div>';
+  /* Sin enlace visible: un socio ya demostro que toca lo que ve. La entrada
+     del entrenador en un dispositivo sin datos es la direccion con
+     #entrenador, que no se muestra en ninguna parte. */
+  if (location.hash === "#entrenador"){
+    history.replaceState(null, "", location.pathname + location.search);
+    setTimeout(function(){ u19CandadoPedir(); }, 50);
+  }
 }
 
 /* Aviso fijo mientras el dispositivo del entrenador no tenga PIN. */
@@ -9908,6 +9914,7 @@ function parseHash(){
   if (h.indexOf("progreso/") === 0) return { kind:"progreso", payload: h.slice(9) };
   if (h.indexOf("r/") === 0) return { kind:"r", payload: h.slice(2) };
   if (h.indexOf("p/") === 0) return { kind:"p", payload: h.slice(2) };
+  /* #entrenador no es contenido de socio: lo atiende el candado. */
   return null;
 }
 
