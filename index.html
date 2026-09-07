@@ -408,6 +408,17 @@ img{max-width:100%;display:block;}
 .ex-gif-block .gif-placeholder{padding:2rem;color:var(--muted);font-size:2.5rem;text-align:center;}
 .badge.terap{background:rgba(226,28,37,.16);color:#ff8a8f;border:1px solid rgba(226,28,37,.45);}
 .badge.contr{background:rgba(58,134,255,.16);color:#7db2ff;border:1px solid rgba(58,134,255,.45);}
+.badge.cat{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border);font-weight:600;}
+.badge.niv{background:rgba(148,163,184,.14);color:#cbd5e1;border:1px solid rgba(148,163,184,.35);font-weight:600;}
+/* Fila de tipos de trabajo: es el primer filtro de la biblioteca. */
+.lib-cats{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .8rem;}
+.cat-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.42rem .8rem;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface-2);color:var(--muted);
+  font-size:.8rem;font-weight:700;cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
+.cat-chip:hover{border-color:rgba(168,209,57,.45);color:var(--text);}
+.cat-chip .n{font-weight:600;opacity:.65;font-size:.72rem;}
+.cat-chip.on{background:rgba(168,209,57,.16);color:var(--accent);border-color:rgba(168,209,57,.55);}
+.cat-chip.on .n{opacity:.85;}
 .badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
 .ex-gif-expand{position:absolute;bottom:.4rem;right:.4rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:.2rem .45rem;font-size:.7rem;cursor:pointer;}
 
@@ -3293,6 +3304,26 @@ function applyTerapDefaults(){
   return changed;
 }
 var CONTR_TYPES = ["Isométrico","Concéntrico","Excéntrico"];
+
+/* Tipo de trabajo. Es el primer corte de la biblioteca: antes de preguntarse
+   qué músculo, se elige si se busca fuerza, movilidad, salto, cardio…
+   El orden es el de uso real en el gimnasio, no alfabético. */
+var LIB_CATS = [
+  ["Fuerza",       "🏋️"],
+  ["Movilidad",    "🧘"],
+  ["Pliometría",   "⚡"],
+  ["Halterofilia", "🥇"],
+  ["Strongman",    "🪨"],
+  ["Cardio",       "🫀"]
+];
+var LIB_NIVELES = ["Principiante","Intermedio","Avanzado"];
+var LIB_MECANICAS = ["Compuesto","Aislado"];
+
+/* Icono del tipo de trabajo; vacío si la ficha no lo trae. */
+function libCatIcono(cat){
+  for (var i = 0; i < LIB_CATS.length; i++) if (LIB_CATS[i][0] === cat) return LIB_CATS[i][1];
+  return "";
+}
 var CONTR_DEFAULTS = {
   "ob9nm3qk":"Isométrico","ze7q9sbc":"Isométrico","awh44p0o":"Isométrico","1ftf1txw":"Isométrico",
   "65v26rww":"Isométrico","wb7efzat":"Isométrico","ftrj4vta":"Isométrico","qviagj5a":"Isométrico",
@@ -3853,6 +3884,8 @@ function u19LibContador(n, q, muscle, equip){
   if (!el) return;
   var f = [];
   if (q) f.push('«' + escapeHtml(q) + '»');
+  if (_libFilter.cat) f.push(_libFilter.cat === "(sin)" ? 'sin clasificar' : escapeHtml(_libFilter.cat));
+  if (_libFilter.niv) f.push('nivel ' + escapeHtml(_libFilter.niv));
   if (muscle === "terap:") f.push('terapéuticos');
   else if (muscle === "contr:") f.push('por contracción');
   else if (muscle === "nogif") f.push('sin GIF ni vídeo');
@@ -5393,6 +5426,9 @@ function openExercisePicker(onPick){
     + '<option value="contr:">Contracción — todas</option>'
     + CONTR_TYPES.map(function(c){ return '<option value="contr:'+escapeAttr(c)+'">'+escapeHtml(c)+'</option>'; }).join("")
     + '</optgroup>'
+    + '<optgroup label="🎯 Tipo de trabajo">'
+    + LIB_CATS.map(function(c){ return '<option value="cat:'+escapeAttr(c[0])+'">'+c[1]+' '+escapeHtml(c[0])+'</option>'; }).join("")
+    + '</optgroup>'
     + '</select>'
     + '</div>'
     + '<div id="ep-list" style="max-height:50vh;overflow-y:auto;display:grid;grid-template-columns:1fr;gap:.4rem;"></div>';
@@ -5409,7 +5445,8 @@ function openExercisePicker(onPick){
         var list = document.getElementById("ep-list");
         var filtered = state.exercises.filter(function(e){
           if (muscle){
-            if (muscle === "terap:"){ if (!e.terap) return false; }
+            if (muscle.indexOf("cat:") === 0){ if (e.cat !== muscle.slice(4)) return false; }
+            else if (muscle === "terap:"){ if (!e.terap) return false; }
             else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
             else if (muscle === "contr:"){ if (!e.contr) return false; }
             else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
@@ -5417,7 +5454,7 @@ function openExercisePicker(onPick){
             else if (e.muscle !== muscle) return false;
           }
           if (q){
-            var hay = musNorm(e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
+            var hay = musNorm(e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.cat||"")+" "+(e.niv||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
             if (!musHit(hay, musNorm(q))) return false;
           }
           return true;
@@ -5436,9 +5473,11 @@ function openExercisePicker(onPick){
             + '<button class="card-main" data-id="'+escapeAttr(e.id)+'" style="flex:1;cursor:pointer;text-align:left;background:none;border:none;padding:.55rem .75rem;color:inherit;font:inherit;">'
             + '<div class="card-title" style="font-size:.95rem;">'+escapeHtml(e.name)+'</div>'
             + '<div class="card-sub">'
+              + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span>':'')
               + musBadges(e)
               + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
               + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
+              + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span>':'')
               + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
               + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
             + '</div>'
@@ -5486,6 +5525,11 @@ function showExercisePreview(exId){
   ov.innerHTML = '<div style="max-width:560px;width:100%;text-align:center;">'
     + media
     + '<div style="color:#fff;font-weight:700;margin-top:.7rem;font-size:1.05rem;">'+escapeHtml(e.name||"")+'</div>'
+    + ((e.cat||e.niv||e.mec)?'<div style="margin-top:.35rem;">'
+        + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span> ':'')
+        + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span> ':'')
+        + (e.mec?'<span class="badge niv">'+escapeHtml(e.mec)+'</span>':'')
+        + '</div>':'')
     + (e.terap?'<div style="margin-top:.35rem;"><span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span></div>':'')
     + (e.contr?'<div style="margin-top:.35rem;"><span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span></div>':'')
     + (e.desc?'<div style="color:rgba(255,255,255,.75);font-size:.85rem;margin-top:.4rem;line-height:1.45;">'+escapeHtml(e.desc)+'</div>':'')
@@ -6139,7 +6183,7 @@ function createFromExerciseImport(){
   renderLibrary();
 }
 
-var _libFilter = { search:"", muscle:"", equipment:"" };
+var _libFilter = { search:"", muscle:"", equipment:"", cat:"", niv:"" };
 
 function renderLibrary(){
   var muscleSet = {};
@@ -6155,6 +6199,30 @@ function renderLibrary(){
   html += '<button class="btn btn-secondary" onclick="openExerciseImporter()">📋 Importar varios</button>';
   html += '<button class="btn btn-ghost" onclick="openDedupeModal()">🧹 Duplicados</button>';
   html += '</div>';
+  html += '</div>';
+
+  /* Recuento por tipo de trabajo, respetando el resto de filtros activos
+     para que el número del chip sea el que verá al pulsarlo. */
+  var _catN = {}, _catTotal = 0;
+  state.exercises.forEach(function(e){
+    if (!_libPasaSinCat(e)) return;
+    _catTotal++;
+    _catN[e.cat || "(sin)"] = (_catN[e.cat || "(sin)"] || 0) + 1;
+  });
+  html += '<div class="lib-cats">';
+  html += '<button type="button" class="cat-chip'+(_libFilter.cat?"":" on")+'" data-cat="">Todos <span class="n">'+_catTotal+'</span></button>';
+  for (var lc = 0; lc < LIB_CATS.length; lc++){
+    var cn = LIB_CATS[lc][0];
+    if (!_catN[cn]) continue;
+    html += '<button type="button" class="cat-chip'+(_libFilter.cat===cn?" on":"")+'" data-cat="'+escapeAttr(cn)+'">'
+      + LIB_CATS[lc][1] + ' ' + escapeHtml(cn) + ' <span class="n">'+_catN[cn]+'</span></button>';
+  }
+  /* Los ejercicios creados a mano no traen tipo de trabajo. Sin este chip
+     desaparecerian al filtrar y pareceria que se han borrado. */
+  if (_catN["(sin)"]){
+    html += '<button type="button" class="cat-chip'+(_libFilter.cat==="(sin)"?" on":"")+'" data-cat="(sin)" '
+      + 'title="Ejercicios que aun no tienen tipo de trabajo asignado">✎ Sin clasificar <span class="n">'+_catN["(sin)"]+'</span></button>';
+  }
   html += '</div>';
 
   html += '<div class="lib-toolbar">';
@@ -6192,6 +6260,15 @@ function renderLibrary(){
     html += '<option value="'+escapeAttr(_eqList[q1])+'"'+(_libFilter.equipment===_eqList[q1]?" selected":"")+'>'+escapeHtml(_eqList[q1])+' ('+_eqs[_eqList[q1]]+')</option>';
   }
   html += '</select>';
+  var _nivN = {};
+  state.exercises.forEach(function(e){ if (e.niv) _nivN[e.niv] = (_nivN[e.niv]||0)+1; });
+  html += '<select id="lib-niv"><option value="">Cualquier nivel</option>';
+  for (var v1=0; v1<LIB_NIVELES.length; v1++){
+    var nv = LIB_NIVELES[v1];
+    if (!_nivN[nv]) continue;
+    html += '<option value="'+escapeAttr(nv)+'"'+(_libFilter.niv===nv?" selected":"")+'>'+escapeHtml(nv)+' ('+_nivN[nv]+')</option>';
+  }
+  html += '</select>';
   html += '</div>';
 
   html += '<div id="lib-count" class="lib-count"></div><div id="lib-grid"></div>';
@@ -6212,7 +6289,52 @@ function renderLibrary(){
     _libVisibles = LIB_TANDA;
     renderLibraryGrid();
   });
+  document.getElementById("lib-niv").addEventListener("change", function(){
+    _libFilter.niv = this.value;
+    _libVisibles = LIB_TANDA;
+    renderLibraryGrid();
+  });
+  /* Los chips repintan la barra entera: los recuentos de los demás cambian. */
+  var chips = document.querySelectorAll("#view-library .cat-chip");
+  for (var ci = 0; ci < chips.length; ci++){
+    chips[ci].addEventListener("click", function(){
+      var v = this.getAttribute("data-cat") || "";
+      _libFilter.cat = (_libFilter.cat === v) ? "" : v;
+      _libVisibles = LIB_TANDA;
+      renderLibrary();
+    });
+  }
   renderLibraryGrid();
+}
+
+/* Los cuatro filtros que no son el tipo de trabajo. Se usa para contar
+   cuántos ejercicios quedarían en cada chip sin contar el chip mismo. */
+function _libPasaSinCat(e){
+  var q = (_libFilter.search||"").trim().toLowerCase();
+  var muscle = _libFilter.muscle, equip = _libFilter.equipment || "";
+  if (equip && e.equipment !== equip) return false;
+  if (_libFilter.niv && e.niv !== _libFilter.niv) return false;
+  if (muscle && !_libMuscleOk(e, muscle)) return false;
+  if (q && !musHit(_libHay(e), musNorm(q))) return false;
+  return true;
+}
+
+/* Un solo sitio decide qué significa cada valor del selector de grupo. */
+function _libMuscleOk(e, muscle){
+  if (muscle === "terap:") return !!e.terap;
+  if (muscle.indexOf("terap:") === 0) return e.terap === muscle.slice(6);
+  if (muscle === "contr:") return !!e.contr;
+  if (muscle.indexOf("contr:") === 0) return e.contr === muscle.slice(6);
+  if (muscle === "nogif") return !(e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0));
+  if (muscle.indexOf("mus:") === 0) return musMatch(e, muscle.slice(4));
+  return e.muscle === muscle;
+}
+
+/* Texto sobre el que busca el buscador de la biblioteca. */
+function _libHay(e){
+  return musNorm(e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")
+    + " " + (e.cat||"") + " " + (e.niv||"") + " " + (e.mec||"") + " " + (e.pat||"")
+    + " " + (e.terap?"terapeutico rehab "+e.terap:"") + " " + (e.contr||"")) + " " + musHay(e);
 }
 
 function renderLibraryGrid(){
@@ -6231,22 +6353,13 @@ function renderLibraryGrid(){
       });
     });
   });
-  function _hasMedia(e){ return !!(e.gif && (/^https?:\/\//.test(e.gif) || e.gif.indexOf("data:") === 0)); }
   var filtered = state.exercises.filter(function(e){
+    if (_libFilter.cat === "(sin)"){ if (e.cat) return false; }
+    else if (_libFilter.cat && e.cat !== _libFilter.cat) return false;
+    if (_libFilter.niv && e.niv !== _libFilter.niv) return false;
     if (equip && e.equipment !== equip) return false;
-    if (muscle){
-      if (muscle === "terap:"){ if (!e.terap) return false; }
-      else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
-      else if (muscle === "contr:"){ if (!e.contr) return false; }
-      else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
-      else if (muscle === "nogif"){ if (_hasMedia(e)) return false; }
-      else if (muscle.indexOf("mus:") === 0){ if (!musMatch(e, muscle.slice(4))) return false; }
-      else if (e.muscle !== muscle) return false;
-    }
-    if (q){
-      var hay = musNorm(e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
-      if (!musHit(hay, musNorm(q))) return false;
-    }
+    if (muscle && !_libMuscleOk(e, muscle)) return false;
+    if (q && !musHit(_libHay(e), musNorm(q))) return false;
     return true;
   }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
 
@@ -6276,9 +6389,12 @@ function renderLibraryGrid(){
       + '<div class="ex-body">'
         + '<h4>'+escapeHtml(e.name||"Sin nombre")+'</h4>'
         + '<div class="ex-meta">'
+          + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span>':'')
           + musBadges(e)
           + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
           + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
+          + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span>':'')
+          + (e.mec?'<span class="badge niv">'+escapeHtml(e.mec)+'</span>':'')
           + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
           + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
           + (heavy?'<span class="badge warn" title="GIF pesado, solo local">⚠ local</span>':'')
@@ -6335,7 +6451,7 @@ window.libVerMas = function(){
 function openExerciseForm(id){
   var ex = id ? getExercise(id) : null;
   var isEdit = !!ex;
-  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"", terap:"", contr:"" };
+  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"", terap:"", contr:"", cat:"", niv:"" };
 
   var muscleOpts = ["Pecho","Espalda","Hombro","Brazo","Pierna","Glúteo","Core","Cardio","Movilidad"];
   var equipOpts = ["Peso corporal","Barra","Mancuernas","Polea","Máquina","Caminadora","Rueda"];
@@ -6386,6 +6502,21 @@ function openExerciseForm(id){
   }
   terapHtml += '</select>';
 
+  var catHtml = '<select id="ef-cat">';
+  catHtml += '<option value="">— Sin clasificar —</option>';
+  for (var q2=0;q2<LIB_CATS.length;q2++){
+    catHtml += '<option value="'+escapeAttr(LIB_CATS[q2][0])+'"'+(e.cat===LIB_CATS[q2][0]?" selected":"")+'>'
+      + LIB_CATS[q2][1] + ' ' + escapeHtml(LIB_CATS[q2][0])+'</option>';
+  }
+  catHtml += '</select>';
+
+  var nivHtml = '<select id="ef-niv">';
+  nivHtml += '<option value="">— Sin nivel —</option>';
+  for (var q3=0;q3<LIB_NIVELES.length;q3++){
+    nivHtml += '<option value="'+escapeAttr(LIB_NIVELES[q3])+'"'+(e.niv===LIB_NIVELES[q3]?" selected":"")+'>'+escapeHtml(LIB_NIVELES[q3])+'</option>';
+  }
+  nivHtml += '</select>';
+
   var contrHtml = '<select id="ef-contr">';
   contrHtml += '<option value="">— Sin especificar —</option>';
   for (var c2=0;c2<CONTR_TYPES.length;c2++){
@@ -6408,6 +6539,10 @@ function openExerciseForm(id){
           musHtml
           + '<div class="field-hint">Se deduce del nombre del ejercicio. Elige uno solo si quieres corregirlo: queda fijo y manda sobre la detección automática.</div>'
         )
+      + '<div class="form-grid cols-2">'
+        + formField("Tipo de trabajo", catHtml)
+        + formField("Nivel", nivHtml)
+      + '</div>'
       + '<div class="form-grid cols-2">'
         + formField("Categoría terapéutica (rehab)", terapHtml)
         + formField("Tipo de contracción", contrHtml)
@@ -6433,6 +6568,8 @@ function openExerciseForm(id){
           equipment: document.getElementById("ef-equip").value,
           terap: document.getElementById("ef-terap").value,
           contr: document.getElementById("ef-contr").value,
+          cat: document.getElementById("ef-cat").value,
+          niv: document.getElementById("ef-niv").value,
           desc: document.getElementById("ef-desc").value.trim(),
           gif: gif
         };
@@ -20895,22 +21032,30 @@ function _cus19Ready(data){
     if (e.id) porId[e.id] = e;
     porNombre[(e.name||"").toLowerCase()] = e;
   });
+  /* Se agrupa por tipo de trabajo, que es como está ordenada la biblioteca.
+     Así se puede traer solo la movilidad, o solo el cardio, sin el resto. */
   var grupos = {};
   _cus19Data.forEach(function(e){
-    var g = e.muscle || "Otro";
+    var g = e.cat || e.muscle || "Otro";
     if (!grupos[g]) grupos[g] = { nuevos:0, reparar:0 };
     var ex = (e.id && porId[e.id]) || porNombre[(e.name||"").toLowerCase()];
     if (!ex) grupos[g].nuevos++;
-    else if (ex.gif !== e.gif || ex.name !== e.name) grupos[g].reparar++;
+    else if (ex.gif !== e.gif || ex.name !== e.name || (e.cat && ex.cat !== e.cat)) grupos[g].reparar++;
   });
   var nuevos = 0, reparar = 0;
   Object.keys(grupos).forEach(function(k){ nuevos+=grupos[k].nuevos; reparar+=grupos[k].reparar; });
-  st.innerHTML = '<strong>'+nuevos+'</strong> nuevos · <strong>'+reparar+'</strong> a reparar (GIF corregido). Elige grupos:';
+  st.innerHTML = '<strong>'+nuevos+'</strong> nuevos · <strong>'+reparar+'</strong> a reparar (GIF o clasificación). Elige el tipo de trabajo:';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.4rem;">';
-  Object.keys(grupos).sort().forEach(function(g){
+  /* Orden de la biblioteca primero; lo que no esté ahí, al final. */
+  var _ordCat = {}; for (var oc = 0; oc < LIB_CATS.length; oc++) _ordCat[LIB_CATS[oc][0]] = oc;
+  Object.keys(grupos).sort(function(a, b){
+    var oa = (a in _ordCat) ? _ordCat[a] : 90, ob = (b in _ordCat) ? _ordCat[b] : 90;
+    return oa !== ob ? oa - ob : a.localeCompare(b);
+  }).forEach(function(g){
     var tot = grupos[g].nuevos + grupos[g].reparar;
     html += '<label style="display:flex;gap:.45rem;align-items:center;font-size:.85rem;cursor:pointer;">'
       + '<input type="checkbox" class="cus19-g" value="'+escapeAttr(g)+'" checked> '
+      + (libCatIcono(g)?libCatIcono(g)+' ':'')
       + escapeHtml(g)+' <span style="color:var(--text-dim);">('+tot+')</span></label>';
   });
   html += '</div>';
@@ -20929,8 +21074,11 @@ function _cus19Import(){
     porNombre[(e.name||"").toLowerCase()] = e;
   });
   var added = 0, fixed = 0;
+  /* Clasificación que trae el catálogo. No se toca lo que Diego haya puesto
+     a mano: solo se rellena lo que está vacío. */
+  var TAXO = ["cat", "niv", "mec", "pat"];
   _cus19Data.forEach(function(e){
-    if (!sel[e.muscle || "Otro"]) return;
+    if (!sel[e.cat || e.muscle || "Otro"]) return;
     var key = (e.name||"").toLowerCase();
     var ex = (e.id && porId[e.id]) || porNombre[key];
     if (ex){
@@ -20941,6 +21089,10 @@ function _cus19Import(){
       if (e.desc && !ex.desc){ ex.desc = e.desc; changed = true; }
       if (e.muscle && !ex.muscle){ ex.muscle = e.muscle; changed = true; }
       if (e.equipment && !ex.equipment){ ex.equipment = e.equipment; changed = true; }
+      for (var t1 = 0; t1 < TAXO.length; t1++){
+        var k1 = TAXO[t1];
+        if (e[k1] && !ex[k1]){ ex[k1] = e[k1]; changed = true; }
+      }
       if (changed) fixed++;
     } else {
       var nuevo = {
@@ -20951,6 +21103,10 @@ function _cus19Import(){
         desc: e.desc || "",
         gif: e.gif || ""
       };
+      for (var t2 = 0; t2 < TAXO.length; t2++){
+        var k2 = TAXO[t2];
+        if (e[k2]) nuevo[k2] = e[k2];
+      }
       state.exercises.push(nuevo);
       porNombre[key] = nuevo;
       porId[nuevo.id] = nuevo;

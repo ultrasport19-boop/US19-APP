@@ -23,6 +23,19 @@ renombrar un ejercicio duplica la biblioteca del cliente.
 **`loadSettings` tiene lista blanca.** Un ajuste nuevo que no se añada ahí se borra solo
 en cada recarga, en silencio.
 
+**La biblioteca tiene dos ejes, no uno.** `muscle` dice qué músculo y `cat` dice qué tipo
+de trabajo: Fuerza, Movilidad, Pliometría, Halterofilia, Strongman o Cardio (`LIB_CATS`).
+Son independientes: una sentadilla con salto es Pierna **y** Pliometría. Los chips de
+arriba filtran por `cat`; los selectores, por músculo, material y nivel (`niv`). Las
+fichas del catálogo traen además `mec` (compuesto o aislado) y `pat` (empuje, tracción o
+isométrico). Un ejercicio creado a mano no trae `cat`: por eso existe el chip
+**«Sin clasificar»**, sin él parecería que se han borrado al filtrar.
+
+**El catálogo se amplía sobre el original, nunca sobre el ya ampliado.** Los ids `us19f…`
+son los 320 que entraron desde free-exercise-db (dominio público) con GIF propio de dos
+fotogramas (`videos/fed-*.gif`). Volver a correr un script de ampliación tomando como
+entrada el `us19_catalogo.json` ya ampliado duplica ids en silencio.
+
 **`(x || [])` no protege de un objeto.** Solo de `null`. Con `localStorage` corrupto,
 `(evs || []).forEach` tumbaba la vista entera. Usar `Array.isArray(x) ? x : []`.
 
