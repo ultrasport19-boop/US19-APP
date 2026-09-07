@@ -6527,7 +6527,7 @@ function libTagsHtml(e, opciones){
   if (t.pat) h += '<span class="badge pat">' + escapeHtml(t.pat) + '</span>';
   if (t.cat && !o.sinCat) h += '<span class="badge cat">' + libCatIcono(t.cat) + ' ' + escapeHtml(t.cat) + '</span>';
   if (e.mec && o.conMec) h += '<span class="badge niv">' + escapeHtml(e.mec) + '</span>';
-  if (e.terap) h += '<span class="badge terap">🩺 ' + escapeHtml(e.terap) + '</span>';
+  if (e.terap) h += '<span class="badge terap" title="Etiqueta terapéutica: zona a proteger">🩺 Terapéutico · ' + escapeHtml(e.terap) + '</span>';
   if (e.contr) h += '<span class="badge contr">⚡ ' + escapeHtml(e.contr) + '</span>';
   return h;
 }
@@ -6707,9 +6707,10 @@ function libResumenTerapeutico(r){
       }
       var t = libTaxDe(def);
       /* Carga alta: lo avanzado, lo explosivo y, desde el 6-sep, también lo
-         intermedio con barra. En una rutina terapéutica eso ya es mucho. */
+         intermedio con barra o con el propio peso (una dominada ya es mucho
+         en una rutina terapéutica). */
       if (t.niv === "Avanzado" || t.cat === "Pliometría" || t.cat === "Halterofilia" || t.cat === "Strongman"
-          || (t.niv === "Intermedio" && def.equipment === "Barra")) altas.push(def.name);
+          || (t.niv === "Intermedio" && (def.equipment === "Barra" || def.equipment === "Peso corporal"))) altas.push(def.name);
     });
   });
   var zk = Object.keys(zonas), h = '<span class="badge terap">🩺 Rutina terapéutica' + (zona ? ' · ' + escapeHtml(zona) : '') + '</span>';
@@ -7738,6 +7739,10 @@ function showClientView(shareData){
   html += '<div class="hero-sub">PLANIFICACIÓN PERSONAL · Ultra-Sport 19</div>';
   html += '<h1>'+escapeHtml(r.name||"Rutina")+'</h1>';
   if (clientName) html += '<div class="hero-meta">Para: '+escapeHtml(clientName)+'</div>';
+  /* Rutina terapéutica: el socio ve la zona a proteger. Vocabulario de sala. */
+  if (typeof libPerfilEquilibrio === "function" && libPerfilEquilibrio(r).terap){
+    html += '<div style="margin-top:.45rem;"><span class="badge terap">🩺 Rutina terapéutica' + (r.zonaTerap ? ' · zona a proteger: ' + escapeHtml(r.zonaTerap) : '') + '</span></div>';
+  }
   if (r.subtitle){
     html += '<div class="text-sm text-muted" style="margin-top:.4rem;">'+escapeHtml(r.subtitle)+'</div>';
   } else {
