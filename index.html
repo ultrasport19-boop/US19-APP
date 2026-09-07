@@ -1201,7 +1201,7 @@ img{max-width:100%;display:block;}
   .cl-top{flex-wrap:wrap;}
   .pz-tools{order:3;flex-basis:100%;margin-left:0;justify-content:flex-start;}
 }
-.pz-one-media .pz-vacio{aspect-ratio:1;max-height:40vh;}
+.pz-one-media .pz-media.pz-vacio{aspect-ratio:1;max-height:40vh;}
 /* ---------- Circuito en vivo ---------- */
 .circ-live{position:fixed;inset:0;z-index:9000;background:#070b0f;color:#f1f5f9;display:flex;flex-direction:column;font-family:var(--font-body);}
 .circ-live[hidden]{display:none;}
@@ -4674,6 +4674,27 @@ function u19BioNotionBuscar(nombre, n){
 }
 /* ===BIONOTION_END=== */
 
+
+/* Lectura por el puente, con los fallos traducidos a algo que se entienda.
+   Sin esto, pedir un endpoint que nadie sirve daba «Unexpected token U»:
+   el asistente contesta texto plano cuando no conoce el tipo. */
+function u19DashLeer(tipo){
+  var url = (typeof u19DashUrl === "function") ? u19DashUrl(tipo) : "";
+  if (!url) return Promise.reject(new Error(
+    "Falta la URL o la clave en Finanzas \u2192 Apps Script \u00b7 Notion Sync."));
+  return fetch(url).then(function(r){ return r.text(); }).then(function(t){
+    var d = null;
+    try { d = JSON.parse(t); }
+    catch (e){
+      throw new Error("\u00ab" + tipo + "\u00bb no lo sirve el asistente. Este panel "
+        + "necesita el puente (US19_DASHBOARD_API), que todav\u00eda no est\u00e1 desplegado.");
+    }
+    if (d && d.error === "clave_invalida")
+      throw new Error("La clave de la app no coincide con US19_CLAVE_APP del asistente.");
+    if (d && d.error) throw new Error(d.error);
+    return d;
+  });
+}
 /* ===DASH_URL_END=== */
 
 window.importClientesNotion = async function(silencioso){
@@ -19350,6 +19371,11 @@ function u19TabPedir(){
   if (typeof u19DashUrl !== "function" || !u19DashUrl("estado"))
     return Promise.reject(new Error(
       "Configura la URL y la clave del puente en Finanzas → Conexión con Notion"));
+  if (typeof u19DashLeer === "function")
+    return u19DashLeer("estado").then(function(d){
+      try { localStorage.setItem(TAB_KEY, JSON.stringify({ ts: Date.now(), datos: d })); } catch (e){}
+      return d;
+    });
   function traer(t){
     return fetch(u19DashUrl(t)).then(function(r){ return r.json(); })
       .catch(function(){ return { error: "no respondió" }; });
@@ -19696,7 +19722,7 @@ function u19AccPedir(){
   var url = (typeof u19DashUrl === "function") ? u19DashUrl("pendientes") : "";
   if (!url) return Promise.reject(new Error(
     "Configura la URL y la clave del puente en Finanzas → Conexión con Notion"));
-  return fetch(url).then(function(r){ return r.json(); }).then(function(d){
+  return u19DashLeer("pendientes").then(function(d){
     if (d && d.error) throw new Error(d.error);
     try { localStorage.setItem(ACC_KEY, JSON.stringify({ ts: Date.now(), datos: d })); } catch (e){}
     return d;
