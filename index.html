@@ -6568,12 +6568,22 @@ function _libMuscleOk(e, muscle){
   if (muscle.indexOf("mus:") === 0) return musMatch(e, muscle.slice(4));
   return e.muscle === muscle;
 }
-/* Texto sobre el que busca el buscador. */
+/* Texto sobre el que busca el buscador. Se cachea por ficha: normalizar
+   2.400 descripciones en cada tecla costaba 90 ms. La clave cambia si cambia
+   algo de lo que entra en el texto (la descripción, por longitud y extremos). */
+var _libHayCache = {};
 function _libHay(e){
+  var d = e.desc || "";
+  var k = e.id + "|" + (e.name||"") + "|" + (e.muscle||"") + "|" + (e.equipment||"") + "|" + (e.cat||"") + "|" + (e.pat||"")
+    + "|" + (e.niv||"") + "|" + (e.mec||"") + "|" + (e.terap||"") + "|" + (e.contr||"") + "|" + (e.mus||"") + "|" + d.length + "|" + d.slice(0, 40) + "|" + d.slice(-40);
+  var c = _libHayCache[k];
+  if (c) return c;
   var t = libTaxDe(e);
-  return musNorm(e.name + " " + (e.muscle||"") + " " + (e.equipment||"") + " " + (e.desc||"")
+  c = musNorm(e.name + " " + (e.muscle||"") + " " + (e.equipment||"") + " " + d
     + " " + t.cat + " " + t.pat + " " + t.niv + " " + (e.mec||"")
     + " " + (e.terap ? "terapeutico rehab " + e.terap : "") + " " + (e.contr||"")) + " " + musHay(e);
+  _libHayCache[k] = c;
+  return c;
 }
 /* Todos los filtros menos el tipo de trabajo: sirve para que cada chip diga
    cuántos quedarían al pulsarlo. */
@@ -6849,6 +6859,9 @@ function renderLibrary(){
     _libKeyBound = true;
     document.addEventListener("keydown", function(ev){
       if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var mo = document.getElementById("modal-overlay");
+      if (mo && mo.classList.contains("active")) return;
+      if (document.getElementById("ex-preview-overlay")) return;
       var v = document.getElementById("view-library");
       if (!v || v.offsetParent === null) return;
       var tag = (ev.target && ev.target.tagName || "").toLowerCase();
@@ -7259,6 +7272,11 @@ function buildShareData(routine){
       desc: ex.desc || "",
       gif: ex.gif || ""
     };
+    /* Clasificación explícita: son cadenas cortas y el socio ve patrón y nivel. */
+    if (ex.cat) copy.cat = ex.cat;
+    if (ex.pat) copy.pat = ex.pat;
+    if (ex.niv) copy.niv = ex.niv;
+    if (ex.terap) copy.terap = ex.terap;
     if (copy.gif && copy.gif.indexOf("data:") === 0){
       copy.gif = "";
       skippedHeavy++;
@@ -7275,6 +7293,9 @@ function buildShareData(routine){
       weeks: routine.weeks || 4,
       startDate: routine.startDate || "",
       notes: routine.notes || "",
+      category: routine.category || "",
+      enfoque: routine.enfoque || "",
+      zonaTerap: routine.zonaTerap || "",
       days: routine.days || []
     },
     client: client ? { id: client.id, name: client.name } : null,
@@ -12444,7 +12465,13 @@ function buildVolumeBadges(r){
     });
   });
   var keys = Object.keys(vol).sort(function(a,b){ return vol[b]-vol[a]; });
-  if (!keys.length) return '<span class="text-xs text-muted">Volumen semanal: aún sin series</span>';
+  if (!keys.length){
+    /* Sin series no hay volumen que mostrar, pero el enfoque y la zona sí:
+       en una rutina terapéutica la zona se elige ANTES de añadir ejercicios. */
+    var pv = libPerfilEquilibrio(r);
+    return '<span class="text-xs text-muted">Volumen semanal: aún sin series</span>'
+      + '<div class="rb-patrones">' + libEnfoqueSelectHtml(r) + (pv.terap ? libResumenTerapeutico(r) : '') + '</div>';
+  }
   var html = '<span class="text-xs text-muted">Series/semana:</span>';
   keys.forEach(function(m){
     var v = vol[m];
