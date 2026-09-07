@@ -4000,6 +4000,8 @@ document.addEventListener("keydown", function(e){
 });
 
 function showView(name){
+  /* Candado: la unica vista abierta a cualquiera es la del socio. */
+  if (name !== "client" && !u19CandadoOk()){ hideTrainerUI(); u19CandadoLanding(); return; }
   // Aviso de cambios sin guardar al salir del editor de rutinas por las pestañas
   var _cur = document.querySelector(".view.active");
   if (_cur && _cur.id === "view-builder" && name !== "builder" && _builderIsDirty()){
@@ -4037,10 +4039,120 @@ function showView(name){
   else if (name==="ficha") renderFicha();
 }
 
+/* ============================================================
+   CANDADO DEL ENTRENADOR
+   Un socio mando captura de Ajustes: la URL sin hash arrancaba la app
+   completa. Todo lo que muestra la interfaz del entrenador pasa por
+   showTrainerUI(), asi que el candado vive ahi. PIN como SHA-256 en
+   localStorage; se pide una vez por sesion.
+   ============================================================ */
+var CANDADO_KEY = "us19_candado";
+var CANDADO_SESION = "us19_candado_ok";
+var _candadoAbierto = false;
+
+function u19CandadoTiene(){
+  try { return !!localStorage.getItem(CANDADO_KEY); } catch (e){ return false; }
+}
+/* Datos que un socio jamas tendria en su navegador: si estan, es el
+   dispositivo del entrenador de antes del candado. */
+function u19EsDispositivoEntrenador(){
+  if (typeof settings === "undefined") return false;
+  return !!(String(settings.dashApiUrl || "").trim() || String(settings.githubToken || "").trim()
+         || String(settings.calendlyToken || "").trim() || String(settings.claudeKey || "").trim()
+         || settings.notionSyncEnabled === true);
+}
+function u19CandadoOk(){
+  if (_candadoAbierto) return true;
+  try { if (sessionStorage.getItem(CANDADO_SESION) === "1"){ _candadoAbierto = true; return true; } } catch (e){}
+  /* Sin PIN pero con datos del entrenador: es Diego antes de crear el PIN.
+     Se abre para no dejarlo fuera; el aviso le pide crearlo. */
+  if (!u19CandadoTiene() && u19EsDispositivoEntrenador()) return true;
+  return false;
+}
+function u19CandadoHash(pin){
+  var data = new TextEncoder().encode("us19|" + String(pin));
+  return crypto.subtle.digest("SHA-256", data).then(function(buf){
+    return Array.prototype.map.call(new Uint8Array(buf), function(b){ return ("0" + b.toString(16)).slice(-2); }).join("");
+  });
+}
+function u19CandadoAbrir(){
+  _candadoAbierto = true;
+  try { sessionStorage.setItem(CANDADO_SESION, "1"); } catch (e){}
+}
+window.u19CandadoCerrar = function(){
+  _candadoAbierto = false;
+  try { sessionStorage.removeItem(CANDADO_SESION); } catch (e){}
+  hideTrainerUI(); u19CandadoLanding();
+};
+
+/* Crear el PIN (primera vez) o cambiarlo. Pide dos veces. */
+window.u19CandadoCrear = function(){
+  var p1 = window.prompt("Crea un PIN para la interfaz del entrenador (4 dígitos o más). Se te pedirá una vez por sesión.");
+  if (p1 === null) return;
+  if (String(p1).length < 4){ toast("Mínimo 4 caracteres.", "warn"); return; }
+  var p2 = window.prompt("Repite el PIN.");
+  if (p2 !== p1){ toast("No coinciden. No se guardó nada.", "warn"); return; }
+  u19CandadoHash(p1).then(function(h){
+    try { localStorage.setItem(CANDADO_KEY, h); } catch (e){}
+    u19CandadoAbrir();
+    var av = document.getElementById("candado-aviso"); if (av) av.remove();
+    toast("PIN creado. Sin él, esta app solo muestra la pantalla del gimnasio.", "success");
+  });
+};
+
+/* Pedir el PIN. Si no hay ninguno en este dispositivo, ofrece crearlo:
+   abre una app VACIA, sin datos de nadie, asi que no hay nada que proteger. */
+window.u19CandadoPedir = function(){
+  if (!u19CandadoTiene()){
+    if (window.confirm("Este dispositivo no tiene PIN ni datos del gimnasio.\n\nCrear un PIN aquí abre una app vacía. ¿Continuar?"))
+      u19CandadoCrear();
+    return;
+  }
+  var pin = window.prompt("PIN del entrenador:");
+  if (pin === null) return;
+  u19CandadoHash(pin).then(function(h){
+    var ok = false;
+    try { ok = (localStorage.getItem(CANDADO_KEY) === h); } catch (e){}
+    if (!ok){ toast("PIN incorrecto.", "error"); return; }
+    u19CandadoAbrir();
+    showTrainerUI(); showView("dashboard");
+  });
+};
+
+/* La pantalla neutra que ve quien abre la URL sin ser el entrenador. */
+function u19CandadoLanding(){
+  var v = document.getElementById("view-client");
+  if (!v) return;
+  var views = document.querySelectorAll(".view");
+  for (var i = 0; i < views.length; i++) views[i].classList.remove("active");
+  v.classList.add("active");
+  v.innerHTML = '<div class="empty-state" style="max-width:520px;margin:12vh auto 0;text-align:center;">'
+    + '<h3 style="font-size:1.6rem;margin:0 0 .4rem;">ULTRA-SPORT <span style="color:var(--accent);">19</span></h3>'
+    + '<p class="text-muted" style="line-height:1.6;">Si eres socio, abre el enlace que te mandaron por WhatsApp: '
+    + 'ahí está tu rutina. Esta dirección, sin ese enlace, no muestra nada más.</p>'
+    + '<p style="margin-top:2.2rem;"><a href="#" class="text-xs text-muted" style="opacity:.6;" '
+    + 'onclick="u19CandadoPedir();return false;">Acceso entrenador</a></p></div>';
+}
+
+/* Aviso fijo mientras el dispositivo del entrenador no tenga PIN. */
+function u19CandadoAviso(){
+  if (u19CandadoTiene() || document.getElementById("candado-aviso")) return;
+  var d = document.createElement("div");
+  d.id = "candado-aviso";
+  d.style.cssText = "background:#7f1d1d;color:#fff;padding:.55rem .9rem;font-size:.85rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;";
+  d.innerHTML = '<b>\u{1F512} Esta app no tiene PIN.</b> Cualquiera que abra la direcci\u00f3n ve esta interfaz. '
+    + '<button class="btn btn-sm" style="background:#fff;color:#7f1d1d;" onclick="u19CandadoCrear()">Crear PIN ahora</button>';
+  var h = document.getElementById("trainer-header");
+  if (h && h.parentNode) h.parentNode.insertBefore(d, h);
+}
+
 function showTrainerUI(){
+  if (!u19CandadoOk()){ hideTrainerUI(); u19CandadoLanding(); return; }
   document.getElementById("trainer-header").style.display = "";
   document.getElementById("tab-bar").style.display = "";
+  u19CandadoAviso();
 }
+/* ===CANDADO_END=== */
 function hideTrainerUI(){
   document.getElementById("trainer-header").style.display = "none";
   document.getElementById("tab-bar").style.display = "none";
@@ -8613,6 +8725,7 @@ window.returnToTrainer = returnToTrainer;
    Bitly. Ahora cada tema es una sección plegable con su estado en el
    título. Todos los ids, el botón Guardar y bodyMount son los mismos. */
 function openSettings(){
+  if (!u19CandadoOk()){ u19CandadoPedir(); return; }
   var env = detectPreviewEnv();
   var bodyHtml = '';
 
