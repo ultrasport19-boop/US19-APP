@@ -13109,31 +13109,363 @@ window.deleteAssessment = function(cid, aid){
 };
 
 /* --- Plantillas --- */
-window.openFromTemplateModal = function(){
-  if (!state.routines.length){ toast("No hay rutinas para usar como plantilla","warn"); return; }
-  var sorted = state.routines.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
-  var rSel = '<select id="tpl-routine">';
-  sorted.forEach(function(r){
-    var cl = getClient(r.clientId);
-    rSel += '<option value="'+escapeAttr(r.id)+'">'+escapeHtml(r.name||"Sin nombre")+(cl?' · '+escapeHtml(cl.name):'')+'</option>';
+/* Plantillas de la casa: rutinas completas por objetivo. Las fichas que usan
+   viajan aquí (RT_FICHAS, copiadas del catálogo) para que la rutina se cree
+   entera aunque el navegador nunca haya importado el catálogo; el importador
+   las repara después por id como a cualquier otra. Cada fila de un día es
+   [id, series, reps, descanso, RIR, nota]; el primer número es el índice del
+   día en r.days (0 = lunes). */
+var RT_FICHAS = [
+  {"id":"us191760","name":"Sentadilla goblet con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"Ponte de pie con los pies separados a la altura de los hombros, sosteniendo una mancuerna verticalmente contra el pecho con ambas manos. Manteniendo el pecho erguido y el core activado, baja el cuerpo a una posición de sentadilla empujando las caderas hacia atrás y flexionando las rodillas. Continúa bajando hasta que los muslos queden paralelos al suelo, o tan abajo como puedas hacerlo cómodamente. Haz una pausa por un momento en la parte inferior, luego empuja con los talones para regresar a la posición inicial. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/1760-yn8yg1r.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Sentadilla"},
+  {"id":"us196407","name":"Press de banca con mancuernas","muscle":"Pecho","equipment":"Mancuernas","desc":"Túmbate en un banco plano con una mancuerna en cada mano a la altura del pecho y las palmas hacia adelante. Mantén los omóplatos juntos, el pecho alto y los pies firmes en el suelo. Empuja las mancuernas hacia arriba hasta extender los brazos, juntándolas ligeramente sin chocarlas. Baja despacio hasta notar el estiramiento. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pecho-press-de-banca-con-mancuernas.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Empuje"},
+  {"id":"us196521","name":"Remo unilateral con mancuerna","muscle":"Espalda","equipment":"Mancuernas","desc":"Apoya una mano y una rodilla sobre un banco con la espalda recta y paralela al suelo. Sujeta una mancuerna con la mano libre, con el brazo extendido. Tira llevando el codo hacia atrás y arriba, pegado al costado, hasta que la mancuerna llegue a la cadera. Baja despacio hasta el estiramiento. Cambia de lado y repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-espalda-remo-unilateral-con-mancuerna.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Tracción"},
+  {"id":"us196253","name":"Zancada con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"De pie con una mancuerna en cada mano a los costados y los pies a la anchura de las caderas. Da un paso hacia adelante y desciende hasta que ambas rodillas formen ángulos rectos, con el torso erguido. Sube empujando con el talón delantero. Puedes alternar piernas o completar todas las repeticiones con una antes de cambiar. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pierna-zancada-con-mancuernas.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Zancada"},
+  {"id":"us196057","name":"Plancha","muscle":"Core","equipment":"Peso corporal","desc":"Colócate boca abajo apoyando los antebrazos en el suelo, con los codos bajo los hombros y las puntas de los pies apoyadas. Eleva el cuerpo formando una línea recta desde la cabeza hasta los talones. Activa el abdomen y los glúteos, mete ligeramente la pelvis y evita que la cadera suba o se hunda. Mantén la posición el tiempo objetivo respirando con normalidad. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-core-plancha.gif","cat":"Fuerza","niv":"Principiante","mec":"Aislado","pat":"Core"},
+  {"id":"us190549","name":"Swing con kettlebell","muscle":"Glúteo","equipment":"Kettlebell","desc":"Ponte de pie con los pies separados a la altura de los hombros, con los dedos de los pies ligeramente hacia afuera. Sujeta la pesa rusa con ambas manos frente al cuerpo, con los brazos extendidos. Flexiona ligeramente las rodillas e inclínate desde las caderas, empujando los glúteos hacia atrás. Lleva la pesa rusa hacia atrás entre las piernas, manteniendo los brazos rectos y la espalda plana. Lleva las caderas hacia adelante y haz que la pesa rusa suba hasta la altura del hombro, usando el impulso generado por las caderas. Deja que la pesa rusa se balancee de vuelta hacia abajo entre las piernas y repite el movimiento el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/0549-UHJlbu3.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Bisagra"},
+  {"id":"us19f0115","name":"Bicicleta estática","muscle":"Cardio","equipment":"Máquina de cardio","desc":"Siéntate y ajusta el sillín a tu altura. Elige el programa o el modo manual e introduce tu edad y peso para estimar el gasto. Pedalea manteniendo una cadencia constante y ajusta la resistencia según el objetivo de la sesión. Ideal para calentar, para trabajo continuo y para intervalos.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/fed-Bicycling_Stationary.gif","cat":"Cardio","niv":"Principiante","pat":"Locomoción"},
+  {"id":"us196260","name":"Peso muerto rumano con mancuernas","muscle":"Isquiotibiales","equipment":"Mancuernas","desc":"De pie con una mancuerna en cada mano por delante de los muslos y las palmas mirando hacia el cuerpo. Flexiona ligeramente las rodillas y mantenlas fijas. Haz una bisagra de cadera llevando los glúteos atrás y bajando las mancuernas pegadas a las piernas, con la espalda recta. Baja hasta notar la tensión en los isquiotibiales y regresa extendiendo la cadera y apretando los glúteos arriba. No redondees la espalda en ningún momento. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-isquios-peso-muerto-rumano-con-mancuernas.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Bisagra"},
+  {"id":"us196615","name":"Press militar con mancuernas","muscle":"Hombros","equipment":"Mancuernas","desc":"Siéntate o quédate de pie sujetando una mancuerna en cada mano a la altura de los hombros, con las palmas mirando al frente y los codos bajo las muñecas. Mantén el abdomen activo y las costillas hacia dentro. Empuja las mancuernas hacia arriba hasta extender los brazos, sin que se golpeen arriba. Desciende despacio hasta que los codos queden algo por debajo de los hombros. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-hombro-press-militar-con-mancuernas.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Empuje"},
+  {"id":"us196564","name":"Jalón al pecho en polea","muscle":"Espalda","equipment":"Polea","desc":"Siéntate en la máquina de jalón con los muslos bien sujetos y las manos en la barra con agarre prono. Baja los hombros y saca el pecho antes de iniciar el tirón. Lleva la barra hacia la parte alta del pecho pensando en bajar los codos, no en tirar con las manos. Regresa despacio hasta el estiramiento. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-espalda-jalon-al-pecho-en-polea.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Tracción"},
+  {"id":"us196348","name":"Step up","muscle":"Pierna","equipment":"Peso corporal","desc":"Colócate frente a un cajón o step de altura media. Apoya un pie completo sobre la superficie y empuja con ese talón para subir el cuerpo, sin impulsarte con la pierna de abajo. Extiende la cadera arriba y desciende despacio controlando la bajada. Cuanto más alto el cajón, más participa el glúteo. Cambia de pierna y repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pierna-step-up-01.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Zancada"},
+  {"id":"us196331","name":"Hip thrust","muscle":"Glúteo","equipment":"Peso corporal","desc":"Siéntate en el suelo con la espalda apoyada en el borde de un banco, a la altura de los omóplatos, y los pies planos a la anchura de las caderas. Mete ligeramente la pelvis y activa el abdomen. Empuja con los talones elevando la cadera hasta que el tronco quede paralelo al suelo. Aprieta los glúteos un segundo arriba y baja despacio sin apoyar del todo. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-gluteo-hip-thrust.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Bisagra"},
+  {"id":"us190276","name":"Dead bug","muscle":"Core","equipment":"Peso corporal","desc":"Túmbate boca arriba con los brazos extendidos hacia el techo. Flexiona las rodillas y levanta las piernas del suelo, formando un ángulo de 90 grados en las caderas y las rodillas. Activa el core y la zona lumbar para presionar la zona lumbar contra el suelo. Baja lentamente el brazo derecho y la pierna izquierda hacia el suelo, manteniéndolos rectos y justo por encima del suelo. Haz una pausa breve y luego vuelve a la posición inicial. Repite el movimiento con el brazo izquierdo y la pierna derecha. Continúa alternando lados durante el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/0276-iny3m5y.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Core"},
+  {"id":"us196048","name":"Escalador","muscle":"Core","equipment":"Peso corporal","desc":"Colócate en posición de plancha alta con las manos bajo los hombros y el cuerpo alineado de la cabeza a los talones. Activa el abdomen para que la cadera no suba ni caiga. Lleva una rodilla hacia el pecho y devuélvela a la posición inicial mientras la otra avanza, alternando en un movimiento continuo. Mantén los hombros sobre las manos durante todo el ejercicio. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-core-escalador.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Core"},
+  {"id":"us196334","name":"Prensa de piernas 45","muscle":"Pierna","equipment":"Máquina","desc":"Siéntate en la prensa de cuarenta y cinco grados con la espalda y la cadera apoyadas y los pies en el centro de la plataforma, a la anchura de los hombros. Quita los seguros. Baja flexionando las rodillas hasta un ángulo cercano a noventa grados, sin que la cadera se despegue del respaldo. Empuja con toda la planta sin bloquear las rodillas. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pierna-prensa-de-piernas-45.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Sentadilla"},
+  {"id":"us190662","name":"Flexiones","muscle":"Pecho","equipment":"Peso corporal","desc":"Comienza en una posición de plancha alta con las manos un poco más separadas que la anchura de los hombros y los pies juntos. Activa el core y baja el cuerpo hacia el suelo flexionando los codos, manteniendo el cuerpo en línea recta. Haz una pausa cuando el pecho esté justo por encima del suelo y luego empújate de vuelta a la posición inicial estirando los brazos. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/0662-I4hDWkc.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Empuje"},
+  {"id":"us196536","name":"Remo sentado en polea","muscle":"Espalda","equipment":"Polea","desc":"Siéntate en la máquina de remo con los pies en los apoyos y las rodillas ligeramente flexionadas. Sujeta el agarre con los brazos extendidos y la espalda recta. Tira hacia el abdomen llevando los codos hacia atrás y juntando los omóplatos, sin balancear el tronco. Regresa despacio hasta el estiramiento completo. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-espalda-remo-sentado-en-polea.gif","cat":"Fuerza","niv":"Principiante","mec":"Compuesto","pat":"Tracción"},
+  {"id":"us196298","name":"Sentadilla búlgara con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"De espaldas a un banco, apoya el empeine del pie trasero sobre él y sujeta una mancuerna en cada mano a los costados. Mantén el torso vertical y el abdomen activo. Baja flexionando la rodilla delantera hasta que el muslo quede paralelo al suelo. Sube empujando con el talón delantero. Cambia de pierna y repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-pierna-sentadilla-bulgara-con-mancuernas.gif","cat":"Fuerza","niv":"Intermedio","mec":"Compuesto","pat":"Zancada"},
+  {"id":"us192133","name":"Paseo del granjero con mancuernas","muscle":"Pierna","equipment":"Mancuernas","desc":"Ponte de pie con una mancuerna en cada mano, palmas hacia los costados. Mantén la espalda recta y los hombros hacia atrás. Da pasos pequeños y controlados hacia adelante, manteniendo una postura erguida. Continúa caminando durante la distancia o el tiempo deseado. Para terminar, deja de caminar y baja con cuidado las mancuernas a los costados.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/2133-qPEzJjA.gif","cat":"Strongman","niv":"Intermedio","mec":"Compuesto","pat":"Locomoción"},
+  {"id":"us196027","name":"Abdominal en polea alta","muscle":"Core","equipment":"Polea","desc":"Arrodíllate frente a una polea alta con una cuerda enganchada y sujétala con ambas manos junto a las sienes. Mantén la cadera fija y el peso repartido. Flexiona el tronco hacia adelante contrayendo el abdomen, llevando los codos hacia los muslos, sin mover la cadera. Regresa despacio hasta el estiramiento. El movimiento sale del abdomen, no de la cadera. Repite el número de repeticiones deseado.","gif":"https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-core-abdominal-en-polea-alta.gif","cat":"Fuerza","niv":"Principiante","mec":"Aislado","pat":"Core"}
+];
+var RT_PLANTILLAS = [
+{
+ "id": "bajar_peso_3d",
+ "nombre": "Bajar de peso · 3 días de cuerpo completo",
+ "icono": "🔥",
+ "category": "fat-loss",
+ "weeks": 8,
+ "cuando": "Lunes, miércoles y viernes",
+ "resumen": "Fuerza de cuerpo completo en días alternos, descansos cortos y un remate de intervalos al final. Para quien empieza o vuelve después de un tiempo. Las cargas se fijan en la primera sesión: el peso con el que salen todas las repeticiones dejando dos de margen.",
+ "notes": "3 sesiones en días alternos · descansos de 45-60 s · termina cada serie con 2 repeticiones de margen · sube la carga cuando completes todas las repeticiones dos sesiones seguidas · camina todos los días",
+ "weekNotes": [
+  "Técnica y cargas cómodas (RIR 3): anota el peso de cada ejercicio",
+  "Mismos pesos, todas las series completas (RIR 3)",
+  "Sube el peso en sentadilla, prensa y peso muerto rumano (RIR 2)",
+  "Descarga: mitad de series con el mismo peso; intervalos suaves",
+  "Sube el peso en press y remos (RIR 2); intervalos completos",
+  "Añade una serie al primer ejercicio de cada día (RIR 2)",
+  "Semana más exigente: RIR 1 en los tres primeros ejercicios de cada día",
+  "Descarga y remedición: peso, medidas y fotos; planificar el siguiente bloque"
+ ],
+ "dias": [
+  [
+   0,
+   [
+    [
+     "us191760",
+     "3",
+     "12",
+     "60s",
+     "2",
+     "Talones apoyados y pecho alto; baja hasta donde la espalda se mantenga recta."
+    ],
+    [
+     "us196407",
+     "3",
+     "10-12",
+     "60s",
+     "2",
+     "Omóplatos juntos; las mancuernas suben en un ligero arco sin chocar."
+    ],
+    [
+     "us196521",
+     "3",
+     "12 por lado",
+     "60s",
+     "2",
+     "Espalda paralela al suelo; el codo pasa pegado al costado."
+    ],
+    [
+     "us196253",
+     "2",
+     "10 por pierna",
+     "60s",
+     "2",
+     "Paso amplio; la rodilla de atrás casi toca el suelo."
+    ],
+    [
+     "us196057",
+     "3",
+     "30-45 s",
+     "45s",
+     "",
+     "Cadera a la altura de los hombros; aprieta glúteos y abdomen."
+    ],
+    [
+     "us190549",
+     "4",
+     "15",
+     "45s",
+     "",
+     "El impulso sale de la cadera, los brazos solo guían; termina de pie con los glúteos apretados."
+    ],
+    [
+     "us19f0115",
+     "8",
+     "30 s fuerte + 60 s suave",
+     "60s",
+     "",
+     "Remate de intervalos: 8 rondas; el descanso es el tramo suave, pedaleando. En el tramo fuerte no se puede hablar seguido."
+    ]
+   ]
+  ],
+  [
+   2,
+   [
+    [
+     "us196260",
+     "4",
+     "12",
+     "60s",
+     "2",
+     "Rodillas apenas flexionadas; las mancuernas bajan rozando las piernas hasta notar los isquiotibiales."
+    ],
+    [
+     "us196615",
+     "3",
+     "10-12",
+     "60s",
+     "2",
+     "Costillas abajo y abdomen firme; no arquees la zona lumbar."
+    ],
+    [
+     "us196564",
+     "3",
+     "12",
+     "60s",
+     "2",
+     "Baja los hombros antes de tirar; la barra llega a la parte alta del pecho."
+    ],
+    [
+     "us196348",
+     "2",
+     "10 por pierna",
+     "60s",
+     "2",
+     "Cajón a la altura de la rodilla; sube con el talón del pie de arriba, sin impulsarte con el de abajo."
+    ],
+    [
+     "us196331",
+     "4",
+     "15",
+     "60s",
+     "2",
+     "Barbilla ligeramente metida; arriba, un segundo con los glúteos apretados."
+    ],
+    [
+     "us190276",
+     "3",
+     "10 por lado",
+     "45s",
+     "",
+     "Lumbar pegada al suelo todo el tiempo; brazo y pierna contrarios."
+    ],
+    [
+     "us196048",
+     "4",
+     "30 s",
+     "30s",
+     "",
+     "Remate: 4 rondas de 30 s con la cadera quieta; descansa 30 s entre rondas."
+    ]
+   ]
+  ],
+  [
+   4,
+   [
+    [
+     "us196334",
+     "3",
+     "15",
+     "60s",
+     "2",
+     "Cadera pegada al respaldo; baja hasta que la lumbar quiera despegarse y ahí para."
+    ],
+    [
+     "us190662",
+     "3",
+     "8-12",
+     "60s",
+     "2",
+     "Si no salen 8 limpias, apoya las manos en un banco o las rodillas en el suelo."
+    ],
+    [
+     "us196536",
+     "3",
+     "12",
+     "60s",
+     "2",
+     "Tronco quieto; codos hacia atrás y omóplatos juntos al final."
+    ],
+    [
+     "us196298",
+     "2",
+     "10 por pierna",
+     "60s",
+     "2",
+     "Pie de atrás sobre el banco; el peso queda en la pierna de delante."
+    ],
+    [
+     "us192133",
+     "3",
+     "30 metros",
+     "60s",
+     "",
+     "Mancuernas pesadas, pasos cortos, hombros atrás; el tronco no se inclina."
+    ],
+    [
+     "us196027",
+     "3",
+     "15",
+     "45s",
+     "",
+     "Redondea la espalda llevando los codos hacia los muslos; la cadera no se mueve."
+    ],
+    [
+     "us19f0115",
+     "6",
+     "1 min fuerte + 1 min suave",
+     "1 min",
+     "",
+     "Remate: 6 rondas; el descanso es el tramo suave, pedaleando para recuperar, no para parar."
+    ]
+   ]
+  ]
+ ]
+}
+];
+function rtPlantilla(id){
+  for (var i = 0; i < RT_PLANTILLAS.length; i++) if (RT_PLANTILLAS[i].id === id) return RT_PLANTILLAS[i];
+  return null;
+}
+/* Mete en la biblioteca las fichas que falten. Devuelve cuántas añadió. */
+function rtAsegurarFichas(ids){
+  var tengo = {};
+  state.exercises.forEach(function(e){ if (e.id) tengo[e.id] = true; });
+  var faltan = 0;
+  ids.forEach(function(id){
+    if (tengo[id]) return;
+    for (var i = 0; i < RT_FICHAS.length; i++){
+      if (RT_FICHAS[i].id === id){
+        state.exercises.push(JSON.parse(JSON.stringify(RT_FICHAS[i])));
+        tengo[id] = true; faltan++;
+        break;
+      }
+    }
   });
-  rSel += '</select>';
+  return faltan;
+}
+/* Arma la rutina en memoria sin guardarla (sirve para el resumen y para crear). */
+function rtArmarRutina(tpl){
+  var r = newEmptyRoutine();
+  r.name = tpl.nombre;
+  r.category = tpl.category || "";
+  r.weeks = tpl.weeks || 4;
+  r.notes = tpl.notes || "";
+  r.weekNotes = (tpl.weekNotes || []).slice();
+  r.plantilla = tpl.id;
+  tpl.dias.forEach(function(d){
+    var day = r.days[d[0]];
+    if (!day) return;
+    d[1].forEach(function(f){
+      day.exercises.push({ exerciseId: f[0], sets: f[1], reps: f[2], weight: "", rest: f[3], rir: f[4] || "", notes: f[5] || "" });
+    });
+  });
+  return r;
+}
+function rtIdsDe(tpl){
+  var ids = [];
+  tpl.dias.forEach(function(d){ d[1].forEach(function(f){ if (ids.indexOf(f[0]) < 0) ids.push(f[0]); }); });
+  return ids;
+}
+function rtCrearDesdePlantilla(tplId, clientId, startDate){
+  var tpl = rtPlantilla(tplId);
+  if (!tpl) return null;
+  var faltaban = rtAsegurarFichas(rtIdsDe(tpl));
+  var r = rtArmarRutina(tpl);
+  r.clientId = clientId || "";
+  r.startDate = startDate || "";
+  state.routines.push(r);
+  saveState();
+  return { rutina: r, faltaban: faltaban };
+}
+function rtResumenHtml(tpl){
+  var r = rtArmarRutina(tpl);
+  var dur = calculateRoutineDuration(r);
+  var ejercicios = 0, series = 0;
+  r.days.forEach(function(d){ d.exercises.forEach(function(e){ ejercicios++; series += parseInt(e.sets, 10) || 0; }); });
+  return '<div class="card" style="background:var(--surface-2);margin:-.2rem 0 .8rem;"><div class="card-main">'
+    + '<div class="card-sub" style="margin-bottom:.4rem;">'
+    + '<span class="badge teal">📅 ' + dur.activeDays + ' días/semana</span>'
+    + '<span class="badge teal">🗓 ' + (tpl.weeks || 4) + ' semanas</span>'
+    + '<span class="badge teal">⏱ ~' + fmtDuration(dur.avgSec) + '/sesión</span>'
+    + '<span class="badge teal">' + ejercicios + ' ejercicios · ' + series + ' series</span>'
+    + '</div>'
+    + '<div class="text-sm" style="line-height:1.45;">' + escapeHtml(tpl.resumen || "") + '</div>'
+    + (tpl.cuando ? '<div class="text-xs text-muted" style="margin-top:.35rem;">' + escapeHtml(tpl.cuando) + '. Se abre en el editor: cambia lo que haga falta antes de compartirla.</div>' : '')
+    + '</div></div>';
+}
+window.rtPintarResumen = function(){
+  var sel = document.getElementById("tpl-routine"), box = document.getElementById("tpl-resumen");
+  if (!sel || !box) return;
+  var v = sel.value || "";
+  var tpl = v.indexOf("tpl:") === 0 ? rtPlantilla(v.slice(4)) : null;
+  box.innerHTML = tpl ? rtResumenHtml(tpl) : "";
+};
+window.openFromTemplateModal = function(){
+  var opts = '<optgroup label="Plantillas de la casa">';
+  RT_PLANTILLAS.forEach(function(t){
+    opts += '<option value="tpl:' + escapeAttr(t.id) + '">' + (t.icono || "") + ' ' + escapeHtml(t.nombre) + '</option>';
+  });
+  opts += '</optgroup>';
+  var sorted = state.routines.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+  if (sorted.length){
+    opts += '<optgroup label="Tus rutinas">';
+    sorted.forEach(function(r){
+      var cl = getClient(r.clientId);
+      opts += '<option value="' + escapeAttr(r.id) + '">' + escapeHtml(r.name||"Sin nombre") + (cl ? ' · ' + escapeHtml(cl.name) : '') + '</option>';
+    });
+    opts += '</optgroup>';
+  }
+  var rSel = '<select id="tpl-routine" onchange="rtPintarResumen()">' + opts + '</select>';
   var today = new Date().toISOString().slice(0,10);
   openModal({
     title: "Nueva rutina desde plantilla",
     bodyHtml:
       formField("Rutina base", rSel)
+      + '<div id="tpl-resumen"></div>'
       + formField("Cliente", clientSelectHtml("", "tpl-client"))
       + formField("Fecha de inicio", '<input type="date" id="tpl-start" value="'+today+'">'),
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
       { label:"Crear rutina", cls:"btn-primary", onClick: function(){
-        var src = getRoutine(document.getElementById("tpl-routine").value);
+        var v = document.getElementById("tpl-routine").value || "";
+        var clientId = document.getElementById("tpl-client").value || "";
+        var start = document.getElementById("tpl-start").value || "";
+        if (v.indexOf("tpl:") === 0){
+          var res = rtCrearDesdePlantilla(v.slice(4), clientId, start);
+          if (!res){ toast("Plantilla no encontrada","warn"); return; }
+          closeModal();
+          openRoutineBuilder(res.rutina.id);
+          toast("Rutina creada desde la plantilla" + (res.faltaban ? " · " + res.faltaban + " ejercicios añadidos a la biblioteca" : ""), "success");
+          return;
+        }
+        var src = getRoutine(v);
         if (!src){ toast("Selecciona una rutina","warn"); return; }
         var copy = JSON.parse(JSON.stringify(src));
         copy.id = genId();
-        copy.clientId = document.getElementById("tpl-client").value || "";
-        copy.startDate = document.getElementById("tpl-start").value || "";
+        copy.clientId = clientId;
+        copy.startDate = start;
         copy.status = "active";
         copy.createdAt = Date.now();
         copy.updatedAt = Date.now();
@@ -13145,6 +13477,7 @@ window.openFromTemplateModal = function(){
       }}
     ]
   });
+  setTimeout(window.rtPintarResumen, 0);
 };
 
 /* --- Papelera --- */
