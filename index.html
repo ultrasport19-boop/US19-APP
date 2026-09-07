@@ -4126,16 +4126,28 @@ function u19CandadoLanding(){
   var views = document.querySelectorAll(".view");
   for (var i = 0; i < views.length; i++) views[i].classList.remove("active");
   v.classList.add("active");
-  v.innerHTML = '<div class="empty-state" style="max-width:520px;margin:12vh auto 0;text-align:center;">'
-    + '<h3 style="font-size:1.6rem;margin:0 0 .4rem;">ULTRA-SPORT <span style="color:var(--accent);">19</span></h3>'
-    + '<p class="text-muted" style="line-height:1.6;">Si eres socio, abre el enlace que te mandaron por WhatsApp: '
-    + 'ahí está tu rutina. Esta dirección, sin ese enlace, no muestra nada más.</p>'
-    + '</div>';
-  /* Sin enlace visible: un socio ya demostro que toca lo que ve. La entrada
-     del entrenador en un dispositivo sin datos es la direccion con
-     #entrenador, que no se muestra en ninguna parte. */
-  if (location.hash === "#entrenador"){
-    history.replaceState(null, "", location.pathname + location.search);
+  var tienePin = u19CandadoTiene();
+  var inner = '<div class="empty-state" style="max-width:520px;margin:12vh auto 0;text-align:center;">'
+    + '<h3 style="font-size:1.6rem;margin:0 0 .4rem;">ULTRA-SPORT <span style="color:var(--accent);">19</span></h3>';
+  if (tienePin){
+    /* Un socio nunca tiene PIN en su navegador: si hay PIN, este dispositivo
+       es del entrenador. Se le pide, con boton por si cancela o se equivoca. */
+    inner += '<p class="text-muted" style="line-height:1.6;">Este dispositivo tiene PIN. Introdúcelo para abrir el panel.</p>'
+      + '<p style="margin-top:1.4rem;"><button class="btn btn-primary" onclick="u19CandadoPedir()">Introducir PIN</button></p>';
+  } else {
+    /* Sin PIN y sin datos: un socio. Nada que tocar; la entrada del
+       entrenador en un dispositivo nuevo es #entrenador, que no se muestra. */
+    inner += '<p class="text-muted" style="line-height:1.6;">Si eres socio, abre el enlace que te mandaron por WhatsApp: '
+      + 'ahí está tu rutina. Esta dirección, sin ese enlace, no muestra nada más.</p>';
+  }
+  v.innerHTML = inner + '</div>';
+
+  var porHash = (location.hash === "#entrenador");
+  if (porHash) history.replaceState(null, "", location.pathname + location.search);
+  /* Con PIN, se pide solo al cargar (una vez por carga: showTrainerUI puede
+     llamarse varias veces al arrancar y no queremos encadenar dialogos). */
+  if ((porHash || tienePin) && !window._candadoAutoPedido){
+    window._candadoAutoPedido = true;
     setTimeout(function(){ u19CandadoPedir(); }, 50);
   }
 }
