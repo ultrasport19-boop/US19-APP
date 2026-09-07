@@ -66,6 +66,7 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 |---|---|
 | `node tools/validar_bloques.js index.html` | Sintaxis de cada bloque `<script>` por separado |
 | `node tools/pruebas.js` | Estructura, vídeo/imagen, lista blanca de `loadSettings`, guardas, secretos |
+| `node tools/taxonomia.js` | Tipo, patrón y nivel de 22 ejercicios conocidos: las trampas de las reglas («pino», «tibial», «lat») |
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `sh tools/instalar_hook.sh` | Deja los dos primeros corriendo en cada commit |
 

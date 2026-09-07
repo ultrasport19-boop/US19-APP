@@ -5779,6 +5779,11 @@ function saveBuilder(){
   if (!name){ toast("Asigna un nombre a la rutina", "error"); return; }
   _builderRoutine.name = name;
   _builderRoutine.updatedAt = Date.now();
+  /* Una rutina terapéutica sin zona a proteger se guarda igual, pero se avisa:
+     la zona es lo que hace útil la etiqueta terapéutica de los ejercicios. */
+  if (typeof libPerfilEquilibrio === "function" && libPerfilEquilibrio(_builderRoutine).terap && !_builderRoutine.zonaTerap){
+    toast("Rutina terapéutica sin zona a proteger: elígela en la línea de equilibrio", "warn");
+  }
   if (_builderIsNew){
     state.routines.push(_builderRoutine);
     _builderIsNew = false;
@@ -7238,6 +7243,9 @@ function deleteExercise(id){
       { label:"Cancelar", cls:"btn-ghost" },
       { label:"Eliminar", cls:"btn-danger", onClick: function(){
         state.exercises = state.exercises.filter(function(x){ return x.id !== id; });
+        /* Que no quede un id muerto en favoritos ni en recientes. */
+        if (state.libFav && state.libFav[id]) delete state.libFav[id];
+        if (Array.isArray(state.libRec)) state.libRec = state.libRec.filter(function(x){ return x !== id; });
         saveState();
         closeModal();
         renderLibraryGrid();

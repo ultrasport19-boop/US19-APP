@@ -5,6 +5,7 @@
 # Dos barreras antes de cada commit que toque index.html:
 #   1. validar_bloques.js - sintaxis de cada bloque <script> por separado.
 #   2. pruebas.js         - banco de pruebas: video, lista blanca, secretos.
+#   3. taxonomia.js       - tipo, patrón y nivel de 22 ejercicios conocidos.
 RAIZ="$(git rev-parse --show-toplevel)"
 
 if git diff --cached --name-only | grep -q "^index.html$"; then
@@ -14,6 +15,9 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
 
   node "$RAIZ/tools/pruebas.js" "$RAIZ/index.html" \
     || { echo ""; echo "index.html no pasa el banco de pruebas: commit cancelado."; exit 1; }
+
+  node "$RAIZ/tools/taxonomia.js" "$RAIZ/index.html" \
+    || { echo ""; echo "la clasificación de ejercicios no pasa la prueba: commit cancelado."; exit 1; }
 
 fi
 exit 0
