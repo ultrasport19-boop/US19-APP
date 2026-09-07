@@ -447,16 +447,6 @@ img{max-width:100%;display:block;}
 .ep-row .ep-fav.on{color:#fde68a;}
 .ep-row .ep-add{flex:0 0 auto;width:1.6rem;height:1.6rem;border-radius:50%;background:rgba(168,209,57,.16);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-weight:800;}
 .ep-row.ok{border-color:var(--accent);background:rgba(168,209,57,.12);}
-@media (max-width:640px){
-  .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;}
-  .exc-body{padding:.5rem .55rem .5rem;gap:.28rem;}
-  .exc-title{font-size:.82rem;}
-  .exc-mus{font-size:.7rem;}
-  .exc-mus span{display:none;}
-  .exc-tags .badge{font-size:.6rem;padding:.15rem .4rem;}
-  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}
-  .lib-sticky{position:static;}
-}
 .lib-count{font-size:.78rem;color:var(--muted);margin:0;font-variant-numeric:tabular-nums;}
 .lib-count b{color:var(--text);}
 .lib-clear{background:transparent;border:0;color:var(--accent);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;padding:.2rem .4rem;border-radius:var(--radius-sm);}
@@ -532,6 +522,19 @@ img{max-width:100%;display:block;}
 .exercise-row .ex-thumb-mini img,.exercise-row .ex-thumb-mini video{width:100%;height:100%;object-fit:cover;display:block;}
 .exercise-row .ex-name small .pat{color:#8fd0ee;font-weight:700;}
 .rb-patrones{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-top:.35rem;}
+/* Móvil: dos tarjetas por fila y filtros sin fijar (la pantalla es corta).
+   Va al final del bloque para ganar a las reglas base de la rejilla. */
+@media (max-width:640px){
+  .lib-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem;}
+  .lib-grid.lista{grid-template-columns:1fr;}
+  .exc-body{padding:.5rem .55rem .5rem;gap:.28rem;}
+  .exc-title{font-size:.82rem;}
+  .exc-mus{font-size:.7rem;}
+  .exc-mus span{display:none;}
+  .exc-tags .badge{font-size:.6rem;padding:.15rem .4rem;}
+  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}
+  .lib-sticky{position:static;}
+}
 .badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
 .ex-gif-expand{position:absolute;bottom:.4rem;right:.4rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:.2rem .45rem;font-size:.7rem;cursor:pointer;}
 
