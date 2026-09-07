@@ -6,7 +6,7 @@
  * origen entero deja de poder escribir y la app pierde la capacidad de
  * guardar. Ahora la media pesada no se cachea y el resto tiene tope.
  */
-var CACHE = "us19-cache-v2";
+var CACHE = "us19-cache-v3";
 var CORE = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 /* Cuantas entradas guardamos como maximo fuera del nucleo. */

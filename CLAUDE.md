@@ -23,13 +23,23 @@ renombrar un ejercicio duplica la biblioteca del cliente.
 **`loadSettings` tiene lista blanca.** Un ajuste nuevo que no se añada ahí se borra solo
 en cada recarga, en silencio.
 
-**La biblioteca tiene dos ejes, no uno.** `muscle` dice qué músculo y `cat` dice qué tipo
-de trabajo: Fuerza, Movilidad, Pliometría, Halterofilia, Strongman o Cardio (`LIB_CATS`).
-Son independientes: una sentadilla con salto es Pierna **y** Pliometría. Los chips de
-arriba filtran por `cat`; los selectores, por músculo, material y nivel (`niv`). Las
-fichas del catálogo traen además `mec` (compuesto o aislado) y `pat` (empuje, tracción o
-isométrico). Un ejercicio creado a mano no trae `cat`: por eso existe el chip
-**«Sin clasificar»**, sin él parecería que se han borrado al filtrar.
+**La biblioteca tiene tres dimensiones, no una.** `muscle` dice qué músculo; `cat` el tipo
+de trabajo (Fuerza, Movilidad, Pliometría, Halterofilia, Strongman, Cardio: `LIB_CATS`);
+`pat` el patrón de movimiento (Empuje, Tracción, Sentadilla, Bisagra, Zancada, Core,
+Locomoción, Accesorio: `LIB_PATS`); y `niv` el nivel. Son independientes: una sentadilla
+con salto es Pierna, Pliometría y Sentadilla a la vez. Los chips filtran por `cat`; los
+selectores por patrón, músculo, material y nivel.
+
+**`libTaxDe(e)` es el único sitio que decide tipo, patrón y nivel.** Devuelve lo escrito en
+la ficha y, si falta, lo deduce del nombre con las mismas reglas que generaron el catálogo
+(`clasificar_v3.py` en el scratchpad de la sesión del 6-sep-2026; la copia en JS es
+`LIB_RE` y `LIB_PAT_REGLAS`). Nunca leas `e.cat` o `e.pat` a pelo en una vista: un
+ejercicio creado a mano no los trae. Si cambias una regla, cámbiala en los dos sitios.
+
+**El importador pisa la clasificación local, salvo `taxManual`.** Una versión anterior del
+catálogo dejó `pat` y `niv` desfasados en los navegadores; por eso `_cus19Import` copia
+`cat/niv/mec/pat` del catálogo aunque la ficha ya tuviera valor. La única excepción es
+`taxManual: true`, que pone el formulario cuando Diego elige tipo, patrón o nivel a mano.
 
 **El catálogo se amplía sobre el original, nunca sobre el ya ampliado.** Los ids `us19f…`
 son los 320 que entraron desde free-exercise-db (dominio público) con GIF propio de dos

@@ -408,17 +408,111 @@ img{max-width:100%;display:block;}
 .ex-gif-block .gif-placeholder{padding:2rem;color:var(--muted);font-size:2.5rem;text-align:center;}
 .badge.terap{background:rgba(226,28,37,.16);color:#ff8a8f;border:1px solid rgba(226,28,37,.45);}
 .badge.contr{background:rgba(58,134,255,.16);color:#7db2ff;border:1px solid rgba(58,134,255,.45);}
-.badge.cat{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border);font-weight:600;}
-.badge.niv{background:rgba(148,163,184,.14);color:#cbd5e1;border:1px solid rgba(148,163,184,.35);font-weight:600;}
-/* Fila de tipos de trabajo: es el primer filtro de la biblioteca. */
-.lib-cats{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .8rem;}
+/* ===== Biblioteca de ejercicios (rediseño 6-sep-2026) =====
+   Dos ejes: tipo de trabajo (chips) y patrón de movimiento (selector).
+   Tarjetas con imagen primero y acciones que aparecen al pasar por encima. */
+.lib-head{display:flex;align-items:flex-end;justify-content:space-between;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
+.lib-head .lib-sub{font-size:.8rem;color:var(--muted);margin-top:.2rem;font-variant-numeric:tabular-nums;}
+.lib-head .lib-sub b{color:var(--text);}
+.lib-acts{display:flex;gap:.45rem;flex-wrap:wrap;}
+.lib-cats{display:flex;gap:.4rem;flex-wrap:wrap;margin:0 0 .7rem;}
 .cat-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.42rem .8rem;border-radius:999px;
   border:1px solid var(--border);background:var(--surface-2);color:var(--muted);
-  font-size:.8rem;font-weight:700;cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
+  font-size:.8rem;font-weight:700;cursor:pointer;transition:background .12s,color .12s,border-color .12s;font:inherit;font-weight:700;}
 .cat-chip:hover{border-color:rgba(168,209,57,.45);color:var(--text);}
-.cat-chip .n{font-weight:600;opacity:.65;font-size:.72rem;}
+.cat-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.cat-chip .n{font-weight:600;opacity:.65;font-size:.72rem;font-variant-numeric:tabular-nums;}
 .cat-chip.on{background:rgba(168,209,57,.16);color:var(--accent);border-color:rgba(168,209,57,.55);}
 .cat-chip.on .n{opacity:.85;}
+.cat-chip.sin{border-style:dashed;}
+.lib-tools{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(4,minmax(130px,1fr)) auto auto;gap:.5rem;align-items:center;margin-bottom:.6rem;}
+@media (max-width:1100px){.lib-tools{grid-template-columns:1fr 1fr 1fr;}.lib-tools .lib-search{grid-column:1 / -1;}}
+@media (max-width:640px){.lib-tools{grid-template-columns:1fr 1fr;}}
+.lib-tools select{width:100%;min-width:0;font-size:.85rem;padding:.5rem .6rem;}
+.lib-search{position:relative;display:flex;align-items:center;}
+.lib-search input{width:100%;padding-left:2.1rem;padding-right:2rem;font-size:.9rem;}
+.lib-search .lib-search-ico{position:absolute;left:.7rem;font-size:.9rem;opacity:.6;pointer-events:none;}
+.lib-search .lib-search-x{position:absolute;right:.35rem;width:1.5rem;height:1.5rem;border-radius:50%;border:0;background:transparent;color:var(--muted);font-size:1.1rem;line-height:1;cursor:pointer;}
+.lib-search .lib-search-x:hover{background:var(--surface-3);color:var(--text);}
+.lib-vista{display:inline-flex;width:max-content;justify-self:start;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.lib-vista button{background:var(--surface-3);border:0;color:var(--muted);padding:.45rem .6rem;cursor:pointer;font-size:.9rem;line-height:1;}
+.lib-vista button.on{background:rgba(168,209,57,.18);color:var(--accent);}
+.lib-status{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 .8rem;min-height:1.4rem;}
+.lib-count{font-size:.78rem;color:var(--muted);margin:0;font-variant-numeric:tabular-nums;}
+.lib-count b{color:var(--text);}
+.lib-clear{background:transparent;border:0;color:var(--accent);font:inherit;font-size:.78rem;font-weight:700;cursor:pointer;padding:.2rem .4rem;border-radius:var(--radius-sm);}
+.lib-clear:hover{background:rgba(168,209,57,.12);}
+/* rejilla y lista comparten la tarjeta; solo cambia la dirección */
+.lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:.8rem;}
+.lib-grid.lista{grid-template-columns:1fr;gap:.45rem;}
+.exc{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;display:flex;flex-direction:column;transition:border-color .15s,transform .15s;position:relative;}
+.exc:hover{border-color:rgba(168,209,57,.55);}
+.exc-media{position:relative;aspect-ratio:4/3;background:#0a0e12;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:2rem;overflow:hidden;cursor:zoom-in;}
+.exc-media img,.exc-media video{width:100%;height:100%;object-fit:cover;display:block;}
+.exc-media .exc-play{position:absolute;right:.5rem;bottom:.5rem;background:rgba(0,0,0,.65);color:#fff;font-size:.65rem;font-weight:800;letter-spacing:.08em;padding:.2rem .45rem;border-radius:999px;}
+.exc-media .exc-nivp{position:absolute;left:.5rem;top:.5rem;}
+.exc-body{padding:.65rem .75rem .6rem;display:flex;flex-direction:column;gap:.35rem;flex:1;min-width:0;}
+.exc-tags{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;}
+.exc-title{font-size:.92rem;font-weight:700;line-height:1.25;cursor:pointer;margin:0;}
+.exc-title:hover{color:var(--accent);}
+.exc-mus{font-size:.76rem;color:var(--text);opacity:.9;line-height:1.35;}
+.exc-mus span{color:var(--muted);}
+.exc-foot{display:flex;align-items:center;justify-content:space-between;gap:.5rem;font-size:.72rem;color:var(--muted);margin-top:auto;padding-top:.3rem;}
+.exc-foot .uso{color:#7dd3fc;}
+.exc-acts{display:flex;gap:.3rem;padding-top:.45rem;border-top:1px dashed var(--border);margin-top:.2rem;}
+.exc-acts .btn{padding:.35rem .5rem;font-size:.68rem;flex:1;}
+.exc-acts .btn.x{flex:0 0 auto;}
+/* vista de lista: compacta, para recorrer 200 resultados */
+.lib-grid.lista .exc{flex-direction:row;align-items:center;gap:.7rem;padding:.4rem .6rem .4rem .4rem;}
+.lib-grid.lista .exc-media{flex:0 0 72px;width:72px;aspect-ratio:4/3;border-radius:var(--radius-sm);font-size:1.3rem;}
+.lib-grid.lista .exc-media .exc-play,.lib-grid.lista .exc-media .exc-nivp{display:none;}
+.lib-grid.lista .exc-body{padding:0;flex-direction:row;align-items:center;gap:.8rem;flex-wrap:wrap;}
+.lib-grid.lista .exc-body .exc-main{flex:1 1 260px;min-width:0;display:flex;flex-direction:column;gap:.15rem;}
+.lib-grid.lista .exc-title{font-size:.9rem;}
+.lib-grid.lista .exc-tags{flex:0 0 auto;}
+.lib-grid.lista .exc-foot{margin:0;padding:0;flex:0 0 auto;}
+.lib-grid.lista .exc-acts{border:0;padding:0;margin:0;flex:0 0 auto;}
+.lib-grid.lista .exc-acts .btn{flex:0 0 auto;}
+/* etiquetas nuevas */
+.badge.pat{background:rgba(42,84,104,.28);color:#8fd0ee;border:1px solid rgba(42,84,104,.6);font-weight:700;}
+.badge.cat{background:rgba(255,255,255,.06);color:var(--text);border:1px solid var(--border);font-weight:600;}
+.badge.niv{background:rgba(148,163,184,.14);color:#cbd5e1;border:1px solid rgba(148,163,184,.35);font-weight:600;}
+.niv-dots{display:inline-flex;gap:2px;align-items:flex-end;height:.75rem;vertical-align:middle;}
+.niv-dots i{display:block;width:4px;background:rgba(255,255,255,.22);border-radius:1px;}
+.niv-dots i:nth-child(1){height:5px;} .niv-dots i:nth-child(2){height:8px;} .niv-dots i:nth-child(3){height:11px;}
+.niv-dots.n1 i:nth-child(1){background:#86efac;}
+.niv-dots.n2 i:nth-child(-n+2){background:#fde68a;}
+.niv-dots.n3 i{background:#fca5a5;}
+.niv-pill{display:inline-flex;align-items:center;gap:.35rem;background:rgba(0,0,0,.6);color:#fff;font-size:.62rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:.2rem .5rem;border-radius:999px;}
+/* vista previa ampliada */
+.exprev-ov{position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.82);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;padding:1rem;animation:fadeIn .12s;}
+.exprev{background:var(--surface-1);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);max-width:980px;width:100%;max-height:92vh;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);overflow:hidden;}
+@media (max-width:760px){.exprev{grid-template-columns:1fr;max-height:94vh;overflow-y:auto;}}
+.exprev-media{background:#000;display:flex;align-items:center;justify-content:center;min-height:240px;}
+.exprev-media img,.exprev-media video{max-width:100%;max-height:92vh;object-fit:contain;display:block;}
+.exprev-info{padding:1.1rem 1.2rem;display:flex;flex-direction:column;gap:.7rem;overflow-y:auto;min-width:0;}
+.exprev-info h3{font-size:1.15rem;line-height:1.25;margin:0;}
+.exprev-tags{display:flex;gap:.3rem;flex-wrap:wrap;}
+.exprev-kv{display:grid;grid-template-columns:auto 1fr;gap:.25rem .7rem;font-size:.8rem;}
+.exprev-kv dt{color:var(--muted);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:.66rem;padding-top:.15rem;}
+.exprev-kv dd{margin:0;}
+.exprev-desc{font-size:.85rem;line-height:1.5;color:var(--text);opacity:.92;}
+.exprev-acts{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:auto;padding-top:.6rem;border-top:1px solid var(--border);}
+.exprev-x{position:absolute;top:.6rem;right:.6rem;width:2rem;height:2rem;border-radius:50%;border:1px solid var(--border);background:var(--surface-2);color:var(--text);cursor:pointer;font-size:1.1rem;line-height:1;}
+/* selector de ejercicio en rutinas */
+.ep-row{display:flex;align-items:center;gap:.65rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:.35rem .5rem .35rem .35rem;width:100%;text-align:left;color:inherit;font:inherit;cursor:pointer;transition:border-color .12s;}
+.ep-row:hover{border-color:rgba(168,209,57,.55);}
+.ep-row .ep-thumb{flex:0 0 64px;width:64px;aspect-ratio:4/3;background:#0a0e12;border-radius:var(--radius-sm);overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:zoom-in;}
+.ep-row .ep-thumb img,.ep-row .ep-thumb video{width:100%;height:100%;object-fit:cover;display:block;}
+.ep-row .ep-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:.15rem;}
+.ep-row .ep-name{font-weight:700;font-size:.9rem;line-height:1.25;}
+.ep-row .ep-sub{font-size:.74rem;color:var(--muted);}
+.ep-row .ep-tags{display:flex;gap:.3rem;flex-wrap:wrap;flex:0 0 auto;}
+/* fila del editor de rutinas: miniatura y patrón */
+.exercise-row .ex-thumb-mini{flex:0 0 48px;width:48px;aspect-ratio:4/3;border-radius:var(--radius-sm);overflow:hidden;background:#0a0e12;display:flex;align-items:center;justify-content:center;cursor:zoom-in;font-size:1.1rem;}
+.exercise-row .ex-thumb-mini img,.exercise-row .ex-thumb-mini video{width:100%;height:100%;object-fit:cover;display:block;}
+.exercise-row .ex-name small .pat{color:#8fd0ee;font-weight:700;}
+.rb-patrones{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center;margin-top:.35rem;}
 .badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
 .ex-gif-expand{position:absolute;bottom:.4rem;right:.4rem;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:4px;padding:.2rem .45rem;font-size:.7rem;cursor:pointer;}
 
@@ -600,8 +694,6 @@ img{max-width:100%;display:block;}
 .cl-grid > .card .card-actions{border-top:1px solid var(--border);padding-top:.7rem;margin-top:auto;}
 .cl-leyenda{display:flex;gap:1rem;flex-wrap:wrap;font-size:.72rem;color:var(--muted);margin:-.6rem 0 1rem;align-items:center;}
 .cl-leyenda i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:.35rem;vertical-align:-1px;}
-.lib-count{font-size:.78rem;color:var(--muted);margin:-.4rem 0 .8rem;}
-.lib-count b{color:var(--text);}
 
 /* ---- Informes y Rendimiento v2: pasos, tira de estado y dos columnas ---- */
 .u-paso{display:flex;align-items:center;gap:.55rem;}
@@ -3319,11 +3411,6 @@ var LIB_CATS = [
 var LIB_NIVELES = ["Principiante","Intermedio","Avanzado"];
 var LIB_MECANICAS = ["Compuesto","Aislado"];
 
-/* Icono del tipo de trabajo; vacío si la ficha no lo trae. */
-function libCatIcono(cat){
-  for (var i = 0; i < LIB_CATS.length; i++) if (LIB_CATS[i][0] === cat) return LIB_CATS[i][1];
-  return "";
-}
 var CONTR_DEFAULTS = {
   "ob9nm3qk":"Isométrico","ze7q9sbc":"Isométrico","awh44p0o":"Isométrico","1ftf1txw":"Isométrico",
   "65v26rww":"Isométrico","wb7efzat":"Isométrico","ftrj4vta":"Isométrico","qviagj5a":"Isométrico",
@@ -3877,22 +3964,6 @@ function u19ClienteEstadoClase(c){
   if (d < 0) return 'venc';
   if (d <= 7) return 'pronto';
   return 'ok';
-}
-
-function u19LibContador(n, q, muscle, equip){
-  var el = document.getElementById("lib-count");
-  if (!el) return;
-  var f = [];
-  if (q) f.push('«' + escapeHtml(q) + '»');
-  if (_libFilter.cat) f.push(_libFilter.cat === "(sin)" ? 'sin clasificar' : escapeHtml(_libFilter.cat));
-  if (_libFilter.niv) f.push('nivel ' + escapeHtml(_libFilter.niv));
-  if (muscle === "terap:") f.push('terapéuticos');
-  else if (muscle === "contr:") f.push('por contracción');
-  else if (muscle === "nogif") f.push('sin GIF ni vídeo');
-  else if (muscle) f.push(escapeHtml(String(muscle).replace(/^(terap|contr|mus):/, '')));
-  if (equip) f.push(escapeHtml(equip));
-  el.innerHTML = '<b>' + n + '</b> de ' + state.exercises.length + ' ejercicios'
-    + (f.length ? ' · filtrando por ' + f.join(' · ') : '');
 }
 
 function u19FechaLargaHoy(){
@@ -5053,10 +5124,16 @@ function renderDayPanel(){
 function exerciseRowHtml(ex, idx){
   var def = getExercise(ex.exerciseId);
   var name = def ? def.name : "Ejercicio";
-  var sub = def ? (def.muscle + (def.equipment ? " · " + def.equipment : "")) : "";
+  /* Patrón · músculo · material: lo que hace falta para ver de un vistazo si
+     el día está equilibrado. La miniatura abre la vista en grande. */
+  var t = def ? libTaxDe(def) : { pat:"" };
+  var mus = def ? musOf(def) : { prim:"" };
+  var sub = def ? ((t.pat ? '<span class="pat">' + escapeHtml(t.pat) + '</span> · ' : '')
+    + escapeHtml(mus.prim || def.muscle || "") + (def.equipment ? " · " + escapeHtml(def.equipment) : "")) : "";
+  var thumb = def ? '<div class="ex-thumb-mini" onclick="showExercisePreview(\'' + escapeAttr(def.id) + '\')" title="Ver en grande">' + libThumbHtml(def) + '</div>' : '';
   return '<div class="exercise-row">'
-    + '<div class="ex-top">'
-    + '<div class="ex-name">'+escapeHtml(name)+'<small>'+escapeHtml(sub)+'</small></div>'
+    + '<div class="ex-top">' + thumb
+    + '<div class="ex-name">'+escapeHtml(name)+'<small>'+sub+'</small></div>'
     + '<div class="ex-actions">'
       + '<button class="btn btn-ghost btn-sm" onclick="changeExercise('+idx+')" title="Cambiar ejercicio">↻</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="moveExercise('+idx+',-1)" title="Subir">↑</button>'
@@ -5409,29 +5486,37 @@ function openExercisePicker(onPick){
   var muscleSet = {};
   state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; });
   var muscles = Object.keys(muscleSet).sort();
+  var uso = _libUsoRutinas();
+  var f = { q:"", cat:"", pat:"", muscle:"", niv:"" };
+  var EP_TANDA = 80, visibles = EP_TANDA;
 
   var bodyHtml =
-    '<div class="lib-toolbar" style="margin-bottom:.6rem;">'
-    + '<input type="text" id="ep-search" placeholder="Buscar ejercicio...">'
-    + '<select id="ep-muscle"><option value="">Todos los grupos</option>'
+    '<div class="lib-cats" id="ep-cats" style="margin-bottom:.5rem;"></div>'
+    + '<div class="lib-tools" style="grid-template-columns:minmax(200px,2fr) repeat(3,minmax(120px,1fr));margin-bottom:.5rem;">'
+    + '<div class="lib-search"><span class="lib-search-ico">⌕</span><input type="text" id="ep-search" placeholder="Buscar ejercicio…" autocomplete="off"></div>'
+    + '<select id="ep-pat"><option value="">Todos los patrones</option>'
+    + LIB_PATS.map(function(p){ return '<option value="' + escapeAttr(p) + '">' + escapeHtml(p) + '</option>'; }).join("")
+    + '</select>'
+    + '<select id="ep-muscle"><option value="">Todos los músculos</option>'
     + '<optgroup label="Grupo general">'
-    + muscles.map(function(m){ return '<option value="'+escapeAttr(m)+'">'+escapeHtml(m)+'</option>'; }).join("")
+    + muscles.map(function(m){ return '<option value="' + escapeAttr(m) + '">' + escapeHtml(m) + '</option>'; }).join("")
     + '</optgroup>'
     + musOptionsHtml("")
     + '<optgroup label="🩺 Terapéuticos (rehab)">'
     + '<option value="terap:">Terapéuticos — todos</option>'
-    + TERAP_ZONES.map(function(z){ return '<option value="terap:'+escapeAttr(z)+'">Terapéutico — '+escapeHtml(z)+'</option>'; }).join("")
+    + TERAP_ZONES.map(function(z){ return '<option value="terap:' + escapeAttr(z) + '">Terapéutico — ' + escapeHtml(z) + '</option>'; }).join("")
     + '</optgroup>'
     + '<optgroup label="⚡ Tipo de contracción">'
     + '<option value="contr:">Contracción — todas</option>'
-    + CONTR_TYPES.map(function(c){ return '<option value="contr:'+escapeAttr(c)+'">'+escapeHtml(c)+'</option>'; }).join("")
-    + '</optgroup>'
-    + '<optgroup label="🎯 Tipo de trabajo">'
-    + LIB_CATS.map(function(c){ return '<option value="cat:'+escapeAttr(c[0])+'">'+c[1]+' '+escapeHtml(c[0])+'</option>'; }).join("")
+    + CONTR_TYPES.map(function(c){ return '<option value="contr:' + escapeAttr(c) + '">' + escapeHtml(c) + '</option>'; }).join("")
     + '</optgroup>'
     + '</select>'
+    + '<select id="ep-niv"><option value="">Cualquier nivel</option>'
+    + LIB_NIVELES.map(function(n){ return '<option value="' + escapeAttr(n) + '">' + escapeHtml(n) + '</option>'; }).join("")
+    + '</select>'
     + '</div>'
-    + '<div id="ep-list" style="max-height:50vh;overflow-y:auto;display:grid;grid-template-columns:1fr;gap:.4rem;"></div>';
+    + '<div class="text-xs text-muted" id="ep-count" style="margin-bottom:.4rem;"></div>'
+    + '<div id="ep-list" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;"></div>';
 
   openModal({
     title: "Elegir ejercicio",
@@ -5439,53 +5524,65 @@ function openExercisePicker(onPick){
     bodyHtml: bodyHtml,
     footer: [{ label:"Cancelar", cls:"btn-ghost" }],
     bodyMount: function(){
+      var list = document.getElementById("ep-list");
+      function pasaSinCat(e, q){
+        var t = libTaxDe(e);
+        if (f.pat && t.pat !== f.pat) return false;
+        if (f.niv && t.niv !== f.niv) return false;
+        if (f.muscle && !_libMuscleOk(e, f.muscle)) return false;
+        if (q && !musHit(_libHay(e), q)) return false;
+        return true;
+      }
+      function pintarChips(catN, total){
+        var box = document.getElementById("ep-cats");
+        var h = '<button type="button" class="cat-chip' + (f.cat ? '' : ' on') + '" data-cat="">Todos <span class="n">' + total + '</span></button>';
+        for (var i = 0; i < LIB_CATS.length; i++){
+          var cn = LIB_CATS[i][0];
+          if (!catN[cn] && f.cat !== cn) continue;
+          h += '<button type="button" class="cat-chip' + (f.cat === cn ? ' on' : '') + '" data-cat="' + escapeAttr(cn) + '">' + LIB_CATS[i][1] + ' ' + escapeHtml(cn) + ' <span class="n">' + (catN[cn] || 0) + '</span></button>';
+        }
+        box.innerHTML = h;
+        var chips = box.querySelectorAll(".cat-chip");
+        for (var c = 0; c < chips.length; c++){
+          chips[c].addEventListener("click", function(){
+            var v = this.getAttribute("data-cat") || "";
+            f.cat = (f.cat === v) ? "" : v; visibles = EP_TANDA; refresh();
+          });
+        }
+      }
       function refresh(){
-        var q = document.getElementById("ep-search").value.trim().toLowerCase();
-        var muscle = document.getElementById("ep-muscle").value;
-        var list = document.getElementById("ep-list");
-        var filtered = state.exercises.filter(function(e){
-          if (muscle){
-            if (muscle.indexOf("cat:") === 0){ if (e.cat !== muscle.slice(4)) return false; }
-            else if (muscle === "terap:"){ if (!e.terap) return false; }
-            else if (muscle.indexOf("terap:") === 0){ if (e.terap !== muscle.slice(6)) return false; }
-            else if (muscle === "contr:"){ if (!e.contr) return false; }
-            else if (muscle.indexOf("contr:") === 0){ if (e.contr !== muscle.slice(6)) return false; }
-            else if (muscle.indexOf("mus:") === 0){ if (!musMatch(e, muscle.slice(4))) return false; }
-            else if (e.muscle !== muscle) return false;
-          }
-          if (q){
-            var hay = musNorm(e.name+" "+e.muscle+" "+(e.equipment||"")+" "+(e.cat||"")+" "+(e.niv||"")+" "+(e.terap?"terapeutico rehab "+e.terap:"")+" "+(e.contr||"")) + " " + musHay(e);
-            if (!musHit(hay, musNorm(q))) return false;
-          }
-          return true;
-        }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+        var q = musNorm(f.q.trim());
+        var base = state.exercises.filter(function(e){ return pasaSinCat(e, q); });
+        var catN = {};
+        base.forEach(function(e){ var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1; });
+        pintarChips(catN, base.length);
+        var filtered = base.filter(function(e){ return !f.cat || libTaxDe(e).cat === f.cat; })
+          .sort(function(a, b){
+            var d = (uso[b.id]||0) - (uso[a.id]||0);
+            if (q === "" && d) return d;   /* sin búsqueda, primero lo que ya usas */
+            return (a.name||"").localeCompare(b.name||"");
+          });
+        var cnt = document.getElementById("ep-count");
+        if (cnt) cnt.innerHTML = '<b>' + filtered.length + '</b> ejercicios' + (q === "" && filtered.length ? ' · primero los que ya usas en rutinas' : '');
         if (!filtered.length){
           list.innerHTML = '<p class="text-muted text-sm" style="padding:1rem;text-align:center;">Sin resultados.</p>';
           return;
         }
-        list.innerHTML = filtered.map(function(e){
-          var hasGif = e.gif && /^https?:\/\//.test(e.gif);
-          var thumb = hasGif
-            ? mediaThumb(e.gif, 'alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;" onerror="this.parentNode.innerHTML=\'🏋️\'"')
-            : '<span style="font-size:1.5rem;">🏋️</span>';
-          return '<div class="card" style="margin:0;display:flex;align-items:stretch;width:100%;background:var(--surface-2);overflow:hidden;">'
-            + '<div class="ep-thumb" data-prev="'+escapeAttr(e.id)+'" title="Ver vista previa" style="flex:0 0 84px;min-height:70px;background:#000;display:flex;align-items:center;justify-content:center;cursor:zoom-in;overflow:hidden;">'+thumb+'</div>'
-            + '<button class="card-main" data-id="'+escapeAttr(e.id)+'" style="flex:1;cursor:pointer;text-align:left;background:none;border:none;padding:.55rem .75rem;color:inherit;font:inherit;">'
-            + '<div class="card-title" style="font-size:.95rem;">'+escapeHtml(e.name)+'</div>'
-            + '<div class="card-sub">'
-              + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span>':'')
-              + musBadges(e)
-              + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
-              + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
-              + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span>':'')
-              + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
-              + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
-            + '</div>'
-            + '</button>'
-          + '</div>';
-        }).join("");
-        var items = list.querySelectorAll("[data-id]");
-        for (var i=0;i<items.length;i++){
+        var hasta = Math.min(visibles, filtered.length);
+        list.innerHTML = filtered.slice(0, hasta).map(function(e){
+          var t = libTaxDe(e), id = escapeAttr(e.id);
+          return '<button type="button" class="ep-row" data-id="' + id + '">'
+            + '<span class="ep-thumb" data-prev="' + id + '" title="Ver en grande">' + libThumbHtml(e, 'alt="" loading="lazy"') + '</span>'
+            + '<span class="ep-main">'
+              + '<span class="ep-name">' + escapeHtml(e.name) + '</span>'
+              + '<span class="ep-sub">' + libMusLinea(e) + (e.equipment ? ' <span>· ' + escapeHtml(e.equipment) + '</span>' : '') + '</span>'
+            + '</span>'
+            + '<span class="ep-tags">' + libTagsHtml(e, { sinCat: !!f.cat }) + libNivDots(t.niv) + (uso[e.id] ? '<span class="badge teal">📋 ' + uso[e.id] + '</span>' : '') + '</span>'
+            + '</button>';
+        }).join("")
+        + (hasta < filtered.length ? '<button type="button" class="btn btn-secondary btn-sm" id="ep-mas" style="align-self:center;margin:.4rem 0;">Mostrar ' + Math.min(EP_TANDA, filtered.length - hasta) + ' más</button>' : '');
+        var items = list.querySelectorAll(".ep-row");
+        for (var i = 0; i < items.length; i++){
           items[i].addEventListener("click", function(){
             var id = this.getAttribute("data-id");
             closeModal();
@@ -5493,20 +5590,21 @@ function openExercisePicker(onPick){
           });
         }
         var prevs = list.querySelectorAll("[data-prev]");
-        for (var p=0;p<prevs.length;p++){
+        for (var p = 0; p < prevs.length; p++){
           prevs[p].addEventListener("click", function(ev){
             ev.stopPropagation();
             showExercisePreview(this.getAttribute("data-prev"));
           });
         }
+        var mas = document.getElementById("ep-mas");
+        if (mas) mas.addEventListener("click", function(){ visibles += EP_TANDA; refresh(); });
       }
-      document.getElementById("ep-search").addEventListener("input", refresh);
-      document.getElementById("ep-muscle").addEventListener("change", refresh);
+      document.getElementById("ep-search").addEventListener("input", function(){ f.q = this.value; visibles = EP_TANDA; refresh(); });
+      document.getElementById("ep-pat").addEventListener("change", function(){ f.pat = this.value; visibles = EP_TANDA; refresh(); });
+      document.getElementById("ep-muscle").addEventListener("change", function(){ f.muscle = this.value; visibles = EP_TANDA; refresh(); });
+      document.getElementById("ep-niv").addEventListener("change", function(){ f.niv = this.value; visibles = EP_TANDA; refresh(); });
       refresh();
-      setTimeout(function(){
-        var s = document.getElementById("ep-search");
-        if (s) s.focus();
-      }, 50);
+      setTimeout(function(){ var s = document.getElementById("ep-search"); if (s) s.focus(); }, 50);
     }
   });
 }
@@ -5516,29 +5614,54 @@ function showExercisePreview(exId){
   if (!e) return;
   var old = document.getElementById("ex-preview-overlay");
   if (old && old.parentNode) old.parentNode.removeChild(old);
+  var t = libTaxDe(e), m = musOf(e), id = escapeAttr(e.id);
+  var media = libTieneMedia(e)
+    ? mediaPlayer(e.gif, 'alt="" onerror="this.outerHTML=\'<div style=&quot;font-size:4rem;padding:2rem;color:#fff&quot;>🏋️</div>\'"')
+    : '<div style="font-size:4rem;padding:2rem;color:#fff;">🏋️</div>';
+  var kv = '';
+  if (m.prim) kv += '<dt>Músculo</dt><dd>' + escapeHtml(m.prim) + (m.sec.length ? ' <span class="text-muted">· + ' + escapeHtml(m.sec.join(", ")) + '</span>' : '') + '</dd>';
+  if (e.muscle) kv += '<dt>Grupo</dt><dd>' + escapeHtml(e.muscle) + '</dd>';
+  if (e.equipment) kv += '<dt>Material</dt><dd>' + escapeHtml(e.equipment) + '</dd>';
+  if (t.niv) kv += '<dt>Nivel</dt><dd>' + libNivDots(t.niv, true) + '</dd>';
+  if (e.mec) kv += '<dt>Mecánica</dt><dd>' + escapeHtml(e.mec) + '</dd>';
   var ov = document.createElement("div");
-  ov.id = "ex-preview-overlay";
-  ov.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,.88);display:flex;align-items:center;justify-content:center;padding:1rem;cursor:zoom-out;";
-  var media = (e.gif && /^https?:\/\//.test(e.gif))
-    ? mediaPlayer(e.gif, 'alt="" style="max-height:62vh;max-width:92vw;border-radius:10px;background:#000;" onerror="this.outerHTML=\'<div style=&quot;font-size:4rem;padding:2rem;&quot;>🏋️</div>\'"')
-    : '<div style="font-size:4rem;padding:2rem;">🏋️</div>';
-  ov.innerHTML = '<div style="max-width:560px;width:100%;text-align:center;">'
-    + media
-    + '<div style="color:#fff;font-weight:700;margin-top:.7rem;font-size:1.05rem;">'+escapeHtml(e.name||"")+'</div>'
-    + ((e.cat||e.niv||e.mec)?'<div style="margin-top:.35rem;">'
-        + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span> ':'')
-        + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span> ':'')
-        + (e.mec?'<span class="badge niv">'+escapeHtml(e.mec)+'</span>':'')
-        + '</div>':'')
-    + (e.terap?'<div style="margin-top:.35rem;"><span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span></div>':'')
-    + (e.contr?'<div style="margin-top:.35rem;"><span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span></div>':'')
-    + (e.desc?'<div style="color:rgba(255,255,255,.75);font-size:.85rem;margin-top:.4rem;line-height:1.45;">'+escapeHtml(e.desc)+'</div>':'')
-    + '<div style="color:rgba(255,255,255,.5);font-size:.75rem;margin-top:.6rem;">Toca para cerrar</div>'
+  ov.id = "ex-preview-overlay"; ov.className = "exprev-ov";
+  ov.innerHTML = '<div class="exprev" role="dialog" aria-label="' + escapeAttr(e.name || "Ejercicio") + '" style="position:relative;">'
+    + '<div class="exprev-media">' + media + '</div>'
+    + '<div class="exprev-info">'
+      + '<div class="exprev-tags">' + libTagsHtml(e) + '</div>'
+      + '<h3>' + escapeHtml(e.name || "") + '</h3>'
+      + (kv ? '<dl class="exprev-kv">' + kv + '</dl>' : '')
+      + (e.desc ? '<div class="exprev-desc">' + escapeHtml(e.desc) + '</div>' : '<div class="text-xs text-muted">Sin descripción todavía.</div>')
+      + '<div class="exprev-acts">'
+        + '<button class="btn btn-secondary btn-sm" data-act="editar">✎ Editar</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="sust">⇄ Sustitutos</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="cerrar" style="margin-left:auto;">Cerrar</button>'
+      + '</div>'
+    + '</div>'
+    + '<button class="exprev-x" data-act="cerrar" title="Cerrar (Esc)">×</button>'
     + '</div>';
-  ov.addEventListener("click", function(){ if (ov.parentNode) ov.parentNode.removeChild(ov); });
+  function cerrar(){
+    if (ov.parentNode) ov.parentNode.removeChild(ov);
+    document.removeEventListener("keydown", tecla);
+  }
+  function tecla(ev){ if (ev.key === "Escape"){ ev.stopPropagation(); cerrar(); } }
+  ov.addEventListener("click", function(ev){
+    var b = ev.target.closest ? ev.target.closest("[data-act]") : null;
+    if (b){
+      var act = b.getAttribute("data-act");
+      cerrar();
+      if (act === "editar") openExerciseForm(e.id);
+      else if (act === "sust") u19Sustitutos(e.id);
+      return;
+    }
+    if (ev.target === ov) cerrar();
+  });
+  document.addEventListener("keydown", tecla);
   document.body.appendChild(ov);
 }
 window.showExercisePreview = showExercisePreview;
+
 
 function saveBuilder(){
   if (!_builderRoutine) return;
@@ -6183,142 +6306,148 @@ function createFromExerciseImport(){
   renderLibrary();
 }
 
-var _libFilter = { search:"", muscle:"", equipment:"", cat:"", niv:"" };
+/* ============================================================
+   BIBLIOTECA DE EJERCICIOS · motor de clasificación y vista
+   (rediseño del 6-sep-2026)
 
-function renderLibrary(){
-  var muscleSet = {};
-  state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; });
-  var muscles = Object.keys(muscleSet).sort();
+   Dos ejes independientes:
+   - tipo de trabajo (cat): Fuerza, Movilidad, Pliometría, Halterofilia,
+     Strongman, Cardio. Son los chips de arriba.
+   - patrón de movimiento (pat): Empuje, Tracción, Sentadilla, Bisagra,
+     Zancada, Core, Locomoción, Accesorio. Es el primer selector.
+   Más el nivel (niv): Principiante, Intermedio, Avanzado.
 
-  var html = '';
-  html += '<div class="section-head">';
-  html += '<h1 class="section-title">BIBLIOTECA <span class="accent">/ EJERCICIOS</span></h1>';
-  html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">';
-  html += '<button class="btn btn-primary" onclick="openExerciseForm()">+ Nuevo Ejercicio</button>';
-  html += '<button class="btn btn-secondary" onclick="importarCatalogoUS19()">🐺 Catálogo US19 (GIFs)</button>';
-  html += '<button class="btn btn-secondary" onclick="openExerciseImporter()">📋 Importar varios</button>';
-  html += '<button class="btn btn-ghost" onclick="openDedupeModal()">🧹 Duplicados</button>';
-  html += '</div>';
-  html += '</div>';
+   Las 2.380 fichas del catálogo traen los tres campos escritos. Los
+   ejercicios creados a mano no; para ellos libTaxDe() deduce los tres
+   con las mismas reglas que generaron el catálogo. Lo escrito manda
+   sobre lo deducido, siempre.
+   ============================================================ */
+var LIB_PATS = ["Empuje","Tracción","Sentadilla","Bisagra","Zancada","Core","Locomoción","Accesorio"];
+var LIB_NIV_ORD = { "Principiante":1, "Intermedio":2, "Avanzado":3 };
 
-  /* Recuento por tipo de trabajo, respetando el resto de filtros activos
-     para que el número del chip sea el que verá al pulsarlo. */
-  var _catN = {}, _catTotal = 0;
-  state.exercises.forEach(function(e){
-    if (!_libPasaSinCat(e)) return;
-    _catTotal++;
-    _catN[e.cat || "(sin)"] = (_catN[e.cat || "(sin)"] || 0) + 1;
-  });
-  html += '<div class="lib-cats">';
-  html += '<button type="button" class="cat-chip'+(_libFilter.cat?"":" on")+'" data-cat="">Todos <span class="n">'+_catTotal+'</span></button>';
-  for (var lc = 0; lc < LIB_CATS.length; lc++){
-    var cn = LIB_CATS[lc][0];
-    if (!_catN[cn]) continue;
-    html += '<button type="button" class="cat-chip'+(_libFilter.cat===cn?" on":"")+'" data-cat="'+escapeAttr(cn)+'">'
-      + LIB_CATS[lc][1] + ' ' + escapeHtml(cn) + ' <span class="n">'+_catN[cn]+'</span></button>';
-  }
-  /* Los ejercicios creados a mano no traen tipo de trabajo. Sin este chip
-     desaparecerian al filtrar y pareceria que se han borrado. */
-  if (_catN["(sin)"]){
-    html += '<button type="button" class="cat-chip'+(_libFilter.cat==="(sin)"?" on":"")+'" data-cat="(sin)" '
-      + 'title="Ejercicios que aun no tienen tipo de trabajo asignado">✎ Sin clasificar <span class="n">'+_catN["(sin)"]+'</span></button>';
-  }
-  html += '</div>';
+var LIB_RE = {
+  strong: /trineo|yugo|neumatico|piedra de atlas|barril|saco|rickshaw|cuerdas? de batalla|mazo|granjero|maleta|levantamiento de tronco/,
+  cardio: /cinta|eliptica|escaladora|escalera sin fin|remoergometro|bicicleta|patinaje|carrera|trote|caminata en|salto a la cuerda|comba/,
+  nuncaCardio: /abdominal|crunch|oblicuo|rueda|plancha/,
+  halt: /(^| )cargada|arrancada|envion|snatch|clean( |$)|jerk( |$)|push press|tiron de cargada|tiron de arrancada|halterofilia|sentadilla olimpica/,
+  plio: /(^| )salto|saltos|pliometric|burpee|skipping|skip( |$)|bound|zancada saltada|lanzamiento|golpe de balon|pase de pecho|empuje de pecho|sprint|pies rapidos|carioca|zarpazo|talon al gluteo|talones al gluteo/,
+  movil: /estiramiento|estirar|movilidad|foam|rodillo|liberacion miofascial|postura de yoga|yoga|gato y camello|camello|perro boca|paloma|circulos? de (hombro|cadera|muneca|tobillo|rodilla|codo|brazo)|circulos? (de )?tobillo|balanceo (frontal|lateral|posterior) de pierna|bascula pelvica|abrazo de rodillas|rodilla al pecho|piramidal|psoas|flexor de cadera|vacio abdominal|respiracion|apertura toracica|dislocacion de hombro/,
+  accFuerte: /gemelo|pantorrilla|muneca|wrist|cuello|neck|cubano|cuban|rotacion (externa|interna)|rotadores|manguito|abduccion|abductor|aductor|aduccion|almeja|(^| )tibial|tobillo|peroneo/,
+  accGrande: /flexiones|plancha|press|remo|dominada|jalon|sentadilla|peso muerto|fondos|zancada|curl de biceps|curl con|curl martillo|curl predicador|curl concentrado|curl inverso con barra/,
+  zancadaManda: /zancada|sentadilla|step ?up|peso muerto/,
+  avanzado: /muscle ?up|pistol|planche|front lever|(^| )lever|handstand|(^| )pino|dragon flag|nordico|nordic|salto en profundidad|depth jump|con cadenas|bandas invertidas|deficit|flexiones a una mano|sentadilla con bandas|peso muerto con bandas|press de banca con bandas|sumo con bandas|rack pull con bandas|cajon con bandas|dominada.* a una mano|dominadas.* a una mano|arquero|archer|typewriter|maltes|maltese|straddle|(^| )l ?sit|bandera|iron cross|cruz de hierro|sissy|zercher|jefferson|sentadilla con barra sobre la cabeza|overhead squat|turco|turkish|palmada|clap|dominada.*lastrad|dominadas.*lastrad|muscle up.*lastrad|fondos.*lastrad|glute ham|gluteo isquio|salto al cajon desde sentado|frankenstein|a una mano con barra|one arm barbell|press de banca con tablas|board press|desde pines|press en el suelo con cadenas|una mano en el suelo con barra|circus|campana de circo|piedras de atlas|yugo|volteo|carga de barril|carga de sacos|peso muerto de coche|rueda de conan|escaleras de potencia|crucifijo|london bridges|trepa de cuerda|rope climb|dominadas agarre abierto posterior|dominadas tras nuca|press tras nuca|push press tras nuca|sentadilla con salto con barra|salto con barra|arrancada|snatch|cargada colgante|cargada en tijera|cargada desde|cargada y envion|clean and jerk|envion|jerk|snatch balance|(^| )cargada /,
+  principiante: /maquina|multipower|smith|polea|cable|estiramiento|rodillo|foam|movilidad|circulos|circulo|balanceo|bascula|banda elastica|con banda |(^| )banda |cinta|eliptica|escaladora|escalera sin fin|bicicleta|remoergometro|caminata|patinaje|plancha|puente|superman|bird dog|dead bug|gato|vacio abdominal|abdominal|crunch|elevacion de gemelos|gemelos|pantorrilla|flexiones de rodillas|flexiones inclinad|flexiones en pared|flexiones modificadas|sentadilla con peso corporal|sentadilla sin peso|sentadilla en silla|sentadilla al aire|wall sit|sentadilla isometrica|marcha del monstruo|almeja|abduccion|aduccion|elevacion de cadera|elevacion de pierna|patada de gluteo|curl de biceps|curl con mancuernas|curl martillo|curl de muneca|curl inverso|elevacion lateral|elevacion frontal|extension de triceps|patada de triceps|aperturas|apertura|pec ?k? deck|contractor|pull apart|rotacion (externa|interna)|halo|paseo del granjero|goblet|isometrico de cuello|cuello|encogimientos con mancuernas|encogimiento con mancuernas|step up|subida|zancada caminando|zancada con peso corporal|postura|yoga|respiracion|tijeras|toque de talon|toque de puntas|elevacion de rodillas|remo invertido|remo con mancuerna|remo a una mano con mancuerna|remo inclinado con mancuernas|press de hombro con mancuernas|press con mancuernas|press de banca con mancuernas|press inclinado con mancuernas|press militar con mancuernas|press de pecho con mancuernas|salto a la cuerda|jumping jack|kettlebell halo|puente de gluteo|hip thrust con peso corporal|extension de cuadriceps/,
+  strongMedio: /trineo|arrastre|granjero|farmer|caminata|remo con trineo|apertura posterior con trineo/,
+  haltMedio: /tiron|peso muerto de|encogimiento de|entrega al rack|push press|balance/
+};
+/* Orden importa: un "curl femoral" cae en Bisagra porque se mira antes que el "curl" de Tracción. */
+var LIB_PAT_REGLAS = [
+  ["Core", /plancha|abdominal|crunch|sit ?up|oblicuo|giro ruso|russian|pallof|anti ?rotacion|lenador|wood ?chop|rueda abdominal|ab wheel|roll ?out|hollow|dead bug|bird dog|elevacion de piernas|elevacion de rodillas|elevacion en v|navaja|jackknife|tijeras|escalador|mountain climber|superman|vacio abdominal|flexion lateral|side bend|limpiaparabrisas|toque de talon|toque de puntas|v ?up|encogimiento de (piernas|rodillas)|capullo|cocoon|dragon flag|l ?sit|rotacion de tronco|(^| )giro (ruso|de tronco|con disco|con balon|con kettlebell|en polea|completo|sentado|de pie|lateral|de judo)|bicicleta abdominal|abdominal bicicleta|otis|janda|bottoms up |body up|gusano|inchworm|codo a rodilla|elevacion de cadera desde plancha|caida abdominal|fallout|golpe de balon|golpes de mazo|paso de kettlebell|figura del 8|molino|windmill|lanzador de hechizos|spell caster|series de velocidad|wind sprint|elevacion lateral de cadera|elevacion de cadera y piernas|core /],
+  ["Locomoción", /caminata|paseo|farmer|granjero|maleta|suitcase|yugo|trineo|sled|arrastre|carry|gateo|marcha del oso|bear crawl|cangrejo|crab walk|rickshaw|carga de (barril|sacos)|piedra|atlas|volteo|neumatico|tire flip|rueda de conan|escaleras de potencia|carrera|trote|sprint|cinta|eliptica|escaladora|escalera sin fin|remoergometro|bicicleta estatica|bicicleta reclinada|patinaje|salto a la cuerda|comba|carioca|skipping|pies rapidos|marcha del monstruo|monster walk|zancada caminando|paso adelante y atras|paso de esqui|rodilla alta contra|aceleracion|tecnica de salida|zarpazo|trabajo de brazos/],
+  ["Accesorio", /gemelo|pantorrilla|calf|soleo|(^| )tibial|antebrazo|muneca|wrist|dedos|pinza de discos|presion de manos|enrollador|cuello|neck|abduccion|abductor|aductor|aduccion|almeja|clamshell|rotacion (externa|interna)|rotadores|manguito|cubano|cuban|flexion de cadera|flexor|circulos de|circulo de|pronacion|supinacion|tabla de equilibrio|balance unipodal|tobillo|peroneo|planta del pie|isometrico de cuello|con arnes de cabeza|protraccion|retraccion|escapular/],
+  ["Empuje", /flexiones|flexion de brazos|push ?up|fondos|(^| )dip |press (?!de piernas)|maltes/],
+  ["Tracción", /remo|jalon|dominada|pull ?up|chin ?up|(^| )curl (?!femoral)/],
+  ["Bisagra", /peso muerto|deadlift|rumano|buenos dias|good morning|hip thrust|empuje de cadera|puente|glute bridge|hip bridge|swing|hiperextension|back extension|extension de cadera|extension lumbar|glute ham|gluteo isquio|nordico|nordic|curl femoral|leg curl|patada de gluteo|kickback de gluteo|pull through|rack pull|tiron|cargada|arrancada|clean|snatch|elevacion de cadera|elevacion de pelvis|bascula pelvica|deslizamientos de isquio|enrollamiento lumbar|elevacion de pierna en cuadrupedia|patada de pierna|donkey kick|elevacion de gluteo|extension de tronco|hip lift|elevacion tumbado sobre la cadera|extension de gluteo|gluteo en maquina/],
+  ["Zancada", /zancada|estocada|desplante|lunge|split|bulgar|step ?up|subida al cajon|subida a|pistol|sentadilla a una pierna|sentadilla unilateral|patinador|skater|cossack|cosaco|sentadilla lateral|sentadilla con reverencia|curtsy|impulso a una pierna|salto de zancada|talon al gluteo a una pierna|saltos a una pierna|salto lateral a una pierna|a una pierna en progresion|salto en tijera|salto en diagonal/],
+  ["Sentadilla", /sentadilla|squat|prensa|leg press|extension de cuadriceps|leg extension|sissy|hack|goblet|wall sit|thruster|salto|saltos|jump|burpee|saltos de rana|(^| )rana |cuadriceps|desplazamiento lateral sobre cajon|sprint sobre banco|marcha sentado/],
+  ["Tracción", /remo|(^| )row|jalon|pulldown|dominada|pull ?up|chin ?up|curl|pull ?over|face pull|encogimiento|shrug|aperturas invertidas|aperturas posteriores|apertura posterior|apertura inversa|aperturas inverso|reverse fly|pajaro|rear delt|deltoides posterior|elevacion posterior|elevacion lateral (tumbad|inclinad)|muscle ?up|trepa|rope climb|pull apart|remo al menton|upright row|high pull|tiron alto|invertido|colgado|hang|london bridges|dominada del arquero|archer pull|gironda|recepcion y lanzamiento/],
+  ["Empuje", /press|extension de triceps|triceps|patada de triceps|kickback|elevacion|lateral raise|front raise|aperturas|apertura|fly|cruce|crossover|pec deck|peck deck|contractor|envion|jerk|push press|arnold|militar|overhead|sobre la cabeza|lanzamiento|empuje|throw|pase de pecho|chest pass|slam|crucifijo|halo|car drivers|around the world|craneo|skull|frances|french|bradford|landmine|jammer|tate|svend|guillotina|antigravedad|body tricep|contraccion isometrica de pecho|isometric|wipers/]
+];
+var LIB_PAT_POR_MUSCULO = { "Pecho":"Empuje","Hombros":"Empuje","Hombro":"Empuje","Tríceps":"Empuje","Espalda":"Tracción","Bíceps":"Tracción","Brazo":"Tracción","Trapecio":"Tracción","Pierna":"Sentadilla","Glúteo":"Bisagra","Isquiotibiales":"Bisagra","Core":"Core","Pantorrilla":"Accesorio","Antebrazo":"Accesorio","Cuello":"Accesorio","Cardio":"Locomoción" };
 
-  html += '<div class="lib-toolbar">';
-  html += '<input type="text" id="lib-search" placeholder="Buscar..." value="'+escapeAttr(_libFilter.search)+'">';
-  html += '<select id="lib-muscle"><option value="">Todos los grupos</option>';
-  html += '<optgroup label="Grupo general">';
-  for (var i=0;i<muscles.length;i++){
-    var m = muscles[i];
-    html += '<option value="'+escapeAttr(m)+'"'+(_libFilter.muscle===m?" selected":"")+'>'+escapeHtml(m)+'</option>';
+function _libCatPorNombre(n, grupo){
+  var veto = LIB_RE.nuncaCardio.test(n);
+  if (LIB_RE.strong.test(n) && !veto) return "Strongman";
+  if ((LIB_RE.cardio.test(n) || grupo === "Cardio") && !veto) return "Cardio";
+  if (LIB_RE.halt.test(n)) return "Halterofilia";
+  if (LIB_RE.plio.test(n)) return "Pliometría";
+  if (LIB_RE.movil.test(n) || grupo === "Movilidad") return "Movilidad";
+  return "Fuerza";
+}
+function _libPatPorNombre(n, cat, grupo){
+  if (cat === "Movilidad") return "";
+  if (cat === "Cardio") return "Locomoción";
+  for (var i = 0; i < LIB_PAT_REGLAS.length; i++){
+    var k = LIB_PAT_REGLAS[i][0], m = LIB_PAT_REGLAS[i][1].exec(n);
+    if (!m) continue;
+    if (k === "Accesorio" && LIB_RE.accGrande.test(n) && !LIB_RE.accFuerte.test(n)) continue;
+    if (k === "Tracción" && /^ ?curl/.test(m[0]) && LIB_RE.zancadaManda.test(n)) continue;
+    return k;
   }
-  html += '</optgroup>';
-  html += musOptionsHtml(_libFilter.muscle);
-  html += '<optgroup label="🩺 Terapéuticos (rehab)">';
-  html += '<option value="terap:"'+(_libFilter.muscle==="terap:"?" selected":"")+'>Terapéuticos — todos</option>';
-  for (var t=0;t<TERAP_ZONES.length;t++){
-    var tz = "terap:"+TERAP_ZONES[t];
-    html += '<option value="'+escapeAttr(tz)+'"'+(_libFilter.muscle===tz?" selected":"")+'>Terapéutico — '+escapeHtml(TERAP_ZONES[t])+'</option>';
-  }
-  html += '</optgroup>';
-  html += '<optgroup label="⚡ Tipo de contracción">';
-  html += '<option value="contr:"'+(_libFilter.muscle==="contr:"?" selected":"")+'>Contracción — todas</option>';
-  for (var c1=0;c1<CONTR_TYPES.length;c1++){
-    var cv = "contr:"+CONTR_TYPES[c1];
-    html += '<option value="'+escapeAttr(cv)+'"'+(_libFilter.muscle===cv?" selected":"")+'>'+escapeHtml(CONTR_TYPES[c1])+'</option>';
-  }
-  html += '</optgroup>';
-  html += '<optgroup label="📷 Material visual">';
-  html += '<option value="nogif"'+(_libFilter.muscle==="nogif"?" selected":"")+'>Sin GIF / vídeo</option>';
-  html += '</optgroup>';
-  html += '</select>';
-  var _eqs = {}; state.exercises.forEach(function(e){ if(e.equipment) _eqs[e.equipment]=(_eqs[e.equipment]||0)+1; });
-  var _eqList = Object.keys(_eqs).sort();
-  html += '<select id="lib-equip"><option value="">Todo el material</option>';
-  for (var q1=0;q1<_eqList.length;q1++){
-    html += '<option value="'+escapeAttr(_eqList[q1])+'"'+(_libFilter.equipment===_eqList[q1]?" selected":"")+'>'+escapeHtml(_eqList[q1])+' ('+_eqs[_eqList[q1]]+')</option>';
-  }
-  html += '</select>';
-  var _nivN = {};
-  state.exercises.forEach(function(e){ if (e.niv) _nivN[e.niv] = (_nivN[e.niv]||0)+1; });
-  html += '<select id="lib-niv"><option value="">Cualquier nivel</option>';
-  for (var v1=0; v1<LIB_NIVELES.length; v1++){
-    var nv = LIB_NIVELES[v1];
-    if (!_nivN[nv]) continue;
-    html += '<option value="'+escapeAttr(nv)+'"'+(_libFilter.niv===nv?" selected":"")+'>'+escapeHtml(nv)+' ('+_nivN[nv]+')</option>';
-  }
-  html += '</select>';
-  html += '</div>';
-
-  html += '<div id="lib-count" class="lib-count"></div><div id="lib-grid"></div>';
-  document.getElementById("view-library").innerHTML = html;
-
-  document.getElementById("lib-search").addEventListener("input", function(){
-    _libFilter.search = this.value;
-    _libVisibles = LIB_TANDA;
-    renderLibraryGrid();
-  });
-  document.getElementById("lib-muscle").addEventListener("change", function(){
-    _libFilter.muscle = this.value;
-    _libVisibles = LIB_TANDA;
-    renderLibraryGrid();
-  });
-  document.getElementById("lib-equip").addEventListener("change", function(){
-    _libFilter.equipment = this.value;
-    _libVisibles = LIB_TANDA;
-    renderLibraryGrid();
-  });
-  document.getElementById("lib-niv").addEventListener("change", function(){
-    _libFilter.niv = this.value;
-    _libVisibles = LIB_TANDA;
-    renderLibraryGrid();
-  });
-  /* Los chips repintan la barra entera: los recuentos de los demás cambian. */
-  var chips = document.querySelectorAll("#view-library .cat-chip");
-  for (var ci = 0; ci < chips.length; ci++){
-    chips[ci].addEventListener("click", function(){
-      var v = this.getAttribute("data-cat") || "";
-      _libFilter.cat = (_libFilter.cat === v) ? "" : v;
-      _libVisibles = LIB_TANDA;
-      renderLibrary();
-    });
-  }
-  renderLibraryGrid();
+  return LIB_PAT_POR_MUSCULO[grupo] || "";
+}
+function _libNivPorNombre(n, cat){
+  if (cat === "Movilidad" || cat === "Cardio") return "Principiante";
+  if (cat === "Strongman") return LIB_RE.strongMedio.test(n) ? "Intermedio" : "Avanzado";
+  if (cat === "Halterofilia") return LIB_RE.haltMedio.test(n) ? "Intermedio" : "Avanzado";
+  if (LIB_RE.avanzado.test(n)) return "Avanzado";
+  if (cat === "Pliometría") return "Intermedio";
+  if (LIB_RE.principiante.test(n)) return "Principiante";
+  return "Intermedio";
+}
+/* Caché fuera de los objetos, como _musCache: no se persiste ni se sincroniza. */
+var _libTaxCache = {};
+function libTaxDe(e){
+  if (!e) return { cat:"", pat:"", niv:"" };
+  var key = (e.name||"") + "|" + (e.muscle||"") + "|" + (e.cat||"") + "|" + (e.pat||"") + "|" + (e.niv||"");
+  var c = _libTaxCache[key];
+  if (c) return c;
+  var n = " " + musNorm(e.name) + " ";
+  var cat = e.cat || _libCatPorNombre(n, e.muscle || "");
+  var pat = e.pat || _libPatPorNombre(n, cat, e.muscle || "");
+  var niv = e.niv || _libNivPorNombre(n, cat);
+  c = { cat:cat, pat:pat, niv:niv };
+  _libTaxCache[key] = c;
+  return c;
+}
+function libCatIcono(cat){
+  for (var i = 0; i < LIB_CATS.length; i++) if (LIB_CATS[i][0] === cat) return LIB_CATS[i][1];
+  return "";
+}
+/* Tres barritas: verde 1, amarillo 2, rojo 3. Con texto, para que no haya que adivinar. */
+function libNivDots(niv, conTexto){
+  var n = LIB_NIV_ORD[niv] || 0;
+  if (!n) return "";
+  return '<span class="niv-dots n' + n + '" title="' + escapeAttr(niv) + '"><i></i><i></i><i></i></span>'
+    + (conTexto ? ' <span class="text-xs" style="color:var(--muted);">' + escapeHtml(niv) + '</span>' : '');
+}
+function libTagsHtml(e, opciones){
+  var t = libTaxDe(e), o = opciones || {};
+  var h = '';
+  if (t.pat) h += '<span class="badge pat">' + escapeHtml(t.pat) + '</span>';
+  if (t.cat && !o.sinCat) h += '<span class="badge cat">' + libCatIcono(t.cat) + ' ' + escapeHtml(t.cat) + '</span>';
+  if (e.mec && o.conMec) h += '<span class="badge niv">' + escapeHtml(e.mec) + '</span>';
+  if (e.terap) h += '<span class="badge terap">🩺 ' + escapeHtml(e.terap) + '</span>';
+  if (e.contr) h += '<span class="badge contr">⚡ ' + escapeHtml(e.contr) + '</span>';
+  return h;
+}
+/* Línea de músculos: primario y secundarios que deduce musOf. */
+function libMusLinea(e){
+  var m = musOf(e);
+  if (!m.prim) return e.muscle ? escapeHtml(e.muscle) : '';
+  return escapeHtml(m.prim) + (m.sec.length ? ' <span>· + ' + escapeHtml(m.sec.join(", ")) + '</span>' : '');
+}
+function libTieneMedia(e){ return !!(e.gif && /^https?:\/\//.test(e.gif)); }
+function libThumbHtml(e, attrs){
+  if (libTieneMedia(e)) return mediaThumb(e.gif, (attrs || 'alt="" loading="lazy"') + ' onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏋️\'"');
+  if (e.gif && e.gif.indexOf("data:") === 0) return '<span title="GIF subido (solo local)">📦</span>';
+  return '🏋️';
 }
 
-/* Los cuatro filtros que no son el tipo de trabajo. Se usa para contar
-   cuántos ejercicios quedarían en cada chip sin contar el chip mismo. */
-function _libPasaSinCat(e){
-  var q = (_libFilter.search||"").trim().toLowerCase();
-  var muscle = _libFilter.muscle, equip = _libFilter.equipment || "";
-  if (equip && e.equipment !== equip) return false;
-  if (_libFilter.niv && e.niv !== _libFilter.niv) return false;
-  if (muscle && !_libMuscleOk(e, muscle)) return false;
-  if (q && !musHit(_libHay(e), musNorm(q))) return false;
-  return true;
-}
+/* ---------------------------- estado de la vista ---------------------------- */
+var _libFilter = { search:"", muscle:"", equipment:"", cat:"", niv:"", pat:"", sort:"nombre" };
+var _libVista = "grid";
+try {
+  if (localStorage.getItem("us19_lib_vista") === "lista") _libVista = "lista";
+  var _lo = localStorage.getItem("us19_lib_orden");
+  if (_lo === "uso" || _lo === "nivel" || _lo === "nombre") _libFilter.sort = _lo;
+} catch(e){}
+var LIB_TANDA = 60;
+var _libVisibles = LIB_TANDA, _libTotal = 0, _libObs = null, _libKeyBound = false;
 
+function _libHayFiltro(){
+  return !!(_libFilter.search || _libFilter.muscle || _libFilter.equipment || _libFilter.cat || _libFilter.niv || _libFilter.pat);
+}
 /* Un solo sitio decide qué significa cada valor del selector de grupo. */
 function _libMuscleOk(e, muscle){
   if (muscle === "terap:") return !!e.terap;
@@ -6329,97 +6458,287 @@ function _libMuscleOk(e, muscle){
   if (muscle.indexOf("mus:") === 0) return musMatch(e, muscle.slice(4));
   return e.muscle === muscle;
 }
-
-/* Texto sobre el que busca el buscador de la biblioteca. */
+/* Texto sobre el que busca el buscador. */
 function _libHay(e){
-  return musNorm(e.name+" "+(e.muscle||"")+" "+(e.equipment||"")+" "+(e.desc||"")
-    + " " + (e.cat||"") + " " + (e.niv||"") + " " + (e.mec||"") + " " + (e.pat||"")
-    + " " + (e.terap?"terapeutico rehab "+e.terap:"") + " " + (e.contr||"")) + " " + musHay(e);
+  var t = libTaxDe(e);
+  return musNorm(e.name + " " + (e.muscle||"") + " " + (e.equipment||"") + " " + (e.desc||"")
+    + " " + t.cat + " " + t.pat + " " + t.niv + " " + (e.mec||"")
+    + " " + (e.terap ? "terapeutico rehab " + e.terap : "") + " " + (e.contr||"")) + " " + musHay(e);
+}
+/* Todos los filtros menos el tipo de trabajo: sirve para que cada chip diga
+   cuántos quedarían al pulsarlo. */
+function _libPasaSinCat(e, q){
+  if (_libFilter.equipment && e.equipment !== _libFilter.equipment) return false;
+  var t = libTaxDe(e);
+  if (_libFilter.niv && t.niv !== _libFilter.niv) return false;
+  if (_libFilter.pat && t.pat !== _libFilter.pat) return false;
+  if (_libFilter.muscle && !_libMuscleOk(e, _libFilter.muscle)) return false;
+  if (q && !musHit(_libHay(e), q)) return false;
+  return true;
+}
+function _libUsoRutinas(){
+  var uso = {};
+  state.routines.forEach(function(r){
+    var seen = {};
+    (r.days||[]).forEach(function(d){
+      (d.exercises||[]).forEach(function(x){
+        if (x.exerciseId && !seen[x.exerciseId]){ seen[x.exerciseId] = true; uso[x.exerciseId] = (uso[x.exerciseId]||0) + 1; }
+      });
+    });
+  });
+  return uso;
+}
+
+function renderLibrary(){
+  var muscleSet = {}, eqs = {};
+  state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; if (e.equipment) eqs[e.equipment] = (eqs[e.equipment]||0) + 1; });
+  var muscles = Object.keys(muscleSet).sort(), eqList = Object.keys(eqs).sort();
+
+  var html = '';
+  html += '<div class="lib-head">';
+  html += '<div><h1 class="section-title">BIBLIOTECA <span class="accent">/ EJERCICIOS</span></h1><div class="lib-sub" id="lib-sub"></div></div>';
+  html += '<div class="lib-acts">';
+  html += '<button class="btn btn-primary" onclick="openExerciseForm()">+ Nuevo</button>';
+  html += '<button class="btn btn-secondary" onclick="importarCatalogoUS19()" title="Trae o repara el catálogo de Ultra-Sport 19">🐺 Catálogo US19</button>';
+  html += '<button class="btn btn-secondary" onclick="openExerciseImporter()">📋 Importar varios</button>';
+  html += '<button class="btn btn-ghost" onclick="openDedupeModal()">🧹 Duplicados</button>';
+  html += '</div></div>';
+
+  html += '<div class="lib-cats" id="lib-cats"></div>';
+
+  html += '<div class="lib-tools">';
+  html += '<div class="lib-search"><span class="lib-search-ico">⌕</span>'
+    + '<input type="text" id="lib-search" placeholder="Buscar por nombre, músculo, material o patrón…  (tecla /)" value="' + escapeAttr(_libFilter.search) + '" autocomplete="off">'
+    + '<button type="button" class="lib-search-x" id="lib-search-x" title="Borrar búsqueda"' + (_libFilter.search ? '' : ' hidden') + '>×</button></div>';
+
+  html += '<select id="lib-pat" title="Patrón de movimiento"><option value="">Todos los patrones</option>';
+  for (var p1 = 0; p1 < LIB_PATS.length; p1++){
+    html += '<option value="' + escapeAttr(LIB_PATS[p1]) + '"' + (_libFilter.pat === LIB_PATS[p1] ? ' selected' : '') + '>' + escapeHtml(LIB_PATS[p1]) + '</option>';
+  }
+  html += '</select>';
+
+  html += '<select id="lib-muscle" title="Grupo y músculo"><option value="">Todos los músculos</option>';
+  html += '<optgroup label="Grupo general">';
+  for (var i = 0; i < muscles.length; i++){
+    html += '<option value="' + escapeAttr(muscles[i]) + '"' + (_libFilter.muscle === muscles[i] ? ' selected' : '') + '>' + escapeHtml(muscles[i]) + '</option>';
+  }
+  html += '</optgroup>' + musOptionsHtml(_libFilter.muscle);
+  html += '<optgroup label="🩺 Terapéuticos (rehab)"><option value="terap:"' + (_libFilter.muscle === "terap:" ? ' selected' : '') + '>Terapéuticos — todos</option>';
+  for (var t = 0; t < TERAP_ZONES.length; t++){
+    var tz = "terap:" + TERAP_ZONES[t];
+    html += '<option value="' + escapeAttr(tz) + '"' + (_libFilter.muscle === tz ? ' selected' : '') + '>Terapéutico — ' + escapeHtml(TERAP_ZONES[t]) + '</option>';
+  }
+  html += '</optgroup><optgroup label="⚡ Tipo de contracción"><option value="contr:"' + (_libFilter.muscle === "contr:" ? ' selected' : '') + '>Contracción — todas</option>';
+  for (var c1 = 0; c1 < CONTR_TYPES.length; c1++){
+    var cv = "contr:" + CONTR_TYPES[c1];
+    html += '<option value="' + escapeAttr(cv) + '"' + (_libFilter.muscle === cv ? ' selected' : '') + '>' + escapeHtml(CONTR_TYPES[c1]) + '</option>';
+  }
+  html += '</optgroup><optgroup label="📷 Material visual"><option value="nogif"' + (_libFilter.muscle === "nogif" ? ' selected' : '') + '>Sin GIF / vídeo</option></optgroup>';
+  html += '</select>';
+
+  html += '<select id="lib-equip" title="Material"><option value="">Todo el material</option>';
+  for (var q1 = 0; q1 < eqList.length; q1++){
+    html += '<option value="' + escapeAttr(eqList[q1]) + '"' + (_libFilter.equipment === eqList[q1] ? ' selected' : '') + '>' + escapeHtml(eqList[q1]) + ' (' + eqs[eqList[q1]] + ')</option>';
+  }
+  html += '</select>';
+
+  html += '<select id="lib-niv" title="Nivel"><option value="">Cualquier nivel</option>';
+  for (var v1 = 0; v1 < LIB_NIVELES.length; v1++){
+    html += '<option value="' + escapeAttr(LIB_NIVELES[v1]) + '"' + (_libFilter.niv === LIB_NIVELES[v1] ? ' selected' : '') + '>' + escapeHtml(LIB_NIVELES[v1]) + '</option>';
+  }
+  html += '</select>';
+
+  html += '<select id="lib-sort" title="Orden">'
+    + '<option value="nombre"' + (_libFilter.sort === "nombre" ? ' selected' : '') + '>A → Z</option>'
+    + '<option value="uso"' + (_libFilter.sort === "uso" ? ' selected' : '') + '>Más usados</option>'
+    + '<option value="nivel"' + (_libFilter.sort === "nivel" ? ' selected' : '') + '>Por nivel</option>'
+    + '</select>';
+  html += '<div class="lib-vista" role="group" aria-label="Vista">'
+    + '<button type="button" id="lib-v-grid" class="' + (_libVista === "grid" ? 'on' : '') + '" title="Tarjetas">▦</button>'
+    + '<button type="button" id="lib-v-lista" class="' + (_libVista === "lista" ? 'on' : '') + '" title="Lista compacta">☰</button></div>';
+  html += '</div>';
+
+  html += '<div class="lib-status"><div id="lib-count" class="lib-count"></div><button type="button" id="lib-clear" class="lib-clear" hidden>Limpiar filtros</button></div>';
+  html += '<div id="lib-grid"></div>';
+  document.getElementById("view-library").innerHTML = html;
+
+  function reset(){ _libVisibles = LIB_TANDA; renderLibraryGrid(); }
+  document.getElementById("lib-search").addEventListener("input", function(){
+    _libFilter.search = this.value;
+    var x = document.getElementById("lib-search-x"); if (x) x.hidden = !this.value;
+    reset();
+  });
+  document.getElementById("lib-search-x").addEventListener("click", function(){
+    var inp = document.getElementById("lib-search"); inp.value = ""; _libFilter.search = ""; this.hidden = true; inp.focus(); reset();
+  });
+  document.getElementById("lib-pat").addEventListener("change", function(){ _libFilter.pat = this.value; reset(); });
+  document.getElementById("lib-muscle").addEventListener("change", function(){ _libFilter.muscle = this.value; reset(); });
+  document.getElementById("lib-equip").addEventListener("change", function(){ _libFilter.equipment = this.value; reset(); });
+  document.getElementById("lib-niv").addEventListener("change", function(){ _libFilter.niv = this.value; reset(); });
+  document.getElementById("lib-sort").addEventListener("change", function(){
+    _libFilter.sort = this.value;
+    try { localStorage.setItem("us19_lib_orden", this.value); } catch(e){}
+    reset();
+  });
+  document.getElementById("lib-v-grid").addEventListener("click", function(){ _libSetVista("grid"); });
+  document.getElementById("lib-v-lista").addEventListener("click", function(){ _libSetVista("lista"); });
+  document.getElementById("lib-clear").addEventListener("click", function(){
+    _libFilter.search = ""; _libFilter.muscle = ""; _libFilter.equipment = ""; _libFilter.cat = ""; _libFilter.niv = ""; _libFilter.pat = "";
+    renderLibrary();
+  });
+  /* La tecla / lleva al buscador, como en cualquier herramienta seria. Solo
+     cuando la biblioteca está a la vista y no se está escribiendo en otro sitio. */
+  if (!_libKeyBound){
+    _libKeyBound = true;
+    document.addEventListener("keydown", function(ev){
+      if (ev.key !== "/" || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      var v = document.getElementById("view-library");
+      if (!v || v.offsetParent === null) return;
+      var tag = (ev.target && ev.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select" || (ev.target && ev.target.isContentEditable)) return;
+      var inp = document.getElementById("lib-search");
+      if (inp){ ev.preventDefault(); inp.focus(); inp.select(); }
+    });
+  }
+  renderLibraryGrid();
+}
+function _libSetVista(v){
+  _libVista = v;
+  try { localStorage.setItem("us19_lib_vista", v); } catch(e){}
+  var a = document.getElementById("lib-v-grid"), b = document.getElementById("lib-v-lista");
+  if (a) a.className = v === "grid" ? "on" : "";
+  if (b) b.className = v === "lista" ? "on" : "";
+  renderLibraryGrid();
+}
+/* Los chips se repintan en cada filtrado: sus recuentos dependen del resto. */
+function _libPintarChips(catN, total, sinN){
+  var box = document.getElementById("lib-cats");
+  if (!box) return;
+  var h = '<button type="button" class="cat-chip' + (_libFilter.cat ? '' : ' on') + '" data-cat="">Todos <span class="n">' + total + '</span></button>';
+  for (var i = 0; i < LIB_CATS.length; i++){
+    var cn = LIB_CATS[i][0];
+    if (!catN[cn] && _libFilter.cat !== cn) continue;
+    h += '<button type="button" class="cat-chip' + (_libFilter.cat === cn ? ' on' : '') + '" data-cat="' + escapeAttr(cn) + '">'
+      + LIB_CATS[i][1] + ' ' + escapeHtml(cn) + ' <span class="n">' + (catN[cn] || 0) + '</span></button>';
+  }
+  if (sinN || _libFilter.cat === "(sin)"){
+    h += '<button type="button" class="cat-chip sin' + (_libFilter.cat === "(sin)" ? ' on' : '') + '" data-cat="(sin)" title="Sin tipo de trabajo ni forma de deducirlo por el nombre">✎ Sin clasificar <span class="n">' + sinN + '</span></button>';
+  }
+  box.innerHTML = h;
+  var chips = box.querySelectorAll(".cat-chip");
+  for (var c = 0; c < chips.length; c++){
+    chips[c].addEventListener("click", function(){
+      var v = this.getAttribute("data-cat") || "";
+      _libFilter.cat = (_libFilter.cat === v) ? "" : v;
+      _libVisibles = LIB_TANDA;
+      renderLibraryGrid();
+    });
+  }
+}
+function u19LibContador(n){
+  var el = document.getElementById("lib-count");
+  if (!el) return;
+  var f = [];
+  if (_libFilter.search) f.push('«' + escapeHtml(_libFilter.search) + '»');
+  if (_libFilter.cat) f.push(_libFilter.cat === "(sin)" ? 'sin clasificar' : escapeHtml(_libFilter.cat));
+  if (_libFilter.pat) f.push(escapeHtml(_libFilter.pat));
+  var m = _libFilter.muscle;
+  if (m === "terap:") f.push('terapéuticos');
+  else if (m === "contr:") f.push('por contracción');
+  else if (m === "nogif") f.push('sin GIF ni vídeo');
+  else if (m) f.push(escapeHtml(String(m).replace(/^(terap|contr|mus):/, '')));
+  if (_libFilter.equipment) f.push(escapeHtml(_libFilter.equipment));
+  if (_libFilter.niv) f.push('nivel ' + escapeHtml(_libFilter.niv).toLowerCase());
+  el.innerHTML = '<b>' + n + '</b> de ' + state.exercises.length + ' ejercicios' + (f.length ? ' · ' + f.join(' · ') : '');
+  var clear = document.getElementById("lib-clear");
+  if (clear) clear.hidden = !_libHayFiltro();
+  var sub = document.getElementById("lib-sub");
+  if (sub){
+    var conMedia = 0; state.exercises.forEach(function(e){ if (libTieneMedia(e)) conMedia++; });
+    sub.innerHTML = '<b>' + state.exercises.length + '</b> ejercicios · <b>' + conMedia + '</b> con GIF o vídeo · ' + LIB_CATS.length + ' tipos de trabajo · ' + LIB_PATS.length + ' patrones';
+  }
 }
 
 function renderLibraryGrid(){
   var grid = document.getElementById("lib-grid");
   if (!grid) return;
-  var q = (_libFilter.search||"").trim().toLowerCase();
-  var muscle = _libFilter.muscle;
-  var equip = _libFilter.equipment || "";
-  // Uso por ejercicio: nº de rutinas distintas que lo incluyen
-  var _exUsage = {};
-  state.routines.forEach(function(r){
-    var seen = {};
-    (r.days||[]).forEach(function(d){
-      (d.exercises||[]).forEach(function(x){
-        if (x.exerciseId && !seen[x.exerciseId]){ seen[x.exerciseId] = true; _exUsage[x.exerciseId] = (_exUsage[x.exerciseId]||0) + 1; }
-      });
-    });
-  });
-  var filtered = state.exercises.filter(function(e){
-    if (_libFilter.cat === "(sin)"){ if (e.cat) return false; }
-    else if (_libFilter.cat && e.cat !== _libFilter.cat) return false;
-    if (_libFilter.niv && e.niv !== _libFilter.niv) return false;
-    if (equip && e.equipment !== equip) return false;
-    if (muscle && !_libMuscleOk(e, muscle)) return false;
-    if (q && !musHit(_libHay(e), musNorm(q))) return false;
-    return true;
-  }).sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); });
+  var q = musNorm((_libFilter.search || "").trim());
+  var uso = _libUsoRutinas();
 
+  var base = state.exercises.filter(function(e){ return _libPasaSinCat(e, q); });
+  var catN = {}, sinN = 0;
+  base.forEach(function(e){ var c = libTaxDe(e).cat; if (c) catN[c] = (catN[c] || 0) + 1; else sinN++; });
+  _libPintarChips(catN, base.length, sinN);
+
+  var filtered = base.filter(function(e){
+    var c = libTaxDe(e).cat;
+    if (_libFilter.cat === "(sin)") return !c;
+    return !_libFilter.cat || c === _libFilter.cat;
+  });
+  var sort = _libFilter.sort;
+  filtered.sort(function(a, b){
+    if (sort === "uso"){ var d = (uso[b.id]||0) - (uso[a.id]||0); if (d) return d; }
+    if (sort === "nivel"){ var dn = (LIB_NIV_ORD[libTaxDe(a).niv]||9) - (LIB_NIV_ORD[libTaxDe(b).niv]||9); if (dn) return dn; }
+    return (a.name||"").localeCompare(b.name||"");
+  });
+
+  u19LibContador(filtered.length);
   if (!filtered.length){
-    u19LibContador(0, q, muscle, equip); grid.innerHTML = emptyState("Sin resultados", "Cambia el filtro o crea un nuevo ejercicio.", "+ Nuevo Ejercicio", "openExerciseForm()");
     grid.className = "";
+    grid.innerHTML = emptyState("Sin resultados", "Cambia el filtro, borra la búsqueda o crea el ejercicio.", "+ Nuevo ejercicio", "openExerciseForm()");
+    _libPintarMas(grid, filtered);
     return;
   }
-  grid.className = "exercise-grid";
-  u19LibContador(filtered.length, q, muscle, equip);
-  /* Pintar 2.060 tarjetas de una vez bloquea el hilo y llena el DOM.
-     Se muestran por tandas: el resto llega al desplazarse. */
+  grid.className = "lib-grid" + (_libVista === "lista" ? " lista" : "");
+  /* Pintar 2.380 tarjetas de una vez bloquea el hilo y llena el DOM: van por tandas. */
   _libTotal = filtered.length;
-  /* Math.min ya cubre que el filtro deje menos de los visibles; resetear
-     aqui rompia el boton «mostrar mas». El reset va al cambiar de filtro. */
-  var _hasta = Math.min(_libVisibles, _libTotal);
-  var html = '';
-  for (var i=0;i<_hasta;i++){
-    var e = filtered[i];
-    var hasGif = e.gif && /^https?:\/\//.test(e.gif);
-    var heavy = e.gif && e.gif.indexOf("data:") === 0;
-    var thumb = hasGif
-      ? mediaThumb(e.gif, 'alt="" loading="lazy" onerror="this.style.display=\'none\';this.parentNode.innerHTML=\'🏋️\'"')
-      : (heavy ? '<span title="GIF subido (solo local)">📦</span>' : '🏋️');
-    html += '<div class="ex-card">'
-      + '<div class="ex-thumb">'+thumb+'</div>'
-      + '<div class="ex-body">'
-        + '<h4>'+escapeHtml(e.name||"Sin nombre")+'</h4>'
-        + '<div class="ex-meta">'
-          + (e.cat?'<span class="badge cat">'+libCatIcono(e.cat)+' '+escapeHtml(e.cat)+'</span>':'')
-          + musBadges(e)
-          + (e.muscle?'<span class="badge green">'+escapeHtml(e.muscle)+'</span>':'')
-          + (e.equipment?'<span class="badge muted">'+escapeHtml(e.equipment)+'</span>':'')
-          + (e.niv?'<span class="badge niv">'+escapeHtml(e.niv)+'</span>':'')
-          + (e.mec?'<span class="badge niv">'+escapeHtml(e.mec)+'</span>':'')
-          + (e.terap?'<span class="badge terap">🩺 Terapéutico — '+escapeHtml(e.terap)+'</span>':'')
-          + (e.contr?'<span class="badge contr">⚡ '+escapeHtml(e.contr)+'</span>':'')
-          + (heavy?'<span class="badge warn" title="GIF pesado, solo local">⚠ local</span>':'')
-          + (_exUsage[e.id]?'<span class="badge teal" title="Rutinas que incluyen este ejercicio">📋 en '+_exUsage[e.id]+' rutina'+(_exUsage[e.id]===1?'':'s')+'</span>':'')
-        + '</div>'
-        + (e.desc?'<p class="text-xs text-muted" style="line-height:1.4;">'+escapeHtml(e.desc)+'</p>':'')
-        + '<div class="ex-acts">'
-          + '<button class="btn btn-ghost btn-sm" onclick="u19Sustitutos(\''+e.id+'\')" title="Alternativas del mismo grupo muscular">⇄ Sustitutos</button>'
-          + '<button class="btn btn-secondary btn-sm" onclick="openExerciseForm(\''+e.id+'\')">Editar</button>'
-          + '<button class="btn btn-ghost btn-sm" onclick="deleteExercise(\''+e.id+'\')" title="Eliminar">🗑</button>'
-        + '</div>'
-      + '</div>'
-    + '</div>';
-  }
+  var hasta = Math.min(_libVisibles, _libTotal), html = '';
+  for (var i = 0; i < hasta; i++) html += libCardHtml(filtered[i], uso[filtered[i].id] || 0);
   grid.innerHTML = html;
   _libPintarMas(grid, filtered);
 }
 
-/* Boton/centinela para la tanda siguiente. */
-var LIB_TANDA = 60;
-var _libVisibles = LIB_TANDA, _libTotal = 0, _libObs = null;
+function libCardHtml(e, uso){
+  var t = libTaxDe(e);
+  var id = escapeAttr(e.id);
+  var esVideo = libTieneMedia(e) && typeof isVideoUrl === "function" && isVideoUrl(e.gif);
+  var lista = _libVista === "lista";
+  var acts = '<div class="exc-acts">'
+    + '<button class="btn btn-ghost btn-sm" onclick="u19Sustitutos(\'' + id + '\')" title="Alternativas con el mismo patrón y músculo">⇄ Sustitutos</button>'
+    + '<button class="btn btn-secondary btn-sm" onclick="openExerciseForm(\'' + id + '\')">Editar</button>'
+    + '<button class="btn btn-ghost btn-sm x" onclick="deleteExercise(\'' + id + '\')" title="Eliminar">🗑</button>'
+    + '</div>';
+  var foot = '<div class="exc-foot"><span>' + escapeHtml(e.equipment || "—") + '</span>'
+    + (uso ? '<span class="uso" title="Rutinas que lo incluyen">📋 ' + uso + ' rutina' + (uso === 1 ? '' : 's') + '</span>' : '')
+    + (lista ? '<span>' + libNivDots(t.niv, true) + '</span>' : '')
+    + '</div>';
+  var media = '<div class="exc-media" onclick="showExercisePreview(\'' + id + '\')" title="Ver en grande">' + libThumbHtml(e)
+    + (esVideo ? '<span class="exc-play">▶ VÍDEO</span>' : '')
+    + (t.niv ? '<span class="exc-nivp niv-pill">' + libNivDots(t.niv) + escapeHtml(t.niv) + '</span>' : '')
+    + '</div>';
+  if (lista){
+    return '<div class="exc" data-id="' + id + '">' + media
+      + '<div class="exc-body"><div class="exc-main">'
+      + '<h4 class="exc-title" onclick="showExercisePreview(\'' + id + '\')">' + escapeHtml(e.name || "Sin nombre") + '</h4>'
+      + '<div class="exc-mus">' + libMusLinea(e) + '</div></div>'
+      + '<div class="exc-tags">' + libTagsHtml(e) + '</div>' + foot + acts
+      + '</div></div>';
+  }
+  return '<div class="exc" data-id="' + id + '">' + media
+    + '<div class="exc-body">'
+    + '<div class="exc-tags">' + libTagsHtml(e) + '</div>'
+    + '<h4 class="exc-title" onclick="showExercisePreview(\'' + id + '\')">' + escapeHtml(e.name || "Sin nombre") + '</h4>'
+    + '<div class="exc-mus">' + libMusLinea(e) + '</div>'
+    + foot + acts
+    + '</div></div>';
+}
+
+/* Botón/centinela para la tanda siguiente. */
 function _libPintarMas(grid, filtered){
   var pie = document.getElementById("lib-mas");
   if (pie && pie.parentNode) pie.parentNode.removeChild(pie);
   if (_libObs){ try { _libObs.disconnect(); } catch(e){} _libObs = null; }
+  if (!filtered.length) return;
   if (_libVisibles >= _libTotal){
     if (_libTotal > LIB_TANDA){
       var fin = document.createElement("div");
@@ -6431,27 +6750,22 @@ function _libPintarMas(grid, filtered){
   }
   var box = document.createElement("div");
   box.id = "lib-mas"; box.className = "lib-mas";
-  box.innerHTML = '<button class="btn btn-secondary btn-sm" onclick="libVerMas()">Mostrar '
-    + Math.min(LIB_TANDA, _libTotal - _libVisibles) + ' más</button>'
+  box.innerHTML = '<button class="btn btn-secondary btn-sm" onclick="libVerMas()">Mostrar ' + Math.min(LIB_TANDA, _libTotal - _libVisibles) + ' más</button>'
     + '<span class="text-xs text-muted">' + _libVisibles + ' de ' + _libTotal + '</span>';
   grid.parentNode.insertBefore(box, grid.nextSibling);
-  /* Y sin tocar nada: al llegar abajo se carga la tanda siguiente. */
   if (typeof IntersectionObserver === "function"){
-    _libObs = new IntersectionObserver(function(ent){
-      if (ent[0] && ent[0].isIntersecting) libVerMas();
-    }, { rootMargin: "300px" });
+    _libObs = new IntersectionObserver(function(ent){ if (ent[0] && ent[0].isIntersecting) libVerMas(); }, { rootMargin: "300px" });
     _libObs.observe(box);
   }
 }
-window.libVerMas = function(){
-  _libVisibles += LIB_TANDA;
-  renderLibraryGrid();
-};
+window.libVerMas = function(){ _libVisibles += LIB_TANDA; renderLibraryGrid(); };
 
 function openExerciseForm(id){
   var ex = id ? getExercise(id) : null;
   var isEdit = !!ex;
-  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"", terap:"", contr:"", cat:"", niv:"" };
+  var e = ex || { name:"", muscle:"", equipment:"", desc:"", gif:"", terap:"", contr:"", cat:"", niv:"", pat:"" };
+  /* Lo que deduciría la app si no se fija nada, para que el formulario lo enseñe. */
+  var auto = libTaxDe({ name:e.name, muscle:e.muscle });
 
   var muscleOpts = ["Pecho","Espalda","Hombro","Brazo","Pierna","Glúteo","Core","Cardio","Movilidad"];
   var equipOpts = ["Peso corporal","Barra","Mancuernas","Polea","Máquina","Caminadora","Rueda"];
@@ -6503,7 +6817,7 @@ function openExerciseForm(id){
   terapHtml += '</select>';
 
   var catHtml = '<select id="ef-cat">';
-  catHtml += '<option value="">— Sin clasificar —</option>';
+  catHtml += '<option value="">— Automático: ' + escapeHtml(auto.cat || "Fuerza") + ' —</option>';
   for (var q2=0;q2<LIB_CATS.length;q2++){
     catHtml += '<option value="'+escapeAttr(LIB_CATS[q2][0])+'"'+(e.cat===LIB_CATS[q2][0]?" selected":"")+'>'
       + LIB_CATS[q2][1] + ' ' + escapeHtml(LIB_CATS[q2][0])+'</option>';
@@ -6511,11 +6825,18 @@ function openExerciseForm(id){
   catHtml += '</select>';
 
   var nivHtml = '<select id="ef-niv">';
-  nivHtml += '<option value="">— Sin nivel —</option>';
+  nivHtml += '<option value="">— Automático: ' + escapeHtml(auto.niv || "Intermedio") + ' —</option>';
   for (var q3=0;q3<LIB_NIVELES.length;q3++){
     nivHtml += '<option value="'+escapeAttr(LIB_NIVELES[q3])+'"'+(e.niv===LIB_NIVELES[q3]?" selected":"")+'>'+escapeHtml(LIB_NIVELES[q3])+'</option>';
   }
   nivHtml += '</select>';
+
+  var patHtml = '<select id="ef-pat">';
+  patHtml += '<option value="">— Automático' + (auto.pat ? ': ' + escapeHtml(auto.pat) : '') + ' —</option>';
+  for (var q4=0;q4<LIB_PATS.length;q4++){
+    patHtml += '<option value="'+escapeAttr(LIB_PATS[q4])+'"'+(e.pat===LIB_PATS[q4]?" selected":"")+'>'+escapeHtml(LIB_PATS[q4])+'</option>';
+  }
+  patHtml += '</select>';
 
   var contrHtml = '<select id="ef-contr">';
   contrHtml += '<option value="">— Sin especificar —</option>';
@@ -6541,12 +6862,14 @@ function openExerciseForm(id){
         )
       + '<div class="form-grid cols-2">'
         + formField("Tipo de trabajo", catHtml)
-        + formField("Nivel", nivHtml)
+        + formField("Patrón de movimiento", patHtml)
       + '</div>'
+      + '<div class="field-hint" style="margin-top:-.4rem;margin-bottom:.6rem;">Tipo, patrón y nivel se deducen del nombre. Elige un valor solo para corregirlo: queda fijo y manda sobre la deducción.</div>'
       + '<div class="form-grid cols-2">'
-        + formField("Categoría terapéutica (rehab)", terapHtml)
+        + formField("Nivel", nivHtml)
         + formField("Tipo de contracción", contrHtml)
       + '</div>'
+      + formField("Categoría terapéutica (rehab)", terapHtml)
       + formField("Descripción", '<textarea id="ef-desc" placeholder="Cómo ejecutar el ejercicio">'+escapeHtml(e.desc||"")+'</textarea>')
       + formField("URL del GIF / imagen",
           '<input type="url" id="ef-gif" value="'+escapeAttr(e.gif||"")+'" placeholder="https://media.giphy.com/...">'
@@ -6570,6 +6893,9 @@ function openExerciseForm(id){
           contr: document.getElementById("ef-contr").value,
           cat: document.getElementById("ef-cat").value,
           niv: document.getElementById("ef-niv").value,
+          pat: document.getElementById("ef-pat").value,
+          /* Si se eligió algo a mano, el importador del catálogo ya no lo pisa. */
+          taxManual: !!(document.getElementById("ef-cat").value || document.getElementById("ef-niv").value || document.getElementById("ef-pat").value),
           desc: document.getElementById("ef-desc").value.trim(),
           gif: gif
         };
@@ -7219,6 +7545,7 @@ function buildExerciseBlock(shareData, r, di, ei, progress){
     +'<div class="meta">'
     +(def&&def.muscle?'<span class="badge green">'+escapeHtml(def.muscle)+'</span>':'')
     +(def&&def.equipment?'<span class="badge muted">'+escapeHtml(def.equipment)+'</span>':'')
+    +(def?(function(){ var t = libTaxDe(def); return (t.pat?'<span class="badge pat">'+escapeHtml(t.pat)+'</span>':'') + (t.niv?'<span class="badge niv">'+escapeHtml(t.niv)+'</span>':''); })():'')
     +(parseRestSeconds(rowEx.rest)>0?'<button class="rest-chip" onclick="startRestTimer(\''+escapeAttr(String(rowEx.rest).replace(/['"\\]/g,""))+'\')" title="Iniciar temporizador de descanso">⏱ '+escapeHtml(rowEx.rest)+'</button>':'')
     +'</div></div>';
   html += '<div class="ex-block-status"><span class="status-pill '+exStatus+'">'+statusLabels[exStatus]+'</span></div>';
@@ -11824,6 +12151,29 @@ function buildVolumeBadges(r){
     html += '<span class="badge '+(out?'muted':'teal')+'"'+(out?' style="color:var(--warn);" title="Fuera del rango 10-20 series/semana"':'')+'>'+escapeHtml(m)+' '+v+(v<10?' ↓':(v>20?' ⚠':''))+'</span>';
   });
   html += '<span class="text-xs text-muted">(objetivo 10-20)</span>';
+  /* Equilibrio por patrón: series semanales de empuje, tracción, sentadilla,
+     bisagra, zancada y core. Es lo primero que mira un ojo entrenado. */
+  var pat = {};
+  ((r&&r.days)||[]).forEach(function(d){
+    ((d&&d.exercises)||[]).forEach(function(x){
+      var def = getExercise(x.exerciseId); if (!def) return;
+      var p = libTaxDe(def).pat; if (!p || p === "Locomoción") return;
+      pat[p] = (pat[p]||0) + (parseInt(x.sets,10)||0);
+    });
+  });
+  var ordenPat = ["Empuje","Tracción","Sentadilla","Bisagra","Zancada","Core","Accesorio"];
+  var pk = ordenPat.filter(function(k){ return pat[k]; });
+  if (pk.length){
+    html += '<div class="rb-patrones"><span class="text-xs text-muted">Patrones:</span>';
+    pk.forEach(function(k){ html += '<span class="badge pat">' + k + ' ' + pat[k] + '</span>'; });
+    var avisos = [], emp = pat["Empuje"]||0, tra = pat["Tracción"]||0;
+    if (emp && tra && Math.max(emp,tra) > Math.min(emp,tra) * 1.6) avisos.push('empuje y tracción descompensados');
+    if (emp && !tra) avisos.push('solo empuje, nada de tracción');
+    if (!emp && tra) avisos.push('solo tracción, nada de empuje');
+    if (((pat["Sentadilla"]||0) + (pat["Zancada"]||0)) > 0 && !(pat["Bisagra"]||0)) avisos.push('rodilla sin bisagra de cadera');
+    if (avisos.length) html += '<span class="text-xs" style="color:var(--warn);" title="Orientativo: cada objetivo tiene su reparto">⚠ ' + escapeHtml(avisos.join(' · ')) + '</span>';
+    html += '</div>';
+  }
   return html;
 }
 
@@ -21022,6 +21372,12 @@ function importarCatalogoUS19(){
 }
 
 var _cus19Data = null;
+/* ¿La ficha local y la del catálogo clasifican distinto? */
+function _cus19TaxDistinta(ex, e){
+  var ks = ["cat", "niv", "mec", "pat"];
+  for (var i = 0; i < ks.length; i++) if ((e[ks[i]] || "") !== (ex[ks[i]] || "")) return true;
+  return false;
+}
 function _cus19Ready(data){
   _cus19Data = data || [];
   var st = document.getElementById("cus19-status");
@@ -21040,7 +21396,7 @@ function _cus19Ready(data){
     if (!grupos[g]) grupos[g] = { nuevos:0, reparar:0 };
     var ex = (e.id && porId[e.id]) || porNombre[(e.name||"").toLowerCase()];
     if (!ex) grupos[g].nuevos++;
-    else if (ex.gif !== e.gif || ex.name !== e.name || (e.cat && ex.cat !== e.cat)) grupos[g].reparar++;
+    else if (ex.gif !== e.gif || ex.name !== e.name || (!ex.taxManual && _cus19TaxDistinta(ex, e))) grupos[g].reparar++;
   });
   var nuevos = 0, reparar = 0;
   Object.keys(grupos).forEach(function(k){ nuevos+=grupos[k].nuevos; reparar+=grupos[k].reparar; });
@@ -21089,9 +21445,17 @@ function _cus19Import(){
       if (e.desc && !ex.desc){ ex.desc = e.desc; changed = true; }
       if (e.muscle && !ex.muscle){ ex.muscle = e.muscle; changed = true; }
       if (e.equipment && !ex.equipment){ ex.equipment = e.equipment; changed = true; }
-      for (var t1 = 0; t1 < TAXO.length; t1++){
-        var k1 = TAXO[t1];
-        if (e[k1] && !ex[k1]){ ex[k1] = e[k1]; changed = true; }
+      /* La clasificación del catálogo manda sobre la que ya tenía la ficha
+         (una versión anterior pudo dejarla desfasada), salvo que Diego la
+         haya fijado a mano en el formulario: entonces no se toca. */
+      if (!ex.taxManual){
+        for (var t1 = 0; t1 < TAXO.length; t1++){
+          var k1 = TAXO[t1];
+          if ((e[k1] || "") !== (ex[k1] || "")){
+            if (e[k1]) ex[k1] = e[k1]; else delete ex[k1];
+            changed = true;
+          }
+        }
       }
       if (changed) fixed++;
     } else {
@@ -22882,9 +23246,15 @@ window.u19Sustitutos = function(exId){
   for (var i = 0; i < state.exercises.length; i++){ if (state.exercises[i].id === exId){ base = state.exercises[i]; break; } }
   if (!base){ toast("Ejercicio no encontrado", "error"); return; }
 
-  var mismos = state.exercises.filter(function(e){
+  var tb = libTaxDe(base);
+  var todos = state.exercises.filter(function(e){
     return e.id !== base.id && e.muscle === base.muscle;
   });
+  /* La sustitución más fiel es la que conserva el gesto: mismo patrón y mismo
+     músculo. Esas van primero y no se repiten en los grupos de abajo. */
+  var mismoPatron = todos.filter(function(e){ return tb.pat && libTaxDe(e).pat === tb.pat; });
+  var yaEsta = {}; mismoPatron.forEach(function(e){ yaEsta[e.id] = true; });
+  var mismos = todos.filter(function(e){ return !yaEsta[e.id]; });
   var otroMaterial = mismos.filter(function(e){ return e.equipment !== base.equipment; });
   var corporal = mismos.filter(function(e){ return e.equipment === "Peso corporal"; });
   var mismoMaterial = mismos.filter(function(e){ return e.equipment === base.equipment; });
@@ -22893,17 +23263,19 @@ window.u19Sustitutos = function(exId){
     if (!arr.length) return '';
     return '<div style="margin-bottom:.9rem;"><div style="font-weight:700;font-size:.85rem;">' + titulo + '</div>'
       + '<div class="text-xs text-muted" style="margin-bottom:.3rem;">' + subt + '</div>'
-      + arr.slice(0, 8).map(function(e){
-          return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.28rem 0;border-bottom:1px solid var(--border);">'
-            + '<span style="font-size:.8rem;">' + escapeHtml(e.name) + '</span>'
-            + '<span class="text-xs text-muted">' + escapeHtml(e.equipment) + '</span></div>';
+      + arr.slice(0, 10).map(function(e){
+          var te = libTaxDe(e);
+          return '<div style="display:flex;justify-content:space-between;gap:.5rem;padding:.28rem 0;border-bottom:1px solid var(--border);align-items:center;">'
+            + '<span style="font-size:.8rem;cursor:zoom-in;" onclick="showExercisePreview(\'' + escapeAttr(e.id) + '\')" title="Ver en grande">' + escapeHtml(e.name) + '</span>'
+            + '<span class="text-xs text-muted" style="white-space:nowrap;">' + escapeHtml(e.equipment) + ' ' + libNivDots(te.niv) + '</span></div>';
         }).join('') + '</div>';
   }
 
   openModal({
     title: "Sustitutos · " + base.name, large: true,
     bodyHtml: '<div class="text-xs text-muted" style="margin-bottom:.8rem;">Mismo grupo muscular (<b>' + escapeHtml(base.muscle)
-      + '</b>). Úsalo cuando falte material, cuando haya una zona a proteger o para variar el estímulo sin cambiar el objetivo.</div>'
+      + '</b>)' + (tb.pat ? ', patrón <b>' + escapeHtml(tb.pat) + '</b>' : '') + '. Úsalo cuando falte material, cuando haya una zona a proteger o para variar el estímulo sin cambiar el objetivo.</div>'
+      + grupo('Mismo patrón' + (tb.pat ? ' · ' + escapeHtml(tb.pat) : ''), 'La sustitución más fiel: mismo músculo y mismo gesto', mismoPatron)
       + grupo('Sin material', 'Peso corporal — la primera opción si hay dolor o carga que evitar', corporal)
       + grupo('Otro material', 'Mismo músculo, implemento distinto', otroMaterial.filter(function(e){ return e.equipment !== "Peso corporal"; }))
       + grupo('Mismo material', 'Variantes con ' + escapeHtml(base.equipment), mismoMaterial)
