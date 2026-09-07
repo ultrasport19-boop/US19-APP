@@ -7301,6 +7301,9 @@ function buildShareData(routine){
       weeks: routine.weeks || 4,
       startDate: routine.startDate || "",
       notes: routine.notes || "",
+      /* La progresión por semana se muestra en la vista del socio (línea _wkNotes),
+         pero nunca viajaba en el enlace: se quedaba en el navegador de Diego. */
+      weekNotes: routine.weekNotes || [],
       category: routine.category || "",
       enfoque: routine.enfoque || "",
       zonaTerap: routine.zonaTerap || "",
