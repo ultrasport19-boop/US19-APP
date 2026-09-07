@@ -1184,6 +1184,7 @@ img{max-width:100%;display:block;}
 .circ-row input{width:100%;}
 .circ-row .circ-acc{display:flex;gap:.2rem;}
 .circ-row .circ-acc .btn{padding:.3rem .5rem;}
+.circ-row .circ-t{width:4.6rem;padding:.3rem .4rem;font-size:.8rem;}
 .circ-resumen{display:flex;gap:.5rem;flex-wrap:wrap;margin:.6rem 0;}
 .circ-rot{overflow-x:auto;margin-top:.6rem;}
 .circ-rot table{border-collapse:collapse;font-size:.78rem;}
@@ -1301,6 +1302,7 @@ body.circ-live-open{overflow:hidden;}
 <div class="toast-wrap" id="toast-wrap"></div>
 <div id="circ-live" class="circ-live" hidden></div>
 <div id="pizarra" class="pizarra" hidden></div>
+<div id="rutina-live" class="circ-live" hidden></div>
 
 <script>
 "use strict";
@@ -5298,6 +5300,8 @@ function renderDayPanel(){
   html += '<span id="day-patrones" style="display:inline-flex;gap:.3rem;flex-wrap:wrap;">' + libPatronesBadges(libPatronesDe(day.exercises)) + '</span>';
   html += '<button class="btn btn-secondary btn-sm" onclick="addExerciseToDay()">+ Ejercicio</button>';
   if (day.exercises.length) html += '<button class="btn btn-secondary btn-sm" onclick="pizarraDiaBuilder()" title="Ver la sesión en movimiento, para planificarla o mostrarla">🎞 Pizarra</button>';
+  if (day.exercises.length) html += '<button class="btn btn-primary btn-sm" onclick="rutinaEnVivoBuilder()" title="Seguir este día con el cronómetro: series, descansos y pitidos">▶ En vivo</button>';
+  if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="circDesdeDia()" title="Crea un circuito con los ejercicios de este día">🔁 Como circuito</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="copyDayTo()" title="Copiar los ejercicios de este día a otro día">⧉ Copiar día</button>';
   if (day.exercises.length) html += '<button class="btn btn-ghost btn-sm" onclick="clearDay()">Vaciar día</button>';
   html += '</div></div>';
@@ -5702,7 +5706,7 @@ function openExercisePicker(onPick, opts){
   state.exercises.forEach(function(e){ if (e.muscle) muscleSet[e.muscle] = true; });
   var muscles = Object.keys(muscleSet).sort();
   var uso = _libUsoRutinas();
-  var f = { q:"", cat:"", pat:"", muscle:"", niv:"" };
+  var f = { q:"", cat:"", pat:"", muscle:"", niv:"", casa: libCasaGuardada() };
   if (opts.preset){ for (var pk in opts.preset) if (opts.preset.hasOwnProperty(pk) && pk in f) f[pk] = opts.preset[pk]; }
   var EP_TANDA = 80, visibles = EP_TANDA, anadidos = 0;
 
@@ -5731,6 +5735,7 @@ function openExercisePicker(onPick, opts){
     + LIB_NIVELES.map(function(n){ return '<option value="' + escapeAttr(n) + '"' + (f.niv === n ? ' selected' : '') + '>' + escapeHtml(n) + '</option>'; }).join("")
     + '</select>'
     + '</div>'
+    + '<label style="display:flex;align-items:center;gap:.4rem;font-size:.82rem;margin:.1rem 0 .45rem;cursor:pointer;"><input type="checkbox" id="ep-casa"' + (f.casa ? ' checked' : '') + '> 🏠 Solo material de la casa <span class="text-muted">(mancuernas, kettlebell, polea, barra, banco, peso corporal, cardio)</span></label>'
     + '<div class="text-xs text-muted" id="ep-count" style="margin-bottom:.4rem;"></div>'
     + '<div id="ep-list" style="max-height:52vh;overflow-y:auto;display:flex;flex-direction:column;gap:.35rem;"></div>';
 
@@ -5750,6 +5755,7 @@ function openExercisePicker(onPick, opts){
         if (f.pat && t.pat !== f.pat) return false;
         if (f.niv && t.niv !== f.niv) return false;
         if (f.muscle && !_libMuscleOk(e, f.muscle)) return false;
+        if (f.casa && !materialCasaOk(e)) return false;
         if (q && !busqCoincide(_libHay(e), q, musNorm((e.name||"") + " " + (e.muscle||"") + " " + (e.equipment||"")))) return false;
         return true;
       }
@@ -5862,6 +5868,7 @@ function openExercisePicker(onPick, opts){
       document.getElementById("ep-pat").addEventListener("change", function(){ f.pat = this.value; visibles = EP_TANDA; refresh(); });
       document.getElementById("ep-muscle").addEventListener("change", function(){ f.muscle = this.value; visibles = EP_TANDA; refresh(); });
       document.getElementById("ep-niv").addEventListener("change", function(){ f.niv = this.value; visibles = EP_TANDA; refresh(); });
+      document.getElementById("ep-casa").addEventListener("change", function(){ f.casa = this.checked; try { localStorage.setItem("us19_lib_casa", f.casa ? "1" : "0"); } catch(err){} visibles = EP_TANDA; refresh(); });
       refresh();
       setTimeout(function(){ search.focus(); }, 50);
     }
@@ -6700,6 +6707,12 @@ function libThumbHtml(e, attrs){
 
 /* ---------------------------- estado de la vista ---------------------------- */
 var _libFilter = { search:"", muscle:"", equipment:"", cat:"", niv:"", pat:"", sort:"nombre" };
+/* Material que hay de verdad en el gimnasio (inventario de sep-2026): sin prensa, hack ni
+   multipower («Máquina»), sin bandas, foam roller, trineo, fitball, cuerda ni rueda. Las dos
+   multifuncionales son «Polea». Los ejercicios propios sin material puesto pasan. */
+var MATERIAL_CASA = ["Peso corporal", "Mancuernas", "Polea", "Barra", "Barra Z", "Kettlebell", "Lastre / Disco", "Balón medicinal", "Máquina de cardio", "Bicicleta estática", "Caminadora", "Banco", "Pelota", "Toalla"];
+function materialCasaOk(e){ return !e.equipment || MATERIAL_CASA.indexOf(e.equipment) >= 0; }
+function libCasaGuardada(){ try { return localStorage.getItem("us19_lib_casa") === "1"; } catch(err){ return false; } }
 var _libVista = "grid";
 try {
   if (localStorage.getItem("us19_lib_vista") === "lista") _libVista = "lista";
@@ -6742,7 +6755,8 @@ function _libHay(e){
 /* Todos los filtros menos el tipo de trabajo: sirve para que cada chip diga
    cuántos quedarían al pulsarlo. */
 function _libPasaSinCat(e, q){
-  if (_libFilter.equipment && e.equipment !== _libFilter.equipment) return false;
+  if (_libFilter.equipment === "(casa)"){ if (!materialCasaOk(e)) return false; }
+  else if (_libFilter.equipment && e.equipment !== _libFilter.equipment) return false;
   var t = libTaxDe(e);
   if (_libFilter.niv && t.niv !== _libFilter.niv) return false;
   if (_libFilter.pat && t.pat !== _libFilter.pat) return false;
@@ -6956,7 +6970,8 @@ function renderLibrary(){
   html += '</optgroup><optgroup label="📷 Material visual"><option value="nogif"' + (_libFilter.muscle === "nogif" ? ' selected' : '') + '>Sin GIF / vídeo</option></optgroup>';
   html += '</select>';
 
-  html += '<select id="lib-equip" title="Material"><option value="">Todo el material</option>';
+  html += '<select id="lib-equip" title="Material"><option value="">Todo el material</option>'
+    + '<option value="(casa)"' + (_libFilter.equipment === "(casa)" ? ' selected' : '') + '>🏠 Material de la casa</option>';
   for (var q1 = 0; q1 < eqList.length; q1++){
     html += '<option value="' + escapeAttr(eqList[q1]) + '"' + (_libFilter.equipment === eqList[q1] ? ' selected' : '') + '>' + escapeHtml(eqList[q1]) + ' (' + eqs[eqList[q1]] + ')</option>';
   }
@@ -7073,7 +7088,7 @@ function u19LibContador(n){
   else if (m === "contr:") f.push('por contracción');
   else if (m === "nogif") f.push('sin GIF ni vídeo');
   else if (m) f.push(escapeHtml(String(m).replace(/^(terap|contr|mus):/, '')));
-  if (_libFilter.equipment) f.push(escapeHtml(_libFilter.equipment));
+  if (_libFilter.equipment) f.push(_libFilter.equipment === "(casa)" ? "🏠 Material de la casa" : escapeHtml(_libFilter.equipment));
   if (_libFilter.niv) f.push('nivel ' + escapeHtml(_libFilter.niv).toLowerCase());
   el.innerHTML = '<b>' + n + '</b> de ' + state.exercises.length + ' ejercicios' + (f.length ? ' · ' + f.join(' · ') : '');
   var clear = document.getElementById("lib-clear");
@@ -13361,8 +13376,19 @@ function busqPuntua(nombre, hay, q){
    protocolo o un circuito; arriba se cambia de día o de fase. Dos formas:
    cuadrícula (todos) y uno a uno (grande, con flechas). */
 var _pz = null;
-var _pzTam = "m";
-try { _pzTam = localStorage.getItem("us19_pizarra_tam") || "m"; } catch(e){}
+var _pzTam = "m", _pzAuto = 0;
+try { _pzTam = localStorage.getItem("us19_pizarra_tam") || "m"; _pzAuto = parseInt(localStorage.getItem("us19_pizarra_auto") || "0", 10) || 0; } catch(e){}
+/* «Uno a uno» como presentación: cada N segundos pasa al siguiente. */
+function pzAutoReloj(){
+  var P = _pz; if (!P) return;
+  if (P.timer){ clearInterval(P.timer); P.timer = null; }
+  if (P.modo === "uno" && _pzAuto > 0) P.timer = setInterval(function(){ if (_pz && _pz.modo === "uno") pzMover(1); }, _pzAuto * 1000);
+}
+window.pzAuto = function(){
+  _pzAuto = { 0: 10, 10: 20, 20: 30, 30: 0 }[_pzAuto] != null ? { 0: 10, 10: 20, 20: 30, 30: 0 }[_pzAuto] : 0;
+  try { localStorage.setItem("us19_pizarra_auto", String(_pzAuto)); } catch(e){}
+  pzPintar();
+};
 function pzMedia(url){
   if (!url) return '<div class="pz-media pz-vacio">📍</div>';
   if (isVideoUrl(url)) return '<video class="pz-media" src="' + escapeAttr(url) + '" poster="' + escapeAttr(posterUrl(url)) + '" autoplay loop muted playsinline preload="metadata"></video>';
@@ -13385,7 +13411,7 @@ window.pizarraAbrir = function(cfg){
     for (var k = 0; k < cfg.secciones.length; k++) if (cfg.secciones[k].items.length){ ini = k; break; }
     if (ini < 0){ toast("No hay ejercicios que mostrar", "warn"); return; }
   }
-  _pz = { cfg: cfg, sec: ini, modo: "grid", idx: 0 };
+  _pz = { cfg: cfg, sec: ini, modo: "grid", idx: 0, timer: null };
   var ov = document.getElementById("pizarra");
   ov.hidden = false; document.body.classList.add("circ-live-open");
   document.addEventListener("keydown", pzTeclas);
@@ -13441,9 +13467,11 @@ function pzPintar(){
   html += '</div>';
   if (P.modo === "uno" && items.length){
     html += '<div class="cl-ctrl"><button class="btn btn-secondary" onclick="pzMover(-1)">◀ Anterior</button>'
-      + '<button class="btn btn-primary big" onclick="pzMover(1)">Siguiente ▶</button></div>';
+      + '<button class="btn btn-primary big" onclick="pzMover(1)">Siguiente ▶</button>'
+      + '<button class="btn btn-ghost" onclick="pzAuto()" title="Pasa solo al siguiente cada 10, 20 o 30 segundos">' + (_pzAuto ? '⏱ Auto ' + _pzAuto + ' s' : '⏱ Auto: no') + '</button></div>';
   }
   ov.innerHTML = html;
+  pzAutoReloj();
 }
 window.pzSeccion = function(i){ if (_pz){ _pz.sec = i; _pz.idx = 0; pzPintar(); } };
 window.pzModo = function(m){ if (_pz){ _pz.modo = m; pzPintar(); } };
@@ -13456,6 +13484,7 @@ window.pzMover = function(d){
 };
 window.pizarraCerrar = function(){
   if (!_pz) return;
+  if (_pz.timer) clearInterval(_pz.timer);
   document.removeEventListener("keydown", pzTeclas);
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch(e){}
   _pz = null;
@@ -13493,11 +13522,200 @@ window.pizarraCircuitoObj = function(c){
   if (!c) return;
   var items = (c.estaciones || []).map(function(s, i){
     return { nombre: "Estación " + (i + 1) + " · " + circEstacionNombre(s), gif: circGifDe(s),
-             detalle: circNum(c.trabajo, 40) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio", nota: s.nota || "" };
+             detalle: circTrabajoDe(c, i) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio", nota: s.nota || "" };
   });
   pizarraAbrir({ titulo: c.nombre || "Circuito", subtitulo: c.grupo || "", secciones: [{ nombre: "Estaciones", items: items }] });
 };
 window.pizarraCircuito = function(id){ pizarraCircuitoObj(circGet(id)); };
+
+/* --- Rutina en vivo --- */
+/* Seguir un día de rutina con el cronómetro: cada serie se marca hecha (o se
+   cuenta sola si va por tiempo), el descanso corre solo y suena al acabar.
+   Mismo motor de tiempo que los circuitos, otro plan: serie → descanso → serie. */
+var _rl = null;
+function rlEsTiempo(reps){ return /\d\s*(s|seg|sec|min|')/i.test(String(reps || "")); }
+function rlPlan(r, dayIdx){
+  var day = (r.days || [])[dayIdx], plan = [];
+  if (!day) return plan;
+  var filas = (day.exercises || []).filter(function(ex){ return ex && ex.exerciseId; });
+  filas.forEach(function(ex, i){
+    var e = getExercise(ex.exerciseId), sets = Math.max(1, parseInt(ex.sets, 10) || 1), rest = parseRestTime(ex.rest);
+    for (var s = 1; s <= sets; s++){
+      plan.push({ tipo: "serie", ex: ex, e: e, serie: s, series: sets, idx: i, total: filas.length,
+                  dur: rlEsTiempo(ex.reps) ? Math.max(1, parseWorkTime(ex.reps)) : 0 });
+      var ultima = (i === filas.length - 1 && s === sets);
+      if (!ultima && rest > 0) plan.push({ tipo: "descanso", dur: rest, ex: ex, e: e, idx: i, siguiente: (s < sets) ? { ex: ex, e: e, serie: s + 1 } : { ex: filas[i + 1], e: getExercise(filas[i + 1].exerciseId), serie: 1 } });
+    }
+  });
+  plan.push({ tipo: "fin", dur: 0 });
+  return plan;
+}
+window.rutinaEnVivo = function(r, dayIdx){
+  if (!r) return;
+  var plan = rlPlan(r, dayIdx);
+  if (plan.length < 2){ toast("Este día no tiene ejercicios", "warn"); return; }
+  var cl = getClient(r.clientId);
+  _rl = { r: r, dia: dayIdx, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), timer: null, ultimoSeg: -1, inicio: Date.now(), titulo: (r.name || "Rutina") + " · " + (DAY_NAMES[dayIdx] || ""), sub: cl ? cl.name : "" };
+  var ov = document.getElementById("rutina-live");
+  ov.hidden = false; document.body.classList.add("circ-live-open");
+  document.addEventListener("keydown", rlTeclas);
+  rlPintar();
+};
+window.rutinaEnVivoBuilder = function(){ if (_builderRoutine) rutinaEnVivo(_builderRoutine, _builderActiveDay || 0); };
+function rlFase(){ return _rl.plan[_rl.i]; }
+function rlDetalle(p){
+  var ex = p.ex, partes = [];
+  if (ex.reps) partes.push(ex.reps + (rlEsTiempo(ex.reps) ? "" : " reps"));
+  if (ex.weight) partes.push(ex.weight + (/[a-z%]/i.test(String(ex.weight)) ? "" : " kg"));
+  if (ex.rir) partes.push("RIR " + ex.rir);
+  return partes.join(" · ");
+}
+function rlPintar(){
+  var L = _rl; if (!L) return;
+  var ov = document.getElementById("rutina-live"), p = rlFase();
+  var series = L.plan.filter(function(x){ return x.tipo === "serie"; }).length;
+  var hechas = L.plan.slice(0, L.i).filter(function(x){ return x.tipo === "serie"; }).length;
+  ov.className = "circ-live f-" + (p.tipo === "serie" ? "trabajo" : p.tipo);
+  var html = '<div class="cl-top"><span class="cl-nombre">▶ ' + escapeHtml(L.titulo) + '</span>'
+    + (L.sub ? '<span class="cl-grupo">' + escapeHtml(L.sub) + '</span>' : '')
+    + '<span class="cl-grupo">Serie ' + Math.min(hechas + (p.tipo === "serie" ? 1 : 0), series) + ' de ' + series + '</span>'
+    + '<button class="btn btn-ghost btn-sm cl-x" onclick="rlSalir()">✕ Salir</button></div>';
+  html += '<div class="cl-main">';
+  if (p.tipo === "fin"){
+    html += '<div class="cl-fase">¡SESIÓN TERMINADA!</div><div class="cl-timer">' + circFmt((Date.now() - L.inicio) / 1000) + '</div>'
+      + '<div class="cl-est">' + escapeHtml(L.titulo) + '</div><div class="cl-sig">' + series + ' series</div>';
+  } else if (p.tipo === "serie"){
+    var e = p.e, gif = e && e.gif ? e.gif : "";
+    html += '<div class="cl-fase">' + escapeHtml((e ? e.name : "Ejercicio") + " · serie " + p.serie + " de " + p.series) + '</div>'
+      + (p.dur ? '<div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>' : '<div class="cl-timer" style="font-size:clamp(2.6rem,9vw,5rem);">' + escapeHtml(p.ex.reps || "") + (p.ex.reps && !rlEsTiempo(p.ex.reps) ? ' <span style="font-size:.4em;">reps</span>' : '') + '</div>')
+      + '<div class="cl-est">' + escapeHtml(rlDetalle(p)) + '</div>'
+      + (p.ex.notes ? '<div class="cl-sig">' + escapeHtml(p.ex.notes) + '</div>' : '')
+      + (gif ? '<div class="cl-media">' + pzMedia(gif) + '</div>' : '')
+      + '<div class="cl-sig">Ejercicio ' + (p.idx + 1) + ' de ' + p.total + (p.ex.rest ? ' · descanso ' + escapeHtml(p.ex.rest) : '') + '</div>';
+  } else {
+    var sig = p.siguiente, se = sig && sig.e;
+    html += '<div class="cl-fase">DESCANSO</div><div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>'
+      + '<div class="cl-est">Siguiente: ' + escapeHtml(se ? se.name : "—") + ' · serie ' + (sig ? sig.serie : 1) + '</div>'
+      + (se && se.gif ? '<div class="cl-media">' + pzMedia(se.gif) + '</div>' : '');
+  }
+  html += '</div><div class="cl-bar"><span id="cl-bar" style="width:' + (series ? (hechas / series * 100) : 100).toFixed(1) + '%"></span></div>';
+  html += '<div class="cl-ctrl">'
+    + '<button class="btn btn-secondary" onclick="rlSalto(-1)" title="Atrás">⏮</button>'
+    + (p.tipo === "fin" ? '<button class="btn btn-primary big" onclick="rlSalir()">Cerrar</button>'
+      : (p.tipo === "serie" && !p.dur ? '<button class="btn btn-primary big" onclick="rlSalto(1)">✓ Serie hecha</button>'
+        : '<button class="btn btn-primary big" id="cl-play" onclick="rlToggle()">' + (L.corriendo ? "⏸ Pausa" : "▶ " + (p.tipo === "serie" ? "Empezar" : "Seguir")) + '</button>'))
+    + '<button class="btn btn-secondary" onclick="rlSalto(1)" title="Saltar">⏭</button>'
+    + '<button class="btn btn-ghost" onclick="rlSonido()" title="Sonido">' + ({ pitido: "🔊", silbato: "📯", off: "🔇" }[L.sonido] || "🔊") + '</button>'
+    + '<button class="btn btn-ghost" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
+    + '</div>';
+  ov.innerHTML = html;
+  /* El descanso arranca solo. */
+  if (p.tipo === "descanso" && !L.corriendo && L.restante === p.dur) rlToggle();
+}
+window.rlToggle = function(){
+  var L = _rl; if (!L) return;
+  var p = rlFase(); if (p.tipo === "fin" || !p.dur) return;
+  if (L.corriendo){ L.corriendo = false; clearInterval(L.timer); L.timer = null; circWakeOff(); }
+  else { L.corriendo = true; L.fin = Date.now() + L.restante * 1000; L.ultimoSeg = -1; circWakeOn(); L.timer = setInterval(rlTick, 200); }
+  rlPintar();
+};
+function rlTick(){
+  var L = _rl; if (!L || !L.corriendo) return;
+  L.restante = Math.max(0, (L.fin - Date.now()) / 1000);
+  var seg = Math.ceil(L.restante);
+  if (seg !== L.ultimoSeg){
+    L.ultimoSeg = seg;
+    if (seg > 0 && seg <= 3 && L.sonido !== "off") circTono(880, 0.1, 0.18);
+    var t = document.getElementById("cl-timer"); if (t) t.textContent = circFmt(seg);
+  }
+  if (L.restante <= 0) rlAvanzar(true);
+}
+function rlAvanzar(sonar){
+  var L = _rl; if (!L) return;
+  L.corriendo = false; clearInterval(L.timer); L.timer = null;
+  L.i = Math.min(L.i + 1, L.plan.length - 1);
+  var q = rlFase();
+  L.restante = q.dur; L.ultimoSeg = -1;
+  if (sonar && L.sonido !== "off"){
+    if (q.tipo === "fin"){ circTono(523, 0.25, 0.2); setTimeout(function(){ circTono(659, 0.25, 0.2); }, 220); setTimeout(function(){ circTono(784, 0.45, 0.2); }, 440); }
+    else if (L.sonido === "silbato") circSilbato();
+    else circTono(q.tipo === "serie" ? 1046 : 440, 0.45, 0.22);
+    if (navigator.vibrate){ try { navigator.vibrate(220); } catch(e){} }
+  }
+  if (q.tipo === "fin") circWakeOff();
+  rlPintar();
+}
+window.rlSalto = function(d){
+  var L = _rl; if (!L) return;
+  if (d > 0){ if (rlFase().tipo !== "fin") rlAvanzar(false); return; }
+  L.corriendo = false; clearInterval(L.timer); L.timer = null;
+  L.i = Math.max(0, L.i - 1); L.restante = rlFase().dur; L.ultimoSeg = -1;
+  rlPintar();
+};
+window.rlSonido = function(){
+  if (!_rl) return;
+  _rl.sonido = { pitido: "silbato", silbato: "off", off: "pitido" }[_rl.sonido] || "pitido";
+  try { localStorage.setItem("us19_circ_sonido", _rl.sonido); } catch(e){}
+  rlPintar();
+};
+window.rlSalir = function(){
+  var L = _rl; if (!L) return;
+  if (L.corriendo && rlFase().tipo !== "fin" && !window.confirm("La sesión está en marcha. ¿Salir?")) return;
+  clearInterval(L.timer); circWakeOff();
+  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch(e){}
+  document.removeEventListener("keydown", rlTeclas);
+  _rl = null;
+  var ov = document.getElementById("rutina-live"); ov.hidden = true; ov.innerHTML = ""; ov.className = "circ-live";
+  if (!_live && !_pz) document.body.classList.remove("circ-live-open");
+};
+function rlTeclas(ev){
+  if (!_rl) return;
+  if (ev.key === " " || ev.code === "Space"){ ev.preventDefault(); var p = rlFase(); if (p.tipo === "serie" && !p.dur) rlSalto(1); else rlToggle(); }
+  else if (ev.key === "ArrowRight"){ ev.preventDefault(); rlSalto(1); }
+  else if (ev.key === "ArrowLeft"){ ev.preventDefault(); rlSalto(-1); }
+  else if (ev.key === "Escape"){ rlSalir(); }
+}
+
+/* --- Día de rutina ↔ circuito --- */
+window.circDesdeDia = function(){
+  var r = _builderRoutine; if (!r) return;
+  var dayIdx = _builderActiveDay || 0, day = (r.days || [])[dayIdx];
+  if (!day || !day.exercises.length){ toast("Este día no tiene ejercicios", "warn"); return; }
+  var c = circNuevo(), cl = getClient(r.clientId);
+  c.nombre = (r.name || "Rutina") + " · " + (DAY_NAMES[dayIdx] || "");
+  c.grupo = cl ? cl.name : "";
+  c.modo = "secuencia";
+  day.exercises.forEach(function(ex){
+    var e = getExercise(ex.exerciseId); if (!e) return;
+    var partes = [];
+    if (ex.sets || ex.reps) partes.push((ex.sets || "?") + " × " + (ex.reps || "?"));
+    if (ex.notes) partes.push(ex.notes);
+    c.estaciones.push({ id: genId(), exerciseId: e.id, nombre: e.name, nota: partes.join(" · ") });
+  });
+  circAutoLayout(c, "circulo");
+  circLista().push(c); saveState();
+  if (typeof _builderIsDirty === "function" && _builderIsDirty()){
+    if (!window.confirm("El circuito ya está creado. La rutina tiene cambios sin guardar: ¿ir al circuito sin guardarla?")) return;
+    _builderSnapshot = null;   /* igual que showView cuando el usuario acepta descartar */
+  }
+  circEditar(c.id);
+  toast("Circuito creado con " + c.estaciones.length + " estaciones", "success");
+};
+window.rutinaDesdeCircuito = function(){
+  var c = circGuardar(true); if (!c) return;
+  var con = c.estaciones.filter(function(s){ return s.exerciseId && getExercise(s.exerciseId); });
+  if (!con.length){ toast("Ninguna estación viene de la biblioteca: no hay ejercicios que llevar a la rutina", "warn"); return; }
+  var r = newEmptyRoutine();
+  r.name = c.nombre || "Circuito";
+  r.notes = c.grupo ? "Desde el circuito · " + c.grupo : "Desde el circuito";
+  r.days[0].exercises = con.map(function(s, i){
+    return { exerciseId: s.exerciseId, sets: String(Math.max(1, circNum(c.rondas, 1))), reps: circTrabajoDe(c, c.estaciones.indexOf(s)) + " s", weight: "", rest: circNum(c.cambio, 15) + "s", rir: "", notes: s.nota || "" };
+  });
+  state.routines.push(r); saveState();
+  _circEdit = null;
+  openRoutineBuilder(r.id);
+  toast("Rutina creada con " + con.length + " ejercicios en el lunes" + (con.length < c.estaciones.length ? " · " + (c.estaciones.length - con.length) + " estaciones libres quedaron fuera" : ""), "success");
+};
 
 /* --- Circuitos --- */
 /* Circuitos por estaciones para clases y grupos (Diego los usa con niños en
@@ -13533,11 +13751,18 @@ function circFmt(sec){
   var m = Math.floor(sec / 60), s = sec % 60;
   return m + ":" + (s < 10 ? "0" : "") + s;
 }
+/* Tiempo de trabajo de una estación: en secuencia cada estación puede tener el suyo;
+   en rotación todas van a la vez y manda el general. */
+function circTrabajoDe(c, i){
+  var s = (c.estaciones || [])[i], propio = s ? circNum(s.trabajo, 0) : 0;
+  return Math.max(1, (c.modo === "secuencia" && propio > 0) ? propio : circNum(c.trabajo, 40));
+}
 function circDuracion(c){
   var N = (c.estaciones || []).length, R = Math.max(1, circNum(c.rondas, 1));
   if (!N) return 0;
-  var t = circNum(c.trabajo, 40), cmb = circNum(c.cambio, 15), dr = circNum(c.descansoRonda, 60);
-  return R * N * t + R * (N - 1) * cmb + (R - 1) * dr;
+  var cmb = circNum(c.cambio, 15), dr = circNum(c.descansoRonda, 60), t = 0;
+  for (var i = 0; i < N; i++) t += circTrabajoDe(c, i);
+  return R * t + R * (N - 1) * cmb + (R - 1) * dr;
 }
 function circMaterial(c){
   var m = {};
@@ -13847,6 +14072,8 @@ function circEditorHtml(){
     + '<h1 class="section-title">' + (_circEditNuevo ? "NUEVO" : "EDITAR") + ' <span class="accent">CIRCUITO</span></h1>'
     + '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">'
     + '<button class="btn btn-ghost" onclick="circVolver()">← Volver</button>'
+    + '<button class="btn btn-ghost" onclick="circProbarSonido()" title="Suena el silbato y el pitido: para ajustar el volumen antes de la clase">🔔 Probar sonido</button>'
+    + '<button class="btn btn-ghost" onclick="rutinaDesdeCircuito()" title="Crea una rutina de un día con las estaciones que vienen de la biblioteca">📋 A rutina</button>'
     + '<button class="btn btn-secondary" onclick="pizarraCircuitoObj(_circEdit)" title="Las estaciones en movimiento">🎞 Pizarra</button>'
     + '<button class="btn btn-secondary" onclick="circGuardarYImprimir()">🖨 Hoja</button>'
     + '<button class="btn btn-secondary" onclick="circGuardarYVivo()">▶ En vivo</button>'
@@ -13913,6 +14140,7 @@ function circCampo(ev){
   else _circEdit[k] = el.value;
   if (k === "modo" || k === "grupos" || k === "rondas" || k === "trabajo" || k === "cambio" || k === "descansoRonda" || k === "nombresGrupos") circPintarResumen();
   if (k === "nombresGrupos") circPintarMapa();
+  if (k === "modo") circPintarEstaciones();
 }
 function circPintarEstaciones(){
   var box = document.getElementById("circ-estaciones");
@@ -13929,6 +14157,7 @@ function circPintarEstaciones(){
       + '<input type="text" data-i="' + i + '" data-k="nombre" value="' + escapeAttr(s.nombre || "") + '" placeholder="Nombre de la estación">'
       + '<input type="text" class="circ-nota" data-i="' + i + '" data-k="nota" value="' + escapeAttr(s.nota || "") + '" placeholder="Consigna corta (se ve en vivo y en la hoja)">'
       + '<div class="circ-acc">'
+        + (c.modo === "secuencia" ? '<input type="number" min="0" max="3600" class="circ-t" data-i="' + i + '" data-k="trabajo" value="' + (circNum(s.trabajo, 0) > 0 ? circNum(s.trabajo, 0) : "") + '" placeholder="' + circNum(c.trabajo, 40) + ' s" title="Segundos en esta estación; vacío = el tiempo general">' : '')
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',-1)" title="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circMover(' + i + ',1)" title="Bajar"' + (i === c.estaciones.length - 1 ? ' disabled' : '') + '>↓</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circDuplicarEst(' + i + ')" title="Duplicar estación">⎘</button>'
@@ -13939,8 +14168,9 @@ function circPintarEstaciones(){
   box.oninput = function(ev){
     var el = ev.target, i = parseInt(el.getAttribute("data-i"), 10), k = el.getAttribute("data-k");
     if (isNaN(i) || !k || !_circEdit.estaciones[i]) return;
-    _circEdit.estaciones[i][k] = el.value;
+    _circEdit.estaciones[i][k] = (k === "trabajo") ? circNum(el.value, 0) : el.value;
     if (k === "nombre") circPintarMapa();
+    if (k === "trabajo") circPintarResumen();
   };
   circPintarMapa();
   circPintarResumen();
@@ -14049,7 +14279,8 @@ window.circImprimir = function(id){
     + '<h2>Mapa de la sala</h2>' + circMapaSvgImprimir(c)
     + '<h2>Estaciones</h2><table><thead><tr><th style="width:36px">#</th><th>Estación</th><th>Consigna</th><th style="width:22%">Observaciones</th></tr></thead><tbody>';
   c.estaciones.forEach(function(s, i){
-    doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b></td><td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
+    var tProp = (c.modo === "secuencia" && circNum(s.trabajo, 0) > 0) ? ' <span style="color:#444;font-weight:normal">· ' + circNum(s.trabajo, 0) + ' s</span>' : '';
+    doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b>' + tProp + '</td><td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
   });
   doc += '</tbody></table>';
   if (c.modo !== "secuencia" && N){
@@ -14077,7 +14308,7 @@ function circPlan(c){
   var plan = [{ tipo: "listos", dur: 5, turno: -1, ronda: 0, estacion: 0 }], turno = 0;
   for (var r = 0; r < R; r++){
     for (var s = 0; s < N; s++){
-      plan.push({ tipo: "trabajo", dur: Math.max(1, t), turno: turno, ronda: r, estacion: s });
+      plan.push({ tipo: "trabajo", dur: circTrabajoDe(c, s), turno: turno, ronda: r, estacion: s });
       if (s < N - 1){ if (cmb > 0) plan.push({ tipo: "cambio", dur: cmb, turno: turno, ronda: r, estacion: s }); }
       else if (r < R - 1 && dr > 0) plan.push({ tipo: "descanso", dur: dr, turno: turno, ronda: r, estacion: s });
       turno++;
@@ -14091,7 +14322,7 @@ window.circEnVivo = function(id){
   if (!c.estaciones.length){ toast("El circuito no tiene estaciones", "warn"); return; }
   var plan = circPlan(c), total = 0;
   plan.forEach(function(p){ total += p.dur; });
-  _live = { c: c, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: true, total: total, hecho: 0, ultimoSeg: -1, timer: null };
+  _live = { c: c, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), total: total, hecho: 0, ultimoSeg: -1, timer: null };
   var ov = document.getElementById("circ-live");
   ov.hidden = false; document.body.classList.add("circ-live-open");
   document.addEventListener("keydown", circLiveTeclas);
@@ -14141,7 +14372,7 @@ function circLivePintar(){
         ? '<button class="btn btn-primary big" onclick="circLiveReiniciar()">↺ Otra vez</button>'
         : '<button class="btn btn-primary big" id="cl-play" onclick="circLiveToggle()">' + (L.corriendo ? "⏸ Pausa" : (L.i === 0 && L.restante === p.dur ? "▶ Empezar" : "▶ Seguir")) + '</button>')
     + '<button class="btn btn-secondary" onclick="circLiveSalto(1)" title="Siguiente fase">⏭</button>'
-    + '<button class="btn btn-ghost" onclick="circLiveSonido()" title="Sonido">' + (L.sonido ? "🔊" : "🔇") + '</button>'
+    + '<button class="btn btn-ghost" onclick="circLiveSonido()" title="Sonido: pitido, silbato o nada">' + ({ pitido: "🔊 Pitido", silbato: "📯 Silbato", off: "🔇" }[L.sonido] || "🔊") + '</button>'
     + '<button class="btn btn-ghost" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
     + '</div>';
   ov.innerHTML = html;
@@ -14195,7 +14426,7 @@ function circLiveAvanzar(sonar){
     circWakeOff();
   } else {
     circLiveEmpezarFase();
-    if (sonar) circBeep(q.tipo === "trabajo" ? 1046 : 440, 0.45, 0.22);
+    if (sonar) circAvisoFase(q.tipo);
   }
   circLivePintar();
 }
@@ -14212,7 +14443,13 @@ window.circLiveReiniciar = function(){
   var L = _live; if (!L) return;
   L.i = 0; L.hecho = 0; L.corriendo = false; circLiveEmpezarFase(); circLivePintar();
 };
-window.circLiveSonido = function(){ if (_live){ _live.sonido = !_live.sonido; if (_live.sonido) circBeep(660, 0.1, 0.15); circLivePintar(); } };
+window.circLiveSonido = function(){
+  if (!_live) return;
+  _live.sonido = { pitido: "silbato", silbato: "off", off: "pitido" }[_live.sonido] || "pitido";
+  try { localStorage.setItem("us19_circ_sonido", _live.sonido); } catch(e){}
+  if (_live.sonido === "silbato") circSilbato(); else if (_live.sonido === "pitido") circBeep(660, 0.1, 0.15);
+  circLivePintar();
+};
 window.circLivePantalla = function(){
   var el = document.documentElement;
   try {
@@ -14242,21 +14479,44 @@ function circLiveTeclas(ev){
 function circLiveVisible(){
   if (_live && _live.corriendo && document.visibilityState === "visible") circWakeOn();
 }
-/* Pitido con Web Audio (sin archivos) y vibración en el teléfono. */
-function circBeep(freq, dur, vol){
-  if (!_live || !_live.sonido) return;
+/* Sonido con Web Audio (sin archivos) y vibración en el teléfono. Tres modos:
+   pitido (corto), silbato (dos notas largas, se oye en un patio) y sin sonido. */
+function circTono(freq, dur, vol, onda){
   try {
     if (!_circAudio) _circAudio = new (window.AudioContext || window.webkitAudioContext)();
     if (_circAudio.state === "suspended") _circAudio.resume();
     var o = _circAudio.createOscillator(), g = _circAudio.createGain(), t0 = _circAudio.currentTime;
-    o.type = "sine"; o.frequency.value = freq || 880;
+    o.type = onda || "sine"; o.frequency.value = freq || 880;
     o.connect(g); g.connect(_circAudio.destination);
     g.gain.setValueAtTime(vol || 0.2, t0);
     g.gain.exponentialRampToValueAtTime(0.0001, t0 + (dur || 0.15));
     o.start(t0); o.stop(t0 + (dur || 0.15) + 0.03);
   } catch(e){}
+}
+function circSilbato(){
+  circTono(1500, 0.24, 0.4, "square");
+  setTimeout(function(){ circTono(1150, 0.5, 0.4, "square"); }, 210);
+  if (navigator.vibrate){ try { navigator.vibrate([200, 80, 320]); } catch(e){} }
+}
+function circSonidoGuardado(){ try { return localStorage.getItem("us19_circ_sonido") || "pitido"; } catch(e){ return "pitido"; } }
+function circBeep(freq, dur, vol){
+  if (!_live || _live.sonido === "off") return;
+  circTono(freq, dur, vol);
   if (navigator.vibrate){ try { navigator.vibrate((dur || 0.15) > 0.3 ? 220 : 60); } catch(e){} }
 }
+/* Aviso de cambio de fase: silbato o pitido según el modo. */
+function circAvisoFase(tipo){
+  if (!_live || _live.sonido === "off") return;
+  if (_live.sonido === "silbato") circSilbato();
+  else circBeep(tipo === "trabajo" ? 1046 : 440, 0.45, 0.22);
+}
+/* Prueba de volumen antes de la clase: silbato y pitido, para subir el volumen a tiempo. */
+window.circProbarSonido = function(){
+  circSilbato();
+  setTimeout(function(){ circTono(880, 0.12, 0.2); }, 900);
+  setTimeout(function(){ circTono(1046, 0.4, 0.22); }, 1150);
+  toast("Silbato y pitido. Si no se oyeron, sube el volumen del teléfono o conecta un altavoz.", "success");
+};
 /* La pantalla no se apaga mientras corre (teléfono o tablet en la clase). */
 function circWakeOn(){
   if (_circWake || !navigator.wakeLock || !navigator.wakeLock.request) return;
@@ -25438,6 +25698,8 @@ function u19PanelOperativoHTML(){
       if (!isNaN(dd) && dd <= 7) reevals.push({ c:c, dias:dd });
     }
   });
+  /* Mientras nadie use «Enviar progreso», la columna no acusa a todos de «nunca reportó». */
+  var hayReportes = reports.length > 0 || state.clients.some(function(c){ return c.progressions && c.progressions.length; });
   dormidos.sort(function(a, b){ return (b.dias == null ? 9999 : b.dias) - (a.dias == null ? 9999 : a.dias); });
   reevals.sort(function(a, b){ return a.dias - b.dias; });
   asimetricos.sort(function(a, b){ return a.d.lsi - b.d.lsi; });
@@ -25458,8 +25720,8 @@ function u19PanelOperativoHTML(){
     + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;margin-top:.6rem;">'
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Entrenan hoy (' + hoyEntrenan.length + ')</div>'
     +     lista(hoyEntrenan, 'Nadie tiene sesión programada hoy.', function(o){ return chip(o.c, o.r ? '<a href="#" onclick="openRoutineBuilder(\'' + o.r.id + '\');return false;" style="text-decoration:none;color:inherit;" title="Abrir la rutina">' + escapeHtml(o.r.name || 'rutina') + ' →</a>' : 'sesión programada'); }) + '</div>'
-    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Sin señales (' + dormidos.length + ')</div>'
-    +     lista(dormidos, 'Todos con actividad reciente ✓', function(o){
+    +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Sin señales (' + (hayReportes ? dormidos.length : '—') + ')</div>'
+    +     lista(hayReportes ? dormidos : [], hayReportes ? 'Todos con actividad reciente ✓' : 'Nadie usa «Enviar progreso» todavía. Cuando un socio lo use, aquí saldrán los que lleven 10 días sin señales.', function(o){
             return chip(o.c, o.dias == null ? 'nunca reportó' : 'hace ' + o.dias + ' días', o.dias == null || o.dias >= 21 ? '#b91c1c' : '#d97706'); }) + '</div>'
     +   '<div><div class="text-xs text-muted" style="text-transform:uppercase;letter-spacing:.06em;margin-bottom:.3rem;">Reevaluaciones (' + reevals.length + ')</div>'
     +     lista(reevals, 'Ninguna en los próximos 7 días.', function(o){
