@@ -280,6 +280,17 @@ function extraerFuncion(nombre) {
     sinGuardia.slice(0, 3).map(x => 'linea ' + x.n + ': ' + x.l.trim().slice(0, 90)).join('  |  '));
   aviso('frontera: ' + asignaciones.length + ' sitios asignan arrays de state; todos comprueban');
 
+  /* LA CICATRIZ DE LA CONVERSION MECANICA. Al cambiar 146 sitios de
+     `(x || [])` a `u19Arr(x)`, la expresion regular se comio el parentesis
+     de la llamada anterior en tres sitios: `.concat(c.d || [])` quedo como
+     `.concatu19Arr(c.d)`. Eso PARSEA —es una propiedad que no existe— asi
+     que ni el validador de bloques ni ninguna suite lo vieron. Lo cazo
+     `arranque.js`, ejecutando. Aqui queda la alarma barata. */
+  const pegadas = [...new Set((src.match(/[A-Za-z_$][\w$]*u19(Arr|Lista)\s*\(/g) || []))]
+    .filter(t => !/^u19(Arr|Lista)\s*\($/.test(t));
+  igual('guardas · ninguna llamada quedó pegada a u19Arr por la conversión',
+    pegadas.join(', '), '');
+
   const isArr = (src.match(/Array\.isArray/g) || []).length;
   aviso('guardas: ' + (src.split('u19Arr(').length - 1) + ' usos de u19Arr y ' + isArr + ' de Array.isArray');
 })();

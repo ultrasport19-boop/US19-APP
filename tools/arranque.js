@@ -93,12 +93,21 @@ function nuevoEl(tag) {
   return el;
 }
 
+/* Los elementos se recuerdan por id. Sin esto, cada getElementById
+   devolvia uno nuevo y todo lo que la app escribia se perdia: se podia
+   comprobar que no reventaba, pero no que hubiera pintado algo. */
+const registro = {};
+function porId(id) {
+  if (!registro[id]) { registro[id] = nuevoEl('div'); registro[id].id = id; }
+  return registro[id];
+}
+
 const documento = {
   readyState: 'loading',
   documentElement: nuevoEl('html'),
   body: nuevoEl('body'),
   head: nuevoEl('head'),
-  getElementById: () => nuevoEl('div'),
+  getElementById: id => porId(id),
   querySelector: () => nuevoEl('div'),
   querySelectorAll: () => [],
   getElementsByClassName: () => [],
@@ -217,6 +226,44 @@ debenExistir.forEach(f => {
   comprobar('montaje · ' + f + '() existe tras cargar los tres bloques',
     typeof vm.runInContext('typeof ' + f, ctx) === 'string' && vm.runInContext('typeof ' + f, ctx) === 'function');
 });
+
+/* --- 4 · Las vistas, pintadas de verdad -----------------------------
+   Esto es lo que de verdad se rompio aquella vez: no que el archivo no
+   cargara, sino que una vista quedara en blanco. Se pulsa cada pestana y
+   se mira que su funcion de pintado no reviente y deje contenido. */
+
+/* EL CANDADO ESTABA PUESTO, y estaba bien puesto. `showView` devuelve la
+   pantalla de bloqueo si no es el dispositivo del entrenador, y este
+   navegador de mentira no tiene ni token ni puente configurados: para la
+   app es el navegador de un desconocido. Correcto — pero entonces las
+   diez vistas ni se pintaban y la prueba media el candado, no la app.
+   Se abre a mano, que es el estado en el que Diego la usa. */
+vm.runInContext('_candadoAbierto = true;', ctx);
+
+const VISTAS = ['dashboard', 'clients', 'routines', 'circuitos', 'library',
+                'rehab', 'finanzas', 'horas', 'informes', 'rendimiento'];
+const conContenido = [];
+const vistos = new Set();
+VISTAS.forEach(nombre => {
+  try {
+    vm.runInContext('showView(' + JSON.stringify(nombre) + ')', ctx);
+    pasa();
+    /* Los render no escriben en «view-X»: escriben en contenedores hijos
+       (#clients-list, #dash-…). Asi que se mira TODO lo que quedo escrito
+       en esta pasada, no un id adivinado. */
+    const escritos = Object.keys(registro).filter(k =>
+      !vistos.has(k) && String(registro[k].innerHTML || '').trim().length > 40);
+    escritos.forEach(k => vistos.add(k));
+    if (escritos.length) conContenido.push(nombre + ' (' + escritos.slice(0, 2).join(', ') + ')');
+  } catch (e) {
+    falla('vista · «' + nombre + '» se pinta sin reventar',
+      String(e && e.message || e).slice(0, 180));
+  }
+});
+comprobar('vistas · la mayoría deja contenido pintado, no solo no revienta',
+  conContenido.length >= Math.ceil(VISTAS.length / 2),
+  'pintaron ' + conContenido.length + ' de ' + VISTAS.length + ': ' + conContenido.join(', '));
+aviso('vistas con contenido: ' + conContenido.join(' · '));
 
 /* Y que el estado se haya cargado de verdad, no que solo exista la
    funcion. El arranque lanza promesas —IndexedDB, el catalogo, la

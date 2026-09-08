@@ -13879,7 +13879,7 @@ function buildAlertsHtml(){
   state.clients.forEach(function(c){
     var hasActive = state.routines.some(function(r){ return r.clientId===c.id && r.status!=="archived"; });
     if (!hasActive) return;
-    var reps = u19Arr(byClient[c.id]).concatu19Arr(byClient[c.name]);
+    var reps = u19Arr(byClient[c.id]).concat(u19Arr(byClient[c.name]));
     var recent = reps.filter(function(rp){ return now-(rp.sentAt||0) <= 14*86400000; });
     var lastMs = reps.reduce(function(mx,rp){ return Math.max(mx, rp.sentAt||0); }, 0);
     var avgPct = recent.length ? Math.round(recent.reduce(function(sum,rp){ return sum+(rp.pct||0); },0)/recent.length) : null;
@@ -18636,7 +18636,7 @@ function u19CalendlyRango(dias){
         return fetch(url, { headers: calendlyHeaders() }).then(function(r){
           return r.json().then(function(d){
             if (!r.ok || (d && d.message && !d.collection)) throw new Error(u19CalError(d));
-            out = out.concatu19Arr(d.collection);
+            out = out.concat(u19Arr(d.collection));
             var next = d.pagination && d.pagination.next_page_token;
             /* Un mes de gimnasio pasa de 100 eventos: hay que paginar. */
             return (next && out.length < 3000) ? pedir(next) : out;
@@ -28702,7 +28702,7 @@ function u19MezclarEval(base, extra){
   });
   if (!base.fecha && extra.fecha) base.fecha = extra.fecha;
   if (!base.momento && extra.momento) base.momento = extra.momento;
-  base.orden_capturas = u19Arr(base.orden_capturas).concatu19Arr(extra.orden_capturas);
+  base.orden_capturas = u19Arr(base.orden_capturas).concat(u19Arr(extra.orden_capturas));
   return base;
 }
 
