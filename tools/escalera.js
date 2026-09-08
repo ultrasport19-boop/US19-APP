@@ -291,6 +291,80 @@ comprobar('interfaz · el botón está en la tarjeta de la biblioteca',
 comprobar('interfaz · y en la ficha del ejercicio',
   src.indexOf('data-act="construir"') > 0 && src.indexOf('act === "construir"') > 0);
 
+/* --- 11 · El modal, ejecutado de verdad ------------------------------
+   Todo lo de arriba prueba la lógica. Lo que Diego toca es el modal, y
+   ahí un escapeHtml mal escrito o una variable que no existe no se ve
+   hasta que se pulsa el botón. Así que se ejecuta con un navegador de
+   mentira y se mira el HTML que produce. */
+
+const moduloUI = trozo('var U19_ESC_REGLAS', '/* ------------------------------------------------------------\n   E · PORTABILIDAD', 'el módulo con su modal');
+if (moduloUI.indexOf('u19ComoConstruir') < 0) abortar('el trozo con el modal no contiene u19ComoConstruir');
+
+let pintado = null, avisos = [];
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ctxUI = {
+  state: { exercises: catalogo },
+  libTaxDe: ctx.libTaxDe,
+  libThumbHtml: () => '<i>gif</i>',
+  escapeHtml: esc, escapeAttr: esc,
+  openModal: o => { pintado = o; },
+  closeModal: () => {},
+  toast: (t) => avisos.push(t),
+  saveState: () => {},
+  u19Sustitutos: () => {},
+  showExercisePreview: () => {},
+  window: {},
+  console, Math, JSON, String, Object, RegExp, Array, Infinity, Number,
+};
+ctxUI.window = ctxUI;
+vm.createContext(ctxUI);
+vm.runInContext(normalizador + '\n' + moduloUI, ctxUI);
+
+try {
+  vm.runInContext('u19ComoConstruir(' + JSON.stringify(puente.id) + ')', ctxUI);
+  pasa();
+} catch (e) {
+  falla('modal · u19ComoConstruir revienta al abrirlo', e && e.message);
+}
+if (pintado) {
+  const html = pintado.bodyHtml || '';
+  comprobar('modal · el título lleva el nombre del ejercicio', (pintado.title || '').indexOf(puente.name) > 0, pintado.title);
+  comprobar('modal · trae la guía de cómo se construye', /Cómo se construye/.test(html));
+  comprobar('modal · trae la escalera', /La escalera/.test(html));
+  comprobar('modal · marca dónde está el ejercicio actual', /estás aquí/.test(html));
+  comprobar('modal · dice qué mirar', /Qué mirar mientras/.test(html));
+  comprobar('modal · dice cuándo subir', /Cuándo pasar al escalón siguiente/.test(html));
+  comprobar('modal · explica por qué está en ese escalón', /Por qué está en el escalón/.test(html));
+  comprobar('modal · deja moverlo a mano', /u19EscMover/.test(html));
+  comprobar('modal · nombra los cuatro pasos de la guía del patrón',
+    (html.match(/<li>/g) || []).length >= 7);
+  comprobar('modal · el primer peldaño de la escalera del puente sale nombrado',
+    html.indexOf('activación') > 0);
+  /* Que no se cuele HTML sin escapar desde el nombre de un ejercicio. */
+  const conComillas = { id: 'zz-test', name: 'Puente <img src=x onerror=alert(1)> "raro"', muscle: puente.muscle, pat: puente.pat, cat: puente.cat, niv: 'Principiante' };
+  catalogo.push(conComillas);
+  try {
+    vm.runInContext('u19ComoConstruir("zz-test")', ctxUI);
+    comprobar('modal · un nombre con HTML dentro sale escapado, no interpretado',
+      (pintado.bodyHtml || '').indexOf('<img src=x') < 0);
+  } catch (e) {
+    falla('modal · revienta con un nombre raro', e && e.message);
+  }
+  catalogo.pop();
+} else {
+  falla('modal · no llegó a pintar nada');
+}
+
+/* Y mover un escalón a mano no debe reventar. */
+try {
+  vm.runInContext('u19EscMover(' + JSON.stringify(puente.id) + ', 1)', ctxUI);
+  comprobar('modal · subirlo a mano deja escManual puesto', puente.escManual >= 1 && puente.escManual <= 4, puente.escManual);
+  vm.runInContext('u19EscMover(' + JSON.stringify(puente.id) + ', 0)', ctxUI);
+  igual('modal · y volver al automático lo quita', puente.escManual, undefined);
+} catch (e) {
+  falla('modal · u19EscMover revienta', e && e.message);
+}
+
 /* --- salida ---------------------------------------------------------- */
 
 console.log('\nUS19-APP · escalera de ejercicios');

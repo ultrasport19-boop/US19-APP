@@ -205,7 +205,8 @@ dentro, «Plancha lateral» contaba como otro ejercicio y «Plancha» se quedaba
 
 Lo que Diego mueve a mano vive en `escManual` sobre la ficha, y el importador del catálogo
 no lo pisa (solo toca los campos de `TAXO` y solo si no hay `taxManual`). Todo esto con
-`tools/escalera.js`, 90 comprobaciones contra el catálogo real y seis mutantes.
+`tools/escalera.js`, **104 comprobaciones** contra el catálogo real —incluido el modal
+ejecutado con un navegador de mentira— y nueve mutantes que caen todos.
 
 ## Dos reglas que no son código
 
