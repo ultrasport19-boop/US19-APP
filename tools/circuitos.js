@@ -26,6 +26,7 @@ function tramo(inicio, fin, nombre) {
 function fn(nombre) { return tramo('function ' + nombre + '(', '\n}\n', nombre) + '\n}\n'; }
 
 const codigo = [
+  fn('u19Arr'),
   fn('musNorm'),
   tramo('/* --- Búsqueda --- */', '/* --- Pizarra --- */', 'el motor de búsqueda'),
   fn('circNum'), fn('circFmt'), fn('circRatio'), fn('circPosAuto'), fn('circGruposNombres'), fn('circNombreGrupo'),

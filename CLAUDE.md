@@ -67,8 +67,22 @@ son los 320 que entraron desde free-exercise-db (dominio público) con GIF propi
 fotogramas (`videos/fed-*.gif`). Volver a correr un script de ampliación tomando como
 entrada el `us19_catalogo.json` ya ampliado duplica ids en silencio.
 
-**`(x || [])` no protege de un objeto.** Solo de `null`. Con `localStorage` corrupto,
-`(evs || []).forEach` tumbaba la vista entera. Usar `Array.isArray(x) ? x : []`.
+**`(x || [])` no protege de un objeto.** Solo de `null`, y con el `localStorage` corrupto
+eso tumbó una vista entera. **Usa `u19Arr(x)`**, que es exactamente `Array.isArray(x) ? x : []`.
+El 8-sep se convirtieron los **146** sitios que leían datos de disco (`c.informes`, `r.days`,
+`c.estaciones`…); las variables locales se quedaron como estaban, porque nacen en la misma
+función. `tools/pruebas.js` ya no lo avisa: **falla** si aparece uno nuevo.
+
+**No confundas `u19Arr` con `u19Lista`.** `u19Lista` además quita los huecos, y eso **corre
+los índices**: recorrer los días de una rutina con `forEach(function(d, i){…})` cambiaría de
+significado si uno fuera nulo. Para un cambio mecánico hace falta la que no toca nada más.
+
+**Los arrays de `state` SÍ están garantizados.** Los 168 sitios que llaman a
+`state.clients.filter` sin guarda están bien: los cuatro caminos que los asignan —`loadState`,
+la reparación de GIFs, importar un respaldo y bajar de la nube— comprueban con
+`Array.isArray`. Ese invariante lo vigila `tools/pruebas.js` sobre los **75** sitios que asignan, y
+exige que la comprobación sea una **guarda** (`if`, `&&`, `||`): un `Array.isArray` suelto
+dentro de un objeto literal no protege nada, y dar eso por bueno ya escondió un mutante.
 
 **Circuitos, pizarra y «en vivo» (7-sep-2026)** viven en el bloque 1, justo antes de
 `/* --- Plantillas --- */`, en este orden: Búsqueda (`busqCoincide`, el único motor de
@@ -109,7 +123,7 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
 | `node tools/escalera.js` | **«Cómo construirlo» contra el catálogo real**: que la progresión ordene de menos a más, que no mezcle gestos distintos (un peso muerto no es una progresión de un puente), que toda familia tenga primer y último peldaño, y que la guía **no use lenguaje clínico** |
-| `node tools/mutantes.js tools/mutantes_escalera.json` | **Pone a prueba las pruebas**: aplica 23 mutantes y comprueba que la suite se pone roja con cada uno. Trabaja sobre una COPIA — nunca toca `index.html` |
+| `node tools/mutantes.js <lista>` | **Pone a prueba las pruebas**: aplica cada mutante y comprueba que la suite se pone roja. Trabaja sobre una COPIA — nunca toca `index.html`. Listas: `tools/mutantes_escalera.json` (24, la escalera) y `tools/mutantes_guardas.json` (6, las guardas de datos) |
 | `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
 | `sh tools/instalar_hook.sh` | Deja **las seis primeras** corriendo en cada commit que toque `index.html` |
 

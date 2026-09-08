@@ -49,6 +49,8 @@ function trozo(ini, fin, comoSeLlama) {
 
 const modulo = trozo('var U19_ESC_REGLAS', 'window.u19ComoConstruir', 'el módulo de la escalera');
 const normalizador = trozo('function musNorm(s){', '/* Coincide si la consulta', 'musNorm');
+/* El ayudante de verdad, no un doble: si cambia en index.html, cambia aqui. */
+const ayudantes = trozo('function u19Arr(', 'function u19DashUrl', 'u19Arr');
 const guiaTxt = trozo('var U19_ESC_GUIA = {', 'function u19EscGuia', 'la guía de patrones');
 
 ['u19EscPuntos', 'u19EscBanda', 'u19EscEscalera', 'u19EscGuia', 'u19EscRaiz', 'u19EscEsClip', 'u19EscClips'].forEach(f => {
@@ -71,7 +73,7 @@ const ctx = {
   console, Math, JSON, String, Object, RegExp, Array,
 };
 vm.createContext(ctx);
-vm.runInContext(normalizador + '\n' + modulo, ctx);
+vm.runInContext(ayudantes + '\n' + normalizador + '\n' + modulo, ctx);
 const api = vm.runInContext('({ u19EscPuntos, u19EscBanda, u19EscEscalera, u19EscGuia, u19EscRaiz, u19EscEsClip, u19EscClips, U19_ESC_BANDAS, U19_ESC_REGLAS, U19_ESC_GUIA })', ctx);
 
 const porNombre = n => catalogo.find(e => e.name === n);
@@ -343,7 +345,7 @@ const ctxUI = {
 };
 ctxUI.window = ctxUI;
 vm.createContext(ctxUI);
-vm.runInContext(normalizador + '\n' + moduloUI, ctxUI);
+vm.runInContext(ayudantes + '\n' + normalizador + '\n' + moduloUI, ctxUI);
 
 try {
   vm.runInContext('u19ComoConstruir(' + JSON.stringify(puente.id) + ')', ctxUI);
@@ -495,7 +497,7 @@ const ctxVivo = {
 };
 ctxVivo.window = ctxVivo;
 vm.createContext(ctxVivo);
-vm.runInContext(moduloVivo, ctxVivo);
+vm.runInContext(ayudantes + '\n' + moduloVivo, ctxVivo);
 
 function sesionDePrueba() {
   const fila = { exerciseId: puente.id, sets: '3', reps: '12', weight: '20', rest: '90s' };
@@ -576,7 +578,7 @@ Object.assign(ctxFicha, {
 ctxFicha.window = ctxFicha;
 vm.createContext(ctxFicha);
 /* Necesita la escalera al lado: de ahí saca el escalón. */
-vm.runInContext(normalizador + '\n' + trozo('var U19_ESC_REGLAS', 'window.u19ComoConstruir', 'la escalera') + '\n' + moduloFicha, ctxFicha);
+vm.runInContext(ayudantes + '\n' + normalizador + '\n' + trozo('var U19_ESC_REGLAS', 'window.u19ComoConstruir', 'la escalera') + '\n' + moduloFicha, ctxFicha);
 
 /* Cuántas veces se recorre el catálogo: la ficha memoriza por id porque
    `u19EscEscalera` recorre las 2.377 fichas en cada llamada. */
@@ -600,6 +602,31 @@ igual('ficha · una rutina de OTRO cliente tampoco',
   fichaCon([{ clientId: 'otro', days: [{ exercises: [filaDe(exDe('Empuje', 1)[0], 4)] }] }]), '');
 igual('ficha · filas que apuntan a ejercicios borrados no pintan ocho barras a cero',
   fichaCon([{ clientId: 'cl1', days: [{ exercises: [{ exerciseId: 'ya-no-existe', sets: '4' }] }] }]), '');
+
+/* EL DATO CORRUPTO, QUE ES DE LO QUE VA u19Arr. Con `(x || [])` un objeto
+   guardado por error pasaba la guarda y reventaba en el .forEach de
+   dentro, tumbando la vista entera. Eso ya paso una vez de verdad, con
+   el localStorage. Aqui se comprueba ejecutandolo, no leyendo el codigo:
+   ninguna de estas formas puede lanzar. */
+[
+  ['los dias de la rutina son un objeto', { clientId: 'cl1', days: { 0: { exercises: [] } } }],
+  ['los ejercicios del dia son un objeto', { clientId: 'cl1', days: [{ exercises: { a: 1 } }] }],
+  ['los dias son una cadena', { clientId: 'cl1', days: 'lunes' }],
+  ['los dias son null', { clientId: 'cl1', days: null }],
+  ['no hay dias', { clientId: 'cl1' }],
+].forEach(([queLePasa, rutinaRota]) => {
+  try {
+    igual('corrupto · ' + queLePasa + ': no pinta nada, pero no revienta', fichaCon([rutinaRota]), '');
+  } catch (e) {
+    falla('corrupto · ' + queLePasa + ' TUMBA la vista', e && e.message);
+  }
+});
+/* `state.routines` NO se comprueba aqui a proposito: no puede no ser un
+   array. Los cuatro sitios que lo asignan —loadState, la reparacion de
+   GIFs, importar respaldo y bajar de la nube— pasan todos por
+   Array.isArray, y de eso se encarga `pruebas.js`. Lo que loadState NO
+   normaliza es lo de dentro (r.days, c.informes, c.estaciones…), que es
+   justo lo que se prueba arriba y para lo que existe u19Arr. */
 
 const emp = exDe('Empuje', 2), trac = exDe('Tracción', 1), core = exDe('Core', 1);
 const rutina = [{ clientId: 'cl1', days: [

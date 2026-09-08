@@ -3730,7 +3730,7 @@ function saveState(sinSubir){
       try {
         state.exercises = [];
         localStorage.setItem(APP_KEY, JSON.stringify(state));
-      } finally { state.exercises = _ej; }
+      } finally { state.exercises = u19Arr(_ej); }
       /* IndexedDB clona solo; sin JSON.stringify de por medio, que con 2.060
          ejercicios bloquearia el hilo en cada guardado. Y con retardo, para
          no reescribir el catalogo entero en cada tecla. */
@@ -3757,7 +3757,7 @@ function saveState(sinSubir){
         } catch(e2){
           toast("Sigue sin haber espacio. Exporta una copia y borra datos de clientes antiguos.", "error");
         } finally {
-          state.exercises = copia;
+          state.exercises = u19Arr(copia);
           _saveReintentando = false;
         }
       });
@@ -4295,7 +4295,7 @@ function hideTrainerUI(){
 function u19SemanaDatos(){
   var dias = [];
   for (var i = 0; i < 7; i++) dias.push({ i: i, n: 0, seg: 0, personas: {} });
-  (state.routines || []).forEach(function(r){
+  u19Arr(state.routines).forEach(function(r){
     if (!r || r.status === "archived") return;
     var ds = Array.isArray(r.days) ? r.days : [];
     for (var k = 0; k < Math.min(7, ds.length); k++){
@@ -4779,6 +4779,20 @@ function u19Lista(x){
   /* Y sin huecos: un null dentro del array revienta igual que un array
      que no lo es, solo que mas adentro y mas dificil de ver. */
   return x.filter(function(e){ return e !== null && e !== undefined; });
+}
+
+/* La hermana sin efectos secundarios de u19Lista, y la diferencia importa:
+   ESTA NO QUITA LOS HUECOS. Quitarlos corre los indices: recorrer los
+   dias de una rutina con `forEach(function(d, i){…})` pasaria a significar
+   otra cosa si uno de los dias fuera nulo. Cuando solo hace falta que un dato de disco no
+   tumbe la vista por no ser un array, es esta.
+
+   Existe porque `(x || [])` NO protege de un objeto, solo de null: con el
+   localStorage corrupto, un `(evs || [])` seguido de `.forEach` tumbo una
+   vista entera. (Escrito partido a proposito: pruebas.js busca ese patron
+   literal como alarma y no distingue un comentario del codigo.) */
+function u19Arr(x){
+  return Array.isArray(x) ? x : [];
 }
 
 function u19DashUrl(tipo, url, clave){
@@ -5282,9 +5296,9 @@ function deleteClient(id){
      para clientes (state.trash asume rutinas: t.routine.name revienta con
      cualquier otra cosa), asi que lo unico que protege aqui es decir lo que se
      pierde ANTES, como ya hace u19BorrarDatosCliente. */
-  var _nInf = (c.informes || []).length,
-      _nRnd = (c.rendimiento || []).length,
-      _nPrg = (c.progressions || []).length;
+  var _nInf = u19Arr(c.informes).length,
+      _nRnd = u19Arr(c.rendimiento).length,
+      _nPrg = u19Arr(c.progressions).length;
   var msg = '<p>¿Eliminar al cliente <strong>'+escapeHtml(c.name)+'</strong>?</p>';
   if (_nInf || _nRnd || _nPrg){
     msg += '<p class="text-sm" style="margin-top:.6rem;">Se borra <b>de forma permanente</b>:</p>'
@@ -5476,7 +5490,7 @@ function renderBuilder(){
   html += formField("Notas", '<input type="text" id="rb-notes" value="'+escapeAttr(r.notes||"")+'" placeholder="Observaciones generales">');
   html += '</div>';
 
-  var _hasWeekNotes = (r.weekNotes||[]).some(function(x){ return x; });
+  var _hasWeekNotes = u19Arr(r.weekNotes).some(function(x){ return x; });
   html += '<details class="week-notes"'+(_hasWeekNotes?' open':'')+'><summary>📈 Progresión por semana (opcional)</summary><div class="week-notes-grid">';
   var _wkCount = Math.min(parseInt(r.weeks,10)||4, 52);
   for (var _wi=0; _wi<_wkCount; _wi++){
@@ -7078,8 +7092,7 @@ function _libRecientes(){
 function libRegistrarReciente(id){
   var a = _libRecientes().filter(function(x){ return x !== id; });
   a.unshift(id);
-  if (a.length > 30) a.length = 30;
-  state.libRec = a;
+  state.libRec = a.slice(0, 30);
   saveState();
   if (typeof scheduleSyncUpload === "function") scheduleSyncUpload();
 }
@@ -7205,8 +7218,8 @@ function _libUsoRutinas(){
   var uso = {};
   state.routines.forEach(function(r){
     var seen = {};
-    (r.days||[]).forEach(function(d){
-      (d.exercises||[]).forEach(function(x){
+    u19Arr(r.days).forEach(function(d){
+      u19Arr(d.exercises).forEach(function(x){
         if (x.exerciseId && !seen[x.exerciseId]){ seen[x.exerciseId] = true; uso[x.exerciseId] = (uso[x.exerciseId]||0) + 1; }
       });
     });
@@ -7535,7 +7548,7 @@ function openExerciseForm(id){
      Se deriva del catalogo, por uso, como ya hace el filtro de la Biblioteca. */
   var equipOpts = (function(){
     var cnt = {};
-    (state.exercises || []).forEach(function(x){ if (x && x.equipment) cnt[x.equipment] = (cnt[x.equipment]||0) + 1; });
+    u19Arr(state.exercises).forEach(function(x){ if (x && x.equipment) cnt[x.equipment] = (cnt[x.equipment]||0) + 1; });
     var lista = Object.keys(cnt).sort(function(a,b){ return (cnt[b]-cnt[a]) || a.localeCompare(b); });
     /* Los basicos siempre disponibles, aunque hoy no haya ninguna ficha. */
     ["Peso corporal","Barra","Mancuernas","Polea","Máquina"].forEach(function(b){
@@ -7722,7 +7735,7 @@ function deleteExercise(id){
         if (Array.isArray(state.libRec)) state.libRec = state.libRec.filter(function(x){ return x !== id; });
         /* Las estaciones de circuito que lo usaban se quedan con el nombre, sin id muerto. */
         if (Array.isArray(state.circuitos)) state.circuitos.forEach(function(c){
-          (c.estaciones || []).forEach(function(s){ if (s.exerciseId === id){ if (!s.nombre) s.nombre = e.name || "Estación"; s.exerciseId = ""; } });
+          u19Arr(c.estaciones).forEach(function(s){ if (s.exerciseId === id){ if (!s.nombre) s.nombre = e.name || "Estación"; s.exerciseId = ""; } });
         });
         saveState();
         closeModal();
@@ -7980,8 +7993,8 @@ function shortenUrl(longUrl, prefix){
 /* Revisa una rutina antes de compartirla: bloquea si está vacía, avisa de huecos. */
 function routineShareIssues(r){
   var total=0, noReps=0, noSets=0;
-  (r.days||[]).forEach(function(d){
-    (d.exercises||[]).forEach(function(x){
+  u19Arr(r.days).forEach(function(d){
+    u19Arr(d.exercises).forEach(function(x){
       total++;
       if (!String(x.reps||"").trim()) noReps++;
       if (!String(x.sets||"").trim()) noSets++;
@@ -8016,7 +8029,7 @@ function openShareModal(routineId, fromBuilder){
     /* 7-sep-2026: un enlace salio con cero ejercicios porque este navegador
        habia perdido la biblioteca. Mejor no compartir que mandar «Ejercicio»
        sin nombre ni GIF. */
-    var _nCat = (state.exercises || []).length;
+    var _nCat = u19Arr(state.exercises).length;
     openModal({
       title: "No se puede compartir aún",
       bodyHtml: '<p>' + data.faltan.length + ' ejercicio' + (data.faltan.length === 1 ? '' : 's') + ' de esta rutina no '
@@ -9362,7 +9375,7 @@ function wipeAll(){
      la papelera ofreciendo rutinas de socios que ya no existen (con su
      clientId) y las horas extra del mes intactas. */
   state.trash = []; state.horasExtra = [];
-  state.exercises = (SEED_DATA.exercises || []).slice();
+  state.exercises = u19Arr(SEED_DATA.exercises).slice();
   saveState();
   closeModal();
   showView("dashboard");
@@ -10921,7 +10934,7 @@ function syncDownload(){
            no se acepta. Se conserva el local y se vuelve a subir entero. */
         var _reSubir = false;
         if (Array.isArray(data.exercises)){
-          var _nLoc = (state.exercises || []).length;
+          var _nLoc = u19Arr(state.exercises).length;
           if (typeof u19CatalogoEncoge === "function" && u19CatalogoEncoge(data.exercises.length, _nLoc)){
             console.warn("Sync: la nube trae " + data.exercises.length + " ejercicios y aquí hay " + _nLoc + "; se conserva el catálogo local y se vuelve a subir.");
             _reSubir = true;
@@ -12539,8 +12552,8 @@ function mergeAllDuplicates(){
       if (!keep.equipment && drop.equipment) keep.equipment = drop.equipment;
       if (!keep.desc && drop.desc) keep.desc = drop.desc;
       if (!keep.gif && drop.gif) keep.gif = drop.gif;
-      state.routines.forEach(function(r){ (r.days||[]).forEach(function(d){ ((d&&d.exercises)||[]).forEach(function(x){ if (x.exerciseId===drop.id) x.exerciseId = keep.id; }); }); });
-      (state.protocols||[]).forEach(function(p){ (p.phases||[]).forEach(function(ph){ (ph.exercises||[]).forEach(function(x){ if (x.exerciseId===drop.id) x.exerciseId = keep.id; }); }); });
+      state.routines.forEach(function(r){ u19Arr(r.days).forEach(function(d){ ((d&&d.exercises)||[]).forEach(function(x){ if (x.exerciseId===drop.id) x.exerciseId = keep.id; }); }); });
+      u19Arr(state.protocols).forEach(function(p){ u19Arr(p.phases).forEach(function(ph){ u19Arr(ph.exercises).forEach(function(x){ if (x.exerciseId===drop.id) x.exerciseId = keep.id; }); }); });
       state.exercises = state.exercises.filter(function(x){ return x.id!==drop.id; });
       merged++;
     }
@@ -12719,7 +12732,7 @@ function buildHistorySection(){
     return html;
   }
   var names = {};
-  hist.forEach(function(h){ (h.perEx||[]).forEach(function(pe){ if (pe.top>0) names[pe.exId]=pe.name; }); });
+  hist.forEach(function(h){ u19Arr(h.perEx).forEach(function(pe){ if (pe.top>0) names[pe.exId]=pe.name; }); });
   var ids = Object.keys(names);
   if (ids.length){
     html += '<div style="display:flex;gap:.5rem;margin-bottom:.5rem;flex-wrap:wrap;"><select id="hist-ex-select" style="flex:1;min-width:160px;">';
@@ -12755,7 +12768,7 @@ function drawHistChart(){
   if (metric==="eva"){
     hist.forEach(function(h){ if (h.maxEva) pts.push({x:h.date||"", y:h.maxEva}); });
   } else {
-    hist.forEach(function(h){ (h.perEx||[]).forEach(function(pe){ var v = (metric==="e1rm") ? (pe.e1rm||0) : (pe.top||0); if (pe.exId===exId && v>0) pts.push({x:h.date||"", y:v}); }); });
+    hist.forEach(function(h){ u19Arr(h.perEx).forEach(function(pe){ var v = (metric==="e1rm") ? (pe.e1rm||0) : (pe.top||0); if (pe.exId===exId && v>0) pts.push({x:h.date||"", y:v}); }); });
   }
   var ctx = cv.getContext("2d");
   var W=cv.width, H=cv.height, padL=46, padB=26, padT=14, padR=10;
@@ -13564,7 +13577,7 @@ function horasExportCsv(){
   var rows = [["Fecha","Dia","EsTurno","HorasTurno","HorasExtra","MotivoExtra","ValorHora","Costo","Devengado","Sesiones","Clientes","Capacidad","Ocupacion","TurnoCerrado"]];
   _horasData.dias.forEach(function(d){
     rows.push([d.fecha, d.dow, d.esTurno ? "si" : "no", d.horas, d.horasExtra,
-      (d.motivos || []).join(" / "), _horasData.cfg.valorHora, d.costoTotal, d.costoDevengado,
+      u19Arr(d.motivos).join(" / "), _horasData.cfg.valorHora, d.costoTotal, d.costoDevengado,
       d.sesiones, d.clientes, d.capacidad,
       (d.completo && d.capacidad ? Math.round(d.clientes/d.capacidad*100) : 0) + "%",
       d.completo ? "si" : "no"]);
@@ -13866,7 +13879,7 @@ function buildAlertsHtml(){
   state.clients.forEach(function(c){
     var hasActive = state.routines.some(function(r){ return r.clientId===c.id && r.status!=="archived"; });
     if (!hasActive) return;
-    var reps = (byClient[c.id]||[]).concat(byClient[c.name]||[]);
+    var reps = u19Arr(byClient[c.id]).concatu19Arr(byClient[c.name]);
     var recent = reps.filter(function(rp){ return now-(rp.sentAt||0) <= 14*86400000; });
     var lastMs = reps.reduce(function(mx,rp){ return Math.max(mx, rp.sentAt||0); }, 0);
     var avgPct = recent.length ? Math.round(recent.reduce(function(sum,rp){ return sum+(rp.pct||0); },0)/recent.length) : null;
@@ -13989,7 +14002,7 @@ function getProgressionSuggestion(exId){
     if (!hist.length) return null;
     var last = hist[hist.length-1];
     var pe = null;
-    (last.perEx||[]).forEach(function(p){ if (p.exId===exId) pe = p; });
+    u19Arr(last.perEx).forEach(function(p){ if (p.exId===exId) pe = p; });
     if (!pe) return null;
     if (pe.sets>0 && pe.done===pe.sets && pe.top>0){
       return "Completaste "+pe.sets+" sets con "+pe.top+" kg la sesión pasada ("+(last.date||"")+") — prueba subir 2,5-5% la carga";
@@ -14258,7 +14271,7 @@ window.sendClientSummary = function(clientId){
     msg += lastMs ? ("Tu último reporte fue el "+new Date(lastMs).toLocaleDateString("es-CL")+". ¡Retomemos! 💪") : "Abre tu rutina y usa el botón Enviar progreso al terminar cada sesión 💪";
   }
   if (c.targetWeight){
-    var _msArr = (c.measurements||[]).filter(function(m){ return m.weight; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+    var _msArr = u19Arr(c.measurements).filter(function(m){ return m.weight; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
     if (_msArr.length) msg += "\n🎯 Meta "+c.targetWeight+" kg · vas en "+_msArr[_msArr.length-1].weight+" kg";
   }
   var phone = String(c.phone).replace(/[^\d]/g,"");
@@ -14447,7 +14460,7 @@ function drawLinePts(cv, pts){
 function drawMeasureChart(c){
   var cv = document.getElementById("ms-chart");
   if (!cv) return;
-  var pts = (c.measurements||[]).filter(function(m){ return m.weight; })
+  var pts = u19Arr(c.measurements).filter(function(m){ return m.weight; })
     .sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); })
     .map(function(m){ return { x:m.date||"", y:m.weight }; });
   if (pts.length >= 2) drawLinePts(cv, pts);
@@ -14548,12 +14561,12 @@ window.openClientTracking = function(clientId){
 };
 window.deleteMeasurement = function(cid, mid){
   var c = getClient(cid); if (!c) return;
-  c.measurements = (c.measurements||[]).filter(function(m){ return m.id!==mid; });
+  c.measurements = u19Arr(c.measurements).filter(function(m){ return m.id!==mid; });
   saveState(); closeModal(); openClientTracking(cid);
 };
 window.deleteAssessment = function(cid, aid){
   var c = getClient(cid); if (!c) return;
-  c.assessments = (c.assessments||[]).filter(function(a){ return a.id!==aid; });
+  c.assessments = u19Arr(c.assessments).filter(function(a){ return a.id!==aid; });
   saveState(); closeModal(); openClientTracking(cid);
 };
 
@@ -14780,8 +14793,8 @@ function pzTeclas(ev){
 }
 /* Puertas de entrada: rutina (tarjeta y editor), protocolo (fase) y circuito. */
 function pzSeccionesDeRutina(r){
-  return (r.days || []).map(function(d, i){
-    return { nombre: DAY_NAMES_SHORT[i] || ("Día " + (i + 1)), items: (d.exercises || []).map(pzItemDeFila) };
+  return u19Arr(r.days).map(function(d, i){
+    return { nombre: DAY_NAMES_SHORT[i] || ("Día " + (i + 1)), items: u19Arr(d.exercises).map(pzItemDeFila) };
   });
 }
 window.pizarraRutina = function(id){
@@ -14813,12 +14826,12 @@ window.pizarraDiaBuilder = function(){
 };
 window.pizarraProtocolo = function(id, fase){
   var p = getProtocol(id); if (!p) return;
-  var secs = (p.phases || []).map(function(ph, i){ return { nombre: ph.name || ("Fase " + (i + 1)), items: (ph.exercises || []).map(pzItemDeFila) }; });
+  var secs = u19Arr(p.phases).map(function(ph, i){ return { nombre: ph.name || ("Fase " + (i + 1)), items: u19Arr(ph.exercises).map(pzItemDeFila) }; });
   pizarraAbrir({ titulo: p.name || "Protocolo", subtitulo: p.region || "", secciones: secs, inicial: fase || 0 });
 };
 window.pizarraCircuitoObj = function(c){
   if (!c) return;
-  var items = (c.estaciones || []).map(function(s, i){
+  var items = u19Arr(c.estaciones).map(function(s, i){
     return { nombre: "Estación " + (i + 1) + " · " + circEstacionNombre(s), gif: circGifDe(s),
              detalle: circTrabajoDe(c, i) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio", nota: s.nota || "" };
   });
@@ -14836,9 +14849,9 @@ var _rl = null, _rlFichas = null;
 function rlEx(id){ return (_rlFichas && _rlFichas[id]) ? _rlFichas[id] : getExercise(id); }
 function rlEsTiempo(reps){ return /\d\s*(s|seg|sec|min|')/i.test(String(reps || "")); }
 function rlPlan(r, dayIdx){
-  var day = (r.days || [])[dayIdx], plan = [];
+  var day = u19Arr(r.days)[dayIdx], plan = [];
   if (!day) return plan;
-  var filas = (day.exercises || []).filter(function(ex){ return ex && ex.exerciseId; });
+  var filas = u19Arr(day.exercises).filter(function(ex){ return ex && ex.exerciseId; });
   filas.forEach(function(ex, i){
     var e = rlEx(ex.exerciseId), sets = Math.max(1, parseInt(ex.sets, 10) || 1), rest = parseRestTime(ex.rest);
     for (var s = 1; s <= sets; s++){
@@ -14961,7 +14974,7 @@ window.rlPonerEscalon = function(nuevoId){
      puede hoy con ese escalón lo normal es que tampoco pueda el martes.
      Se deshace con el mismo botón. */
   var guardada = false;
-  for (var k = 0; k < (state.routines || []).length; k++) if (state.routines[k] === L.r){ guardada = true; break; }
+  for (var k = 0; k < u19Arr(state.routines).length; k++) if (state.routines[k] === L.r){ guardada = true; break; }
   if (guardada) saveState();
   closeModal();
   rlPintar();
@@ -15036,7 +15049,7 @@ function rlTeclas(ev){
 /* --- Día de rutina ↔ circuito --- */
 window.circDesdeDia = function(){
   var r = _builderRoutine; if (!r) return;
-  var dayIdx = _builderActiveDay || 0, day = (r.days || [])[dayIdx];
+  var dayIdx = _builderActiveDay || 0, day = u19Arr(r.days)[dayIdx];
   if (!day || !day.exercises.length){ toast("Este día no tiene ejercicios", "warn"); return; }
   var c = circNuevo(), cl = getClient(r.clientId);
   c.nombre = (r.name || "Rutina") + " · " + (DAY_NAMES[dayIdx] || "");
@@ -15111,11 +15124,11 @@ function circFmt(sec){
 /* Tiempo de trabajo de una estación: en secuencia cada estación puede tener el suyo;
    en rotación todas van a la vez y manda el general. */
 function circTrabajoDe(c, i){
-  var s = (c.estaciones || [])[i], propio = s ? circNum(s.trabajo, 0) : 0;
+  var s = u19Arr(c.estaciones)[i], propio = s ? circNum(s.trabajo, 0) : 0;
   return Math.max(1, (c.modo === "secuencia" && propio > 0) ? propio : circNum(c.trabajo, 40));
 }
 function circDuracion(c){
-  var N = (c.estaciones || []).length, R = Math.max(1, circNum(c.rondas, 1));
+  var N = u19Arr(c.estaciones).length, R = Math.max(1, circNum(c.rondas, 1));
   if (!N) return 0;
   var cmb = circNum(c.cambio, 15), dr = circNum(c.descansoRonda, 60), t = 0;
   for (var i = 0; i < N; i++) t += circTrabajoDe(c, i);
@@ -15123,7 +15136,7 @@ function circDuracion(c){
 }
 function circMaterial(c){
   var m = {};
-  (c.estaciones || []).forEach(function(s){
+  u19Arr(c.estaciones).forEach(function(s){
     var e = s.exerciseId ? getExercise(s.exerciseId) : null;
     if (e && e.equipment && !/peso corporal/i.test(e.equipment)) m[e.equipment] = (m[e.equipment] || 0) + 1;
   });
@@ -15342,7 +15355,7 @@ function circShareData(c){
   return { type: "circuito", v: 1, sharedAt: Date.now(),
     circuito: { nombre: c.nombre || "", grupo: c.grupo || "", notas: c.notas || "", modo: c.modo || "rotacion", grupos: c.grupos, rondas: c.rondas,
       trabajo: c.trabajo, cambio: c.cambio, descansoRonda: c.descansoRonda, ratio: c.ratio || "16:9", nombresGrupos: c.nombresGrupos || "",
-      estaciones: (c.estaciones || []).map(function(s){
+      estaciones: u19Arr(c.estaciones).map(function(s){
         var g = circGifDe(s), o = { nombre: circEstacionNombre(s), nota: s.nota || "", x: s.x, y: s.y, trabajo: circNum(s.trabajo, 0) };
         if (g && g.indexOf("data:") !== 0) o.gif = g;
         return o;
@@ -15394,7 +15407,7 @@ function showCircuitoView(data){
   var src = data.circuito;
   var c = { id: "compartido", nombre: src.nombre || "Circuito", grupo: src.grupo || "", notas: src.notas || "", modo: src.modo || "rotacion", grupos: src.grupos, rondas: src.rondas,
             trabajo: src.trabajo, cambio: src.cambio, descansoRonda: src.descansoRonda, ratio: src.ratio || "16:9", nombresGrupos: src.nombresGrupos || "",
-            estaciones: (src.estaciones || []).map(function(s){ return { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" }; }) };
+            estaciones: u19Arr(src.estaciones).map(function(s){ return { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" }; }) };
   _circCompartido = c;
   hideTrainerUI();
   showView("client");
@@ -15435,7 +15448,7 @@ function showCircuitoView(data){
 
 /* ---------- lista ---------- */
 function circCardHtml(c){
-  var N = (c.estaciones || []).length, dur = circDuracion(c);
+  var N = u19Arr(c.estaciones).length, dur = circDuracion(c);
   return '<div class="card">'
     + '<div class="card-main">'
       + '<div class="card-title">' + escapeHtml(c.nombre || "Sin nombre") + '</div>'
@@ -16792,7 +16805,7 @@ function rtArmarRutina(tpl){
   r.category = tpl.category || "";
   r.weeks = tpl.weeks || 4;
   r.notes = tpl.notes || "";
-  r.weekNotes = (tpl.weekNotes || []).slice();
+  r.weekNotes = u19Arr(tpl.weekNotes).slice();
   r.plantilla = tpl.id;
   tpl.dias.forEach(function(d){
     var day = r.days[d[0]];
@@ -16918,7 +16931,7 @@ window.openTrashModal = function(){
 };
 window.restoreFromTrash = function(rid){
   var found = null;
-  state.trash = (state.trash||[]).filter(function(x){
+  state.trash = u19Arr(state.trash).filter(function(x){
     if (x.routine && x.routine.id===rid){ found = x; return false; }
     return true;
   });
@@ -16932,7 +16945,7 @@ window.restoreFromTrash = function(rid){
   }
 };
 window.purgeTrashItem = function(rid){
-  state.trash = (state.trash||[]).filter(function(x){ return !(x.routine && x.routine.id===rid); });
+  state.trash = u19Arr(state.trash).filter(function(x){ return !(x.routine && x.routine.id===rid); });
   saveState();
   closeModal();
   renderRoutines();
@@ -17084,18 +17097,18 @@ window.globalSearch = function(q){
     .sort(function(a, b){ return (b.p - a.p) || ((a.e.name||"").length - (b.e.name||"").length); })
     .map(function(x){ return x.e; });
   if (ejHits.length){ res.push('<div class="gs-head">Ejercicios · ' + ejHits.length + '</div>'); ejHits.slice(0,6).forEach(function(e){ res.push('<div class="gs-item" onclick="gsGoExercise(\'' + e.id + '\')"><span class="badge muted">Ejercicio</span> ' + escapeHtml(e.name||'') + (e.muscle ? ' <span class="text-muted" style="font-size:.72rem;">· ' + escapeHtml(e.muscle) + '</span>' : '') + '</div>'); }); if (ejHits.length > 6) res.push('<div class="gs-item gs-more" onclick="gsGoLibrary()">… y ' + (ejHits.length - 6) + ' más · ver en Biblioteca</div>'); }
-  var circHits = (state.circuitos || []).filter(function(c){
-    return busqCoincide(musNorm((c.nombre||"") + " " + (c.grupo||"") + " " + (c.estaciones||[]).map(function(s){ return s.nombre || ""; }).join(" ")), q_);
+  var circHits = u19Arr(state.circuitos).filter(function(c){
+    return busqCoincide(musNorm((c.nombre||"") + " " + (c.grupo||"") + " " + u19Arr(c.estaciones).map(function(s){ return s.nombre || ""; }).join(" ")), q_);
   });
   if (circHits.length){
     res.push('<div class="gs-head">Circuitos · ' + circHits.length + '</div>');
     circHits.slice(0, 4).forEach(function(c){
       res.push('<div class="gs-item" onclick="closeGSearch();circEditar(\'' + c.id + '\')"><span class="badge muted">Circuito</span> ' + escapeHtml(c.nombre||"Sin nombre")
         + (c.grupo ? ' <span class="text-muted" style="font-size:.72rem;">' + escapeHtml(c.grupo) + '</span>' : '')
-        + ' <span class="text-muted" style="font-size:.72rem;">' + (c.estaciones||[]).length + ' est.</span></div>');
+        + ' <span class="text-muted" style="font-size:.72rem;">' + u19Arr(c.estaciones).length + ' est.</span></div>');
     });
   }
-  var protHits = (state.protocols || []).filter(function(p){
+  var protHits = u19Arr(state.protocols).filter(function(p){
     var nom = musNorm((p.name||"") + " " + (p.region||"") + " " + (p.patologia||""));
     return busqCoincide(nom + " " + musNorm((p.segment||"") + " " + (p.description||"")), q_, nom);
   });
@@ -17120,7 +17133,7 @@ window.globalSearch = function(q){
         if(d==null||d>14) return null; return d<0 ? ('vencida hace '+Math.abs(d)+' d') : ('en '+d+' d'); } },
     { re:/dolor|eva|bandera|derivar/, lbl:'con dolor o banderas rojas',
       test:function(c){ if(c.redFlags&&c.redFlags.blocked) return 'banderas rojas';
-        var pl=(c.painLog||[]); if(!pl.length) return null; var u=pl[pl.length-1];
+        var pl=u19Arr(c.painLog); if(!pl.length) return null; var u=pl[pl.length-1];
         var e=(u.eva!=null)?u.eva:u.valor; return (e!=null&&e>=4) ? ('EVA '+e+'/10') : null; } }
   ];
   consultas.forEach(function(q){
@@ -17184,7 +17197,7 @@ window.gsGoExercise = function(id){ closeGSearch(); showExercisePreview(id); };
 function buildObjectiveHtml(c){
   if (!c.targetWeight) return "";
   var target = parseFloat(c.targetWeight);
-  var ms = (c.measurements||[]).filter(function(m){ return m.weight; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
+  var ms = u19Arr(c.measurements).filter(function(m){ return m.weight; }).sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); });
   if (!ms.length){
     return '<div class="crit-list" style="margin-top:0;margin-bottom:.8rem;"><strong>🎯 Meta:</strong> '+target+' kg'+(c.targetDate?' al '+escapeHtml(c.targetDate):'')+' <span class="text-muted">— registra una medida para ver el avance</span></div>';
   }
@@ -17236,7 +17249,7 @@ window.addLsiTest = function(cid){
 };
 window.deleteLsiTest = function(cid, tid){
   var c = getClient(cid); if (!c) return;
-  c.lsiTests = (c.lsiTests||[]).filter(function(t){ return t.id!==tid; });
+  c.lsiTests = u19Arr(c.lsiTests).filter(function(t){ return t.id!==tid; });
   saveState(); closeModal(); openClientTracking(cid);
 };
 
@@ -17266,7 +17279,7 @@ window.addTrainerLog = function(cid){
 };
 window.deleteTrainerLog = function(cid, lid){
   var c = getClient(cid); if (!c) return;
-  c.log = (c.log||[]).filter(function(l){ return l.id!==lid; });
+  c.log = u19Arr(c.log).filter(function(l){ return l.id!==lid; });
   saveState(); closeModal(); openClientTracking(cid);
 };
 
@@ -18236,7 +18249,7 @@ function u19ClienteActivo(c){
   return (d === null) || (d > -30);
 }
 function u19ClientesActivos(){
-  return (state.clients || []).filter(u19ClienteActivo);
+  return u19Arr(state.clients).filter(u19ClienteActivo);
 }
 function u19FinMes(ts){
   if (!ts) return null;
@@ -18279,11 +18292,11 @@ function u19AgendaPorCalendly(c){
 
 function u19FinRiesgo(){
   var out = { total: 0, n: 0, items: [], mrr: 0 };
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var precio = u19FinNum(c.planPrice);
     if (precio > 0) out.mrr += precio;
-    var tieneRutina = (state.routines || []).some(function(r){ return r.clientId === c.id && r.status !== "archived"; });
+    var tieneRutina = u19Arr(state.routines).some(function(r){ return r.clientId === c.id && r.status !== "archived"; });
     if (!tieneRutina || precio <= 0) return;
     /* Si Notion sabe cuando vino por ultima vez, esa es la verdad; el
        reporte de progreso es un proxy. Un cliente puede venir y no
@@ -18319,7 +18332,7 @@ function u19FinAntiguedad(){
     { lbl: "Más de un año", min: 12, max: 1e9, n: 0, mrr: 0, color: "#15803d" }
   ];
   var sinFecha = { n: 0, mrr: 0 };
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var precio = u19FinNum(c.planPrice);
     var m = u19FinMes(c.createdAt);
@@ -18332,7 +18345,7 @@ function u19FinAntiguedad(){
 }
 
 function u19FinConcentracion(){
-  var conPrecio = (state.clients || [])
+  var conPrecio = u19Arr(state.clients)
     .filter(function(c){ return u19ClienteActivo(c) && u19FinNum(c.planPrice) > 0; })
     .map(function(c){ return { n: c.name || "—", p: u19FinNum(c.planPrice), id: c.id }; })
     .sort(function(a, b){ return b.p - a.p; });
@@ -18367,7 +18380,7 @@ function u19FinOcupacion(sesionesSemana){
    ------------------------------------------------------------ */
 function u19FinRenovaciones(){
   var venc = [], pronto = [];
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var precio = u19FinNum(c.planPrice);
     if (precio <= 0 || !c.planEndDate) return;
@@ -18623,7 +18636,7 @@ function u19CalendlyRango(dias){
         return fetch(url, { headers: calendlyHeaders() }).then(function(r){
           return r.json().then(function(d){
             if (!r.ok || (d && d.message && !d.collection)) throw new Error(u19CalError(d));
-            out = out.concat(d.collection || []);
+            out = out.concatu19Arr(d.collection);
             var next = d.pagination && d.pagination.next_page_token;
             /* Un mes de gimnasio pasa de 100 eventos: hay que paginar. */
             return (next && out.length < 3000) ? pedir(next) : out;
@@ -19299,7 +19312,7 @@ function u19NoShows(){
               coste: 0, items: [], pct: 0, hayDatos: false };
   var sesMes = u19SesionesMes();
 
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     out.activos++;
     /* Notion no deberia mandar negativos, pero uno solo descuadraria
@@ -19354,7 +19367,7 @@ function u19Retencion(){
               mrrEnJuego: 0, mrr: 0, vencidosCLP: 0, hayDatos: false };
   var esperadas = u19SesionesMes();
 
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     out.activos++;
     var precio = u19FinNum(c.planPrice);
@@ -19410,7 +19423,7 @@ function u19Retencion(){
      Inactivo el mismo dia que vence, sin gracia, asi que caen del panel justo
      cuando habria que escribirles. Van aparte: no suman al MRR (no estan
      pagando) y la conversacion con ellos es otra. */
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!c || c.type === "rehab") return;
     if (u19ClienteActivo(c)) return;
     var fin = c.planEndDate || "";
@@ -19478,13 +19491,13 @@ function u19PlantelMetrics(){
   var out = { total: 0, evaluados: 0, sinEvaluar: [], filas: [],
               deficit: [], mejoran: [], empeoran: [], reeval: [],
               cobertura: { tres: 0, dos: 0, uno: 0, cero: 0 } };
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     out.total++;
     var sRnd = u19SerieRnd(c);
     var sFrz = u19SerieFrz(c);
     var sLsi = (typeof u19SerieLsiPuntos === 'function') ? u19SerieLsiPuntos(c) : [];
-    var nBio = (c.evals || []).length || (c.measurements || []).length;
+    var nBio = u19Arr(c.evals).length || u19Arr(c.measurements).length;
     var dominios = (sRnd.length ? 1 : 0) + (sFrz.length ? 1 : 0) + (nBio ? 1 : 0);
     if (dominios >= 3) out.cobertura.tres++;
     else if (dominios === 2) out.cobertura.dos++;
@@ -20034,12 +20047,12 @@ function u19RtResultadoHTML(izq, der){
 /* -------- El ruido del montaje -------- */
 
 function u19RtRuido(){
-  var base = (settings.rtBaseline || []).filter(function(n){ return typeof n === "number" && n > 0; });
+  var base = u19Arr(settings.rtBaseline).filter(function(n){ return typeof n === "number" && n > 0; });
   return u19RtErrorTipico(base);
 }
 
 function u19RtRuidoHTML(){
-  var base = (settings.rtBaseline || []);
+  var base = u19Arr(settings.rtBaseline);
   var te = u19RtRuido();
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
   h += '<div class="card-title">\u{1f4cf} Cuánto se mueve solo tu montaje</div>';
@@ -20083,7 +20096,7 @@ window.u19RtAddBaseline = function(){
     if (typeof toast === "function") toast("Pon tu media en milisegundos", "warn");
     return;
   }
-  settings.rtBaseline = (settings.rtBaseline || []).concat([Math.round(v)]);
+  settings.rtBaseline = u19Arr(settings.rtBaseline).concat([Math.round(v)]);
   saveSettings();
   if (typeof renderRendimiento === "function") renderRendimiento();
   if (typeof toast === "function") toast("Medición añadida", "success");
@@ -20375,7 +20388,7 @@ window.u19AsignarFranjas = function(){
 };
 
 window.u19SetFranja = function(id, v){
-  var c = (state.clients || []).filter(function(x){ return String(x.id) === String(id); })[0];
+  var c = u19Arr(state.clients).filter(function(x){ return String(x.id) === String(id); })[0];
   if (!c) return;
   c.franja = (c.franja === v) ? "" : v;   /* volver a pulsar la quita */
   saveState();
@@ -21222,7 +21235,7 @@ function u19SemanaVivaHTML(){
      recupera; que no parezca descartado. Va en ambar y ANTES que los activos
      en riesgo: dejo de venir y ademas ya no paga, es mas urgente. */
   var filas = [], recien = [], viejos = [];
-  (r.vencidos || []).forEach(function(it){
+  u19Arr(r.vencidos).forEach(function(it){
     if (it.diasVencido != null && it.diasVencido <= 7){ it._nivel = 'recien'; recien.push(it); }
     else { it._nivel = 'vencido'; viejos.push(it); }
   });
@@ -21393,7 +21406,7 @@ function u19FinHistRegistrar(ingresos, costo, clientes){
    guardamos son los de hoy, no los de entonces. */
 function u19FinHistReconstruir(meses){
   var out = [], hoy = new Date();
-  var cl = (state.clients || []);
+  var cl = u19Arr(state.clients);
   for (var i = meses; i >= 1; i--){
     var d = new Date(hoy.getFullYear(), hoy.getMonth() - i + 1, 0, 23, 59, 59); /* ultimo dia */
     var mes = u19MesClave(d);
@@ -21498,7 +21511,7 @@ function u19FrecuenciaPlan(nombre){
 
 function u19FinPorCupo(){
   var grupos = {}, sinFrec = 0;
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var precio = u19FinNum(c.planPrice);
     if (precio <= 0) return;
@@ -21830,7 +21843,7 @@ function u19NombreClave(k){
 /* La valvula: saca el catalogo de localStorage y lo deja en IndexedDB.
    Devuelve una promesa que resuelve a true si consiguio liberar sitio. */
 function u19MudarCatalogo(){
-  var ejercicios = (state.exercises || []);
+  var ejercicios = u19Arr(state.exercises);
   if (!ejercicios.length) return Promise.resolve(false);
   return u19IdbGuardar("exercises", JSON.parse(JSON.stringify(ejercicios)))
     .then(function(){
@@ -21891,7 +21904,7 @@ function u19CatalogoAntesDeSubir(){
     return _syncMaybeDecrypt(remote);
   }).then(function(data){
     if (!data || data.app !== "ultrasport19" || !Array.isArray(data.exercises)) return false;
-    var local = (state.exercises || []).length;
+    var local = u19Arr(state.exercises).length;
     if (data.exercises.length <= local || u19CatalogoEncoge(data.exercises.length, local)) return false;
     state.exercises = data.exercises;
     saveState(true);
@@ -21909,7 +21922,7 @@ function u19GuardarCatalogoDiferido(){
   _catTimer = setTimeout(function(){
     _catTimer = null;
     if (typeof u19IdbGuardar !== "function") return;
-    u19IdbGuardar("exercises", (state.exercises || []).slice()).catch(function(){});
+    u19IdbGuardar("exercises", u19Arr(state.exercises).slice()).catch(function(){});
   }, 1200);
 }
 /* La tarjeta de Ajustes: cuanto ocupa cada cosa y cuanto queda. */
@@ -22105,7 +22118,7 @@ function u19AnalizarConClaude(idSuf){
     if (!obj) throw new Error("Claude respondió, pero no en el JSON esperado. Revisa el texto crudo en la consola.");
     var ta = document.getElementById("u19-uni-json-" + idSuf);
     if (ta) ta.value = JSON.stringify(obj, null, 2);
-    var n = (obj.evaluaciones || []).length;
+    var n = u19Arr(obj.evaluaciones).length;
     var r = obj.rendimiento && obj.rendimiento.sesiones ? obj.rendimiento.sesiones.length : 0;
     var f = obj.fuerza && obj.fuerza.mediciones ? obj.fuerza.mediciones.length : 0;
     poner("✓ Listo: " + n + " evaluación(es), " + r + " sesión(es) de BlazePod, " + f + " medición(es) de fuerza. "
@@ -22505,7 +22518,7 @@ function u19InformeClienteDoc(inv, cli){
 
   var nombre = (cli && cli.nombre) || "";
   var fechas = [];
-  (inv.bio || []).forEach(function(e){ if (e.fecha) fechas.push(e.fecha); });
+  u19Arr(inv.bio).forEach(function(e){ if (e.fecha) fechas.push(e.fecha); });
   if (inv.rnd && inv.rnd.resumen && inv.rnd.resumen.fecha_act) fechas.push(inv.rnd.resumen.fecha_act);
   if (inv.frz && inv.frz.resumen && inv.frz.resumen.fecha_act) fechas.push(inv.frz.resumen.fecha_act);
   fechas.sort();
@@ -22608,7 +22621,7 @@ var PCT_MINIMO = 8;
 /* Junta el ultimo valor de cada deportista activo para un indicador. */
 function u19PoblacionGym(metrica){
   var vals = [];
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var v = null;
     if (metrica === "reaccion"){
@@ -22894,7 +22907,7 @@ function u19FinVencimientos(){
     { lbl: "En 3 sem.",   n: 0, v: 0, col: "#7dd3fc" },
     { lbl: "En 4 sem.",   n: 0, v: 0, col: "#7dd3fc" }
   ];
-  (state.clients || []).forEach(function(c){
+  u19Arr(state.clients).forEach(function(c){
     if (!u19ClienteActivo(c)) return;
     var precio = u19FinNum(c.planPrice);
     if (precio <= 0 || !c.planEndDate) return;
@@ -24502,14 +24515,14 @@ function infOptsHistorial(d1, d2){
   var pts = [];
   function push(d){ if (d && d.evaluaciones && d.evaluaciones[0] && d.evaluaciones[0].fecha) pts.push(d.evaluaciones[0]); }
   push(d1);
-  (_infOpts.extraEvals || []).forEach(function(x){ push(x.data); });
+  u19Arr(_infOpts.extraEvals).forEach(function(x){ push(x.data); });
   push(d2);
   var seen = {};
   return pts.filter(function(e){ return !seen[e.fecha] && (seen[e.fecha] = 1); }).sort(function(a, b){ return a.fecha < b.fecha ? -1 : 1; });
 }
 function infOptsWarnings(d1, d2, e1, e2){
   var w = [].concat(d1.warnings || [], d2.warnings || []);
-  (_infOpts.extraEvals || []).forEach(function(x){ if (x.data && x.data.warnings) w = w.concat(x.data.warnings); });
+  u19Arr(_infOpts.extraEvals).forEach(function(x){ if (x.data && x.data.warnings) w = w.concat(x.data.warnings); });
   w = w.concat(
     infDetectLRInversion(e1, e2),
     infSanityWarnings(e1.bioimpedancia, e1.fecha),
@@ -24540,7 +24553,7 @@ function infOptsRefreshWarnings(){
 }
 function infOptsExtrasRender(){
   var box = document.getElementById('inf-extra-list'); if (!box) return;
-  box.innerHTML = (_infOpts.extraEvals || []).map(function(x, i){
+  box.innerHTML = u19Arr(_infOpts.extraEvals).map(function(x, i){
     var st = x.data ? ' · ' + x.data.evaluaciones[0].fecha + ' ✓' : (x.jsonText ? ' · JSON inválido' : '');
     var cls = x.data ? 'iop-extra ok' : (x.jsonText ? 'iop-extra bad' : 'iop-extra');
     return '<div class="' + cls + '">'
@@ -24574,7 +24587,7 @@ function infExportReport(){
     _fmt: 'us19-report-v1',
     cliente: { nombre: _infState.nombre || '', rut: _infState.rut || '' },
     eval1: _infState.ev1raw || '', eval2: _infState.ev2raw || '',
-    extraEvals: (_infOpts.extraEvals || []).map(function(x){ return x.jsonText; }),
+    extraEvals: u19Arr(_infOpts.extraEvals).map(function(x){ return x.jsonText; }),
     metas: _infOpts.metas, fotos: _infOpts.fotos,
     indicaciones: _infOpts.indicaciones || '', folio: _infOpts.folio || '', opts: _infOpts.opts
   };
@@ -24722,7 +24735,7 @@ function infImportFromObject(d){
                  indicaciones:d.indicaciones || "", opts:d.opts || null, fotos:d.fotos || null };
     var textos = [];
     if (d.eval1) textos.push(d.eval1);
-    (d.extraEvals || []).forEach(function(t){ if (t) textos.push(t); });
+    u19Arr(d.extraEvals).forEach(function(t){ if (t) textos.push(t); });
     if (d.eval2) textos.push(d.eval2);
     textos.forEach(function(t){
       var raw = (typeof t === "string") ? t : JSON.stringify(t);
@@ -24772,7 +24785,7 @@ function infHistToNorm(p){
     if (q.ok) evs.push({ fecha:ev.fecha, jsonText:t, data:q.data });
   }
   push(p.ev1);
-  (p.historial || []).forEach(push);
+  u19Arr(p.historial).forEach(push);
   push(p.ev2);
   if (!evs.length) return { ok:false, error:"Ese informe guardado no tiene evaluaciones legibles." };
   return { ok:true, origen:"Historial de la app · datos exactos",
@@ -24874,8 +24887,8 @@ window.infImportFile = function(input){
 /* Informes guardados en la app, de todos los clientes, más recientes primero. */
 function infHistList(){
   var rows = [];
-  (state.clients || []).forEach(function(c){
-    (c.informes || []).forEach(function(inf, ii){
+  u19Arr(state.clients).forEach(function(c){
+    u19Arr(c.informes).forEach(function(inf, ii){
       if (!inf || !inf.payload) return;
       rows.push({ cid:c.id, ii:ii, cliente:c.name || "—", fecha:inf.fecha || "",
                   folio:inf.payload.folio || "" });
@@ -25262,10 +25275,10 @@ function progApplyFromModal(){
 
   // 1) Registro de progresión en el historial del cliente
   var ejercicios=[], totalSets=0;
-  (d.dias||[]).forEach(function(dia){
-    (dia.ejercicios||[]).forEach(function(ex){
+  u19Arr(d.dias).forEach(function(dia){
+    u19Arr(dia.ejercicios).forEach(function(ex){
       if(!ex||!ex.nombre) return;
-      var series=(ex.series||[]).map(function(s){ return { n:s.n!=null?s.n:null, reps:s.reps!=null?s.reps:null, peso_kg:s.peso_kg!=null?s.peso_kg:null, rpe:s.rpe!=null?s.rpe:null, rir:s.rir!=null?s.rir:null, eva:s.eva!=null?s.eva:null, estado:s.estado||null }; });
+      var series=u19Arr(ex.series).map(function(s){ return { n:s.n!=null?s.n:null, reps:s.reps!=null?s.reps:null, peso_kg:s.peso_kg!=null?s.peso_kg:null, rpe:s.rpe!=null?s.rpe:null, rir:s.rir!=null?s.rir:null, eva:s.eva!=null?s.eva:null, estado:s.estado||null }; });
       totalSets+=series.length;
       ejercicios.push({ dia:dia.dia||null, nombre:ex.nombre, plan:ex.plan||null, series:series, comentario:ex.comentario||null, mejorSet:_prgBestSet(series) });
     });
@@ -25563,7 +25576,7 @@ window.openProgressHistory = function(clientId){
   // Evolución de cargas: por ejercicio, peso del mejor set en cada fecha (orden cronológico)
   var byEx={};
   progs.slice().sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); }).forEach(function(p){
-    (p.ejercicios||[]).forEach(function(e){
+    u19Arr(p.ejercicios).forEach(function(e){
       var best=e.mejorSet; if(!best||best.peso_kg==null) return;
       if(!byEx[e.nombre]) byEx[e.nombre]=[];
       byEx[e.nombre].push({ fecha:String(p.fecha||""), peso:best.peso_kg, reps:best.reps, rpe:best.rpe });
@@ -25591,7 +25604,7 @@ window.openProgressHistory = function(clientId){
       +'<span class="text-xs text-muted">'+(p.rutinaNombre?escapeHtml(p.rutinaNombre):"rutina no vinculada")+(p.cumplimiento!=null?(" · "+p.cumplimiento+"% cumplim."):"")+'</span></div>';
     if(p.nota) body+='<div class="text-xs" style="font-style:italic;margin:.3rem 0;color:var(--text);">💬 '+escapeHtml(p.nota)+'</div>';
     body+='<table class="rc-cmp" style="width:100%;margin-top:.4rem;"><tr><th>Ejercicio</th><th>Mejor set</th><th>RPE</th></tr>';
-    (p.ejercicios||[]).forEach(function(e){
+    u19Arr(p.ejercicios).forEach(function(e){
       var b=e.mejorSet;
       var mset=b?((b.reps!=null?b.reps:"—")+" × "+(b.peso_kg!=null?b.peso_kg+"kg":"—")):"—";
       body+='<tr><td>'+escapeHtml(e.nombre||"—")+'</td><td>'+mset+'</td><td>'+(b&&b.rpe!=null?b.rpe:"—")+'</td></tr>';
@@ -26222,7 +26235,7 @@ function rndNivelColor(n){ return n==="ok"?"#15803d":(n==="vigilar"?"#b45309":"#
 
 /* Motor de análisis: agrupa por lado, calcula asimetría y evolución. */
 function rndMetrics(data, dominante){
-  var ses=(data.sesiones||[]).map(rndNormSesion).filter(function(s){ return s.hits!=null || s.reaccion_ms_prom!=null; });
+  var ses=u19Arr(data.sesiones).map(rndNormSesion).filter(function(s){ return s.hits!=null || s.reaccion_ms_prom!=null; });
   ses.forEach(function(s){ var d=rndDerivados(s); s.hits_min=d.hits_min; s.ritmo_ms=d.ritmo_ms; });
   ses.sort(function(a,b){ return String(a.fecha||"")<String(b.fecha||"")?-1:1; });
 
@@ -27389,7 +27402,7 @@ function u19ProgresionDesdeReporte(data){
   var stats = data.stats || computeSessionStats(r, progress);
   var ejercicios = [];
   for (var di = 0; di < 7; di++){
-    var day = (r.days || [])[di];
+    var day = u19Arr(r.days)[di];
     if (!day || !day.exercises || !day.exercises.length) continue;
     for (var ei = 0; ei < day.exercises.length; ei++){
       var rowEx = day.exercises[ei];
@@ -27528,7 +27541,7 @@ function rndSetupDiff(c, actual){
 /* B3 · Reevaluación en un clic + envío por WhatsApp. */
 window.rndRollover = function(){
   if (!_rndState.metrics){ toast("Analiza las sesiones primero", "warn"); return; }
-  var ses = (_rndState.data.sesiones || []).slice();
+  var ses = u19Arr(_rndState.data.sesiones).slice();
   if (!ses.length) return;
   /* Conserva la última medición de cada lado como línea base y limpia el resto. */
   var base = [];
@@ -27679,10 +27692,10 @@ function u19PanelOperativoHTML(){
       return r.clientId === c.id && r.status !== "archived";
     });
     var entrenaHoy = rut.some(function(r){
-      var d = (r.days || [])[hoyIdx];
+      var d = u19Arr(r.days)[hoyIdx];
       return d && d.exercises && d.exercises.length;
     });
-    if (entrenaHoy) hoyEntrenan.push({ c:c, r:rut.filter(function(r){ var d = (r.days || [])[hoyIdx]; return d && d.exercises && d.exercises.length; })[0] });
+    if (entrenaHoy) hoyEntrenan.push({ c:c, r:rut.filter(function(r){ var d = u19Arr(r.days)[hoyIdx]; return d && d.exercises && d.exercises.length; })[0] });
 
     var t = ultimo[c.id] || ultimo[(c.name || "").toLowerCase()] || null;
     var prog = (c.progressions && c.progressions.length) ? c.progressions[c.progressions.length - 1] : null;
@@ -27925,7 +27938,7 @@ function u19EscClips(base){
   if (!base) return [];
   var r = u19EscRaiz(base.name);
   if (!r) return [];
-  return (state.exercises || []).filter(function(e){
+  return u19Arr(state.exercises).filter(function(e){
     return e && e.name && u19EscEsClip(e) && u19EscRaiz(e.name) === r;
   }).sort(function(a, b){ return (a.name || "").localeCompare(b.name || "", "es"); });
 }
@@ -27936,7 +27949,7 @@ function u19EscClips(base){
 function u19EscEscalera(base){
   if (!base) return [];
   var tb = libTaxDe(base), raiz = u19EscRaiz(base.name);
-  var fam = (state.exercises || []).filter(function(e){
+  var fam = u19Arr(state.exercises).filter(function(e){
     if (!e || !e.name || u19EscEsClip(e)) return false;
     if (e.muscle !== base.muscle) return false;
     if (u19EscRaiz(e.name) !== raiz) return false;
@@ -28305,7 +28318,7 @@ window.u19ExportarCliente = function(clientId){
 window.u19BorrarDatosCliente = function(clientId){
   var c = getClient(clientId);
   if (!c){ toast("Cliente no encontrado", "error"); return; }
-  var nInf = (c.informes || []).length, nRnd = (c.rendimiento || []).length, nPrg = (c.progressions || []).length;
+  var nInf = u19Arr(c.informes).length, nRnd = u19Arr(c.rendimiento).length, nPrg = u19Arr(c.progressions).length;
   var nRut = state.routines.filter(function(r){ return r.clientId === c.id; }).length;
   openModal({
     title: "Borrar los datos de " + c.name,
@@ -28415,7 +28428,7 @@ function u19LsiDirigido(vIzq, vDer, mejorEsMayor, ladoAfectado){
 function u19SerieLSI(c){
   var out = [];
   if (!c) return out;
-  (c.lsiTests || []).forEach(function(t){
+  u19Arr(c.lsiTests).forEach(function(t){
     if (t.lsi == null) return;
     out.push({
       fecha: t.date || "", lsi: Number(t.lsi),
@@ -28425,7 +28438,7 @@ function u19SerieLSI(c){
       deficitLado: null, dirigido: true, detalle: t.affected + " / " + t.healthy
     });
   });
-  (c.rendimiento || []).forEach(function(e){
+  u19Arr(c.rendimiento).forEach(function(e){
     if (!e.asimetria) return;
     var cand = [e.asimetria.reaccion, e.asimetria.hits].filter(Boolean);
     if (!cand.length) return;
@@ -28439,7 +28452,7 @@ function u19SerieLSI(c){
       detalle: (e.resumen && e.resumen.reaccion_prom != null) ? e.resumen.reaccion_prom + " ms" : ""
     });
   });
-  (c.fuerza || []).forEach(function(e){
+  u19Arr(c.fuerza).forEach(function(e){
     if (!e.peor) return;
     out.push({
       fecha: e.fecha || "", lsi: Number(e.peor.lsi),
@@ -28450,7 +28463,7 @@ function u19SerieLSI(c){
       detalle: (e.resumen && e.resumen.fuerza_max != null) ? (e.resumen.fuerza_max.toFixed(0) + " N") : ""
     });
   });
-  (c.pruebas || []).forEach(function(p){
+  u19Arr(c.pruebas).forEach(function(p){
     if (!p.d || p.d.lsi == null) return;
     var esBp = p.disp === "blazepod";
     out.push({
@@ -28689,7 +28702,7 @@ function u19MezclarEval(base, extra){
   });
   if (!base.fecha && extra.fecha) base.fecha = extra.fecha;
   if (!base.momento && extra.momento) base.momento = extra.momento;
-  base.orden_capturas = (base.orden_capturas || []).concat(extra.orden_capturas || []);
+  base.orden_capturas = u19Arr(base.orden_capturas).concatu19Arr(extra.orden_capturas);
   return base;
 }
 
@@ -28832,7 +28845,7 @@ function frzRFD(m){
 
 /* ---------- motor ---------- */
 function frzMetrics(data, dominante, afectado, pesoKg){
-  var meds = (data.mediciones || []).map(frzNormMed)
+  var meds = u19Arr(data.mediciones).map(frzNormMed)
     .filter(function(m){ return m.fuerza_max_n != null || m.rango_grados != null; });
   meds.forEach(function(m){
     m.rfd = frzRFD(m);
@@ -28922,7 +28935,7 @@ function frzDentroDelError(par){
 /* ---------- control de calidad ---------- */
 function frzSanityWarnings(fm){
   var w = [];
-  (fm.mediciones || []).forEach(function(m, i){
+  u19Arr(fm.mediciones).forEach(function(m, i){
     var et = m.movimiento + (m.lado ? " (" + rndLadoTxt(m.lado).toLowerCase() + ")" : "");
     if (!m.lado)
       w.push(et + ": sin lado. El título de ActiveForce lo trae entre paréntesis; sin él no se puede emparejar ni calcular simetría.");
@@ -29859,7 +29872,7 @@ var U19_CSS_MAX = "\n@media all{"
    ------------------------------------------------------------ */
 function u19VeredictoGlobal(inv){
   var lsis = [];
-  if (inv.frz){ (inv.frz.pares || []).forEach(function(p){ lsis.push({ v:p.q.lsi, q:'fuerza en ' + p.nombre }); }); }
+  if (inv.frz){ u19Arr(inv.frz.pares).forEach(function(p){ lsis.push({ v:p.q.lsi, q:'fuerza en ' + p.nombre }); }); }
   if (inv.rnd && inv.rnd.asimetria){
     /* Reaccion y toques son dos medidas distintas: se cuentan por separado,
        igual que las dibuja el radar. */
@@ -30016,7 +30029,7 @@ function u19RepeticionesHTML(m){
   if (!m || !m.porLado) return '';
   var bloques = [];
   ['bilateral', 'izquierdo', 'derecho', 'sinlado'].forEach(function(l){
-    var arr = (m.porLado[l] || []).filter(function(s){ return s.reaccion_ms_prom != null || s.hits != null; });
+    var arr = u19Arr(m.porLado[l]).filter(function(s){ return s.reaccion_ms_prom != null || s.hits != null; });
     if (arr.length < 2) return;
     function stats(vals){
       if (!vals.length) return null;
@@ -30051,7 +30064,7 @@ function u19RepeticionesHTML(m){
    el aparato entrega.
    ------------------------------------------------------------ */
 function frzMapaSVG(fm){
-  var pts = (fm.mediciones || []).filter(function(m){ return m.fuerza_max_n != null && m.tiempo_al_pico_seg != null; });
+  var pts = u19Arr(fm.mediciones).filter(function(m){ return m.fuerza_max_n != null && m.tiempo_al_pico_seg != null; });
   if (pts.length < 2) return '';
   var W = 300, H = 190, mx = 34, my = 16, pb = 26;
   var xs = pts.map(function(p){ return p.tiempo_al_pico_seg; });
@@ -30402,7 +30415,7 @@ function u19DiasSinReportar(c){
       if (mismo && r.sentAt && (!t || r.sentAt > t)) t = r.sentAt;
     });
   } catch(e){}
-  var pr = (c.progressions || []);
+  var pr = u19Arr(c.progressions);
   if (pr.length){
     var ult = pr[pr.length - 1];
     var ts = ult.importadoEl || (ult.fecha ? Date.parse(ult.fecha) : null);
@@ -30417,7 +30430,7 @@ function u19DiasHastaReeval(c){
   return isNaN(d) ? null : d;
 }
 function u19UltimoInforme(c){
-  var a = (c.informes || []);
+  var a = u19Arr(c.informes);
   return a.length ? a[a.length - 1] : null;
 }
 
@@ -30457,13 +30470,13 @@ function u19Timeline(c){
     if (!fecha) return;
     ev.push({ f: String(fecha).slice(0, 10), tipo: tipo, t: titulo, d: detalle || '', col: color });
   }
-  (c.informes || []).forEach(function(i){
+  u19Arr(c.informes).forEach(function(i){
     var b = (i.payload && i.payload.ev2 && i.payload.ev2.bioimpedancia) || {};
     add(i.fecha, 'Composición', 'Informe de composición corporal',
       (b.peso_kg != null ? b.peso_kg + ' kg' : '') + (b.grasa_pct != null ? ' · ' + b.grasa_pct + '% grasa' : ''), '#0e5132');
   });
   var _fInf = {};
-  (c.informes || []).forEach(function(i){ _fInf[String(i.fecha || '').slice(0, 10)] = 1; });
+  u19Arr(c.informes).forEach(function(i){ _fInf[String(i.fecha || '').slice(0, 10)] = 1; });
   var _nb = (typeof u19FichaBio === 'function') ? u19FichaBio(c) : null;
   (_nb ? _nb.evs : []).forEach(function(e2){
     if (_fInf[String(e2.fecha || '').slice(0, 10)]) return;
@@ -30471,45 +30484,45 @@ function u19Timeline(c){
     add(e2.fecha, 'Composición', 'Bioimpedancia · Notion',
       (b2.peso_kg != null ? b2.peso_kg + ' kg' : '') + (b2.grasa_pct != null ? ' · ' + b2.grasa_pct + '% grasa' : ''), '#0e5132');
   });
-  (c.pruebas || []).forEach(function(p){
+  u19Arr(c.pruebas).forEach(function(p){
     var cat = (typeof u19BateriaCat === 'function') ? u19BateriaCat(p.prueba) : null;
     add(p.fecha, 'Prueba', (cat ? cat.nombre : p.prueba) + ((p.v || {}).mov ? ' · ' + u19BateriaMov(p) : ''),
       ((p.d || {}).principal || '') + ((p.d || {}).lsi != null ? ' · LSI ' + p.d.lsi + '%' : ''), '#0891b2');
   });
-  (c.rendimiento || []).forEach(function(r){
+  u19Arr(c.rendimiento).forEach(function(r){
     var a = r.asimetria, cand = a ? [a.reaccion, a.hits].filter(Boolean) : [];
     var peor = cand.length ? cand.slice().sort(function(x, y){ return y.pct - x.pct; })[0] : null;
     add(r.fecha, 'Rendimiento', 'Evaluación BlazePod',
       ((r.resumen && r.resumen.reaccion_prom != null) ? r.resumen.reaccion_prom + ' ms' : '')
       + (peor ? ' · LSI ' + peor.lsi.toFixed(0) + '%' : ''), '#2563eb');
   });
-  (c.fuerza || []).forEach(function(f){
+  u19Arr(c.fuerza).forEach(function(f){
     add(f.fecha, 'Fuerza', 'Dinamometría ActiveForce',
       ((f.resumen && f.resumen.fuerza_max != null) ? f.resumen.fuerza_max.toFixed(0) + ' N' : '')
       + (f.peor ? ' · LSI ' + f.peor.lsi.toFixed(0) + '% en ' + f.peor.nombre : ''), '#b45309');
   });
-  (c.progressions || []).forEach(function(pr){
+  u19Arr(c.progressions).forEach(function(pr){
     add(pr.fecha, 'Entrenamiento', 'Sesión reportada' + (pr.rutinaNombre ? ' · ' + pr.rutinaNombre : ''),
       (pr.cumplimiento != null ? pr.cumplimiento + '% de cumplimiento' : '')
       + (pr.origen === 'link' ? '' : ' · importada'), '#15803d');
   });
-  (c.lsiTests || []).forEach(function(t){
+  u19Arr(c.lsiTests).forEach(function(t){
     add(t.date, 'Simetría', 'Test manual · ' + (t.name || 'LSI'), 'LSI ' + t.lsi + '%', '#7c3aed');
   });
-  (c.painLog || []).forEach(function(pl){
+  u19Arr(c.painLog).forEach(function(pl){
     add(pl.date || pl.fecha, 'Clínico', 'Registro de dolor',
       (pl.eva != null ? 'EVA ' + pl.eva + '/10' : ''), '#b91c1c');
   });
-  (c.measurements || []).forEach(function(mm){
+  u19Arr(c.measurements).forEach(function(mm){
     add(mm.date, 'Medidas', 'Medidas corporales', (mm.weight ? mm.weight + ' kg' : ''), '#64748b');
   });
-  (c.assessments || []).forEach(function(a2){
+  u19Arr(c.assessments).forEach(function(a2){
     add(a2.date, 'Valoración', 'Valoración registrada', (a2.notes || '').slice(0, 90), '#0891b2');
   });
-  (c.log || []).forEach(function(l){
+  u19Arr(c.log).forEach(function(l){
     add(l.date, 'Nota', 'Nota de seguimiento', (l.text || '').slice(0, 90), '#64748b');
   });
-  (c.evals || []).forEach(function(e2){
+  u19Arr(c.evals).forEach(function(e2){
     var t = e2.tipo || e2.type || e2.nombre || e2.name || 'Evaluación clínica';
     add(e2.date || e2.fecha, 'Clínico', String(t),
       (e2.resultado || e2.result || e2.notas || e2.notes || '').toString().slice(0, 90), '#7c3aed');
@@ -31554,8 +31567,8 @@ function u19RndBateriaPintar(){
   var el = document.getElementById("rnd-bat-lista"); if (!el) return;
   var c = u19RndClienteApp();
   if (!c){ el.innerHTML = '<p class="text-xs text-muted" style="margin:0 0 .6rem;line-height:1.5;">Elige un deportista arriba para ver y registrar sus pruebas. Si viene de Notion y aún no está en la app, impórtalo en Clientes.</p>'; return; }
-  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; }).slice(0, 5);
-  var h = '<div class="text-xs text-muted" style="margin:0 0 .5rem;">' + escapeHtml(c.name || "") + ' · ' + (c.pruebas || []).length + ' prueba' + ((c.pruebas || []).length === 1 ? '' : 's')
+  var ps = u19Arr(c.pruebas).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; }).slice(0, 5);
+  var h = '<div class="text-xs text-muted" style="margin:0 0 .5rem;">' + escapeHtml(c.name || "") + ' · ' + u19Arr(c.pruebas).length + ' prueba' + (u19Arr(c.pruebas).length === 1 ? '' : 's')
     + ' · <a href="#" onclick="abrirFicha(\'' + c.id + '\',\'evaluaciones\');return false;">ver todas en su ficha</a></div>';
   if (ps.length){
     h += '<div class="u19-scrollx"><table class="u-tbl"><tbody>' + ps.map(function(p){
@@ -31576,7 +31589,7 @@ window.u19BateriaDesdeRnd = function(){
 /* ---- Bloque en Evaluaciones ---- */
 function u19BateriaBloque(c){
   var titulo = "Batería de pruebas · ActivForce 2 y BlazePod";
-  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; });
+  var ps = u19Arr(c.pruebas).slice().sort(function(a, b){ return (String(b.fecha) + b.createdAt) < (String(a.fecha) + a.createdAt) ? -1 : 1; });
   var accion = '<span style="display:flex;gap:.4rem;flex-wrap:wrap;justify-content:flex-end;">'
     + (ps.length ? '<button class="btn btn-secondary btn-sm" onclick="u19BateriaInforme(\'' + c.id + '\')" title="Informe imprimible (guárdalo como PDF) con todas las pruebas y su evolución">🖨 Informe</button>' : '')
     + '<button class="btn btn-primary btn-sm" onclick="u19BateriaAbrir(\'' + c.id + '\')">+ Registrar prueba</button></span>';
@@ -31590,7 +31603,7 @@ function u19BateriaBloque(c){
     /* La misma prueba (y movimiento) anterior, para decir si mejora. */
     var prev = null;
     for (var i = 0; i < ps.length; i++){ var q = ps[i]; if (q === p || q.prueba !== p.prueba || String(q.fecha) >= String(p.fecha)) continue; if ((q.v || {}).mov !== (p.v || {}).mov) continue; if (!prev || String(q.fecha) > String(prev.fecha)) prev = q; }
-    var lectura = (d.lineas || []).slice();
+    var lectura = u19Arr(d.lineas).slice();
     if (prev && prev.d && d.lsi != null && prev.d.lsi != null) lectura.push('<b style="color:' + (d.lsi >= prev.d.lsi ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.lsi - prev.d.lsi, 1) + ' pts de LSI</b> vs ' + rndFdate(prev.fecha));
     else if (prev && prev.d && d.tiempo != null && prev.d.tiempo != null) lectura.push('<b style="color:' + (d.tiempo <= prev.d.tiempo ? 'var(--success)' : 'var(--danger)') + ';">' + batR(d.tiempo - prev.d.tiempo, 2) + ' s</b> vs ' + rndFdate(prev.fecha));
     else if (prev && prev.d && d.nivelTest != null && prev.d.nivelTest != null) lectura.push('<b style="color:' + (d.nivelTest >= prev.d.nivelTest ? 'var(--success)' : 'var(--danger)') + ';">' + (d.nivelTest - prev.d.nivelTest > 0 ? '+' : '') + (d.nivelTest - prev.d.nivelTest) + ' nivel' + (Math.abs(d.nivelTest - prev.d.nivelTest) === 1 ? '' : 'es') + '</b> vs ' + rndFdate(prev.fecha));
@@ -31617,7 +31630,7 @@ function u19BateriaBloque(c){
 function u19BateriaLectura(p, ps){
   var d = p.d || {}, prev = null;
   for (var i = 0; i < ps.length; i++){ var q = ps[i]; if (q === p || q.prueba !== p.prueba || String(q.fecha) >= String(p.fecha)) continue; if ((q.v || {}).mov !== (p.v || {}).mov) continue; if (!prev || String(q.fecha) > String(prev.fecha)) prev = q; }
-  var out = { lineas: (d.lineas || []).slice(), cambio: "", mejora: null, prev: prev };
+  var out = { lineas: u19Arr(d.lineas).slice(), cambio: "", mejora: null, prev: prev };
   if (prev && prev.d){
     var pd = prev.d;
     if (d.lsi != null && pd.lsi != null){ out.cambio = (d.lsi - pd.lsi > 0 ? "+" : "") + batR(d.lsi - pd.lsi, 1) + " pts de LSI"; out.mejora = d.lsi >= pd.lsi; }
@@ -31631,7 +31644,7 @@ function u19BateriaLectura(p, ps){
 function u19HoyISO(){ var d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
 window.u19BateriaInforme = function(clientId){
   var c = getClient(clientId); if (!c) return;
-  var ps = (c.pruebas || []).slice().sort(function(a, b){ return (String(a.fecha) + a.createdAt) < (String(b.fecha) + b.createdAt) ? -1 : 1; });
+  var ps = u19Arr(c.pruebas).slice().sort(function(a, b){ return (String(a.fecha) + a.createdAt) < (String(b.fecha) + b.createdAt) ? -1 : 1; });
   if (!ps.length){ toast("Esta persona aún no tiene pruebas registradas", "warn"); return; }
   var w = window.open("", "_blank");
   if (!w){ toast("El navegador bloqueó la ventana del informe: permite ventanas emergentes para esta app", "error"); return; }
@@ -31777,14 +31790,14 @@ function fichaResumen(c){
     + '</div>';
 
   var conteos = [
-    ['Informes de composición', (c.informes || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
-    ['Evaluaciones de rendimiento', (c.rendimiento || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
-    ['Dinamometrías', (c.fuerza || []).length, "abrirFicha('" + c.id + "','evaluaciones')"],
-    ['Sesiones reportadas', (c.progressions || []).length, "abrirFicha('" + c.id + "','entrenamiento')"],
+    ['Informes de composición', u19Arr(c.informes).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Evaluaciones de rendimiento', u19Arr(c.rendimiento).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Dinamometrías', u19Arr(c.fuerza).length, "abrirFicha('" + c.id + "','evaluaciones')"],
+    ['Sesiones reportadas', u19Arr(c.progressions).length, "abrirFicha('" + c.id + "','entrenamiento')"],
     ['Rutinas activas', rut.length, "abrirFicha('" + c.id + "','entrenamiento')"],
-    ['Registros de dolor', (c.painLog || []).length, "abrirFicha('" + c.id + "','clinico')"],
+    ['Registros de dolor', u19Arr(c.painLog).length, "abrirFicha('" + c.id + "','clinico')"],
     ['Bioimpedancias en Notion', nb ? nEv.length : (hayPuente ? '…' : '–'), "abrirFicha('" + c.id + "','evaluaciones')"],
-    ['Pruebas ActivForce · BlazePod', (c.pruebas || []).length, "abrirFicha('" + c.id + "','evaluaciones')"]
+    ['Pruebas ActivForce · BlazePod', u19Arr(c.pruebas).length, "abrirFicha('" + c.id + "','evaluaciones')"]
   ];
   var resumenN = '<div class="u-counts">' + conteos.map(function(x){
     return '<button class="u-count" onclick="' + x[2] + '"><b>' + x[1] + '</b><span>' + x[0] + '</span></button>';
@@ -31860,8 +31873,8 @@ function fichaComoEntrena(c){
   var rut = state.routines.filter(function(r){ return r.clientId === c.id && r.status !== "archived"; });
   var filas = [];
   rut.forEach(function(r){
-    (r.days || []).forEach(function(d){
-      (d.exercises || []).forEach(function(x){ if (x && x.exerciseId) filas.push(x); });
+    u19Arr(r.days).forEach(function(d){
+      u19Arr(d.exercises).forEach(function(x){ if (x && x.exerciseId) filas.push(x); });
     });
   });
   if (!filas.length) return "";
@@ -32366,8 +32379,8 @@ window.u19AplicarRirGlobal = function(){
   if (v === null) return;
   v = String(v).trim();
   var n = 0;
-  (_builderRoutine.days || []).forEach(function(d){
-    (d.exercises || []).forEach(function(ex){ ex.rir = v; n++; });
+  u19Arr(_builderRoutine.days).forEach(function(d){
+    u19Arr(d.exercises).forEach(function(ex){ ex.rir = v; n++; });
   });
   if (typeof renderBuilder === "function") renderBuilder();
   toast(v ? ("RIR " + v + " aplicado a " + n + " ejercicios") : ("Objetivo de RIR quitado de " + n + " ejercicios"), "success");

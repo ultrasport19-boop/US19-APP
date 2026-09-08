@@ -1,0 +1,36 @@
+{
+  "suite": "tools/pruebas.js",
+  "fuente": "index.html",
+  "mutantes": [
+    {
+      "nombre": "vuelve un (x || []) sobre un dato de disco",
+      "de": "  var nInf = u19Arr(c.informes).length,",
+      "a": "  var nInf = (c.informes || []).length,"
+    },
+    {
+      "nombre": "u19Arr deja pasar cualquier cosa",
+      "de": "  return Array.isArray(x) ? x : [];",
+      "a": "  return x || [];"
+    },
+    {
+      "nombre": "u19Arr empieza a quitar huecos y corre los indices",
+      "de": "  return Array.isArray(x) ? x : [];",
+      "a": "  return Array.isArray(x) ? x.filter(function(e){ return e != null; }) : [];"
+    },
+    {
+      "nombre": "u19Arr copia el array en vez de devolverlo tal cual",
+      "de": "  return Array.isArray(x) ? x : [];",
+      "a": "  return Array.isArray(x) ? x.slice() : [];"
+    },
+    {
+      "nombre": "la nube asigna el catalogo sin comprobar que sea un array",
+      "de": "        if (Array.isArray(data.exercises)){\n          var _nLoc = u19Arr(state.exercises).length;",
+      "a": "        if (data.exercises){\n          var _nLoc = u19Arr(state.exercises).length;"
+    },
+    {
+      "nombre": "importar un respaldo deja de comprobar los clientes",
+      "de": "      if (!confirm(msg)) return;\n      if (Array.isArray(data.clients)) state.clients = data.clients;",
+      "a": "      if (!confirm(msg)) return;\n      state.clients = data.clients;"
+    }
+  ]
+}

@@ -211,10 +211,77 @@ function extraerFuncion(nombre) {
   const evs = /\(\s*evs\s*\|\|\s*\[\]\s*\)\s*\.\s*(forEach|map|filter|reduce|some|every|sort)/.test(src);
   comprobar('guardas · el caso documentado (evs || []) no ha vuelto', !evs);
 
-  const total = (src.match(/\|\|\s*\[\]\s*\)\s*\.\s*(forEach|map|filter|reduce|some|every|sort|slice)/g) || []).length;
+  /* Este aviso salia en cada corrida —«146 usos de (x || []).metodo…»— y
+     acabo siendo parte del paisaje. El 8-sep se convirtieron a u19Arr() los
+     146 que leen datos de disco, asi que deja de ser un aviso y pasa a ser
+     una alarma: si vuelve a aparecer uno, es un sitio nuevo donde un objeto
+     guardado por error tumba la vista. */
+  const rutas = (src.match(/\(\s*[A-Za-z_$][A-Za-z0-9_$]*(?:\.[A-Za-z0-9_$]+)+\s*\|\|\s*\[\]\s*\)/g) || []);
+  comprobar('guardas · ningun dato de disco se protege ya con "(x || [])"',
+    rutas.length === 0,
+    rutas.slice(0, 4).join('  ') + (rutas.length > 4 ? '  y ' + (rutas.length - 4) + ' mas' : '')
+      + '  ← usar u19Arr(x), que si distingue un objeto de un array');
+
+  /* Y que el ayudante haga lo que dice, ejecutandolo de verdad. */
+  const desde = src.indexOf('function u19Arr(');
+  if (desde < 0) falla('guardas · u19Arr() no esta en index.html');
+  else {
+    const cuerpo = src.slice(desde);
+    const u19Arr = new Function('return ' + cuerpo.slice(0, cuerpo.indexOf('\n}\n') + 3))();
+    const dentro = [1, 2];
+    comprobar('u19Arr · un array pasa tal cual, sin copiar', u19Arr(dentro) === dentro);
+    igual('u19Arr · un objeto guardado por error se vuelve array vacio', u19Arr({ a: 1 }).length, 0);
+    igual('u19Arr · una cadena tambien: no se recorre letra a letra', u19Arr('abc').length, 0);
+    igual('u19Arr · null', u19Arr(null).length, 0);
+    igual('u19Arr · undefined', u19Arr(undefined).length, 0);
+    igual('u19Arr · un numero', u19Arr(7).length, 0);
+    /* La diferencia con u19Lista es la razon de que existan las dos:
+       u19Lista quita los huecos, y eso CORRE LOS INDICES. */
+    igual('u19Arr · NO quita los huecos, a diferencia de u19Lista', u19Arr([1, null, 3]).length, 3);
+  }
+
+  /* LA FRONTERA. Hay 168 sitios que llaman a state.clients.filter,
+     state.routines.forEach y compañía SIN guarda, y estan bien: los
+     cuatro caminos que asignan esos arrays —loadState, la reparacion de
+     GIFs, importar un respaldo y bajar de la nube— comprueban antes con
+     Array.isArray. Ese es el invariante que hace segura toda la app; si
+     alguien añade un quinto camino sin comprobar, se cae aqui y no en la
+     pantalla de Diego. */
+  const CAMPOS = 'clients|routines|exercises|protocols|trash|circuitos|libRec|horasExtra';
+  const lineas = src.split('\n');
+  const asignaciones = lineas
+    .map((l, i) => ({ n: i + 1, l }))
+    .filter(x => new RegExp('(?<![\\w.])state\\.(' + CAMPOS + ')\\s*=[^=]').test(x.l));
+  const sinGuardia = asignaciones.filter(x => {
+    if (/Array\.isArray/.test(x.l)) return false;                          // comprobado en la linea
+    if (/=\s*u19(Arr|Lista)\s*\(/.test(x.l)) return false;                 // comprobado por el ayudante
+    if (new RegExp('state\\.(' + CAMPOS + ')\\s*=\\s*state\\.').test(x.l)) return false; // filtrado de si mismo
+    if (/=\s*\[\s*\]/.test(x.l)) return false;                             // vaciado explicito
+    if (/=[^=]*\.(slice|filter|map|concat)\s*\(/.test(x.l)) return false;  // devuelven array siempre
+    if (/SEED_DATA\./.test(x.l)) return false;                             // la semilla de la app
+    /* Y el caso normal, que la version anterior de esta comprobacion no
+       veia: la guarda esta unas lineas ARRIBA, envolviendo la asignacion.
+       `if (Array.isArray(data.exercises)){ … state.exercises = data.exercises; }`
+       es correcto y se leia como un fallo. Se busca la comprobacion del
+       MISMO origen en las seis lineas anteriores. */
+    const m = new RegExp('state\\.(?:' + CAMPOS + ')\\s*=\\s*([A-Za-z_$][\\w.$]*)').exec(x.l);
+    if (!m) return true;
+    const origen = m[1].replace(/[.$]/g, c => '\\' + c);
+    const antes = lineas.slice(Math.max(0, x.n - 7), x.n - 1).join('\n');
+    /* Y tiene que ser una GUARDA, no un Array.isArray cualquiera. Con solo
+       buscar el texto, esto daba por bueno el respaldo: seis lineas mas
+       arriba hay un `clients: Array.isArray(data.clients) ? … : 0` dentro
+       del objeto que cuenta cuantos vienen, y eso no protege nada. Lo caza
+       un mutante que quita la guarda de verdad. */
+    return !new RegExp('(if\\s*\\(|&&\\s*|\\|\\|\\s*)!?Array\\.isArray\\(' + origen + '\\)').test(antes);
+  });
+  comprobar('frontera · todo lo que asigna un array de state comprueba antes que lo sea',
+    sinGuardia.length === 0,
+    sinGuardia.slice(0, 3).map(x => 'linea ' + x.n + ': ' + x.l.trim().slice(0, 90)).join('  |  '));
+  aviso('frontera: ' + asignaciones.length + ' sitios asignan arrays de state; todos comprueban');
+
   const isArr = (src.match(/Array\.isArray/g) || []).length;
-  aviso('guardas: ' + total + ' usos de "(x || []).metodo" conviven con ' + isArr +
-        ' usos de Array.isArray. No es un fallo, pero cada uno es un sitio donde un objeto guardado por error rompe la vista.');
+  aviso('guardas: ' + (src.split('u19Arr(').length - 1) + ' usos de u19Arr y ' + isArr + ' de Array.isArray');
 })();
 
 /* =====================================================================
