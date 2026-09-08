@@ -243,11 +243,263 @@ function extraerFuncion(nombre) {
     ['token de Notion (antiguo)', /\bsecret_[A-Za-z0-9]{30,}/],
     ['clave de Anthropic', /\bsk-ant-[A-Za-z0-9_\-]{20,}/],
     ['token de GitHub', /\bgh[pousr]_[A-Za-z0-9]{30,}/],
+    ['token de GitHub (fine-grained)', /\bgithub_pat_[A-Za-z0-9_]{30,}/],
     ['token de Meta/WhatsApp', /\bEAA[A-Za-z0-9]{60,}/],
   ];
   patrones.forEach(function (p) {
     comprobar('secretos · sin ' + p[0], !p[1].test(src));
   });
+})();
+
+/* =====================================================================
+ * 7 · LO QUE SALE DE ESTE NAVEGADOR
+ * Tres agujeros reales, tapados el 8-sep-2026. Cada comprobacion de aqui
+ * defiende uno; si alguna se pone roja, se volvio a abrir:
+ *   a) el token de GitHub viajaba dentro de cada enlace compartido
+ *   b) la sincronizacion subia el estado en claro a una rama publica
+ *   c) un enlace de progreso trucado ejecutaba JavaScript en la app
+ * ===================================================================== */
+
+(function loQueSale() {
+
+  /* --- a) Ningun token dentro de un enlace --------------------------- */
+
+  comprobar('salida · el enlace compartido no lleva tokens',
+    !/maskToken\s*\(\s*settings\./.test(src),
+    'maskToken(settings.…) vuelve a meter una llave en el payload que se sube a la rama publica');
+
+  /* maskToken y unmaskToken siguen haciendo falta: los enlaces repartidos
+     antes del arreglo todavia traen sc.gt y hay que saber leerlos. */
+  comprobar('salida · unmaskToken sigue existiendo (enlaces antiguos)',
+    extraerFuncion('unmaskToken') !== null);
+
+  /* --- b) Nunca subir el estado en claro ----------------------------- */
+
+  const prep = extraerFuncion('_syncPrepareContent');
+  if (prep) {
+    comprobar('salida · _syncPrepareContent no devuelve el estado en claro',
+      !/Promise\.resolve\s*\(\s*jsonStr\s*\)/.test(prep),
+      'volvio a resolver con el JSON sin cifrar');
+    comprobar('salida · _syncPrepareContent rechaza si falta la clave',
+      /Promise\.reject/.test(prep));
+  }
+
+  const subir = extraerFuncion('syncUploadNow');
+  if (subir) {
+    comprobar('salida · syncUploadNow aborta sin cifrado activo',
+      /!\s*settings\.encEnabled/.test(subir),
+      'sin esta guarda, el estado de los socios sube legible a la rama de datos');
+  }
+
+  /* --- b bis) El respaldo no reparte las llaves ---------------------- */
+
+  const exp = extraerFuncion('exportBackup');
+  if (exp) {
+    comprobar('salida · exportBackup no vuelca settings entero',
+      !/\bsettings:\s*settings\s*,/.test(exp),
+      'el respaldo plano vuelve a llevarse githubToken, bitlyToken, calendlyToken, claudeKey y dashClave');
+    comprobar('salida · exportBackup limpia los campos secretos',
+      /RESP_SECRETO_CAMPOS/.test(exp));
+  }
+
+  const imp = extraerFuncion('importBackup');
+  if (imp) {
+    /* Si el respaldo ya no trae llaves, restaurarlo no debe borrar las que
+       este navegador si tiene. Sin esto, el arreglo de arriba rompe la app. */
+    comprobar('salida · importBackup conserva las llaves locales',
+      /RESP_SECRETO_CAMPOS/.test(imp),
+      'restaurar un respaldo volveria a dejar los tokens en blanco');
+  }
+
+  /* --- c) Nada del enlace se pinta sin pasar por un filtro ----------- */
+
+  const rep = extraerFuncion('showProgressReport');
+  if (rep) {
+    /* stats llega dentro del enlace y pct acaba en un atributo style. */
+    comprobar('salida · showProgressReport fuerza stats.pct a numero',
+      /Number\s*\(\s*stats\.pct\s*\)/.test(rep),
+      'un pct de texto libre dentro de style="width:…" es ejecutable');
+    ['done', 'partial', 'total'].forEach(function (c) {
+      comprobar('salida · showProgressReport fuerza stats.' + c + ' a numero',
+        new RegExp('Number\\s*\\(\\s*stats\\.' + c + '\\s*\\)').test(rep));
+    });
+    comprobar('salida · la celda Plan escapa las reps del enlace',
+      !/plan-cell">'\s*\+\s*\(\s*rowEx\.reps/.test(rep),
+      'rowEx.reps vuelve a pintarse sin escapeHtml, y viene del enlace');
+  }
+
+})();
+
+/* =====================================================================
+ * 8 · PARIDAD DE CLAVES DEL ESTADO
+ * La comprobacion que mas perdida de datos evita del repositorio.
+ *
+ * Cada coleccion de `state` tiene que estar decidida A PROPOSITO en tres
+ * sitios: la sincronizacion, el respaldo y el borrado total. Cuando una
+ * clave nueva se olvida en alguno, no falla nada visible: simplemente ese
+ * dato no viaja, o sobrevive a un borrado. Asi es como horasExtra y trash
+ * se quedaron fuera de la sincronizacion sin que nadie lo notara.
+ *
+ * Aqui se declara la decision. Una clave nueva sin declarar FALLA: obliga
+ * a decidir en vez de olvidar.
+ * ===================================================================== */
+
+(function paridadDeClaves() {
+
+  const DECIDIDO = {
+    clients:    { sync: true,  respaldo: true,  borrado: true },
+    routines:   { sync: true,  respaldo: true,  borrado: true },
+    exercises:  { sync: true,  respaldo: true,  borrado: true },
+    protocols:  { sync: true,  respaldo: true,  borrado: true },
+    libFav:     { sync: true,  respaldo: true,  borrado: true },
+    libRec:     { sync: true,  respaldo: true,  borrado: true },
+    circuitos:  { sync: true,  respaldo: true,  borrado: true },
+
+    /* horasExtra NO se sincroniza, a proposito. Un equipo que solo anadio
+       horas no mueve las fechas de rutinas ni clientes; meterlo en el payload
+       antes de que localTime sea de fiar convertiria la divergencia de hoy en
+       borrado. Viaja en el respaldo, que si es una accion explicita.
+       Revisar solo con una prueba de fusion de por medio. */
+    horasExtra: { sync: false, respaldo: true,  borrado: true },
+
+    /* trash es el bufer de deshacer, LOCAL por diseno: se autopurga a los 30
+       dias y la papelera hace t.routine.name sin comprobar, asi que una
+       entrada que no sea una rutina la revienta. Lo que si es obligatorio es
+       que un "borrar TODO" se la lleve. */
+    trash:      { sync: false, respaldo: false, borrado: true },
+  };
+
+  const cuerpos = {
+    sync:    extraerFuncion('buildSyncPayload'),
+    respaldo: extraerFuncion('exportBackup'),
+    borrado: extraerFuncion('wipeAll'),
+  };
+  const loadState = extraerFuncion('loadState');
+
+  /* a) Ninguna clave del estado puede quedar sin declarar. */
+  if (loadState) {
+    const asignadas = {};
+    (loadState.match(/state\.([A-Za-z0-9_$]+)\s*=/g) || []).forEach(function (m) {
+      asignadas[m.replace(/^state\./, '').replace(/\s*=$/, '')] = true;
+    });
+    /* lastChangeAt es la marca de agua de saveState, no una coleccion. */
+    delete asignadas.lastChangeAt;
+    const sinDeclarar = Object.keys(asignadas).filter(function (k) { return !DECIDIDO[k]; });
+    comprobar('paridad · toda clave de loadState esta declarada arriba',
+      sinDeclarar.length === 0,
+      'sin decidir: ' + sinDeclarar.join(', ') + ' — anadela a DECIDIDO diciendo si viaja en sync, respaldo y borrado');
+  }
+
+  /* b) Y cada una tiene que aparecer donde se declaro que aparece. */
+  Object.keys(DECIDIDO).forEach(function (clave) {
+    ['sync', 'respaldo', 'borrado'].forEach(function (sitio) {
+      const cuerpo = cuerpos[sitio];
+      if (!cuerpo) return;                       // extraerFuncion ya marco el fallo
+      const esperado = DECIDIDO[clave][sitio];
+      const re = new RegExp('(state\\.' + clave + '\\b|\\b' + clave + '\\s*:)');
+      const esta = re.test(cuerpo);
+      if (esperado) {
+        comprobar('paridad · ' + clave + ' aparece en ' + sitio, esta,
+          'se declaro que viaja y no esta: ese dato se pierde en ese camino');
+      } else {
+        comprobar('paridad · ' + clave + ' NO aparece en ' + sitio, !esta,
+          'aparece pero se declaro que no debia — lee el motivo en DECIDIDO antes de cambiar la declaracion');
+      }
+    });
+  });
+
+  /* c) La marca de agua que decide quien gana. */
+  const saveState = extraerFuncion('saveState');
+  if (saveState) {
+    comprobar('paridad · saveState escribe state.lastChangeAt',
+      /state\.lastChangeAt\s*=/.test(saveState),
+      'sin ella, la sincronizacion vuelve a decidir por las fechas de rutinas y altas, y pisa el trabajo de la sala');
+    comprobar('paridad · y no la escribe cuando el cambio viene de fuera',
+      /!\s*sinSubir/.test(saveState),
+      'marcarla al aplicar la bajada haria que el equipo se creyera siempre mas nuevo que la nube');
+  }
+  if (cuerpos.sync) {
+    comprobar('paridad · lastChangeAt viaja en el payload',
+      /lastChangeAt/.test(cuerpos.sync));
+  }
+  const syncDownload = extraerFuncion('syncDownload');
+  if (syncDownload) {
+    comprobar('paridad · syncDownload usa lastChangeAt para decidir',
+      /lastChangeAt/.test(syncDownload));
+    comprobar('paridad · syncDownload no baja con una subida en cola',
+      /_syncTimer/.test(syncDownload),
+      'sin esto, arrancar la app pisa el cambio que aun no habia salido');
+  }
+})();
+
+/* =====================================================================
+ * 9 · EL IMPORTADOR, EJECUTADO
+ * La prueba 5 solo miraba que existieran funciones con "import" en el
+ * nombre: 21 casaban y ninguna se ejecutaba nunca. Cambiar el emparejado
+ * a `porNombre[key]` — la trampa literal del CLAUDE.md — pasaba las
+ * suites en verde y duplicaba fichas. Esto lo ejecuta de verdad.
+ * ===================================================================== */
+
+(function importadorDeVerdad() {
+  const codigo = extraerFuncion('_cus19Import');
+  if (!codigo) return;
+
+  const vm = require('vm');
+
+  function correr(fichaLocal, fichaCatalogo) {
+    const state = { exercises: [fichaLocal] };
+    const ctx = {
+      state: state,
+      _cus19Data: [fichaCatalogo],
+      document: { querySelectorAll: function () { return [{ checked: true, value: 'Fuerza' }]; } },
+      toast: function () {}, saveState: function () {}, closeModal: function () {},
+      renderLibrary: function () {}, genId: function () { return 'nuevo'; },
+      Object: Object, Array: Array, String: String,
+    };
+    vm.createContext(ctx);
+    vm.runInContext(codigo + '\n_cus19Import();', ctx);
+    return state.exercises;
+  }
+
+  /* El caso que importa: la MISMA ficha (mismo id) con el nombre corregido
+     en el catalogo. Tiene que actualizarse, no duplicarse. */
+  let res;
+  try {
+    res = correr(
+      { id: 'us19f042', name: 'Nombre viejo', muscle: 'Pierna', cat: 'Fuerza' },
+      { id: 'us19f042', name: 'Nombre nuevo', muscle: 'Pierna', cat: 'Fuerza', gif: 'g.gif', desc: 'd' }
+    );
+  } catch (e) {
+    falla('importador · se puede ejecutar', e.message);
+    return;
+  }
+  pasa();
+  igual('importador · un ejercicio renombrado NO se duplica', res.length, 1);
+  igual('importador · se le actualiza el nombre', res[0] && res[0].name, 'Nombre nuevo');
+  igual('importador · conserva su id', res[0] && res[0].id, 'us19f042');
+
+  /* Y el contrario: una ficha que de verdad es nueva, entra. */
+  try {
+    const res2 = correr(
+      { id: 'us190001', name: 'Ya estaba', muscle: 'Pierna', cat: 'Fuerza' },
+      { id: 'us199999', name: 'De verdad nueva', muscle: 'Pierna', cat: 'Fuerza' }
+    );
+    igual('importador · una ficha nueva si se anade', res2.length, 2);
+  } catch (e) {
+    falla('importador · una ficha nueva si se anade', e.message);
+  }
+
+  /* Y lo que Diego fijo a mano no se toca. */
+  try {
+    const res3 = correr(
+      { id: 'us19f042', name: 'X', muscle: 'Pierna', cat: 'Movilidad', taxManual: true },
+      { id: 'us19f042', name: 'X', muscle: 'Pierna', cat: 'Fuerza' }
+    );
+    igual('importador · taxManual protege la clasificacion hecha a mano',
+      res3[0] && res3[0].cat, 'Movilidad');
+  } catch (e) {
+    falla('importador · taxManual protege la clasificacion hecha a mano', e.message);
+  }
 })();
 
 /* =====================================================================

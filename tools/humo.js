@@ -14,7 +14,7 @@
  *      consola del navegador (F12) y se lee el resultado.
  *
  *   B) Automatico, si tienes Playwright a mano:
- *        npx playwright@latest install chromium     (una sola vez)
+ *        npm i -D playwright && npx playwright install chromium   (una sola vez)
  *        node tools/humo.js --auto
  *
  * Playwright NO es dependencia de la app: la app sigue sin build, sin
@@ -80,8 +80,10 @@ async function modoAuto() {
   catch (e) {
     console.log('');
     console.log('Playwright no esta disponible. Dos salidas:');
-    console.log('  · npx playwright@latest install chromium   y vuelve a intentar');
-    console.log('  · node tools/humo.js --pegar               y lo haces a mano en 30 segundos');
+    console.log('  · npm i -D playwright && npx playwright install chromium   y vuelve a intentar');
+    console.log('    (el `npx playwright install` a secas baja NAVEGADORES, no el modulo:');
+    console.log('     por eso este require seguia fallando despues de correrlo)');
+    console.log('  · node tools/humo.js --pegar   y lo haces a mano en 30 segundos');
     console.log('');
     process.exit(2);
   }
@@ -104,6 +106,16 @@ async function modoAuto() {
   const errores = [];
   pagina.on('console', function (m) { if (m.type() === 'error') errores.push(m.text()); });
   pagina.on('pageerror', function (e) { errores.push('pageerror: ' + e.message); });
+
+  /* El candado del entrenador, abierto ANTES de que cargue nada.
+     Sin esto, un perfil recien creado no lo tiene abierto: u19CandadoOk() da
+     false, showView() sale por hideTrainerUI() y return, y la prueba fallaba
+     en 20 comprobaciones que no tienen NADA que ver con el arranque. Es decir,
+     la unica suite que ve los fallos de arranque llevaba tiempo en rojo por un
+     motivo ajeno, y un rojo permanente no avisa de nada. */
+  await pagina.addInitScript(function () {
+    try { sessionStorage.setItem('us19_candado_ok', '1'); } catch (e) {}
+  });
 
   await pagina.goto('http://127.0.0.1:' + PUERTO + '/index.html', { waitUntil: 'load' });
   await pagina.waitForTimeout(1500);

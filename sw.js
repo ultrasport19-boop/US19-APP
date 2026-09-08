@@ -6,11 +6,16 @@
  * origen entero deja de poder escribir y la app pierde la capacidad de
  * guardar. Ahora la media pesada no se cachea y el resto tiene tope.
  */
-var CACHE = "us19-cache-v3";
+var CACHE = "us19-cache-v4";
 var CORE = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 /* Cuantas entradas guardamos como maximo fuera del nucleo. */
 var MAX_ENTRADAS = 60;
+
+/* Cuanto se espera a la red para el NUCLEO antes de tirar de copia.
+   Sigue siendo red-primero: la red gana si contesta a tiempo, y cuando no,
+   se sirve la copia y la red termina por detras y deja la cache al dia. */
+var PLAZO_NUCLEO_MS = 2500;
 
 /* Lo que NO se guarda: pesa mucho, cambia poco y se sirve bien desde la red. */
 function esMediaPesada(url) {
@@ -61,18 +66,48 @@ self.addEventListener("fetch", function (e) {
      El nucleo manda: los iconos son .png pero deben seguir cacheados. */
   if (!esNucleo(url) && esMediaPesada(url)) return;
 
+  var red = fetch(e.request).then(function (res) {
+    if (res && res.ok) {
+      var copy = res.clone();
+      caches.open(CACHE).then(function (c) {
+        return c.put(e.request, copy).then(function () {
+          if (!esNucleo(url)) return podar(c);
+        });
+      }).catch(function () { /* cuota llena: seguimos sirviendo de red */ });
+    }
+    return res;
+  });
+
+  /* Sin conexion, fetch RECHAZA enseguida y se cae a la cache: eso ya
+     funcionaba. El caso malo es la senal debil de la sala, donde la peticion
+     ni contesta ni falla: no hay rechazo que capturar y el arranque se queda
+     colgado en el splash. Es decir, con mala senal la app abria PEOR que sin
+     senal. Por eso el nucleo lleva plazo: si la red no llega en
+     PLAZO_NUCLEO_MS se sirve la copia y la red sigue por detras.
+     Ojo: no se invierte a cache-primero a proposito. El aviso de version
+     nueva se dispara por controllerchange, o sea solo cuando cambia este
+     archivo; sirviendo siempre de cache, un index.html viejo se quedaria ahi
+     para siempre, porque podar() nunca desaloja el nucleo. */
+  var redSegura = red.catch(function () { return null; });
+
+  if (esNucleo(url)) {
+    var plazo = new Promise(function (ok) { setTimeout(function () { ok(null); }, PLAZO_NUCLEO_MS); });
+    e.respondWith(
+      Promise.race([redSegura, plazo]).then(function (ganador) {
+        if (ganador) return ganador;                 /* la red llego a tiempo */
+        return caches.match(e.request).then(function (hit) {
+          if (hit) return hit;                       /* copia buena: se sirve ya */
+          /* No hay copia (primera visita): no queda mas que esperar a la red. */
+          return redSegura.then(function (r) { return r || caches.match("./index.html"); });
+        });
+      })
+    );
+    return;
+  }
+
   e.respondWith(
-    fetch(e.request).then(function (res) {
-      if (res && res.ok) {
-        var copy = res.clone();
-        caches.open(CACHE).then(function (c) {
-          return c.put(e.request, copy).then(function () {
-            if (!esNucleo(url)) return podar(c);
-          });
-        }).catch(function () { /* cuota llena: seguimos sirviendo de red */ });
-      }
-      return res;
-    }).catch(function () {
+    redSegura.then(function (res) {
+      if (res) return res;
       return caches.match(e.request).then(function (hit) { return hit || caches.match("./index.html"); });
     })
   );

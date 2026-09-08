@@ -1,16 +1,26 @@
 # US19-APP — reglas del repositorio
 
 PWA de un solo archivo. Sin build, sin dependencias, sin servidor.
-`index.html` ronda las 23.000 líneas y `US19_DASHBOARD_API.gs` es el puente a Notion.
+`index.html` es el archivo; `US19_DASHBOARD_API.gs` es el puente a Notion.
+
+> **Las cifras de este documento envejecen.** No las copies: recuéntalas.
+> ```sh
+> wc -l < index.html                       # tamaño del archivo
+> grep -o '<script'   index.html | wc -l   # aperturas (incluye las de dentro de cadenas)
+> grep -o '</script>' index.html | wc -l   # bloques REALES
+> node -e "console.log(JSON.parse(require('fs').readFileSync('us19_catalogo.json','utf8')).length)"
+> node tools/validar_bloques.js index.html # los bloques, con sus líneas
+> ```
+> Al 8-sep-2026: 31.675 líneas · 8 aperturas · **3 bloques reales** · 2.377 fichas.
 
 ## Trampas de este código
 
-**El hoisting no cruza bloques `<script>`.** Hay **tres** (verificado el 6-sep-2026:
-7 aperturas `<script>` en el archivo, pero 4 son texto dentro de cadenas — las ventanas
-de impresión — y solo hay 3 `</script>` de verdad). Una función declarada en el bloque 3
-no existe cuando corre el bloque 1. Por eso el arranque va dentro de `DOMContentLoaded`
-y no al vuelo. Esto ya provocó una vez que el Panel saliera en blanco en producción, y
-ninguna suite lo vio porque `eval` aplana los bloques.
+**El hoisting no cruza bloques `<script>`.** Hay **tres**. Las aperturas `<script>` son
+más que los bloques: las de más son texto dentro de cadenas (las ventanas de impresión) y
+una vive en un comentario; los `</script>` son los que cuentan. Una función declarada en
+el bloque 3 no existe cuando corre el bloque 1. Por eso el arranque va dentro de
+`DOMContentLoaded` y no al vuelo. Esto ya provocó una vez que el Panel saliera en blanco
+en producción, y ninguna suite lo vio porque `eval` aplana los bloques.
 
 **Vídeo contra imagen.** Tres ayudantes: `isVideoUrl`, `mediaThumb`, `mediaPlayer`.
 En **listados siempre `mediaThumb`**, que pinta el póster `.jpg`. `mediaPlayer` (que sí
@@ -22,6 +32,12 @@ renombrar un ejercicio duplica la biblioteca del cliente.
 
 **`loadSettings` tiene lista blanca.** Un ajuste nuevo que no se añada ahí se borra solo
 en cada recarga, en silencio.
+
+**`encRestoreFromCache()` ya no es síncrona.** Desenvolver la llave pasa por IndexedDB,
+así que devuelve una promesa y deja `_encRestaurando` en alto mientras tanto.
+`syncUploadNow` y `_syncMaybeDecrypt` **esperan a `_encListo`** en vez de dar por
+bloqueado el equipo; sin esa espera, cada arranque pedía la contraseña maestra por nada.
+Quien añada otro camino que cifre o descifre tiene que esperar igual.
 
 **La biblioteca tiene tres dimensiones, no una.** `muscle` dice qué músculo; `cat` el tipo
 de trabajo (Fuerza, Movilidad, Pliometría, Halterofilia, Strongman, Cardio: `LIB_CATS`);
@@ -84,14 +100,18 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/pruebas.js` | Estructura, vídeo/imagen, lista blanca de `loadSettings`, guardas, secretos |
 | `node tools/taxonomia.js` | Tipo, patrón y nivel de 22 ejercicios conocidos: las trampas de las reglas («pino», «tibial», «lat») |
 | `node tools/circuitos.js` | Circuitos y búsqueda: reparto de grupos por estación, plan de fases, duración, tiempo por estación, plurales y sinónimos |
+| `node tools/cifrado.js` | **Ejecuta** el cifrado, no lo lee: activar, cifrar/descifrar, sobre alterado, desbloquear en otro equipo, clave de recuperación y migración de los sobres de 150.000 vueltas |
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
-| `sh tools/instalar_hook.sh` | Deja los dos primeros corriendo en cada commit |
+| `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
+| `sh tools/instalar_hook.sh` | Deja **las cinco primeras** corriendo en cada commit que toque `index.html` |
 
 **La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
 pasa en verde.** Si renombras `mediaThumb`, la prueba no se salta silenciosamente: aborta
 diciendo que la función no existe. Ese era el fallo del banco anterior. Está verificado
-con tres mutantes (meter `<video>` en `mediaThumb`, sacar una clave de la lista blanca,
-renombrar una función): los tres se detectan.
+con mutantes: meter `<video>` en `mediaThumb`, sacar una clave de la lista blanca,
+renombrar una función, y los cuatro de la sección 7 (volver a meter el token en el enlace,
+volver a subir en claro, quitar un `escapeHtml`, volcar `settings` entero). Todos se
+detectan. `cifrado.js` aborta igual si no encuentra el módulo entre sus dos marcadores.
 
 `pruebas.js` **no puede ver los fallos de arranque**, porque evalúa trozos sueltos y eso
 aplana los bloques. Para eso está `humo.js`, que pulsa las 9 pestañas en un navegador real
@@ -102,8 +122,54 @@ dependencia de la app: sin él, `--pegar` da el código para pegar en la consola
 
 - El puente exige `API_CLAVE`; **sin ella no responde a nadie** (fail-closed).
 - La clave se guarda **aparte de la URL**: enseñar la `/exec` no debe regalar el acceso.
-- Ningún token vive en el repositorio. Van en Propiedades del script de Apps Script.
-- Hay una CSP que acota `connect-src` a los seis hosts que la app usa de verdad.
-- Respaldo y sincronización: PBKDF2-SHA256 con 600.000 vueltas. Cada sobre lleva escritas
-  sus propias vueltas, así que los antiguos se siguen abriendo y se migran solos.
+- Ningún token vive en el **código fuente**. Van en Propiedades del script de Apps Script.
+- Hay una CSP que acota `connect-src` a los **siete** hosts que la app usa de verdad
+  (github, raw.githubusercontent, calendly, script.google, script.googleusercontent,
+  api.anthropic, api-ssl.bitly). Recuéntalos: `grep -oE "connect-src[^;\"]*" index.html`.
+- Respaldo y sincronización: PBKDF2-SHA256 con **1.200.000 vueltas** (el doble de lo que
+  pide OWASP, porque el sobre de llaves viaja en un repo público y se puede atacar sin
+  límite desde casa). Cada sobre lleva escritas sus propias vueltas, así que los antiguos
+  (600.000 y 150.000) se siguen abriendo y se migran solos la primera vez que se usan.
+- **La master key no está en claro en ningún sitio.** Vive envuelta en `ultrasport19_mk2`
+  por una AES-GCM 256 generada con `extractable:false` y guardada en IndexedDB
+  (`us19_llave_dispositivo`): el navegador la usa, ningún JS puede exportarla, y un
+  volcado de `localStorage` —una captura, una extensión, un respaldo— ya no descifra
+  nada. `ultrasport19_mk` es el rastro de la v1 y se retira solo, pero **solo después de
+  verificar que el envoltorio nuevo vuelve a abrir y da los mismos bytes**.
+- **Segundo factor opcional con el PIN del entrenador** (`settings.encPinRequerido`, por
+  dispositivo, no se sincroniza): debajo de la llave del equipo va otra capa derivada del
+  PIN, así un perfil de navegador copiado entero tampoco abre. El PIN vive **solo en
+  memoria** (`window._u19PinMem`); en disco está su SHA-256, que no descifra. Con el
+  segundo factor puesto, `_encGuardarMK` **se niega a guardar sin el PIN**: antes que
+  rebajar la protección en silencio, no guarda nada y el desbloqueo lo vuelve a pedir.
+  Si se cambia el PIN, `u19CandadoCrear` vuelve a envolver la llave con el nuevo.
+- La contraseña maestra exige 12 caracteres con mezcla (o 16 sin ella) y rechaza las
+  obvias; se puede **cambiar sin regenerar la master key** (`encCambiarFrase`), que era la
+  razón por la que nunca se cambiaba. La clave de recuperación son 20 caracteres de un
+  alfabeto de 30 con descarte de muestras: 98 bits y sin el sesgo del `% 31` de antes.
+  Todo esto, con siete mutantes que lo prueban, en `tools/cifrado.js`.
+- **Ningún respaldo se descarga solo en claro.** Hasta el 8-sep-2026 `_autoBackup` dejaba
+  cada 7 días en Descargas un JSON sin cifrar con todos los socios. Ahora avisa; la copia
+  buena es la cifrada de Ajustes, y `exportBackup` pide confirmación diciendo lo que se
+  lleva. El resumen de «Datos y respaldos» enseña **los dos** relojes: antes miraba solo
+  el cifrado y decía «nunca respaldado» aunque hubiera copias simples recientes.
+- **La sincronización no sube sin cifrar.** `syncUploadNow` aborta si `encEnabled` es
+  falso y `_syncPrepareContent` rechaza en vez de devolver el JSON plano. Antes el cifrado
+  era opcional y venía apagado de fábrica, y por eso el estado entero acabó legible en la
+  rama `data`.
+- **Ningún token viaja dentro de un enlace compartido.** El bloque `sc` de los enlaces
+  `#r/` llevaba `gt`/`bt` "enmascarados" con base64 invertido, que se deshace en una
+  línea, y esos archivos viven en la rama pública. Sin ellos el socio sigue enviando su
+  progreso: la vista cae sola al enlace largo `#progreso/`.
 - **El repositorio es público.** Nunca escribas aquí datos de clientes ni credenciales.
+
+## Dos reglas que no son código
+
+**NUNCA subas `SEED_VERSION`.** `loadState` no distingue «no hay nada» de «hay datos con
+semilla vieja»: en los dos casos planta `SEED_DATA` y llama a `saveState()`, que programa
+subida. Subir esa constante borra clientes, rutinas y circuitos en todos los navegadores.
+Para refrescar el catálogo, migración explícita.
+
+**No muevas a `u19Arrancar()` los `document.getElementById` del nivel superior del
+bloque 1.** Hoy funcionan por el orden del DOM. Moverlos toca justo el orden de arranque,
+que es la trampa que ya dejó el Panel en blanco una vez.

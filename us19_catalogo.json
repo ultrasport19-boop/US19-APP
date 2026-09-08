@@ -3159,18 +3159,6 @@
   "niv": "Intermedio"
  },
  {
-  "id": "us196096",
-  "name": "Curl agarre cerrado con barra z",
-  "muscle": "Bíceps",
-  "equipment": "Barra Z",
-  "desc": "De pie sujetando una barra Z con agarre supino y las manos en la parte interior de las curvas, más juntas que los hombros. Mantén los codos pegados al tronco. Flexiona los codos subiendo la barra hacia el pecho sin desplazarlos hacia adelante. Baja despacio hasta la extensión completa. El agarre cerrado enfatiza la porción larga del bíceps. Repite el número de repeticiones deseado.",
-  "gif": "https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-biceps-curl-agarre-cerrado-con-barra-z.gif",
-  "cat": "Fuerza",
-  "mec": "Aislado",
-  "pat": "Tracción",
-  "niv": "Intermedio"
- },
- {
   "id": "us190446",
   "name": "Curl agarre cerrado con barra Z",
   "muscle": "Bíceps",
@@ -3489,18 +3477,6 @@
   "equipment": "Barra",
   "desc": "Siéntate en un banco con la espalda recta y sujeta una barra con agarre supino cerrado, las manos a la anchura de las caderas. Mantén los codos pegados al tronco. Flexiona los codos subiendo la barra hacia el pecho sin ayudarte con la espalda. Aprieta el bíceps arriba y baja despacio hasta extender los brazos. Repite el número de repeticiones deseado.",
   "gif": "https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-biceps-curl-con-barra-agarre-cerrado-sentado.gif",
-  "cat": "Fuerza",
-  "mec": "Aislado",
-  "pat": "Tracción",
-  "niv": "Intermedio"
- },
- {
-  "id": "us196092",
-  "name": "Curl con barra z",
-  "muscle": "Bíceps",
-  "equipment": "Barra Z",
-  "desc": "De pie con los pies a la anchura de las caderas, sujeta una barra Z con agarre supino aprovechando las curvas de la barra. Mantén los codos pegados a los costados y el abdomen activo. Flexiona los codos subiendo la barra hacia el pecho sin balancear el tronco. Baja despacio hasta extender los brazos. La barra Z reduce la tensión en la muñeca. Repite el número de repeticiones deseado.",
-  "gif": "https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-biceps-curl-con-barra-z.gif",
   "cat": "Fuerza",
   "mec": "Aislado",
   "pat": "Tracción",
@@ -18205,18 +18181,6 @@
   "equipment": "Barra Z",
   "desc": "El recorrido completo del press francés va desde el estiramiento con la barra por detrás de la cabeza hasta la extensión total del codo. Túmbate en el banco, sujeta la barra con agarre cerrado y mantén los brazos ligeramente inclinados hacia atrás para no perder tensión. Baja hasta el estiramiento máximo del tríceps y extiende sin bloquear de golpe. Acortar el recorrido reduce el estímulo. Repite el número de repeticiones deseado.",
   "gif": "https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-vid-triceps-press-frances-con-barra-recorrido.mp4",
-  "cat": "Fuerza",
-  "mec": "Compuesto",
-  "pat": "Empuje",
-  "niv": "Intermedio"
- },
- {
-  "id": "us196194",
-  "name": "Press francés con barra z",
-  "muscle": "Tríceps",
-  "equipment": "Barra Z",
-  "desc": "Túmbate en un banco plano con los pies firmes en el suelo. Sujeta una barra Z con agarre prono cerrado y llévala sobre el pecho con los brazos extendidos. Flexiona los codos bajando la barra hacia la frente o justo por detrás de la cabeza, manteniendo los codos quietos y apuntando al techo. Extiende los brazos apretando el tríceps sin bloquear de golpe. Los codos no deben abrirse. Repite el número de repeticiones deseado.",
-  "gif": "https://cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/us19-triceps-press-frances-con-barra-z.gif",
   "cat": "Fuerza",
   "mec": "Compuesto",
   "pat": "Empuje",
