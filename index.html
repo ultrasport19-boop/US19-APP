@@ -1206,6 +1206,11 @@ img{max-width:100%;display:block;}
 .circ-live{position:fixed;inset:0;z-index:9000;background:#070b0f;color:#f1f5f9;display:flex;flex-direction:column;font-family:var(--font-body);}
 .circ-live[hidden]{display:none;}
 body.circ-live-open{overflow:hidden;}
+/* La vista en vivo va a z-index 9000 y el modal a 100: sin esto, la
+   escalera abierta desde «En vivo» se pinta DETRAS de la pantalla negra
+   y el boton parece no hacer nada. Se sube solo mientras hay una vista
+   viva abierta, que es la unica situacion en que hace falta. */
+body.circ-live-open .modal-overlay{z-index:9500;}
 .cl-top{display:flex;align-items:center;gap:.8rem;padding:.6rem 1rem;border-bottom:1px solid var(--border);font-size:.9rem;}
 .cl-top .cl-nombre{font-weight:800;font-size:1.05rem;}
 .cl-top .cl-grupo{color:var(--muted);}
@@ -14904,6 +14909,7 @@ function rlPintar(){
       : (p.tipo === "serie" && !p.dur ? '<button class="btn btn-primary big" onclick="rlSalto(1)">✓ Serie hecha</button>'
         : '<button class="btn btn-primary big" id="cl-play" onclick="rlToggle()">' + (L.corriendo ? "⏸ Pausa" : "▶ " + (p.tipo === "serie" ? "Empezar" : "Seguir")) + '</button>'))
     + '<button class="btn btn-secondary" onclick="rlSalto(1)" title="Saltar">⏭</button>'
+    + (rlPuedeEscalera(p) ? '<button class="btn btn-ghost" onclick="rlEscalera()" title="Cómo construirlo: bajar o subir un escalón sin perder la sesión">🪜</button>' : '')
     + '<button class="btn btn-ghost" onclick="rlSonido()" title="Sonido">' + ({ pitido: "🔊", silbato: "📯", off: "🔇" }[L.sonido] || "🔊") + '</button>'
     + '<button class="btn btn-ghost" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
     + '</div>';
@@ -14918,6 +14924,50 @@ function rlPintar(){
   /* El descanso arranca solo. */
   if (p.tipo === "descanso" && !L.corriendo && L.restante === p.dur) rlToggle();
 }
+/* La escalera solo cuando hay un ejercicio delante y la rutina es de la
+   casa. Con `_rlFichas` la rutina llegó por un enlace compartido: eso es
+   modo lectura, el socio no cambia su propia rutina. */
+function rlPuedeEscalera(p){
+  return !!(_rl && !_rlFichas && p && p.ex && p.ex.exerciseId && p.tipo !== "fin");
+}
+window.rlEscalera = function(){
+  var L = _rl; if (!L) return;
+  var p = rlFase();
+  if (!rlPuedeEscalera(p)) return;
+  /* Con la sesión en marcha se pausa: mirar la escalera no debe costar
+     segundos de descanso ni dejar el cronómetro corriendo a solas. */
+  if (L.corriendo) rlToggle();
+  u19ComoConstruir(p.ex.exerciseId, "vivo");
+};
+
+/* Cambia el ejercicio de la fase en curso. NO rehace el plan a propósito:
+   rehacerlo perdería el cronómetro, la serie en curso y el progreso, que
+   es justo lo que no se puede perder a mitad de sesión. Basta con mutar
+   la fila y reapuntar las fases que miraban a esa misma fila. */
+window.rlPonerEscalon = function(nuevoId){
+  var L = _rl; if (!L) return;
+  var p = rlFase();
+  if (!rlPuedeEscalera(p)) return;
+  var nuevo = getExercise(nuevoId);
+  if (!nuevo){ toast("Ejercicio no encontrado", "error"); return; }
+  var fila = p.ex;
+  fila.exerciseId = nuevoId;
+  for (var i = 0; i < L.plan.length; i++){
+    var f = L.plan[i];
+    if (f.ex === fila) f.e = nuevo;
+    if (f.siguiente && f.siguiente.ex === fila) f.siguiente.e = nuevo;
+  }
+  /* Si la rutina es una de las guardadas, el cambio se queda: quien no
+     puede hoy con ese escalón lo normal es que tampoco pueda el martes.
+     Se deshace con el mismo botón. */
+  var guardada = false;
+  for (var k = 0; k < (state.routines || []).length; k++) if (state.routines[k] === L.r){ guardada = true; break; }
+  if (guardada) saveState();
+  closeModal();
+  rlPintar();
+  toast("Ahora va «" + nuevo.name + "»" + (guardada ? ", y queda guardado" : "") + " 🪜", "success");
+};
+
 window.rlToggle = function(){
   var L = _rl; if (!L) return;
   var p = rlFase(); if (p.tipo === "fin" || !p.dur) return;
@@ -28068,7 +28118,10 @@ window.u19ComoConstruir = function(exId, filaRutina){
   var miBanda = u19EscBanda(base, escalera);
   var pts = u19EscPuntos(base);
 
-  var puedeCambiar = (filaRutina !== null && filaRutina !== undefined
+  /* `filaRutina` es el índice de la fila del constructor, o la cadena
+     "vivo" cuando se abre desde la sesión en marcha. */
+  var enVivo = (filaRutina === "vivo");
+  var puedeCambiar = enVivo || (filaRutina !== null && filaRutina !== undefined
     && typeof _builderRoutine !== "undefined" && _builderRoutine);
   function fila(e){
     var yo = (e.id === base.id);
@@ -28083,7 +28136,7 @@ window.u19ComoConstruir = function(exId, filaRutina){
       + '</span>'
       + '<span class="text-xs text-muted" style="white-space:nowrap;">' + escapeHtml(e.equipment || "") + '</span>'
       + (puedeCambiar && !yo
-          ? '<button class="btn btn-ghost btn-sm" style="flex:0 0 auto;" onclick="u19EscPonerEnRutina(' + filaRutina + ',\'' + escapeAttr(e.id) + '\')" title="Poner este en la rutina, conservando series y pesos">Poner</button>'
+          ? '<button class="btn btn-ghost btn-sm" style="flex:0 0 auto;" onclick="' + (enVivo ? 'rlPonerEscalon(\'' + escapeAttr(e.id) + '\')' : 'u19EscPonerEnRutina(' + filaRutina + ',\'' + escapeAttr(e.id) + '\')') + '" title="Poner este en la rutina, conservando series y pesos">Poner</button>'
           : '')
       + '</div>';
   }
@@ -28105,7 +28158,8 @@ window.u19ComoConstruir = function(exId, filaRutina){
        + '<div class="text-xs text-muted" style="line-height:1.55;margin-bottom:.5rem;">'
        + 'El mismo movimiento (<b>' + escapeHtml(u19EscRaiz(base.name) || "—") + '</b>) dentro de <b>' + escapeHtml(base.muscle || "—") + '</b>, de menos a más. '
        + 'Si todavía no puede con este, se baja un escalón y se sube cuando cumpla el criterio de abajo.'
-       + (puedeCambiar ? ' <b>Pulsa «Poner»</b> y se cambia en la rutina conservando series, repeticiones, peso, descanso y RIR.' : '')
+       + (enVivo ? ' <b>Pulsa «Poner»</b> y se cambia sin salir de la sesión: no se pierde la serie en curso ni el cronómetro.'
+          : (puedeCambiar ? ' <b>Pulsa «Poner»</b> y se cambia en la rutina conservando series, repeticiones, peso, descanso y RIR.' : ''))
        + '</div>';
     for (i = 0; i < U19_ESC_BANDAS.length; i++){
       var b = U19_ESC_BANDAS[i];

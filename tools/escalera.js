@@ -435,6 +435,110 @@ try {
   falla('rutina · revienta con un ejercicio que no existe', e && e.message);
 }
 
+/* --- 13 · La escalera dentro de «En vivo» ---------------------------
+   El momento en que más se necesita: la serie empezada, la persona
+   delante, y se ve que el ejercicio le queda grande. */
+
+vm.runInContext('u19ComoConstruir(' + JSON.stringify(puente.id) + ', "vivo")', ctxUI);
+const htmlVivo = pintado.bodyHtml || '';
+comprobar('vivo · el «Poner» llama a la sesión, no al constructor',
+  htmlVivo.indexOf('rlPonerEscalon(') > 0 && htmlVivo.indexOf('u19EscPonerEnRutina') < 0);
+comprobar('vivo · el aviso dice que no se pierde la sesión', /sin salir de la sesión/.test(htmlVivo));
+
+/* EL FALLO QUE CASI SE CUELA, Y NO ERA DE LÓGICA. La vista en vivo es
+   `.circ-live` con z-index 9000 y el modal `.modal-overlay` con 100: sin
+   una regla que lo suba, la escalera se abre DETRÁS de la pantalla negra
+   y el botón parece no hacer nada. */
+comprobar('vivo · el CSS sube el modal por encima de la vista viva',
+  /body\.circ-live-open\s+\.modal-overlay\s*\{[^}]*z-index\s*:\s*9[0-9]{3}/.test(src),
+  'falta la regla body.circ-live-open .modal-overlay{z-index:…}');
+const zLive = (src.match(/\.circ-live\{[^}]*z-index\s*:\s*(\d+)/) || [])[1];
+const zModalVivo = (src.match(/body\.circ-live-open\s+\.modal-overlay\s*\{[^}]*z-index\s*:\s*(\d+)/) || [])[1];
+comprobar('vivo · y lo sube DE VERDAD por encima, no por poco',
+  Number(zModalVivo) > Number(zLive), 'modal ' + zModalVivo + ' vs vista viva ' + zLive);
+
+/* La lógica de la sesión, ejecutada. */
+const moduloVivo = trozo('function rlPuedeEscalera(p){', 'window.rlToggle = function(){', 'la escalera de «En vivo»');
+const puente2 = api.u19EscEscalera(puente)[0];
+let repintados = 0, guardados = 0, avisosVivo = [];
+const ctxVivo = {
+  _rl: null, _rlFichas: null,
+  rlFase: () => ctxVivo._rl.plan[ctxVivo._rl.i],
+  rlPintar: () => { repintados++; },
+  rlToggle: () => { ctxVivo._rl.corriendo = !ctxVivo._rl.corriendo; },
+  getExercise: id => catalogo.find(e => e.id === id) || null,
+  state: { routines: [] },
+  saveState: () => { guardados++; },
+  closeModal: () => {},
+  toast: t => avisosVivo.push(t),
+  u19ComoConstruir: () => {},
+  window: {}, console, Math, JSON, String, Object, Array, Number,
+};
+ctxVivo.window = ctxVivo;
+vm.createContext(ctxVivo);
+vm.runInContext(moduloVivo, ctxVivo);
+
+function sesionDePrueba() {
+  const fila = { exerciseId: puente.id, sets: '3', reps: '12', weight: '20', rest: '90s' };
+  const rutina = { name: 'De prueba', days: [{ day: 1, exercises: [fila] }] };
+  const plan = [
+    { tipo: 'serie', ex: fila, e: puente, serie: 1, series: 3, idx: 0, total: 1 },
+    { tipo: 'descanso', ex: fila, e: puente, idx: 0, siguiente: { ex: fila, e: puente, serie: 2 } },
+    { tipo: 'serie', ex: fila, e: puente, serie: 2, series: 3, idx: 0, total: 1 },
+    { tipo: 'fin', dur: 0 },
+  ];
+  return { r: rutina, plan, i: 2, corriendo: false, fila };
+}
+
+ctxVivo._rl = sesionDePrueba();
+comprobar('vivo · con una serie delante, el botón aparece',
+  vm.runInContext('rlPuedeEscalera(rlFase())', ctxVivo));
+ctxVivo._rl.i = 3;
+comprobar('vivo · en la pantalla de «terminada» no aparece',
+  !vm.runInContext('rlPuedeEscalera(rlFase())', ctxVivo));
+ctxVivo._rl.i = 2;
+
+/* EL SOCIO NO CAMBIA SU PROPIA RUTINA. Cuando llega por enlace
+   compartido, `_rlFichas` trae las fichas del enlace: eso es modo
+   lectura. */
+ctxVivo._rlFichas = { [puente.id]: puente };
+comprobar('vivo · en la vista del socio (rutina compartida) NO aparece',
+  !vm.runInContext('rlPuedeEscalera(rlFase())', ctxVivo));
+ctxVivo._rlFichas = null;
+
+/* El cambio de peldaño no puede rehacer el plan: se perdería el
+   cronómetro, la serie en curso y el progreso. */
+const antesI = ctxVivo._rl.i, antesPlan = ctxVivo._rl.plan;
+repintados = 0; guardados = 0; avisosVivo = [];
+vm.runInContext('rlPonerEscalon(' + JSON.stringify(puente2.id) + ')', ctxVivo);
+igual('vivo · la fila apunta al peldaño nuevo', ctxVivo._rl.fila.exerciseId, puente2.id);
+igual('vivo · la serie en curso NO se pierde', ctxVivo._rl.i, antesI);
+comprobar('vivo · el plan es el mismo objeto: no se rehace', ctxVivo._rl.plan === antesPlan);
+comprobar('vivo · todas las fases de esa fila apuntan al ejercicio nuevo',
+  ctxVivo._rl.plan.filter(f => f.ex === ctxVivo._rl.fila).every(f => f.e && f.e.id === puente2.id));
+comprobar('vivo · y también el «siguiente» del descanso',
+  ctxVivo._rl.plan[1].siguiente.e.id === puente2.id);
+igual('vivo · se repinta una vez', repintados, 1);
+igual('vivo · una rutina que no está guardada no toca el disco', guardados, 0);
+comprobar('vivo · y avisa de lo que pasó', avisosVivo.some(a => /Ahora va/.test(String(a))));
+
+/* Si la rutina SÍ es una de las guardadas, el cambio se queda. */
+ctxVivo._rl = sesionDePrueba();
+ctxVivo.state.routines = [ctxVivo._rl.r];
+guardados = 0; avisosVivo = [];
+vm.runInContext('rlPonerEscalon(' + JSON.stringify(puente2.id) + ')', ctxVivo);
+igual('vivo · una rutina guardada sí se guarda', guardados, 1);
+comprobar('vivo · y se dice, para que no sea una sorpresa el martes',
+  avisosVivo.some(a => /queda guardado/.test(String(a))));
+
+/* Un id que no existe no debe dejar la sesión a medias. */
+ctxVivo._rl = sesionDePrueba();
+ctxVivo.state.routines = [];
+avisosVivo = [];
+vm.runInContext('rlPonerEscalon("no-existe")', ctxVivo);
+igual('vivo · un ejercicio inexistente no toca la fila', ctxVivo._rl.fila.exerciseId, puente.id);
+comprobar('vivo · y lo dice', avisosVivo.some(a => /no encontrado/i.test(String(a))));
+
 /* --- salida ---------------------------------------------------------- */
 
 console.log('\nUS19-APP · escalera de ejercicios');

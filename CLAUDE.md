@@ -212,8 +212,21 @@ repeticiones, peso, descanso, RIR y notas**. Eso es lo que hace que se use: borr
 y volver a añadirla desde el selector pierde la prescripción entera, y por eso bajar un
 escalón daba pereza.
 
-`tools/escalera.js`: **118 comprobaciones** contra el catálogo real —incluidos el modal y
-el constructor ejecutados con un navegador de mentira— y catorce mutantes que caen todos.
+**Y en «En vivo»** (botón 🪜 en los controles), con la persona delante:
+`rlPonerEscalon` **no rehace el plan** —eso perdería el cronómetro, la serie en curso y el
+progreso—, solo muta la fila y reapunta las fases que miraban a ella, incluido el
+`siguiente` del descanso. Si la rutina es una de las guardadas, el cambio se queda y se
+dice. **No aparece en la vista del socio**: con `_rlFichas` la rutina llegó por un enlace
+compartido y eso es modo lectura.
+
+**La trampa de «En vivo» no es de lógica, es de CSS.** `.circ-live` va a `z-index:9000` y
+`.modal-overlay` a `100`: sin `body.circ-live-open .modal-overlay{z-index:9500}` la
+escalera se abre **detrás** de la pantalla negra y el botón parece no hacer nada. Cualquier
+otro modal que se abra desde una vista viva tiene el mismo problema.
+
+`tools/escalera.js`: **137 comprobaciones** contra el catálogo real —incluidos el modal, el
+constructor y la sesión en vivo ejecutados con un navegador de mentira— y veinte mutantes
+que caen todos, el del `z-index` incluido.
 
 ## Dos reglas que no son código
 
