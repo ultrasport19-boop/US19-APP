@@ -40,9 +40,13 @@ if (!fs.existsSync(suite)) { console.log('\n  ✗ no encuentro la suite: ' + sui
 
 const original = fs.readFileSync(fuente, 'utf8');
 const copia = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'us19-mut-')), path.basename(fuente));
-/* La suite lee el catálogo del lado de su index.html: hay que llevárselo. */
-const catalogo = path.join(raiz, 'us19_catalogo.json');
-if (fs.existsSync(catalogo)) fs.copyFileSync(catalogo, path.join(path.dirname(copia), 'us19_catalogo.json'));
+/* Si la suite lee algo mas del lado de su archivo, se lo lleva a la copia.
+   Por defecto, el catalogo: escalera.js lo busca junto a index.html. */
+const acompana = lista.acompana || ['us19_catalogo.json'];
+acompana.forEach(function (rel) {
+  const de = path.join(raiz, rel);
+  if (fs.existsSync(de)) fs.copyFileSync(de, path.join(path.dirname(copia), path.basename(rel)));
+});
 
 function corre() {
   try { execFileSync('node', [suite, copia], { stdio: 'pipe', encoding: 'utf8' }); return { rojo: false, salida: '' }; }
