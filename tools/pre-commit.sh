@@ -2,7 +2,17 @@
 # Hook de pre-commit de US19-APP. Se instala con tools/instalar_hook.sh
 # (los hooks no viajan con el repo, hay que instalarlos en cada clon).
 #
-# Siete barreras antes de cada commit que toque index.html:
+# Una barrera que corre SIEMPRE, y siete mas cuando el commit toca index.html.
+#
+#   0. secretos.js  - va fuera del `if` a proposito. Las otras siete
+#                     comprueban la app, y solo tiene sentido correrlas si
+#                     la app cambio. Una credencial no respeta esa
+#                     frontera: puede aterrizar en tools/, en el .gs del
+#                     puente o en una nota. Y este repositorio es publico
+#                     — las fichas de los socios ya estuvieron ocho semanas
+#                     en claro aqui, y borrar el archivo no bastaba.
+#
+# Y las siete que miran index.html:
 #   1. validar_bloques.js - sintaxis de cada bloque <script> por separado.
 #   2. pruebas.js         - estructura, vídeo, lista blanca, secretos y lo que sale del navegador.
 #   3. taxonomia.js       - tipo, patrón y nivel de 22 ejercicios conocidos.
@@ -16,6 +26,9 @@
 #                           fallo del hoisting entre bloques, que ya dejo el Panel en blanco
 #                           en produccion: las otras seis aplanan justo esa diferencia.
 RAIZ="$(git rev-parse --show-toplevel)"
+
+node "$RAIZ/tools/secretos.js" \
+  || { echo ""; echo "hay algo con forma de credencial en el repositorio: commit cancelado."; exit 1; }
 
 if git diff --cached --name-only | grep -q "^index.html$"; then
 
