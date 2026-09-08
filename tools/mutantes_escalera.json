@@ -1,0 +1,126 @@
+{
+  "suite": "tools/escalera.js",
+  "fuente": "index.html",
+  "mutantes": [
+    {
+      "nombre": "se quita el filtro de raiz: vuelve el cajon de 85 peldanos",
+      "de": "    if (u19EscRaiz(e.name) !== raiz) return false;\n",
+      "a": ""
+    },
+    {
+      "nombre": "cualquier guion largo cuenta como clip: se pierde la activacion",
+      "de": "  if (cola.indexOf(\"activacion\") === 0) return false;   /* es una regresión, no un clip */\n  return U19_ESC_COLA_CLIP.test(cola);",
+      "a": "  return true;"
+    },
+    {
+      "nombre": "los escalones vuelven a ser absolutos",
+      "de": "  if (familia && familia.length > 1){",
+      "a": "  if (false){"
+    },
+    {
+      "nombre": "unilateral pasa a contar como mas facil",
+      "de": "[ 3, /a una pierna|a un brazo|a una mano|a un pie|unilateral/, \"a un solo lado",
+      "a": "[-3, /a una pierna|a un brazo|a una mano|a un pie|unilateral/, \"a un solo lado"
+    },
+    {
+      "nombre": "«plancha» vuelve a las genericas y parte su familia",
+      "de": "var U19_ESC_GENERICAS = \" elevacion",
+      "a": "var U19_ESC_GENERICAS = \" plancha elevacion"
+    },
+    {
+      "nombre": "se cuela vocabulario clinico en la guia",
+      "de": "que: \"Mover la cadera hacia atrás y hacia adelante con la espalda quieta.",
+      "a": "que: \"Para un paciente con lesión lumbar en tratamiento, mover la cadera."
+    },
+    {
+      "nombre": "el nombre del ejercicio deja de escaparse",
+      "de": "      + (yo ? '<b>' + escapeHtml(e.name) + '</b>",
+      "a": "      + (yo ? '<b>' + e.name + '</b>"
+    },
+    {
+      "nombre": "se quita la marca de donde estas",
+      "de": "· estás aquí</span>",
+      "a": "</span>"
+    },
+    {
+      "nombre": "el modal deja de decir cuando subir",
+      "de": "Cuándo pasar al escalón siguiente",
+      "a": "Siguiente"
+    },
+    {
+      "nombre": "cambiar el peldano borra la prescripcion",
+      "de": "  fila.exerciseId = nuevoId;\n  closeModal();",
+      "a": "  d.exercises[idx] = { exerciseId: nuevoId, sets:'3', reps:'10', weight:'', rest:'60s' };\n  closeModal();"
+    },
+    {
+      "nombre": "el «Poner» sale tambien desde la biblioteca",
+      "de": "  var puedeCambiar = enVivo || (filaRutina !== null && filaRutina !== undefined\n    && typeof _builderRoutine !== \"undefined\" && _builderRoutine);",
+      "a": "  var puedeCambiar = true;"
+    },
+    {
+      "nombre": "una fila que no existe deja de avisar",
+      "de": "  if (!fila){ toast(\"No encuentro ese ejercicio en el día\", \"error\"); return; }\n  var nuevo = null;",
+      "a": "  if (!fila){ return; }\n  var nuevo = null;"
+    },
+    {
+      "nombre": "se quita la regla que sube el modal sobre la vista viva",
+      "de": "body.circ-live-open .modal-overlay{z-index:9500;}",
+      "a": "body.circ-live-open .modal-overlay{z-index:50;}"
+    },
+    {
+      "nombre": "el socio puede cambiar su propia rutina",
+      "de": "  return !!(_rl && !_rlFichas && p && p.ex",
+      "a": "  return !!(_rl && p && p.ex"
+    },
+    {
+      "nombre": "el cambio en vivo rehace el plan y pierde la serie",
+      "de": "  var fila = p.ex;\n  fila.exerciseId = nuevoId;",
+      "a": "  var fila = p.ex;\n  fila.exerciseId = nuevoId;\n  L.plan = L.plan.slice(); L.i = 0;"
+    },
+    {
+      "nombre": "el descanso sigue anunciando el ejercicio viejo",
+      "de": "    if (f.siguiente && f.siguiente.ex === fila) f.siguiente.e = nuevo;\n",
+      "a": ""
+    },
+    {
+      "nombre": "una rutina guardada deja de guardarse",
+      "de": "  if (guardada) saveState();",
+      "a": "  if (false) saveState();"
+    },
+    {
+      "nombre": "cuentan tambien las rutinas archivadas",
+      "de": "r.clientId === c.id && r.status !== \"archived\"; });\n  var filas = [];",
+      "a": "r.clientId === c.id; });\n  var filas = [];"
+    },
+    {
+      "nombre": "se pierde la memorizacion del escalon",
+      "de": "    var b = cache[def.id];\n    if (b === undefined){",
+      "a": "    var b = undefined;\n    if (b === undefined){"
+    },
+    {
+      "nombre": "se dibuja el reparto de escalones con un solo ejercicio",
+      "de": "  if (conEscalera >= 3){",
+      "a": "  if (conEscalera >= 1){"
+    },
+    {
+      "nombre": "no se nombran los patrones que estan en cero",
+      "de": "  if (vacios.length && vacios.length < FICHA_PATRONES.length){",
+      "a": "  if (false){"
+    },
+    {
+      "nombre": "las series del mismo patron dejan de sumarse",
+      "de": "    pat[p] = (pat[p] || 0) + n;",
+      "a": "    pat[p] = n;"
+    },
+    {
+      "nombre": "se cuela lenguaje clinico en la ficha",
+      "de": "'Puede estar bien —un bloque de tren superior no lleva sentadilla— o ser un hueco;",
+      "a": "'Es un deficit funcional con riesgo de lesion;"
+    },
+    {
+      "nombre": "se pinta el bloque aunque no quede ningun ejercicio de verdad",
+      "de": "  if (!totalSeries) return \"\";",
+      "a": "  if (false) return \"\";"
+    }
+  ]
+}

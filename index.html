@@ -31846,6 +31846,110 @@ function fichaEvaluaciones(c){
   return out + '<button class="btn btn-primary" onclick="showView(\'rendimiento\')">Nueva evaluación →</button>';
 }
 
+
+/* Los ocho patrones, en el orden en que se leen: primero los grandes.
+   Locomoción entra aquí aunque `libPatronesDe` la deje fuera del aviso de
+   equilibrio, porque en la ficha lo que se quiere es la foto completa. */
+var FICHA_PATRONES = ["Empuje", "Tracción", "Sentadilla", "Bisagra", "Zancada", "Core", "Locomoción", "Accesorio"];
+
+/* «Cómo entrena» — idea que Diego dejó apuntada el 7-sep y que solo ahora
+   se puede contestar entera: qué patrones toca esta persona y en qué
+   escalón los está haciendo.
+   Solo rutinas ACTIVAS: una archivada cuenta lo que hacía en marzo. */
+function fichaComoEntrena(c){
+  var rut = state.routines.filter(function(r){ return r.clientId === c.id && r.status !== "archived"; });
+  var filas = [];
+  rut.forEach(function(r){
+    (r.days || []).forEach(function(d){
+      (d.exercises || []).forEach(function(x){ if (x && x.exerciseId) filas.push(x); });
+    });
+  });
+  if (!filas.length) return "";
+
+  /* Series por patrón, contando todos los patrones. */
+  var pat = {}, totalSeries = 0;
+  filas.forEach(function(x){
+    var def = getExercise(x.exerciseId); if (!def) return;
+    var p = libTaxDe(def).pat; if (!p) return;
+    var n = parseInt(x.sets, 10) || 0;
+    pat[p] = (pat[p] || 0) + n;
+    totalSeries += n;
+  });
+
+  /* En qué escalón trabaja. La familia de un ejercicio cuesta de calcular
+     —recorre el catálogo— así que se memoriza por id: una ficha con 30
+     ejercicios haría 30 recorridos de 2.377 sin esto. */
+  var cache = {}, esc = { 1:0, 2:0, 3:0, 4:0 }, conEscalera = 0;
+  filas.forEach(function(x){
+    var def = getExercise(x.exerciseId); if (!def) return;
+    var b = cache[def.id];
+    if (b === undefined){
+      var fam = u19EscEscalera(def);
+      b = fam.length ? u19EscBanda(def, fam) : 0;   /* 0 = sin familia con que comparar */
+      cache[def.id] = b;
+    }
+    if (b){ esc[b]++; conEscalera++; }
+  });
+
+  /* Si ninguna fila apunta a un ejercicio que exista, el bloque no diría
+     nada: mejor no pintarlo que enseñar ocho barras a cero. */
+  if (!totalSeries) return "";
+
+  var maxPat = 0;
+  FICHA_PATRONES.forEach(function(p){ if ((pat[p] || 0) > maxPat) maxPat = pat[p] || 0; });
+
+  var barras = FICHA_PATRONES.map(function(p){
+    var n = pat[p] || 0;
+    var ancho = maxPat ? Math.round(n / maxPat * 100) : 0;
+    return '<div style="display:flex;align-items:center;gap:.5rem;margin:.18rem 0;">'
+      + '<span class="text-xs" style="flex:0 0 5.6rem;color:var(--muted);">' + escapeHtml(p) + '</span>'
+      + '<span style="flex:1;height:8px;border-radius:4px;background:var(--border);overflow:hidden;">'
+      +   '<span style="display:block;height:100%;width:' + ancho + '%;background:' + (n ? 'var(--accent)' : 'transparent') + ';"></span>'
+      + '</span>'
+      + '<span class="text-xs" style="flex:0 0 3.4rem;text-align:right;' + (n ? '' : 'color:var(--muted);') + '">'
+      +   (n ? n + ' ser.' : 'sin series') + '</span>'
+      + '</div>';
+  }).join('');
+
+  var vacios = FICHA_PATRONES.filter(function(p){ return !(pat[p] || 0); });
+  var cuerpo = '<div class="text-xs text-muted" style="margin-bottom:.5rem;line-height:1.5;">'
+    + totalSeries + ' series por semana en ' + rut.length + ' rutina' + (rut.length === 1 ? '' : 's')
+    + ' activa' + (rut.length === 1 ? '' : 's') + '. Es lo que está escrito en la rutina, no lo que reportó.</div>'
+    + barras;
+
+  if (vacios.length && vacios.length < FICHA_PATRONES.length){
+    cuerpo += '<div class="text-xs" style="margin-top:.5rem;line-height:1.5;color:var(--muted);">'
+      + 'Sin series: <b>' + vacios.map(escapeHtml).join(", ") + '</b>. '
+      + 'Puede estar bien —un bloque de tren superior no lleva sentadilla— o ser un hueco; lo dice el objetivo, no la tabla.</div>';
+  }
+
+  /* El escalón, solo si hay con qué compararlo. */
+  if (conEscalera >= 3){
+    var seg = [1,2,3,4].map(function(b){
+      var pc = Math.round(esc[b] / conEscalera * 100);
+      if (!pc) return '';
+      return '<span title="' + esc[b] + ' en el escalón ' + b + ' · ' + escapeHtml(U19_ESC_BANDAS[b-1].nom) + '" '
+        + 'style="display:block;height:100%;width:' + pc + '%;background:rgba(168,209,57,' + (0.25 + b * 0.18).toFixed(2) + ');"></span>';
+    }).join('');
+    var arriba = esc[3] + esc[4], abajo = esc[1] + esc[2];
+    cuerpo += '<div style="margin-top:.9rem;border-top:1px solid var(--border);padding-top:.6rem;">'
+      + '<div class="text-xs" style="font-weight:600;margin-bottom:.25rem;">En qué escalón entrena</div>'
+      + '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--border);">' + seg + '</div>'
+      + '<div class="text-xs text-muted" style="margin-top:.3rem;line-height:1.5;">'
+      + [1,2,3,4].filter(function(b){ return esc[b]; }).map(function(b){
+          return esc[b] + ' en el ' + b + ' (' + escapeHtml(U19_ESC_BANDAS[b-1].nom.toLowerCase()) + ')';
+        }).join(' · ')
+      + '. ' + (abajo > arriba * 2
+          ? 'Casi todo en los peldaños de abajo: hay <b>margen para subir</b> donde ya cumpla el criterio.'
+          : (arriba > abajo * 2
+              ? 'Casi todo en los peldaños de arriba: si alguno le cuesta, con el <b>\U0001fa9c</b> se baja sin perder los pesos.'
+              : 'Repartido entre peldaños fáciles y exigentes.'))
+      + '</div></div>';
+  }
+
+  return u19Bloque('Cómo entrena', cuerpo);
+}
+
 function fichaEntrenamiento(c){
   var rut = state.routines.filter(function(r){ return r.clientId === c.id; });
   var out = '';
@@ -31860,6 +31964,8 @@ function fichaEntrenamiento(c){
     out += u19Bloque('Rutinas', '<p class="text-xs text-muted">Sin rutinas asignadas.</p>',
       '<button class="btn btn-primary btn-sm" onclick="crearRutinaParaCliente(\'' + c.id + '\')">Crear rutina</button>');
   }
+  out += fichaComoEntrena(c);
+
   var pr = c.progressions || [];
   if (pr.length){
     out += u19Bloque('Sesiones reportadas', '<table class="u-tbl"><thead><tr><th>Fecha</th><th>Rutina</th><th>Cumplimiento</th><th></th></tr></thead><tbody>' + pr.slice().reverse().slice(0, 15).map(function(x){

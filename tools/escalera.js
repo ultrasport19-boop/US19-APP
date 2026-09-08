@@ -77,6 +77,27 @@ const api = vm.runInContext('({ u19EscPuntos, u19EscBanda, u19EscEscalera, u19Es
 const porNombre = n => catalogo.find(e => e.name === n);
 const nombre = e => e.name;
 
+/* Quién tiene familia, en UNA pasada. Preguntárselo a `u19EscEscalera`
+   ejercicio por ejercicio son 2.377 × 2.377 con expresiones regulares
+   dentro: la suite pasaba de tres segundos a más de dos minutos, y esto
+   corre en cada commit. Se agrupa por la misma clave que usa la función
+   —raíz + músculo + patrón (o tipo, si no hay patrón)— y más abajo se
+   comprueba contra la función de verdad que agrupar así es equivalente. */
+const claveFamilia = e => api.u19EscRaiz(e.name) + '|' + (e.muscle || '')
+  + '|' + (e.pat ? 'P:' + e.pat : 'C:' + (e.cat || ''));
+const noClips = catalogo.filter(e => !api.u19EscEsClip(e));
+const tamFamilia = new Map();
+noClips.forEach(e => { const k = claveFamilia(e); tamFamilia.set(k, (tamFamilia.get(k) || 0) + 1); });
+const tieneFamilia = e => !api.u19EscEsClip(e) && (tamFamilia.get(claveFamilia(e)) || 0) >= 2;
+
+/* Y que ese atajo diga lo mismo que la función, no lo que me convenga. */
+const desacuerdos = noClips.filter((e, i) => i % 37 === 0)
+  .filter(e => tieneFamilia(e) !== (api.u19EscEscalera(e).length > 0));
+igual('atajo · agrupar por raíz+músculo+patrón da lo mismo que preguntar una a una',
+  desacuerdos.length, 0);
+
+const conFamilia = noClips.filter(tieneFamilia);
+
 /* --- 3 · El caso que pidió Diego: el puente ------------------------- */
 
 const sinTax = catalogo.filter(e => !e.cat || !e.niv).length;
@@ -200,12 +221,10 @@ igual('familia · en la escalera no se cuela otro músculo, otro patrón ni otro
 comprobar('familia · el propio ejercicio está en su escalera', escaleraPuente.indexOf(puente.name) >= 0);
 
 /* Un ejercicio sin vecinos no debe inventarse una escalera de uno. */
-const solitarios = catalogo.filter(e => {
-  if (api.u19EscEsClip(e)) return false;
-  const fam = catalogo.filter(o => !api.u19EscEsClip(o) && o.muscle === e.muscle
-    && api.u19EscRaiz(o.name) === api.u19EscRaiz(e.name) && (e.pat ? o.pat === e.pat : o.cat === e.cat));
-  return fam.length === 1;
-});
+/* Con el mapa de familias ya calculado: filtrar el catálogo dentro de un
+   filtro del catálogo son 2.377² con expresiones regulares, y esto corre
+   en el hook de cada commit. */
+const solitarios = noClips.filter(e => !tieneFamilia(e));
 if (solitarios.length) {
   igual('familia · un ejercicio sin vecinos devuelve escalera vacía, no una de uno',
     api.u19EscEscalera(solitarios[0]).length, 0);
@@ -539,13 +558,103 @@ vm.runInContext('rlPonerEscalon("no-existe")', ctxVivo);
 igual('vivo · un ejercicio inexistente no toca la fila', ctxVivo._rl.fila.exerciseId, puente.id);
 comprobar('vivo · y lo dice', avisosVivo.some(a => /no encontrado/i.test(String(a))));
 
+/* --- 14 · «Cómo entrena» en la ficha del cliente --------------------
+   La idea 8 que Diego dejó apuntada el 7-sep, que solo ahora se puede
+   contestar entera: qué patrones toca esa persona y en qué escalón. */
+
+const moduloFicha = trozo('var FICHA_PATRONES', 'function fichaEntrenamiento(c){', 'el bloque «Cómo entrena»');
+
+const ctxFicha = Object.create(null);
+Object.assign(ctxFicha, {
+  state: { routines: [], exercises: catalogo },
+  getExercise: id => catalogo.find(e => e.id === id) || null,
+  libTaxDe: ctx.libTaxDe,
+  escapeHtml: esc,
+  u19Bloque: (t, cuerpo) => '<BLOQUE t="' + t + '">' + cuerpo + '</BLOQUE>',
+  console, Math, JSON, String, Object, Number, Array, RegExp, parseInt, Infinity,
+});
+ctxFicha.window = ctxFicha;
+vm.createContext(ctxFicha);
+/* Necesita la escalera al lado: de ahí saca el escalón. */
+vm.runInContext(normalizador + '\n' + trozo('var U19_ESC_REGLAS', 'window.u19ComoConstruir', 'la escalera') + '\n' + moduloFicha, ctxFicha);
+
+/* Cuántas veces se recorre el catálogo: la ficha memoriza por id porque
+   `u19EscEscalera` recorre las 2.377 fichas en cada llamada. */
+let vecesEscalera = 0;
+vm.runInContext('u19EscEscalera_original = u19EscEscalera;', ctxFicha);
+ctxFicha.u19EscEscalera_contada = function (e) { vecesEscalera++; return ctxFicha.u19EscEscalera_original(e); };
+vm.runInContext('u19EscEscalera = u19EscEscalera_contada;', ctxFicha);
+
+function fichaCon(rutinas) {
+  ctxFicha.state.routines = rutinas;
+  vecesEscalera = 0;
+  return vm.runInContext('fichaComoEntrena({ id: "cl1" })', ctxFicha);
+}
+const exDe = (pat, n) => conFamilia.filter(e => e.pat === pat).slice(0, n);
+const filaDe = (e, sets) => ({ exerciseId: e.id, sets: String(sets) });
+
+igual('ficha · sin rutinas no pinta el bloque', fichaCon([]), '');
+igual('ficha · una rutina archivada no cuenta',
+  fichaCon([{ clientId: 'cl1', status: 'archived', days: [{ exercises: [filaDe(exDe('Empuje', 1)[0], 4)] }] }]), '');
+igual('ficha · una rutina de OTRO cliente tampoco',
+  fichaCon([{ clientId: 'otro', days: [{ exercises: [filaDe(exDe('Empuje', 1)[0], 4)] }] }]), '');
+igual('ficha · filas que apuntan a ejercicios borrados no pintan ocho barras a cero',
+  fichaCon([{ clientId: 'cl1', days: [{ exercises: [{ exerciseId: 'ya-no-existe', sets: '4' }] }] }]), '');
+
+const emp = exDe('Empuje', 2), trac = exDe('Tracción', 1), core = exDe('Core', 1);
+const rutina = [{ clientId: 'cl1', days: [
+  { exercises: [filaDe(emp[0], 4), filaDe(emp[1], 3)] },
+  { exercises: [filaDe(trac[0], 5), filaDe(core[0], 2)] },
+]}];
+const htmlFicha = fichaCon(rutina);
+comprobar('ficha · con rutinas activas sí pinta el bloque', htmlFicha.indexOf('Cómo entrena') > 0);
+comprobar('ficha · suma las series de los dos días', /14 series por semana/.test(htmlFicha),
+  (htmlFicha.match(/\d+ series por semana/) || [])[0]);
+comprobar('ficha · suma las series del mismo patrón (4+3 de empuje)', /7 ser\./.test(htmlFicha));
+comprobar('ficha · nombra los patrones que se quedan en cero',
+  /Sin series: <b>[^<]*Sentadilla[^<]*<\/b>/.test(htmlFicha),
+  (htmlFicha.match(/Sin series: <b>[^<]*<\/b>/) || [])[0]);
+comprobar('ficha · y no llama problema a lo que puede no serlo',
+  /Puede estar bien/.test(htmlFicha));
+comprobar('ficha · dice que es lo escrito, no lo reportado',
+  /no lo que reportó/.test(htmlFicha));
+comprobar('ficha · con cuatro ejercicios sale la barra de escalones',
+  /En qué escalón entrena/.test(htmlFicha));
+
+/* Memoización: sin ella, una ficha de 30 ejercicios recorrería 30 veces
+   el catálogo entero. */
+const repetido = [{ clientId: 'cl1', days: [{ exercises: [
+  filaDe(emp[0], 3), filaDe(emp[0], 3), filaDe(emp[0], 3), filaDe(emp[0], 3), filaDe(trac[0], 3),
+]}]}];
+fichaCon(repetido);
+igual('ficha · el catálogo se recorre una vez por ejercicio DISTINTO, no por fila', vecesEscalera, 2);
+
+/* Con menos de tres ejercicios comparables no se dibuja una estadística
+   que no significa nada. */
+const soloUno = [{ clientId: 'cl1', days: [{ exercises: [filaDe(emp[0], 3)] }] }];
+comprobar('ficha · con un solo ejercicio no se inventa un reparto de escalones',
+  !/En qué escalón entrena/.test(fichaCon(soloUno)));
+
+/* Cuánto del catálogo tiene escalera de verdad. Si una regla de familia
+   se rompe, esto se desploma antes de que nadie lo note en la app. */
+const conEsc = conFamilia.length;
+const pctEsc = conEsc / noClips.length * 100;
+comprobar('cobertura · la mayoría del catálogo tiene escalera (hoy 76 %)',
+  pctEsc > 60, pctEsc.toFixed(1) + ' % de ' + noClips.length + ' ejercicios');
+
+/* Vocabulario, otra vez: esto lo lee Diego pero vive en la misma ficha
+   que el bloque clínico. */
+const lineaMala = moduloFicha.split('\n').find(l => PROHIBIDAS.test(l));
+comprobar('ficha · «Cómo entrena» no usa lenguaje clínico', !lineaMala, lineaMala && lineaMala.trim().slice(0, 110));
+
 /* --- salida ---------------------------------------------------------- */
 
 console.log('\nUS19-APP · escalera de ejercicios');
 console.log('archivo: ' + ruta);
 console.log('  · catálogo: ' + catalogo.length + ' ejercicios · reparto por escalón: '
   + [1, 2, 3, 4].map(b => b + ':' + (reparto[b] || 0)).join(' · '));
-console.log('  · clips de técnica reconocidos: ' + totalClips);
+console.log('  · clips de técnica reconocidos: ' + totalClips
+  + '  ·  con escalera: ' + conEsc + ' de ' + noClips.length + ' (' + pctEsc.toFixed(0) + ' %)');
 console.log('  · la escalera del puente, que es el caso que pidió Diego:');
 famPuente.forEach(e => console.log('      ' + api.u19EscBanda(e, famPuente) + ' · ' + e.name));
 console.log('');

@@ -13,6 +13,11 @@ PWA de un solo archivo. Sin build, sin dependencias, sin servidor.
 > ```
 > Al 8-sep-2026: 31.675 líneas · 8 aperturas · **3 bloques reales** · 2.377 fichas.
 
+> **Los mutantes se aplican sobre una COPIA, nunca sobre `index.html`.** El 8-sep un script
+> que mutaba el archivo de verdad tardó más de dos minutos, se fue a segundo plano y siguió
+> escribiendo encima mientras yo editaba; al matarlo, su `finally` no llegó a correr y el
+> archivo se quedó con un `if (false)` dentro. Para eso está `tools/mutantes.js`.
+
 ## Trampas de este código
 
 **El hoisting no cruza bloques `<script>`.** Hay **tres**. Las aperturas `<script>` son
@@ -104,6 +109,7 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
 | `node tools/escalera.js` | **«Cómo construirlo» contra el catálogo real**: que la progresión ordene de menos a más, que no mezcle gestos distintos (un peso muerto no es una progresión de un puente), que toda familia tenga primer y último peldaño, y que la guía **no use lenguaje clínico** |
+| `node tools/mutantes.js tools/mutantes_escalera.json` | **Pone a prueba las pruebas**: aplica 23 mutantes y comprueba que la suite se pone roja con cada uno. Trabaja sobre una COPIA — nunca toca `index.html` |
 | `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
 | `sh tools/instalar_hook.sh` | Deja **las seis primeras** corriendo en cada commit que toque `index.html` |
 
@@ -206,6 +212,11 @@ dentro, «Plancha lateral» contaba como otro ejercicio y «Plancha» se quedaba
 Lo que Diego mueve a mano vive en `escManual` sobre la ficha, y el importador del catálogo
 no lo pisa (solo toca los campos de `TAXO` y solo si no hay `taxManual`).
 
+**En la ficha del cliente** («Entrenamiento» → «Cómo entrena») la escalera contesta algo que
+antes no se podía mirar: qué patrones toca esa persona **y en qué escalón**. Solo rutinas
+activas. El escalón se memoriza por id dentro del render: `u19EscEscalera` recorre las 2.377
+fichas en cada llamada, así que sin memorizar una ficha de 30 ejercicios haría 30 recorridos.
+
 **Desde el constructor de rutinas** (botón 🪜 en cada fila del día) la escalera gana un
 «Poner» en cada peldaño: `u19EscPonerEnRutina` cambia el ejercicio **conservando series,
 repeticiones, peso, descanso, RIR y notas**. Eso es lo que hace que se use: borrar la fila
@@ -224,9 +235,16 @@ compartido y eso es modo lectura.
 escalera se abre **detrás** de la pantalla negra y el botón parece no hacer nada. Cualquier
 otro modal que se abra desde una vista viva tiene el mismo problema.
 
-`tools/escalera.js`: **137 comprobaciones** contra el catálogo real —incluidos el modal, el
-constructor y la sesión en vivo ejecutados con un navegador de mentira— y veinte mutantes
-que caen todos, el del `z-index` incluido.
+`tools/escalera.js`: **153 comprobaciones** contra el catálogo real —el modal, el constructor,
+la sesión en vivo y la ficha del cliente, ejecutados con un navegador de mentira— y
+**24 mutantes** en `tools/mutantes_escalera.json` que caen todos, el del `z-index` incluido.
+
+**Cuidado con el coste:** `u19EscEscalera` recorre las 2.377 fichas en cada llamada. Dos
+comprobaciones que la llamaban dentro de un bucle sobre el catálogo hicieron que la suite
+pasara de 3 s a **más de dos minutos** — y corre en cada commit. Se agrupa por
+raíz+músculo+patrón en una pasada, con una comprobación que verifica contra la función real
+que agrupar así da lo mismo. El hook completo tarda **12,6 s**, de los cuales 10 son el
+cifrado (PBKDF2 a 1,2 M de vueltas, que es coste buscado).
 
 ## Dos reglas que no son código
 
