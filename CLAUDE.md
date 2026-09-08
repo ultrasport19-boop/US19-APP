@@ -27,6 +27,13 @@ el bloque 3 no existe cuando corre el bloque 1. Por eso el arranque va dentro de
 `DOMContentLoaded` y no al vuelo. Esto ya provocó una vez que el Panel saliera en blanco
 en producción, y ninguna suite lo vio porque `eval` aplana los bloques.
 
+**Desde el 8-sep hay una prueba que SÍ lo ve:** `node tools/arranque.js` carga los tres
+bloques **en orden y en el mismo contexto**, como el navegador, y dispara `DOMContentLoaded`.
+Si un bloque llama al cargar a algo declarado más abajo, falla diciendo qué función y en qué
+bloque está. También recoge lo que revienta dentro de un `setTimeout` — ahí vive el arranque
+de esta app, y un error así tumbaba el proceso sin decir nada. No sustituye a `humo.js`:
+aquí no hay pintado ni CSS, solo el orden de carga.
+
 **Vídeo contra imagen.** Tres ayudantes: `isVideoUrl`, `mediaThumb`, `mediaPlayer`.
 En **listados siempre `mediaThumb`**, que pinta el póster `.jpg`. `mediaPlayer` (que sí
 mete `<video>`) solo en la vista previa y en la ampliación. Un `<video>` en un listado de
@@ -125,7 +132,8 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/escalera.js` | **«Cómo construirlo» contra el catálogo real**: que la progresión ordene de menos a más, que no mezcle gestos distintos (un peso muerto no es una progresión de un puente), que toda familia tenga primer y último peldaño, y que la guía **no use lenguaje clínico** |
 | `node tools/mutantes.js <lista>` | **Pone a prueba las pruebas**: aplica cada mutante y comprueba que la suite se pone roja. Trabaja sobre una COPIA — nunca toca `index.html`. Listas: `tools/mutantes_escalera.json` (24, la escalera) y `tools/mutantes_guardas.json` (6, las guardas de datos) |
 | `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
-| `sh tools/instalar_hook.sh` | Deja **las seis primeras** corriendo en cada commit que toque `index.html` |
+| `node tools/arranque.js` | **El arranque, sin navegador**: carga los tres bloques EN ORDEN y en el mismo contexto y dispara `DOMContentLoaded`. Es lo único que ve el fallo del hoisting entre bloques — las demás aplanan justo esa diferencia |
+| `sh tools/instalar_hook.sh` | Deja **las siete primeras** corriendo en cada commit que toque `index.html` |
 
 **La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
 pasa en verde.** Si renombras `mediaThumb`, la prueba no se salta silenciosamente: aborta

@@ -1,0 +1,27 @@
+{
+  "suite": "tools/arranque.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "EL FALLO DOCUMENTADO: el bloque 1 llama al cargar a una funcion del bloque 3",
+      "de": "var SEED_VERSION = 20260612;",
+      "a": "var SEED_VERSION = 20260612;\nu19PintarInforme();"
+    },
+    {
+      "nombre": "el arranque deja de esperar a DOMContentLoaded y corre al vuelo",
+      "de": "document.addEventListener(\"DOMContentLoaded\"",
+      "a": "({addEventListener:function(){}}).addEventListener(\"DOMContentLoaded\""
+    },
+    {
+      "nombre": "el arranque deja de llamar a loadState y el estado se queda vacio",
+      "de": "  loadState();",
+      "a": "  /* loadState(); */"
+    },
+    {
+      "nombre": "algo revienta dentro de un setTimeout del arranque",
+      "de": "function u19Arr(x){",
+      "a": "setTimeout(function(){ noExisteEstaFuncion(); }, 5);\nfunction u19Arr(x){"
+    }
+  ]
+}
