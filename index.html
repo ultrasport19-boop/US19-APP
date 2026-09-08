@@ -17187,10 +17187,13 @@ function u19FinMes(ts){
 function u19DiasUmbral(c){
   var frec = (typeof u19FrecuenciaPlan === "function")
     ? u19FrecuenciaPlan((c && c.notionPlan) || "") : null;
-  if (frec >= 4) return { aviso: 7,  fuga: 12, frec: frec };
-  if (frec === 3) return { aviso: 9,  fuga: 15, frec: frec };
-  if (frec === 2) return { aviso: 12, fuga: 20, frec: frec };
-  return { aviso: 11, fuga: 21, frec: frec };
+  /* 7-sep-2026, regla de Diego: el aviso es a los 7 dias para todos los
+     planes (igual que el bot, RV_CFG.DIAS_SIN_AGENDAR); lo que cambia por
+     plan es cuando se da por fuga. */
+  if (frec >= 4) return { aviso: 7, fuga: 12, frec: frec };
+  if (frec === 3) return { aviso: 7, fuga: 15, frec: frec };
+  if (frec === 2) return { aviso: 7, fuga: 20, frec: frec };
+  return { aviso: 7, fuga: 21, frec: frec };
 }
 
 /* Los que entrenan en grupo cerrado no reservan por Calendly: que no
@@ -20073,10 +20076,10 @@ function u19AccCuerpoHTML(d){
   var h = '';
   h += u19AccListaHTML('reactivacion', 'Propuestas del bot (congeladas hasta que apruebes o descartes)', d.reactivacion,
         (d.tarifas && d.tarifas.marketing) || 78,
-        'El bot propone cada día a las 8:00 (hasta 5 por día) a quien lleva más días sin agendar de lo que '
-        + 'tolera su plan, incluidos los que se les venció el plan hace 60 días o menos. Marca y aprueba: '
-        + 'los envía él, cada 4 h entre 9:00 y 21:00. Un nombre sale de aquí cuando lo apruebas o vuelve a agendar. '
-        + 'Es categoría Marketing: el más caro de los dos.');
+        'Cada día a las 8:00 el bot cruza Calendly con Notion y propone (hasta 20 por día) a quien lleva '
+        + 'más de 7 días sin agendar y no tiene hora tomada, sea cual sea su plan, incluidos los que se les '
+        + 'venció el plan hace 60 días o menos. Marca y aprueba: los envía él dentro de la hora, entre 9:00 y 21:00. '
+        + 'Un nombre sale de aquí cuando lo apruebas o vuelve a agendar. Es categoría Marketing: el más caro de los dos.');
   h += u19AccListaHTML('ingreso', 'Altas por aprobar', d.ingreso,
         (d.tarifas && d.tarifas.utility) || 14,
         'Al aprobar, el bot manda la bienvenida con los datos de pago.');
