@@ -3668,7 +3668,8 @@ function loadState(){
 /* Evita que el reintento del desborde se llame a si mismo. */
 var _saveReintentando = false;
 
-function saveState(){
+function saveState(sinSubir){
+  if (typeof u19CatalogoAnotar === "function") u19CatalogoAnotar();
   try {
     /* Si el catalogo ya vive en IndexedDB, no vuelve a localStorage. */
     var _mudado = false;
@@ -3715,7 +3716,9 @@ function saveState(){
       ? "Sin espacio en el navegador: los cambios NO se guardaron. Exporta una copia y borra datos de clientes antiguos."
       : "No se pudo guardar: " + (e && e.message ? e.message : "error desconocido"), "error");
   }
-  if (typeof scheduleSyncUpload === "function") scheduleSyncUpload();
+  /* sinSubir: lo usa syncDownload, que guarda lo recien bajado y no tiene
+     que volver a subirlo. */
+  if (!sinSubir && typeof scheduleSyncUpload === "function") scheduleSyncUpload();
 }
 
 function loadSettings(){
@@ -7594,9 +7597,12 @@ function buildShareData(routine){
   }
   var skippedHeavy = 0;
   var exercises = [];
+  /* Ids de la rutina que no estan en la biblioteca de este dispositivo. El
+     socio los veria como «Ejercicio» sin GIF: openShareModal lo bloquea. */
+  var faltan = [];
   for (var id in usedExIds){
     var ex = getExercise(id);
-    if (!ex) continue;
+    if (!ex){ faltan.push(id); continue; }
     var copy = {
       id: ex.id,
       name: ex.name,
@@ -7637,6 +7643,7 @@ function buildShareData(routine){
     client: client ? { id: client.id, name: client.name } : null,
     exercises: exercises,
     skippedHeavy: skippedHeavy,
+    faltan: faltan,
     sharedAt: Date.now()
   };
 }
@@ -7855,6 +7862,26 @@ function openShareModal(routineId, fromBuilder){
     ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ Avisos antes de compartir:<ul style="margin:.35rem 0 0 1.1rem;padding:0;">'+_issues.warnings.map(function(w){ return '<li>'+escapeHtml(w)+'</li>'; }).join('')+'</ul></div></div>'
     : '';
   var data = buildShareData(r);
+  if (data.faltan && data.faltan.length){
+    /* 7-sep-2026: un enlace salio con cero ejercicios porque este navegador
+       habia perdido la biblioteca. Mejor no compartir que mandar «Ejercicio»
+       sin nombre ni GIF. */
+    var _nCat = (state.exercises || []).length;
+    openModal({
+      title: "No se puede compartir aún",
+      bodyHtml: '<p>' + data.faltan.length + ' ejercicio' + (data.faltan.length === 1 ? '' : 's') + ' de esta rutina no '
+        + (data.faltan.length === 1 ? 'está' : 'están') + ' en la biblioteca de este dispositivo (tiene ' + _nCat + '). '
+        + 'El socio los vería como «Ejercicio», sin nombre ni GIF.</p>'
+        + '<p class="text-sm text-muted" style="margin-top:.5rem;">Si la biblioteca está incompleta, pulsa <b>Sincronizar</b> para traerla de la nube, '
+        + 'o <b>Biblioteca → Importar catálogo US19</b>. Si el ejercicio se borró, cámbialo en la rutina.</p>',
+      footer: [
+        { label:"Cerrar", cls:"btn-ghost" },
+        { label:"Sincronizar", cls:"btn-secondary", onClick: function(){ closeModal(); if (typeof manualSync === "function") manualSync(); } },
+        { label:"Editar rutina", cls:"btn-primary", onClick: function(){ closeModal(); openRoutineBuilder(r.id); } }
+      ]
+    });
+    return;
+  }
   var encoded = encodeShareData(data);
   var baseUrl = getAppBaseUrl();
 
@@ -9763,10 +9790,14 @@ function syncUploadNow(){
   if (!url){ updateSyncBadge("error","Sin repo"); return; }
   var repoFull = getDerivedRepo() || settings.githubRepo;
 
-  var payload = buildSyncPayload();
-  var json = JSON.stringify(payload);
-
-  _syncPrepareContent(json).then(function(contentStr){
+  /* Si el catalogo de aqui es sospechosamente chico, primero se mira la
+     nube: si alli hay mas, se adopta y se sube entero. Nunca al reves. */
+  var _antes = (typeof u19CatalogoAntesDeSubir === "function") ? u19CatalogoAntesDeSubir() : Promise.resolve(false);
+  _antes.then(function(){
+    var payload = buildSyncPayload();
+    var json = JSON.stringify(payload);
+    return _syncPrepareContent(json);
+  }).then(function(contentStr){
     var b64 = btoa(unescape(encodeURIComponent(contentStr)));
     var body = {
       message: "ultrasport19: sync " + new Date().toISOString().slice(0,19),
@@ -9874,12 +9905,25 @@ function syncDownload(){
       if (remoteTime > localTime){
         if (Array.isArray(data.clients)) state.clients = data.clients;
         if (Array.isArray(data.routines)) state.routines = data.routines;
-        if (Array.isArray(data.exercises)) state.exercises = data.exercises;
+        /* CANDADO DEL CATALOGO: un catalogo que encoge a menos de la mitad
+           no se acepta. Se conserva el local y se vuelve a subir entero. */
+        var _reSubir = false;
+        if (Array.isArray(data.exercises)){
+          var _nLoc = (state.exercises || []).length;
+          if (typeof u19CatalogoEncoge === "function" && u19CatalogoEncoge(data.exercises.length, _nLoc)){
+            console.warn("Sync: la nube trae " + data.exercises.length + " ejercicios y aquí hay " + _nLoc + "; se conserva el catálogo local y se vuelve a subir.");
+            _reSubir = true;
+          } else state.exercises = data.exercises;
+        }
         if (Array.isArray(data.protocols)) state.protocols = data.protocols;
         if (data.libFav && typeof data.libFav === "object" && !Array.isArray(data.libFav)) state.libFav = data.libFav;
         if (Array.isArray(data.libRec)) state.libRec = data.libRec;
         if (Array.isArray(data.circuitos)) state.circuitos = data.circuitos;
-        try { localStorage.setItem(APP_KEY, JSON.stringify(state)); } catch(e){}
+        /* saveState y no un setItem a pelo: con el catalogo en IndexedDB, el
+           JSON entero (1,3 MB de ejercicios) desbordaba la cuota en silencio
+           y lo bajado no quedaba guardado. */
+        saveState(true);
+        if (_reSubir && typeof scheduleSyncUpload === "function") scheduleSyncUpload();
         updateSyncBadge("synced","Sincronizado ↓");
         setTimeout(function(){ updateSyncBadge("idle"); }, 4000);
         return true; // data changed
@@ -20681,12 +20725,57 @@ function u19RecuperarCatalogo(){
   return u19IdbLeer("exercises").then(function(lista){
     if (Array.isArray(lista) && lista.length){
       state.exercises = lista;
+      if (typeof u19CatalogoAnotar === "function") u19CatalogoAnotar();
       return true;
     }
     /* Si IndexedDB no lo tiene, se quita la marca para no quedarse sin
        catalogo en silencio: volvera a cargarse del JSON o del seed. */
     try { localStorage.removeItem(FLAG_CATALOGO_IDB); } catch(e){}
     return false;
+  }).catch(function(){ return false; });
+}
+/* CANDADO DEL CATALOGO (7-sep-2026). Un dispositivo con la biblioteca vacia
+   subio 13 ejercicios (las fichas de plantilla) y «gana el ultimo» los puso en
+   todos los demas: los enlaces de socio salieron sin nombre ni GIF. La marca
+   de agua es el mayor catalogo que este navegador ha tenido; nada que sea
+   menos de la mitad se acepta ni se sube sin mirar antes la nube. */
+var CATALOGO_MARCA_KEY = "us19_catalogo_marca";
+function u19CatalogoMarca(){
+  try { return parseInt(localStorage.getItem(CATALOGO_MARCA_KEY) || "0", 10) || 0; } catch(e){ return 0; }
+}
+function u19CatalogoAnotar(){
+  var n = (state && Array.isArray(state.exercises)) ? state.exercises.length : 0;
+  if (n > u19CatalogoMarca()){ try { localStorage.setItem(CATALOGO_MARCA_KEY, String(n)); } catch(e){} }
+}
+/* ¿`nuevo` ejercicios es un catalogo que encoge frente a lo que hay/hubo? */
+function u19CatalogoEncoge(nuevo, actual){
+  var ref = Math.max(actual || 0, u19CatalogoMarca());
+  return ref >= 100 && nuevo < ref / 2;
+}
+/* ¿El catalogo de este dispositivo es sospechosamente chico? */
+function u19CatalogoSospechoso(){
+  var n = (state && Array.isArray(state.exercises)) ? state.exercises.length : 0;
+  return u19CatalogoEncoge(n, 0);
+}
+/* Antes de subir: si el catalogo local es sospechoso, se mira la nube y, si
+   alli hay mas, se adopta. El dispositivo roto se cura solo en vez de romper
+   a los demas. Resuelve siempre: un fallo aqui no debe frenar la subida. */
+function u19CatalogoAntesDeSubir(){
+  if (!u19CatalogoSospechoso()) return Promise.resolve(false);
+  var repoFull = getDerivedRepo() || settings.githubRepo;
+  if ((repoFull || "").split("/").length !== 2) return Promise.resolve(false);
+  return fetchRawWithFallback(SYNC_PATH, repoFull, DATA_BRANCH).then(function(remote){
+    return _syncMaybeDecrypt(remote);
+  }).then(function(data){
+    if (!data || data.app !== "ultrasport19" || !Array.isArray(data.exercises)) return false;
+    var local = (state.exercises || []).length;
+    if (data.exercises.length <= local || u19CatalogoEncoge(data.exercises.length, local)) return false;
+    state.exercises = data.exercises;
+    saveState(true);
+    u19CatalogoAnotar();
+    console.warn("Sync: catalogo local sospechoso (" + local + "); se adoptan los " + data.exercises.length + " de la nube.");
+    toast("Se recuperó el catálogo de ejercicios desde la nube (" + data.exercises.length + ").", "success");
+    return true;
   }).catch(function(){ return false; });
 }
 /* Escritura diferida del catalogo: se llama en cada saveState mientras el
@@ -24568,9 +24657,17 @@ document.addEventListener("keydown", function(e){
 function u19Arrancar(){
   /* Si el catalogo se mudo a IndexedDB, se recupera antes de pintar nada:
      la Biblioteca y las rutinas lo necesitan ya cargado. */
-  var seguir = function(){ init(); observarAppTop(); if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion(); };
+  /* Una sola vez: antes, si IndexedDB tardaba mas de 2,5 s, el temporizador
+     arrancaba la app y la lectura la volvia a arrancar. Y 8 s, no 2,5: mas
+     vale esperar que arrancar con la biblioteca vacia y subirla asi. */
+  var _arrancado = false;
+  var seguir = function(){
+    if (_arrancado) return;
+    _arrancado = true;
+    init(); observarAppTop(); if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion();
+  };
   if (typeof u19RecuperarCatalogo === "function"){
-    var t = setTimeout(seguir, 2500);   /* si IndexedDB no responde, se arranca igual */
+    var t = setTimeout(seguir, 8000);   /* si IndexedDB no responde, se arranca igual */
     u19RecuperarCatalogo().then(function(){ clearTimeout(t); seguir(); },
                                 function(){ clearTimeout(t); seguir(); });
   } else seguir();
