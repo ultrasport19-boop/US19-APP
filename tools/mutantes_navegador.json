@@ -1,0 +1,26 @@
+{
+  "suite": "tools/navegador.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "un error de verdad en el arranque, que solo se ve ejecutando",
+      "de": "function u19Arr(x){",
+      "a": "document.addEventListener(\"DOMContentLoaded\", function(){ estoNoExisteEnAbsoluto(); });\nfunction u19Arr(x){"
+    },
+    {
+      "nombre": "el candado deja de pintar su pantalla",
+      "de": "Si eres socio, abre el enlace que te mandaron",
+      "a": "Bienvenido a la aplicacion"
+    }
+  ],
+  "_por_que_solo_dos": [
+    "Esta prueba abre la app en un perfil recien creado: sin token ni puente, para la app",
+    "es el navegador de un desconocido y el candado se queda en su pantalla. Eso es lo",
+    "correcto, pero significa que NO recorre las vistas por dentro.",
+    "Un mutante que rompa algo dentro de u19Arr, por ejemplo, escapa aqui — y lo caza",
+    "arranque.js, que abre el candado a mano. Las dos se complementan: esta comprueba que",
+    "un navegador DE VERDAD carga la app sin un solo error; aquella, que las diez vistas y",
+    "los caminos funcionan. Ninguna sustituye a la otra."
+  ]
+}
