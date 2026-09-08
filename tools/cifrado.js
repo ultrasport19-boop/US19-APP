@@ -66,6 +66,7 @@ const modulo = src.slice(iIni, iFin);
   '_encWrapMK', '_encUnwrapMK', '_encMigrarWrap', 'encGenRecoveryKey',
   '_encDevKeyGet', '_encGuardarMK', '_encCargarMKDe', 'encFuerzaFrase',
   'encDesbloquearConPin', 'encCambiarFrase',
+  'encOrdenSecretos', 'encFetchEnvelope', 'encNormalizarClaveRec',
 ].forEach(function (f) {
   if (modulo.indexOf('function ' + f) < 0) abortar('el modulo extraido no contiene ' + f + '()');
 });
@@ -113,6 +114,9 @@ function nuevoEntorno(store0, idb0) {
     saveSettings: function () {},
     document: { getElementById: function () { return null; } },
     DATA_BRANCH: 'data',
+    SYNC_PATH: 'sync/state.json',
+    /* Sin token ni repositorio derivado: es el telefono recien estrenado. */
+    getDerivedRepo: function () { return null; },
     getGitHubSyncUrl: function () { return ''; },   // sin red: encFetchEnvelope cae a la cache
     getGitHubHeaders: function () { return {}; },
     fetch: function () { return Promise.reject(new Error('sin red en las pruebas')); },
@@ -127,6 +131,7 @@ function nuevoEntorno(store0, idb0) {
     '_encWrapMK', '_encUnwrapMK', '_encEnvelope', '_encMkRaw',
     'encFuerzaFrase', 'encPinActivar', 'encPinDesactivar', 'encDesbloquearConPin',
     'encCambiarFrase', 'encRegenerarRecuperacion', 'encNormalizarClaveRec',
+    'encOrdenSecretos', 'encFetchEnvelope', '_encFallos',
   ].join(', ') + ' })', ctx);
   const api = vm.runInContext('({ encSetup:encSetup, encUnlock:encUnlock, encEncryptPayload:encEncryptPayload,'
     + ' encDecryptPayload:encDecryptPayload, encGenRecoveryKey:encGenRecoveryKey,'
@@ -135,7 +140,9 @@ function nuevoEntorno(store0, idb0) {
     + ' encFuerzaFrase:encFuerzaFrase, encPinActivar:encPinActivar,'
     + ' encPinDesactivar:encPinDesactivar, encDesbloquearConPin:encDesbloquearConPin,'
     + ' encCambiarFrase:encCambiarFrase, encRegenerarRecuperacion:encRegenerarRecuperacion,'
-    + ' encNormalizarClaveRec:encNormalizarClaveRec })', ctx);
+    + ' encNormalizarClaveRec:encNormalizarClaveRec,'
+    + ' encOrdenSecretos:encOrdenSecretos, encFetchEnvelope:encFetchEnvelope,'
+    + ' _encFallos:_encFallos })', ctx);
   return { api: api, ctx: ctx, store: store, idb: idb, settings: settings, localStorage: localStorage };
 }
 
@@ -466,6 +473,81 @@ async function principal() {
   const apiDic = vm.runInContext('({ encUnlock:encUnlock, encUnlocked:encUnlocked })', dic.ctx);
   await apiDic.encUnlock(recovery.toLowerCase().replace(/-/g, ''), true);
   igual('dictado · la clave escrita en minusculas y sin guiones abre igual', apiDic.encUnlocked(), true);
+
+  /* vii bis) LO QUE FALLABA EN EL TELEFONO -------------------------
+     Diego, 8-sep-2026: «en el PC funciona, en el telefono la contrasena
+     siempre sale erronea». No era la contrasena. Eran tres cosas, y estas
+     comprobaciones existen para que no vuelvan. */
+
+  const orden = A.api.encOrdenSecretos;
+
+  /* 1. El gestor de contrasenas del movil rellena el campo de contrasena
+        solo. La regla vieja era «usa la de recuperacion SOLO si el otro
+        esta vacio»: nunca lo estaba, asi que la clave buena no se probaba
+        NUNCA y cada intento sumaba castigo. */
+  const conAutorrelleno = orden('lo-que-relleno-el-navegador', 'US19-ABCDE-FGHJK-MNPQR-STVWX', true);
+  igual('movil · con la recuperacion abierta, la clave va PRIMERA aunque el gestor haya rellenado la contrasena',
+    conAutorrelleno[0][0], 'US19-ABCDE-FGHJK-MNPQR-STVWX');
+  igual('movil · y va marcada como clave de recuperacion', conAutorrelleno[0][1], true);
+  igual('movil · la contrasena autorrellenada queda de reserva, no se pierde',
+    conAutorrelleno.length, 2);
+
+  /* 2. Con el panel cerrado manda la contrasena, como siempre. */
+  igual('escritorio · con el panel cerrado, primero la contrasena',
+    orden('mi frase', '', false)[0][0], 'mi frase');
+  igual('escritorio · nada escrito, nada que probar', orden('', '', false).length, 0);
+  igual('el mismo texto en los dos campos no se prueba dos veces',
+    orden('igual', 'igual', true).length, 1);
+
+  /* 3. Probar el segundo secreto no debe costar dos castigos. */
+  const cast = nuevoEntorno();
+  vm.runInContext('_encEnvelope = ' + A.store['ultrasport19_env'] + ';', cast.ctx);
+  const apiCast = vm.runInContext('({ encUnlock:encUnlock, _encFallos:_encFallos })', cast.ctx);
+  await apiCast.encUnlock('no es la frase', false, true).then(
+    function () { falla('castigo · una frase mala no deberia abrir'); }, function () { pasa(); });
+  igual('castigo · el primero de dos intentos NO suma', apiCast._encFallos().n, 0);
+  await apiCast.encUnlock('tampoco es', false).then(
+    function () { falla('castigo · una frase mala no deberia abrir'); }, function () { pasa(); });
+  igual('castigo · el ultimo SI suma', apiCast._encFallos().n, 1);
+
+  /* 4. El normalizador solo arreglaba un caso: reagrupaba de cinco solo si
+        NO habia ningun guion. Un guion largo del teclado del movil bastaba
+        para que la clave correcta no abriera. */
+  igual('clave · guion largo del teclado del movil',
+    norm('US19\u2014ABCDE\u2014FGHJK\u2014MNPQR\u2014STVWX'), 'US19-ABCDE-FGHJK-MNPQR-STVWX');
+  igual('clave · guiones de mas y espacios entre medias',
+    norm('  us19 -- abcde - -fghjk--mnpqr - stvwx  '), 'US19-ABCDE-FGHJK-MNPQR-STVWX');
+  igual('clave · se cuela un caracter que no esta en el alfabeto',
+    norm('US19-ABCDE-FGHJK-MNPQR-STVW*X'), 'US19-ABCDE-FGHJK-MNPQR-STVWX');
+  igual('clave · el prefijo lleva U y 1, que NO son del alfabeto: se quita antes de filtrar',
+    norm('us19abcdefghjkmnpqrstvwx'), 'US19-ABCDE-FGHJK-MNPQR-STVWX');
+
+  /* 5. El error dejaba de decir la verdad. Sin sobre en ningun sitio, esto
+        lanzaba «no hay datos cifrados» y el modal lo pintaba como
+        «contrasena incorrecta»: por eso en el telefono no habia forma de
+        saber que pasaba. Ahora el motivo viaja con el error. */
+  const sinSobre = nuevoEntorno();
+  const apiSin = vm.runInContext('({ encFetchEnvelope:encFetchEnvelope, encUnlock:encUnlock })', sinSobre.ctx);
+  await apiSin.encFetchEnvelope().then(
+    function () { falla('sobre · sin llave en ningun sitio deberia fallar, no resolver'); },
+    function (e) {
+      comprobar('sobre · el fallo dice POR QUE (encMotivo), no «contrasena incorrecta»',
+        e && e.encMotivo === 'sobre', 'encMotivo = ' + (e && e.encMotivo));
+      comprobar('sobre · y el mensaje habla de la sincronizacion, que es lo que falta',
+        /sincronizaci/i.test(e && e.message || ''), e && e.message);
+    });
+
+  /* 6. Media llave: el sobre existe pero no trae la mitad que se pide. */
+  const media = nuevoEntorno();
+  const sobreEntero = JSON.parse(A.store['ultrasport19_env']);
+  vm.runInContext('_encEnvelope = ' + JSON.stringify({ pw: sobreEntero.pw }) + ';', media.ctx);
+  const apiMedia = vm.runInContext('({ encUnlock:encUnlock })', media.ctx);
+  await apiMedia.encUnlock('US19-ABCDE-FGHJK-MNPQR-STVWX', true).then(
+    function () { falla('media llave · no deberia abrir sin la mitad de recuperacion'); },
+    function (e) {
+      comprobar('media llave · lo dice en vez de llamarlo clave incorrecta',
+        /recuperaci/i.test(e && e.message || ''), e && e.message);
+    });
 
   /* viii) El sorteo de la clave, sin sesgo -------------------------- */
 

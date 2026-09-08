@@ -103,6 +103,7 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/cifrado.js` | **Ejecuta** el cifrado, no lo lee: activar, cifrar/descifrar, sobre alterado, desbloquear en otro equipo, clave de recuperación y migración de los sobres de 150.000 vueltas |
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
+| `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
 | `sh tools/instalar_hook.sh` | Deja **las cinco primeras** corriendo en cada commit que toque `index.html` |
 
 **La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
@@ -148,6 +149,20 @@ dependencia de la app: sin él, `--pegar` da el código para pegar en la consola
   razón por la que nunca se cambiaba. La clave de recuperación son 20 caracteres de un
   alfabeto de 30 con descarte de muestras: 98 bits y sin el sesgo del `% 31` de antes.
   Todo esto, con siete mutantes que lo prueban, en `tools/cifrado.js`.
+- **El sobre de llaves se lee sin token, a propósito.** `encFetchEnvelope` lo pide primero
+  a la API con el token y, si eso no responde, por la vía pública de la rama `data`. Suena
+  a rebaja y no lo es: el sobre son las dos llaves **envueltas** con PBKDF2 y esa rama ya
+  es pública, así que no expone nada nuevo. Lo que arregla es un teléfono recién estrenado,
+  que **no podía desbloquear nunca** porque sin token la API devolvía 401 y la función se
+  tragaba el fallo. No lo vuelvas a atar al token.
+- **Los errores del desbloqueo dicen la verdad.** El modal llamaba «contraseña incorrecta»
+  a *cualquier* fallo, incluido no haber podido leer la llave; por eso en el móvil no había
+  forma de saber qué pasaba. Ahora los errores propios llevan `encMotivo` y se muestran
+  tal cual; «contraseña o clave incorrecta» queda solo para lo que de verdad lo es.
+- **En el móvil manda lo que el usuario abrió, no qué campo tiene texto.** El gestor de
+  contraseñas rellena solo el campo de contraseña, y la regla vieja —usar la clave de
+  recuperación *solo* si ese campo estaba vacío— hacía que la clave buena no se probara
+  jamás, sumando castigo en cada intento. Está en `encOrdenSecretos`, con sus mutantes.
 - **Ningún respaldo se descarga solo en claro.** Hasta el 8-sep-2026 `_autoBackup` dejaba
   cada 7 días en Descargas un JSON sin cifrar con todos los socios. Ahora avisa; la copia
   buena es la cifrada de Ajustes, y `exportBackup` pide confirmación diciendo lo que se

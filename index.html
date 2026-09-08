@@ -9757,14 +9757,43 @@ function encRegenerarRecuperacion(){
 /* La clave se dicta por telefono y se copia a mano: se acepta en minusculas,
    con espacios de mas y sin guiones. Las de antes del 8-sep-2026 ya se
    generaban en mayusculas y con guiones de cinco, asi que esto no las rompe. */
+/* Se dicta por telefono y se copia de un papel, asi que llega como llega:
+   en minusculas, con espacios, sin guiones, con guion largo del teclado del
+   movil, o con un caracter colado. Antes esto solo reagrupaba cuando NO
+   habia ningun guion — un solo guion raro y la clave buena no abria.
+   Ahora se queda con las letras del alfabeto y reagrupa siempre. El alfabeto
+   no tiene I, L, O, U, 0 ni 1, y el prefijo se quita antes de filtrar
+   justamente porque «US19» lleva U y 1. */
 function encNormalizarClaveRec(s){
   var t = String(s == null ? "" : s).toUpperCase().replace(/\s+/g, "");
-  if (t.indexOf("-") < 0 && t.indexOf("US19") === 0){
-    var cuerpo = t.slice(4), gr = [], i;
-    for (i = 0; i < cuerpo.length; i += 5) gr.push(cuerpo.slice(i, i + 5));
-    if (gr.length) t = "US19-" + gr.join("-");
+  t = t.replace(/^US19[-\u2010-\u2015_]?/, "");
+  var cuerpo = "", i, ch;
+  for (i = 0; i < t.length; i++){
+    ch = t.charAt(i);
+    if (ENC_REC_ALPH.indexOf(ch) >= 0) cuerpo += ch;
   }
-  return t;
+  var gr = [];
+  for (i = 0; i < cuerpo.length; i += 5) gr.push(cuerpo.slice(i, i + 5));
+  return "US19-" + gr.join("-");
+}
+
+/* En que orden se prueba lo que hay escrito en el modal de desbloquear.
+   ESTO ERA EL FALLO DEL TELEFONO: la regla vieja era «usa la clave de
+   recuperacion solo si el campo de contrasena esta vacio», y en el movil el
+   gestor de contrasenas rellena ese campo solo. Nunca estaba vacio, asi que
+   la clave de recuperacion se ignoraba SIEMPRE y se probaba una contrasena
+   guardada y rancia — un intento fallido detras de otro hasta el castigo.
+   Ahora manda lo que el usuario abrio, y el otro campo queda de reserva. */
+function encOrdenSecretos(pw, rk, recAbierta){
+  var lista = [];
+  function meter(sec, esRec){
+    if (!sec) return;
+    for (var i = 0; i < lista.length; i++) if (lista[i][0] === sec) return;
+    lista.push([sec, esRec]);
+  }
+  if (recAbierta){ meter(rk, true); meter(pw, false); }
+  else           { meter(pw, false); meter(rk, true); }
+  return lista;
 }
 
 /* Restaurar la sesion al arrancar. Ya no es instantaneo (IndexedDB es
@@ -9893,33 +9922,78 @@ function encSetup(passphrase){
   });
 }
 
-/* Descarga el sobre de llaves desde el state.json remoto (o usa cache) */
-function encFetchEnvelope(){
-  var url=getGitHubSyncUrl();
-  if (!url) return Promise.resolve(_encEnvelope);
-  return fetch(url + "?ref=" + DATA_BRANCH, { headers:getGitHubHeaders() }).then(function(r){
-    if (!r.ok) return _encEnvelope;
-    return r.json().then(function(meta){
-      if (!meta || !meta.content) return _encEnvelope;
-      var jsonStr = decodeURIComponent(escape(atob(String(meta.content).replace(/\n/g,""))));
-      var obj = JSON.parse(jsonStr);
-      /* Que el remoto aun no este cifrado no quiere decir que no haya sobre:
-         puede estar cacheado aqui de una activacion anterior cuya subida no
-         llego a salir. Devolver null en ese hueco impedia desbloquear. */
-      return obj.enc ? obj.keys : (_encEnvelope || null);
-    });
-  }).catch(function(){ return _encEnvelope; });
+/* La misma ruta del state.json, pero por la via publica de la rama de datos.
+   Es el plan B para leer el sobre cuando la API no contesta. No expone nada
+   nuevo: el sobre son las dos llaves ENVUELTAS con PBKDF2 y esa rama ya es
+   publica. Lo que arregla es un dispositivo nuevo —un telefono— que todavia
+   no tiene el token configurado y por eso no podia desbloquear nunca. */
+function _encRawEnvelopeUrl(){
+  var repoFull = (typeof getDerivedRepo === "function" ? getDerivedRepo() : null)
+              || (settings && settings.githubRepo);
+  var parts = String(repoFull || "").split("/");
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return null;
+  var ruta = (typeof SYNC_PATH === "string" && SYNC_PATH) ? SYNC_PATH : "sync/state.json";
+  return "https://raw.githubusercontent.com/" + parts[0] + "/" + parts[1]
+       + "/" + DATA_BRANCH + "/" + ruta;
 }
-/* Desbloquear en este dispositivo con contraseña o clave de recuperación */
-function encUnlock(secret, isRecovery){
+
+/* Del JSON del estado, la parte que interesa aqui. Que el remoto aun no este
+   cifrado no quiere decir que no haya sobre: puede estar cacheado de una
+   activacion anterior cuya subida no llego a salir. */
+function _encSobreDe(obj){ return (obj && obj.enc && obj.keys) ? obj.keys : null; }
+
+function _encErr(msg, motivo){ var e = new Error(msg); e.encMotivo = motivo || "sobre"; return e; }
+
+/* Descarga el sobre de llaves. ANTES se tragaba todos los fallos y devolvia
+   `_encEnvelope`, que en un telefono recien estrenado es null: el desbloqueo
+   moria por «no hay datos cifrados» y el modal lo mostraba como «contrasena
+   incorrecta». Esa era la razon de que en el movil fallara hasta la
+   contrasena buena. Ahora cada motivo viaja con su mensaje, y si la API no
+   responde se intenta la via publica antes de rendirse. */
+function encFetchEnvelope(){
+  var url = getGitHubSyncUrl();
+  var porApi = (url && settings && settings.githubToken)
+    ? fetch(url + "?ref=" + DATA_BRANCH, { headers:getGitHubHeaders() }).then(function(r){
+        if (!r.ok) return null;
+        return r.json().then(function(meta){
+          if (!meta || !meta.content) return null;
+          return JSON.parse(decodeURIComponent(escape(atob(String(meta.content).replace(/\n/g,"")))));
+        });
+      }).catch(function(){ return null; })
+    : Promise.resolve(null);
+
+  return porApi.then(function(obj){
+    var sobre = _encSobreDe(obj);
+    if (sobre) return sobre;
+    var raw = _encRawEnvelopeUrl();
+    if (!raw) return null;
+    return fetch(raw, { cache:"no-store" })
+      .then(function(r){ return r.ok ? r.json().then(_encSobreDe) : null; })
+      .catch(function(){ return null; });
+  }).then(function(sobre){
+    if (sobre) return sobre;
+    if (_encEnvelope) return _encEnvelope;
+    throw _encErr(_encRawEnvelopeUrl()
+      ? "No pude leer la llave desde GitHub. Revisa la conexi\u00f3n y vuelve a intentar."
+      : "Este dispositivo no sabe de qu\u00e9 repositorio leer la llave: configura la sincronizaci\u00f3n primero.");
+  });
+}
+/* Desbloquear en este dispositivo con contraseña o clave de recuperación.
+   `noContar` sirve para el primer intento cuando hay dos secretos escritos:
+   probar el otro despues no debe costar dos castigos. */
+function encUnlock(secret, isRecovery, noContar){
   var espera = _encFalloEspera();
   if (espera > 0)
-    return Promise.reject(new Error("Demasiados intentos seguidos. Espera " + Math.ceil(espera/1000) + " s."));
+    return Promise.reject(_encErr("Demasiados intentos seguidos. Espera " + Math.ceil(espera/1000) + " s.", "intentos"));
   /* La de recuperacion se copia a mano de un papel: se acepta como salga. */
   var sec = isRecovery ? encNormalizarClaveRec(secret) : secret;
   return encFetchEnvelope().then(function(env){
-    if (!env) throw new Error("Aún no hay datos cifrados en la nube");
+    if (!env) throw _encErr("Aún no hay datos cifrados en la nube");
     var cual = isRecovery ? "rec" : "pw";
+    if (!env[cual])
+      throw _encErr(isRecovery
+        ? "La llave guardada no tiene mitad de recuperaci\u00f3n: entra con la contrase\u00f1a maestra."
+        : "La llave guardada no tiene mitad de contrase\u00f1a: usa la clave de recuperaci\u00f3n.");
     return _encUnwrapMK(env[cual], sec).then(function(mkRaw){
       _encFalloLimpiar();
       _encMkRaw=mkRaw; _encEnvelope=env;
@@ -9939,8 +10013,9 @@ function encUnlock(secret, isRecovery){
       });
     }, function(e){
       /* Solo cuenta como intento fallido lo que falla al ABRIR el sobre. Un
-         corte de red no debe ir sumando castigo. */
-      _encFalloSumar();
+         corte de red no debe ir sumando castigo. Y si esto era el primero de
+         dos secretos escritos, tampoco: lo cuenta el ultimo. */
+      if (!noContar) _encFalloSumar();
       throw e;
     });
   });
@@ -10342,7 +10417,17 @@ function encPromptUnlock(){
      maestra: es el mismo PIN que ya se escribe para abrir la app. */
   if (_encFaltaPin) encPedirPinUI(); else encOpenUnlockModal();
 }
-function encToggleRecovery(){ var w=document.getElementById("enc-rec-wrap"); if (w) w.style.display = (w.style.display==="none"?"block":"none"); }
+/* Al abrir la recuperacion se VACIA el campo de contrasena. En el movil lo
+   rellena el gestor sin que nadie lo pida, y dos campos llenos a la vez es
+   justo lo que hacia que la clave buena no se probara nunca. */
+function encToggleRecovery(){
+  var w=document.getElementById("enc-rec-wrap"); if (!w) return;
+  var abrir = (w.style.display === "none");
+  w.style.display = abrir ? "block" : "none";
+  var pw=document.getElementById("enc-unlock"), rk=document.getElementById("enc-reckey");
+  if (abrir){ if (pw) pw.value=""; if (rk) try { rk.focus(); } catch(e){} }
+  else if (rk) rk.value="";
+}
 window.encToggleRecovery = encToggleRecovery;
 
 function encOpenSetupModal(){
@@ -10401,15 +10486,28 @@ function encOpenUnlockModal(){
     + '<p class="text-sm text-muted" style="line-height:1.5;margin-bottom:.8rem;">Ingresa tu contraseña maestra para desbloquear los datos cifrados en este dispositivo. Tarda un segundo a propósito.</p>'
     + formField("Contraseña maestra", '<input type="password" id="enc-unlock" autocomplete="current-password" placeholder="••••••••">')
     + '<div class="text-xs" style="margin:.2rem 0 .4rem;"><a style="cursor:pointer;color:var(--accent);" onclick="encToggleRecovery()">¿Olvidaste la contraseña? Usar clave de recuperación</a></div>'
-    + '<div id="enc-rec-wrap" style="display:none;">'+formField("Clave de recuperación", '<input type="text" id="enc-reckey" placeholder="US19-XXXXX-XXXXX-XXXXX-XXXXX">')+'</div>';
+    + '<div id="enc-rec-wrap" style="display:none;">'
+    + formField("Clave de recuperación", '<input type="text" id="enc-reckey" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="US19-XXXXX-XXXXX-XXXXX-XXXXX">')
+    + '<p class="text-xs text-muted" style="margin:-.3rem 0 .2rem;line-height:1.5;">Da igual si va en minúsculas o sin guiones. Al abrir esto se vacía la contraseña de arriba: en el teléfono la rellena solo el navegador y estorba.</p>'
+    + '</div>';
   openModal({ title:"🔓 Desbloquear datos", bodyHtml:body, footer:[
     { label:"Cancelar", cls:"btn-ghost" },
     { label:"Desbloquear", cls:"btn-primary", onClick:function(){
         var pw=_encGv("enc-unlock"), rk=_encGv("enc-reckey");
-        var useRec = !!rk && !pw;
-        var secret = useRec ? rk : pw;
-        if (!secret){ toast("Ingresa la contraseña o la clave de recuperación","error"); return; }
-        encUnlock(secret, useRec).then(function(){
+        var w=document.getElementById("enc-rec-wrap");
+        var cand = encOrdenSecretos(pw, rk, !!(w && w.style.display !== "none"));
+        if (!cand.length){ toast("Ingresa la contraseña o la clave de recuperación","error"); return; }
+        /* Si hay dos escritos se prueban los dos, pero cuenta un solo intento
+           fallido. Un fallo de SOBRE (sin red, sin repositorio) no mejora
+           probando el otro secreto: se dice tal cual y se para. */
+        function intentar(i){
+          var ultimo = (i === cand.length - 1);
+          return encUnlock(cand[i][0], cand[i][1], !ultimo).catch(function(e){
+            if (ultimo || (e && e.encMotivo)) throw e;
+            return intentar(i + 1);
+          });
+        }
+        intentar(0).then(function(){
           closeModal(); toast("Datos desbloqueados 🔓","success");
           /* Si el PIN es el segundo factor y no esta en memoria, la llave no
              se ha podido volver a guardar (no la rebajamos a una sin PIN).
@@ -10419,8 +10517,12 @@ function encOpenUnlockModal(){
             setTimeout(function(){ encPinPonerUI(true); }, 400);
           if (typeof syncDownload==="function") syncDownload().then(function(ch){ if (ch) showView("dashboard"); });
         }).catch(function(e){
-          toast((e && e.message && e.message.indexOf("intentos") >= 0) ? e.message
-                                                                      : "Contraseña o clave incorrecta","error");
+          /* Solo lo que de verdad es un secreto malo se llama asi. Antes
+             CUALQUIER error —incluido no poder leer la llave— se anunciaba
+             como «contrasena incorrecta», y no habia forma de saber que
+             pasaba en el telefono. */
+          toast((e && e.encMotivo && e.message) ? e.message
+                                                : "Contraseña o clave incorrecta","error");
         });
       } }
   ]});
