@@ -3584,6 +3584,45 @@ function applyContrDefaults(){
   return changed;
 }
 
+/* 7-sep-2026: las 98 fichas de la semilla desaparecieron del catalogo el
+   5-sep y las rutinas reales siguen usandolas por id (salian como «Ejercicio»
+   y el enlace del socio sin ellas). SEED_DATA viaja en este archivo, asi que
+   cada dispositivo puede reponerlas sin la nube: se copia toda ficha de la
+   semilla que una rutina o un protocolo use y no este en la biblioteca.
+   Devuelve cuantas repuso. */
+function u19RepararFichasSemilla(){
+  if (typeof SEED_DATA === "undefined" || !Array.isArray(SEED_DATA.exercises)) return 0;
+  if (!Array.isArray(state.exercises)) return 0;
+  var tengo = {}, semilla = {}, usados = {};
+  state.exercises.forEach(function(e){ if (e && e.id) tengo[e.id] = true; });
+  SEED_DATA.exercises.forEach(function(e){ if (e && e.id) semilla[e.id] = e; });
+  (Array.isArray(state.routines) ? state.routines : []).forEach(function(r){
+    (Array.isArray(r && r.days) ? r.days : []).forEach(function(d){
+      (Array.isArray(d && d.exercises) ? d.exercises : []).forEach(function(x){ if (x && x.exerciseId) usados[x.exerciseId] = true; });
+    });
+  });
+  (Array.isArray(state.protocols) ? state.protocols : []).forEach(function(p){
+    (Array.isArray(p && p.phases) ? p.phases : []).forEach(function(f){
+      (Array.isArray(f && f.exercises) ? f.exercises : []).forEach(function(x){ if (x && x.exerciseId) usados[x.exerciseId] = true; });
+    });
+  });
+  var n = 0;
+  Object.keys(usados).forEach(function(id){
+    if (tengo[id] || !semilla[id]) return;
+    var copia = JSON.parse(JSON.stringify(semilla[id]));
+    /* Los GIF de la semilla pueden apuntar al repo US19-MEDIA, que ya no existe. */
+    copia.gif = String(copia.gif || "")
+      .split("ultrasport19-boop.github.io/US19-MEDIA/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/")
+      .split("raw.githubusercontent.com/ultrasport19-boop/US19-MEDIA/main/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/")
+      .split("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-MEDIA@main/videos/").join("cdn.jsdelivr.net/gh/ultrasport19-boop/US19-APP@main/videos/");
+    state.exercises.push(copia);
+    tengo[id] = true;
+    n++;
+  });
+  if (n) console.log("Biblioteca: " + n + " ficha(s) de la semilla repuesta(s) porque las usan rutinas o protocolos.");
+  return n;
+}
+
 function loadState(){
   try {
     var raw = localStorage.getItem(APP_KEY);
@@ -9919,6 +9958,9 @@ function syncDownload(){
         if (data.libFav && typeof data.libFav === "object" && !Array.isArray(data.libFav)) state.libFav = data.libFav;
         if (Array.isArray(data.libRec)) state.libRec = data.libRec;
         if (Array.isArray(data.circuitos)) state.circuitos = data.circuitos;
+        /* Lo bajado puede traer rutinas que usan fichas de la semilla que
+           el catalogo bajado no tiene: se reponen antes de guardar. */
+        try { if (typeof u19RepararFichasSemilla === "function" && u19RepararFichasSemilla()) _reSubir = true; } catch(eSem){}
         /* saveState y no un setItem a pelo: con el catalogo en IndexedDB, el
            JSON entero (1,3 MB de ejercicios) desbordaba la cuota en silencio
            y lo bajado no quedaba guardado. */
@@ -24525,6 +24567,11 @@ function init(){
   loadState();
   runDataFixups();
   ensureRehabClinico(); /* REHAB-CLÍNICO: siembra protocolos base + campo rut */
+  /* Fichas de la semilla que usan las rutinas y faltan en la biblioteca. */
+  try {
+    var _repuestas = u19RepararFichasSemilla();
+    if (_repuestas){ saveState(); toast("Se repusieron " + _repuestas + " ejercicio(s) de la biblioteca que usaban tus rutinas.", "success"); }
+  } catch(eSem){ console.error("u19RepararFichasSemilla:", eSem); }
   showPreviewBannerIfNeeded();
 
   // Self-heal: when served over http(s), the real location is the source of
