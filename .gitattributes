@@ -1,2 +1,17 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Pero «text=auto» decide el final de linea de la COPIA DE TRABAJO segun
+# core.autocrlf de cada maquina, y en Windows ese valor viene en true de
+# fabrica (aqui esta en el gitconfig de «C:/Program Files/Git/etc»). Este
+# repositorio lo tiene apagado en .git/config, asi que en el disco de
+# Diego index.html sale en LF; en un clon nuevo saldria en CRLF.
+#
+# Eso no es cosmetica: las herramientas de tools/ y los parches usan
+# anclas de coincidencia exacta, y un ancla LF da CERO coincidencias en
+# un archivo CRLF. Se declara por archivo para que no dependa de la
+# maquina. El blob sigue en LF en los dos casos.
+index.html text eol=lf
+CLAUDE.md  text eol=crlf
+*.js       text eol=lf
+*.json     text eol=lf
