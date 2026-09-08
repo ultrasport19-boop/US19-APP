@@ -5607,6 +5607,7 @@ function exerciseRowHtml(ex, idx){
     + '<div class="ex-top">' + thumb
     + '<div class="ex-name">'+escapeHtml(name)+'<small>'+sub+'</small></div>'
     + '<div class="ex-actions">'
+      + '<button class="btn btn-ghost btn-sm" onclick="u19EscDesdeRutina('+idx+')" title="Cómo construirlo: bajar o subir un escalón sin perder series ni pesos">🪜</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="changeExercise('+idx+')" title="Cambiar ejercicio">↻</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="moveExercise('+idx+',-1)" title="Subir">↑</button>'
       + '<button class="btn btn-ghost btn-sm" onclick="moveExercise('+idx+',1)" title="Bajar">↓</button>'
@@ -28052,7 +28053,12 @@ function u19EscGuia(base){
 }
 
 /* ---- El modal ---- */
-window.u19ComoConstruir = function(exId){
+/* `filaRutina` es el índice de la fila del constructor desde la que se
+   abrió, o null si viene de la biblioteca. Cuando viene de una rutina,
+   cada peldaño gana un «Poner»: el momento en que hace falta bajar un
+   escalón no es mirando la biblioteca, es escribiendo la rutina de
+   alguien y viendo que ese ejercicio le queda grande. */
+window.u19ComoConstruir = function(exId, filaRutina){
   var base = null, i;
   for (i = 0; i < state.exercises.length; i++){ if (state.exercises[i].id === exId){ base = state.exercises[i]; break; } }
   if (!base){ toast("Ejercicio no encontrado", "error"); return; }
@@ -28062,6 +28068,8 @@ window.u19ComoConstruir = function(exId){
   var miBanda = u19EscBanda(base, escalera);
   var pts = u19EscPuntos(base);
 
+  var puedeCambiar = (filaRutina !== null && filaRutina !== undefined
+    && typeof _builderRoutine !== "undefined" && _builderRoutine);
   function fila(e){
     var yo = (e.id === base.id);
     var te = libTaxDe(e);
@@ -28074,6 +28082,9 @@ window.u19ComoConstruir = function(exId){
       + (yo ? '<b>' + escapeHtml(e.name) + '</b> <span class="text-xs" style="color:var(--accent);">· estás aquí</span>' : escapeHtml(e.name))
       + '</span>'
       + '<span class="text-xs text-muted" style="white-space:nowrap;">' + escapeHtml(e.equipment || "") + '</span>'
+      + (puedeCambiar && !yo
+          ? '<button class="btn btn-ghost btn-sm" style="flex:0 0 auto;" onclick="u19EscPonerEnRutina(' + filaRutina + ',\'' + escapeAttr(e.id) + '\')" title="Poner este en la rutina, conservando series y pesos">Poner</button>'
+          : '')
       + '</div>';
   }
 
@@ -28093,7 +28104,9 @@ window.u19ComoConstruir = function(exId){
     h += '<div style="font-weight:700;font-size:.9rem;margin-bottom:.15rem;">La escalera</div>'
        + '<div class="text-xs text-muted" style="line-height:1.55;margin-bottom:.5rem;">'
        + 'El mismo movimiento (<b>' + escapeHtml(u19EscRaiz(base.name) || "—") + '</b>) dentro de <b>' + escapeHtml(base.muscle || "—") + '</b>, de menos a más. '
-       + 'Si todavía no puede con este, se baja un escalón y se sube cuando cumpla el criterio de abajo.</div>';
+       + 'Si todavía no puede con este, se baja un escalón y se sube cuando cumpla el criterio de abajo.'
+       + (puedeCambiar ? ' <b>Pulsa «Poner»</b> y se cambia en la rutina conservando series, repeticiones, peso, descanso y RIR.' : '')
+       + '</div>';
     for (i = 0; i < U19_ESC_BANDAS.length; i++){
       var b = U19_ESC_BANDAS[i];
       var enBanda = escalera.filter(function(e){ return u19EscBanda(e, escalera) === b.n; });
@@ -28166,6 +28179,34 @@ window.u19ComoConstruir = function(exId){
       { label:"Cerrar", cls:"btn-secondary" }
     ]
   });
+};
+
+/* Abre la escalera desde una fila del constructor de rutinas. */
+window.u19EscDesdeRutina = function(idx){
+  if (typeof _builderRoutine === "undefined" || !_builderRoutine) return;
+  var d = _builderRoutine.days[_builderActiveDay];
+  var fila = d && d.exercises ? d.exercises[idx] : null;
+  if (!fila){ toast("No encuentro ese ejercicio en el día", "error"); return; }
+  u19ComoConstruir(fila.exerciseId, idx);
+};
+
+/* Cambia el ejercicio de esa fila por otro peldaño. Lo que NO se toca:
+   series, repeticiones, peso, descanso, RIR y notas — que es justo lo que
+   se pierde si se borra la fila y se vuelve a añadir desde el selector, y
+   el motivo por el que bajar un escalón daba pereza. */
+window.u19EscPonerEnRutina = function(idx, nuevoId){
+  if (typeof _builderRoutine === "undefined" || !_builderRoutine) return;
+  var d = _builderRoutine.days[_builderActiveDay];
+  var fila = d && d.exercises ? d.exercises[idx] : null;
+  if (!fila){ toast("No encuentro ese ejercicio en el día", "error"); return; }
+  var nuevo = null;
+  for (var i = 0; i < state.exercises.length; i++) if (state.exercises[i].id === nuevoId){ nuevo = state.exercises[i]; break; }
+  if (!nuevo){ toast("Ejercicio no encontrado", "error"); return; }
+  fila.exerciseId = nuevoId;
+  closeModal();
+  if (typeof renderDayPanel === "function") renderDayPanel();
+  if (typeof updateDayTabBadge === "function") updateDayTabBadge();
+  toast("Ahora va «" + nuevo.name + "» 🪜", "success");
 };
 
 /* Mover un ejercicio de escalón a mano. delta 0 = volver al automático. */

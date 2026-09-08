@@ -204,9 +204,16 @@ de palabras genéricas no puede incluir movimientos que ya son concretos: con «
 dentro, «Plancha lateral» contaba como otro ejercicio y «Plancha» se quedaba sin escalera.
 
 Lo que Diego mueve a mano vive en `escManual` sobre la ficha, y el importador del catálogo
-no lo pisa (solo toca los campos de `TAXO` y solo si no hay `taxManual`). Todo esto con
-`tools/escalera.js`, **104 comprobaciones** contra el catálogo real —incluido el modal
-ejecutado con un navegador de mentira— y nueve mutantes que caen todos.
+no lo pisa (solo toca los campos de `TAXO` y solo si no hay `taxManual`).
+
+**Desde el constructor de rutinas** (botón 🪜 en cada fila del día) la escalera gana un
+«Poner» en cada peldaño: `u19EscPonerEnRutina` cambia el ejercicio **conservando series,
+repeticiones, peso, descanso, RIR y notas**. Eso es lo que hace que se use: borrar la fila
+y volver a añadirla desde el selector pierde la prescripción entera, y por eso bajar un
+escalón daba pereza.
+
+`tools/escalera.js`: **118 comprobaciones** contra el catálogo real —incluidos el modal y
+el constructor ejecutados con un navegador de mentira— y catorce mutantes que caen todos.
 
 ## Dos reglas que no son código
 

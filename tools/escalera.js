@@ -313,6 +313,12 @@ const ctxUI = {
   saveState: () => {},
   u19Sustitutos: () => {},
   showExercisePreview: () => {},
+  /* El constructor de rutinas, de mentira: lo justo para que la escalera
+     pueda cambiar un ejercicio sin salir. */
+  _builderRoutine: { days: [{ day: 1, exercises: [] }] },
+  _builderActiveDay: 0,
+  renderDayPanel: () => {},
+  updateDayTabBadge: () => {},
   window: {},
   console, Math, JSON, String, Object, RegExp, Array, Infinity, Number,
 };
@@ -363,6 +369,70 @@ try {
   igual('modal · y volver al automático lo quita', puente.escManual, undefined);
 } catch (e) {
   falla('modal · u19EscMover revienta', e && e.message);
+}
+
+/* --- 12 · La escalera dentro del constructor de rutinas -------------
+   El momento en que hace falta bajar un escalón no es mirando la
+   biblioteca: es escribiendo la rutina de alguien y viendo que el
+   ejercicio le queda grande. Y lo que hace que se use de verdad es que
+   NO haya que volver a escribir series, pesos y descansos. */
+
+const otroPeldano = famPuente.find(e => e.id !== puente.id);
+
+vm.runInContext('u19ComoConstruir(' + JSON.stringify(puente.id) + ')', ctxUI);
+comprobar('rutina · desde la biblioteca NO aparece «Poner»',
+  (pintado.bodyHtml || '').indexOf('u19EscPonerEnRutina') < 0);
+
+vm.runInContext(`_builderRoutine.days[0].exercises = [{
+  exerciseId: ${JSON.stringify(puente.id)}, sets: "4", reps: "12", weight: "20", rest: "90s", rir: "2", notes: "ojo con la cadera"
+}];`, ctxUI);
+try {
+  vm.runInContext('u19EscDesdeRutina(0)', ctxUI);
+  pasa();
+} catch (e) { falla('rutina · u19EscDesdeRutina revienta', e && e.message); }
+
+const htmlRut = pintado.bodyHtml || '';
+comprobar('rutina · desde una fila SÍ aparece «Poner»', htmlRut.indexOf('u19EscPonerEnRutina(0,') > 0);
+comprobar('rutina · y el aviso explica que conserva series y pesos', /conservando series/.test(htmlRut));
+const ponerEnElActual = new RegExp('u19EscPonerEnRutina\\(0,.?' + puente.id).test(htmlRut);
+comprobar('rutina · el ejercicio actual no lleva «Poner» (ya está puesto)', !ponerEnElActual);
+
+/* LO QUE IMPORTA: cambiar el peldaño sin perder la prescripción. Borrar
+   la fila y volver a añadirla desde el selector la pierde entera, y por
+   eso bajar un escalón daba pereza. */
+try {
+  vm.runInContext('u19EscPonerEnRutina(0, ' + JSON.stringify(otroPeldano.id) + ')', ctxUI);
+  const fila = vm.runInContext('_builderRoutine.days[0].exercises[0]', ctxUI);
+  igual('rutina · el ejercicio cambia al peldaño elegido', fila.exerciseId, otroPeldano.id);
+  igual('rutina · conserva las series', fila.sets, '4');
+  igual('rutina · conserva las repeticiones', fila.reps, '12');
+  igual('rutina · conserva el peso', fila.weight, '20');
+  igual('rutina · conserva el descanso', fila.rest, '90s');
+  igual('rutina · conserva el RIR', fila.rir, '2');
+  igual('rutina · conserva las notas', fila.notes, 'ojo con la cadera');
+} catch (e) {
+  falla('rutina · u19EscPonerEnRutina revienta', e && e.message);
+}
+
+/* Y no debe romperse si la fila ya no está — ni callarse, que es peor:
+   el ejercicio se quedaría como estaba sin que nadie lo supiera.
+   OJO: hay que vaciar los avisos antes, porque el cambio de arriba dejó
+   el suyo y «hay algún aviso» pasaría en verde sin probar nada. */
+avisos.length = 0;
+try {
+  vm.runInContext('u19EscPonerEnRutina(9, ' + JSON.stringify(otroPeldano.id) + ')', ctxUI);
+  comprobar('rutina · una fila que no existe avisa, en vez de reventar o callarse',
+    avisos.some(a => /no encuentro/i.test(String(a))), JSON.stringify(avisos));
+} catch (e) {
+  falla('rutina · revienta con una fila que no existe', e && e.message);
+}
+avisos.length = 0;
+try {
+  vm.runInContext('u19EscPonerEnRutina(0, "no-existe-este-id")', ctxUI);
+  comprobar('rutina · un ejercicio que no existe también avisa',
+    avisos.some(a => /no encontrado/i.test(String(a))), JSON.stringify(avisos));
+} catch (e) {
+  falla('rutina · revienta con un ejercicio que no existe', e && e.message);
 }
 
 /* --- salida ---------------------------------------------------------- */
