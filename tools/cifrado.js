@@ -131,7 +131,7 @@ function nuevoEntorno(store0, idb0) {
     '_encWrapMK', '_encUnwrapMK', '_encEnvelope', '_encMkRaw',
     'encFuerzaFrase', 'encPinActivar', 'encPinDesactivar', 'encDesbloquearConPin',
     'encCambiarFrase', 'encRegenerarRecuperacion', 'encNormalizarClaveRec',
-    'encOrdenSecretos', 'encFetchEnvelope', '_encFallos',
+    'encOrdenSecretos', 'encFetchEnvelope', '_encFallos', 'ENC_FALLOS_KEY',
   ].join(', ') + ' })', ctx);
   const api = vm.runInContext('({ encSetup:encSetup, encUnlock:encUnlock, encEncryptPayload:encEncryptPayload,'
     + ' encDecryptPayload:encDecryptPayload, encGenRecoveryKey:encGenRecoveryKey,'
@@ -142,7 +142,7 @@ function nuevoEntorno(store0, idb0) {
     + ' encCambiarFrase:encCambiarFrase, encRegenerarRecuperacion:encRegenerarRecuperacion,'
     + ' encNormalizarClaveRec:encNormalizarClaveRec,'
     + ' encOrdenSecretos:encOrdenSecretos, encFetchEnvelope:encFetchEnvelope,'
-    + ' _encFallos:_encFallos })', ctx);
+    + ' _encFallos:_encFallos, ENC_FALLOS_KEY:ENC_FALLOS_KEY })', ctx);
   return { api: api, ctx: ctx, store: store, idb: idb, settings: settings, localStorage: localStorage };
 }
 
@@ -585,13 +585,24 @@ async function principal() {
   try { await apiT.encUnlock('tampoco es', false); } catch (e) { frenado = e.message || ''; }
   comprobar('freno · tras tres fallos hay que esperar', /intentos/i.test(frenado),
     'obtuve ' + JSON.stringify(frenado));
-  comprobar('freno · la espera queda anotada en localStorage', !!T.store['us19_enc_fallos']);
+  /* La clave sale del modulo, no escrita a mano: si se renombra el contador
+     —como el 8-sep-2026, para no cobrarle a Diego los intentos que no hizo—
+     esto tiene que seguir probando lo mismo, no reventar. */
+  const KFALLOS = A.api.ENC_FALLOS_KEY;
+  comprobar('freno · la espera queda anotada en localStorage', !!T.store[KFALLOS]);
   /* Y el freno no debe encasquillarse: con la frase buena, en cuanto
      pasa la espera, se abre y el contador se limpia. */
-  T.store['us19_enc_fallos'] = JSON.stringify({ n: 3, ts: 0 });
+  T.store[KFALLOS] = JSON.stringify({ n: 3, ts: 0 });
   await apiT.encUnlock(FRASE, false);
   igual('freno · pasada la espera, la frase buena abre', apiT.encUnlocked(), true);
-  comprobar('freno · y el contador se borra', !T.store['us19_enc_fallos']);
+  comprobar('freno · y el contador se borra', !T.store[KFALLOS]);
+  /* Y el contador viejo no se queda de recuerdo. */
+  const vieja = nuevoEntorno({ 'us19_enc_fallos': JSON.stringify({ n: 9, ts: Date.now() }) });
+  vm.runInContext('_encEnvelope = ' + A.store['ultrasport19_env'] + ';', vieja.ctx);
+  const apiVieja = vm.runInContext('({ encUnlock:encUnlock, encUnlocked:encUnlocked })', vieja.ctx);
+  await apiVieja.encUnlock(FRASE, false);
+  igual('contador viejo · nueve fallos del contador de antes no frenan nada', apiVieja.encUnlocked(), true);
+  comprobar('contador viejo · y su rastro se borra del disco', !vieja.store['us19_enc_fallos']);
 
   /* xi) El segundo factor no se cae solo --------------------------
      Escenario real: 2FA puesto, se recarga la pestana, el candado no

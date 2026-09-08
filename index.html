@@ -9378,7 +9378,14 @@ var ENC_MK_KEY2 = "ultrasport19_mk2";  /* la master key ENVUELTA. Lo unico que q
                                           absolutamente nada. */
 var ENC_ENV_KEY = "ultrasport19_env";  // sobre de llaves (JSON) cacheado
 var ENC_DEV_IDB = "us19_llave_dispositivo"; /* la llave del equipo, dentro de IndexedDB */
-var ENC_FALLOS_KEY = "us19_enc_fallos";     /* intentos fallidos: { n, ts } */
+var ENC_FALLOS_KEY_V1 = "us19_enc_fallos";  /* el contador de antes del 8-sep-2026 */
+/* El contador estrena nombre a proposito. Los intentos que habia acumulados
+   en el telefono de Diego NO eran intentos suyos: eran el fallo de abajo
+   —el gestor de contrasenas rellenaba el campo y la clave de recuperacion
+   no se probaba nunca—, y le dejaron cinco minutos de espera por un error
+   que no cometio. Se empieza de cero una sola vez; el rastro viejo se borra
+   la primera vez que se mira. */
+var ENC_FALLOS_KEY = "us19_enc_fallos2";    /* intentos fallidos: { n, ts } */
 var ENC_PIN_ITERS = 300000;           /* capa del PIN. Un PIN es corto y mas vueltas no
                                          lo salvan solas: por eso va SIEMPRE debajo de la
                                          llave no exportable, nunca sola. */
@@ -9588,6 +9595,7 @@ function _encGuardarMK(mkRaw){
    con el telefono en la mano. */
 function _encFallos(){
   try {
+    try { localStorage.removeItem(ENC_FALLOS_KEY_V1); } catch(e2){}
     var o = JSON.parse(localStorage.getItem(ENC_FALLOS_KEY) || "{}");
     return { n: Number(o.n) || 0, ts: Number(o.ts) || 0 };
   } catch(e){ return { n:0, ts:0 }; }
@@ -10078,7 +10086,7 @@ var RESP_AVISO_DIAS = 7;
 var RESP_PREFIJOS = ["ultrasport19_", "us19_"];
 /* Se respalda por prefijo, no por lista: asi una clave nueva entra sola
    y nadie se olvida de anadirla. */
-var RESP_NUNCA = ["us19_catalogo_en_idb", RESP_TS_KEY, ENC_FALLOS_KEY];
+var RESP_NUNCA = ["us19_catalogo_en_idb", RESP_TS_KEY, ENC_FALLOS_KEY, ENC_FALLOS_KEY_V1];
 /* Fuera por defecto: un respaldo filtrado no debe entregar ademas las
    llaves. Se recuperan pegandolas de nuevo, que son cuatro campos. */
 var RESP_SECRETO_CLAVES = [ENC_MK_KEY, ENC_MK_KEY2];
