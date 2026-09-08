@@ -20031,8 +20031,9 @@ function u19AccCuerpoHTML(d){
   var h = '';
   h += u19AccListaHTML('reactivacion', 'Propuestas del bot (congeladas hasta que apruebes o descartes)', d.reactivacion,
         (d.tarifas && d.tarifas.marketing) || 78,
-        'Esta lista NO rota sola: cada nombre sigue aquí hasta que lo apruebes (el bot le escribe) '
-        + 'o vuelva a agendar. Para ver quién se está yendo hoy, mira la lista de arriba. '
+        'El bot propone cada día a las 8:00 (hasta 5 por día) a quien lleva más días sin agendar de lo que '
+        + 'tolera su plan, incluidos los que se les venció el plan hace 60 días o menos. Marca y aprueba: '
+        + 'los envía él, cada 4 h entre 9:00 y 21:00. Un nombre sale de aquí cuando lo apruebas o vuelve a agendar. '
         + 'Es categoría Marketing: el más caro de los dos.');
   h += u19AccListaHTML('ingreso', 'Altas por aprobar', d.ingreso,
         (d.tarifas && d.tarifas.utility) || 14,
@@ -20169,10 +20170,14 @@ function u19AccionesHTML(){
     + '<span id="acc-msg" style="font-size:.78rem;">'
     + (viejo ? '<span style="color:var(--muted);">Datos ' + escapeHtml(u19AccEdadTxt(viejo.minutos)) + ', actualizando…</span>' : '')
     + '</span></div>';
-  /* Primero lo vivo: quien se esta yendo AHORA. Despues, lo que el bot
-     dejo propuesto, que es otra cosa y esta congelado hasta que se apruebe. */
-  h += u19SemanaVivaHTML();
+  /* Primero las propuestas del bot: es lo que Diego marca y aprueba para
+     que el bot escriba (7-sep-2026: «lo de arriba con botones de WhatsApp es
+     manual, no me interesa»). La lista viva queda debajo, plegada, como
+     referencia de a quien propondra el bot manana a las 8:00. */
   h += '<div id="acc-cuerpo">' + (d ? u19AccCuerpoHTML(d) : '') + '</div>';
+  h += '<details style="margin-top:.9rem;"><summary class="text-xs text-muted" style="cursor:pointer;">'
+    + '\u23f1 Qui\u00e9n se est\u00e1 yendo esta semana (calculado aqu\u00ed, sin el bot) \u2014 referencia</summary>'
+    + u19SemanaVivaHTML() + '</details>';
   h += '</div></div>';
   return h;
 }
