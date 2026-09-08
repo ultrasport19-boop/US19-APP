@@ -323,10 +323,78 @@ function extraerFuncion(nombre) {
     ['token de GitHub', /\bgh[pousr]_[A-Za-z0-9]{30,}/],
     ['token de GitHub (fine-grained)', /\bgithub_pat_[A-Za-z0-9_]{30,}/],
     ['token de Meta/WhatsApp', /\bEAA[A-Za-z0-9]{60,}/],
+    /* Los tres de abajo faltaban. El de Calendly es el que duele: la app
+       guarda un calendlyToken en los ajustes y un token de Calendly es un
+       JWT — ninguno de los seis de arriba lo reconoce. */
+    ['token de Calendly (JWT)', /\beyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}/],
+    ['clave de API de Google', /\bAIza[A-Za-z0-9_\-]{33}\b/],
+    ['clave privada en formato PEM', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
   ];
   patrones.forEach(function (p) {
-    comprobar('secretos · sin ' + p[0], !p[1].test(src));
+    comprobar('secretos · sin ' + p[0] + ' en index.html', !p[1].test(src));
   });
+
+  /* Y no solo index.html. El repositorio es publico y tiene otros treinta
+     archivos de texto —tools/, el .gs del puente, notas— por los que una
+     credencial pasaba entera. De los 2.764 archivos registrados, 2.733 son
+     GIF, mp4 y jpg: esos no se leen, no cuesta nada saltarlos. */
+  const BINARIOS = /\.(gif|mp4|jpg|jpeg|png|webp|ico|woff2?|ttf|otf|pdf|zip)$/i;
+  let registrados = [];
+  try {
+    registrados = require('child_process')
+      .execFileSync('git', ['ls-files', '-z'], { cwd: path.join(__dirname, '..') })
+      .toString('utf8').split('\u0000').filter(Boolean).filter(f => !BINARIOS.test(f));
+  } catch (e) { /* sin git no se puede: lo dice el aviso de abajo */ }
+
+  comprobar('secretos · puedo preguntarle a git que archivos hay',
+    registrados.length > 0, 'git ls-files no devolvio nada de texto');
+
+  const sucios = [];
+  registrados.forEach(function (rel) {
+    let texto;
+    try { texto = fs.readFileSync(path.join(__dirname, '..', rel), 'utf8'); }
+    catch (e) { return; }
+    patrones.forEach(function (p) {
+      const m = p[1].exec(texto);
+      /* Se dice QUE y DONDE, nunca el valor: esto se ejecuta en una
+         terminal que a veces acaba pegada en un chat. */
+      if (m) sucios.push(rel + ':' + texto.slice(0, m.index).split('\n').length + ' — ' + p[0]);
+    });
+  });
+  comprobar('secretos · ni una credencial en los otros archivos del repositorio',
+    sucios.length === 0, sucios.join(' · '));
+
+  /* --- Y la prueba de la prueba ---------------------------------------
+     El `\\b` de los patrones no es adorno. Barriendo los 143 commits con el
+     patron SIN `\\b` salto una coincidencia en index.html: susto de dos
+     minutos, porque un token de Meta en el historial de un repositorio
+     publico no se arregla borrando el archivo.
+
+     No era un token. Era el logo, que va embebido como data URI y cuyo
+     base64 tiene en mitad `...JTEUAAQ` seguido de `EAAAHI` y seiscientos
+     caracteres mas. Con `\\b` no coincide, porque la letra de antes es una
+     `Q` y ahi no hay frontera de palabra. Ese `\\b` es lo unico que separa
+     esto de gritar en cada commit por una imagen — y una prueba que grita
+     sin motivo se acaba ignorando, que es peor que no tenerla.
+
+     Las dos cadenas se construyen aqui, no se escriben: si estuvieran
+     enteras, el barrido de arriba las encontraria y esta prueba se
+     denunciaria a si misma. */
+  const patronMeta = patrones.filter(function (p) { return /Meta/.test(p[0]); })[0];
+  comprobar('secretos · el patron de Meta sigue en la lista', !!patronMeta);
+  if (patronMeta) {
+    const dentroDeUnBase64 = 'SUNDX1BST0ZJTEUAAQ' + 'EAAAHI' + 'QzZmVi'.repeat(12);
+    comprobar('secretos · el logo en base64 NO se confunde con un token (el \\b importa)',
+      !patronMeta[1].test(dentroDeUnBase64),
+      'el patron volvio a coincidir dentro de una imagen: cada commit con un data URI daria la alarma');
+
+    const unTokenDeVerdad = 'WSP_TOKEN=' + 'EAA' + 'G7kQz2mVb'.repeat(9);
+    comprobar('secretos · y un token de verdad sigue saltando',
+      patronMeta[1].test(unTokenDeVerdad),
+      'de tanto afinar el patron ya no reconoce lo que existe para reconocer');
+  }
+  aviso('secretos: ' + registrados.length + ' archivos de texto revisados, ' +
+        patrones.length + ' formas de credencial buscadas');
 })();
 
 /* =====================================================================
