@@ -6186,6 +6186,7 @@ function showExercisePreview(exId){
       + (e.desc ? '<div class="exprev-desc">' + escapeHtml(e.desc) + '</div>' : '<div class="text-xs text-muted">Sin descripción todavía.</div>')
       + '<div class="exprev-acts">'
         + '<button class="btn btn-secondary btn-sm" data-act="editar">✎ Editar</button>'
+        + '<button class="btn btn-ghost btn-sm" data-act="construir">🪜 Cómo construirlo</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="sust">⇄ Sustitutos</button>'
         + '<button class="btn btn-ghost btn-sm" data-act="cerrar" style="margin-left:auto;">Cerrar</button>'
       + '</div>'
@@ -6203,6 +6204,7 @@ function showExercisePreview(exId){
       var act = b.getAttribute("data-act");
       cerrar();
       if (act === "editar") openExerciseForm(e.id);
+      else if (act === "construir") u19ComoConstruir(e.id);
       else if (act === "sust") u19Sustitutos(e.id);
       return;
     }
@@ -7441,6 +7443,7 @@ function libCardHtml(e, uso){
   var fav = libEsFav(e.id);
   var acts = '<div class="exc-acts">'
     + '<button class="btn btn-ghost btn-sm x fav' + (fav ? ' on' : '') + '" onclick="libFavTarjeta(this,\'' + id + '\')" title="' + (fav ? 'Quitar de favoritos' : 'Marcar favorito') + '">' + (fav ? '★' : '☆') + '</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="u19ComoConstruir(\'' + id + '\')" title="La escalera: por dónde empezar y cómo ir subiendo">🪜 Cómo construirlo</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="u19Sustitutos(\'' + id + '\')" title="Alternativas con el mismo patrón y músculo">⇄ Sustitutos</button>'
     + '<button class="btn btn-secondary btn-sm" onclick="openExerciseForm(\'' + id + '\')">Editar</button>'
     + '<button class="btn btn-ghost btn-sm x" onclick="deleteExercise(\'' + id + '\')" title="Eliminar">🗑</button>'
@@ -27724,6 +27727,463 @@ window.u19Sustitutos = function(exId){
       || '<p class="text-xs text-muted">No hay alternativas registradas para este grupo muscular.</p>',
     footer: [{ label:"Cerrar", cls:"btn-ghost" }]
   });
+};
+
+
+/* ============================================================
+   F · CÓMO CONSTRUIRLO — la escalera de un ejercicio
+   ------------------------------------------------------------
+   El catálogo tiene 17 variantes de puente, 108 de flexión y 141 de
+   sentadilla. Lo que no tenía es el ORDEN. Y `niv` no sirve para esto:
+   las 17 variantes de puente son «Principiante», desde el puente en el
+   suelo hasta el de una pierna en banco con barra.
+
+   Así que la dificultad se saca del nombre y del material, con reglas
+   escritas y a la vista. Es una PROPUESTA: el modal enseña por qué cada
+   ejercicio está donde está, y se puede mover a mano.
+   ============================================================ */
+
+/* Cada regla: [peso, expresión, por qué]. El peso positivo sube el
+   ejercicio de escalón. Se aplican sobre el nombre normalizado (sin
+   tildes, en minúsculas), que es como está escrito el catálogo. */
+var U19_ESC_REGLAS = [
+  [ 3, /a una pierna|a un brazo|a una mano|a un pie|unilateral/, "a un solo lado: el doble de trabajo y hay que sostener el equilibrio" ],
+  [ 3, /salto|saltand|pliometr|explosiv/,                        "hay que salir rápido: exige controlar la caída" ],
+  [ 2, /pierna[s]? extendida|piernas rectas|brazo[s]? extendido/,"palanca larga: el mismo gesto pesa más" ],
+  [ 2, /elevad|en banco|declinad|deficit|desde deficit/,          "más recorrido del que da el suelo" ],
+  [ 2, /lastrad|con disco|con chaleco|con lastre/,                "carga añadida al peso del cuerpo" ],
+  [ 2, /con barra/,                                               "con barra: más carga y las dos manos atadas al mismo punto" ],
+  [ 2, /fitball|bosu|trx|anillas|balon suizo|suspension/,         "apoyo inestable: hay que sujetar además de mover" ],
+  [1.5, /con mancuerna|kettlebell/,                               "carga externa que cada lado sostiene por su cuenta" ],
+  [-2, /asistid/,                                                 "lleva ayuda: se puede dosificar cuánta" ],
+  [-2, /de rodillas|arrodillad/,                                  "de rodillas: menos peso que mover y menos palanca" ],
+  [-2, /en la pared|contra la pared|en pared/,                    "contra la pared: el ángulo decide cuánto pesa" ],
+  [-2, /activacion/,                                              "es de activación: buscar el músculo, no cansarlo" ],
+  [-1.5,/isometric|mantenid|sostenid/,                            "sin recorrido: sostener es más fácil de controlar que moverse" ],
+  [ -1, /parcial|media altura|medio recorrido/,                   "recorrido parcial: se trabaja el tramo que sí controla" ],
+  [ -1, /apoyad|con apoyo|sujet/,                                 "con un punto de apoyo que quita parte del trabajo" ]
+];
+var U19_ESC_NIVPESO = { "Principiante":0, "Intermedio":2, "Avanzado":4 };
+
+/* Los cuatro escalones. El corte es por puntos, no por posición: dos
+   ejercicios igual de difíciles comparten escalón en vez de inventarse
+   un orden entre ellos. */
+/* Los cortes NO son redondos a propósito. Con el corte en 0, la versión
+   limpia del gesto —«Puente de glúteos», que puntúa 0— caía en el mismo
+   escalón que la activación con banda, y ese es justo el salto que hay
+   que ver. En -0.5 el primer escalón se queda solo con lo que lleva ayuda
+   o no tiene recorrido, que es lo que significa «empezar aquí». */
+var U19_ESC_BANDAS = [
+  { n:1, hasta:-0.5, nom:"Empezar aquí",  desc:"Con ayuda, sin recorrido completo o solo buscando el músculo" },
+  { n:2, hasta: 1.5, nom:"El básico",     desc:"El movimiento entero, con el propio cuerpo" },
+  { n:3, hasta: 3.5, nom:"Subir un poco", desc:"Más palanca, un solo lado o algo de carga" },
+  { n:4, hasta: 999, nom:"Exigente",      desc:"Carga, velocidad o inestabilidad encima del gesto" }
+];
+
+/* Puntos de un ejercicio, con la lista de por qués. */
+function u19EscPuntos(e){
+  if (!e) return { p:0, por:[] };
+  var n = " " + musNorm(e.name || "") + " ";
+  var t = (typeof libTaxDe === "function") ? libTaxDe(e) : { niv:e.niv };
+  var p = U19_ESC_NIVPESO[t.niv] || 0, por = [];
+  if (p) por.push({ w:p, txt:"nivel " + t.niv.toLowerCase() });
+  for (var i = 0; i < U19_ESC_REGLAS.length; i++){
+    if (U19_ESC_REGLAS[i][1].test(n)){
+      p += U19_ESC_REGLAS[i][0];
+      por.push({ w:U19_ESC_REGLAS[i][0], txt:U19_ESC_REGLAS[i][2] });
+    }
+  }
+  return { p:p, por:por };
+}
+
+/* En qué escalón cae, DENTRO de su familia. Que sea relativo no es un
+   detalle: con una escala absoluta, «Dominadas asistidas» caía en el
+   segundo escalón y el primero se quedaba vacío — o sea que justo lo que
+   pidió Diego, «si no puede hacerlo, por dónde empieza», no aparecía.
+   Una dominada asistida es difícil en absoluto y fácil dentro de las
+   dominadas, y aquí lo único que importa es lo segundo.
+
+   El más fácil de la familia es siempre el 1 y el más difícil el 4. Sin
+   familia (una ficha suelta) se cae a los cortes absolutos, que para eso
+   están. `escManual` manda sobre todo; el importador no lo toca. */
+function u19EscBanda(e, familia){
+  if (e && e.escManual >= 1 && e.escManual <= 4) return e.escManual;
+  var p = u19EscPuntos(e).p, i;
+  if (familia && familia.length > 1){
+    var min = Infinity, max = -Infinity;
+    for (i = 0; i < familia.length; i++){
+      var q = familia[i].escManual >= 1 && familia[i].escManual <= 4
+        ? null : u19EscPuntos(familia[i]).p;
+      if (q === null) continue;
+      if (q < min) min = q;
+      if (q > max) max = q;
+    }
+    if (max > min) return 1 + Math.round(3 * (p - min) / (max - min));
+    if (max === min) return 2;   /* toda la familia cuesta lo mismo */
+  }
+  for (i = 0; i < U19_ESC_BANDAS.length; i++) if (p <= U19_ESC_BANDAS[i].hasta) return U19_ESC_BANDAS[i].n;
+  return 4;
+}
+
+/* La RAÍZ del movimiento, sacada del nombre. Mismo patrón no es mismo
+   gesto: un peso muerto comparte patrón (Bisagra) y músculo (Glúteos)
+   con un puente, pero no es una progresión del puente. Sin esto la
+   escalera del puente salían 85 peldaños y terminaba en «Peso muerto a
+   una mano lateral con barra».
+   La primera palabra basta casi siempre; cuando es genérica se toma la
+   segunda, y si esa es preposición, la tercera: «press de banca». */
+/* Solo las que por si solas no dicen que ejercicio es. «Plancha»,
+   «zancada», «fondos», «crunch», «salto», «marcha» y «paseo» SI lo
+   dicen: tomarles la segunda palabra partia la familia en trozos de
+   uno y dejaba a «Plancha» sin escalera, porque «Plancha lateral»
+   contaba como otro movimiento.
+   Ojo con «flexion»: en singular es flexion de cadera y necesita la
+   segunda palabra; en plural, «flexiones», son las de pecho y NO va
+   en esta lista. */
+var U19_ESC_GENERICAS = " elevacion elevaciones extension extensiones flexion curl press remo abdominal abdominales jalon apertura aperturas tiron tirones encogimiento encogimientos patada patadas giro giros peso rotacion estiramiento ";
+var U19_ESC_PREPOS = " de al en con a del la el para sobre por ";
+function u19EscRaiz(nombre){
+  var w = musNorm(nombre || "").split(" ").filter(Boolean);
+  if (!w.length) return "";
+  var r = [w[0]];
+  if (U19_ESC_GENERICAS.indexOf(" " + w[0] + " ") >= 0 && w.length > 1) r.push(w[1]);
+  if (U19_ESC_PREPOS.indexOf(" " + r[r.length - 1] + " ") >= 0 && w.length > r.length) r.push(w[r.length]);
+  return r.join(" ");
+}
+
+/* 487 fichas del catálogo no son variantes: son clips de técnica —
+   «Sentadilla — anchura de pies», «(2.ª demostración)»—. En una escalera
+   estorban; en «cómo construirlo» son exactamente lo que hace falta, así
+   que van a su propia sección.
+   OJO: el guion largo NO basta para reconocerlos. «Puente de glúteos con
+   banda — activación» lo lleva y es una regresión de verdad, de las más
+   útiles. Manda la cola. */
+var U19_ESC_COLA_CLIP = /^(tecnica|recorrido|agarre|anchura|error|colocacion|altura|inclinacion|angulo|variante|alineacion|control|postura|trayectoria|enfasis|posicion|apoyo|orientacion|zona|como|que mirar|respiracion|ritmo|tempo)/;
+function u19EscEsClip(e){
+  var n = e && e.name ? e.name : "";
+  if (/demostraci|versi[oó]n|\(\s*\d+\s*\.\s*[ªa]/i.test(n)) return true;
+  var i = n.indexOf("\u2014");
+  if (i < 0) return false;
+  var cola = musNorm(n.slice(i + 1));
+  if (cola.indexOf("activacion") === 0) return false;   /* es una regresión, no un clip */
+  return U19_ESC_COLA_CLIP.test(cola);
+}
+
+/* Los clips de técnica del mismo movimiento: el material para enseñarlo. */
+function u19EscClips(base){
+  if (!base) return [];
+  var r = u19EscRaiz(base.name);
+  if (!r) return [];
+  return (state.exercises || []).filter(function(e){
+    return e && e.name && u19EscEsClip(e) && u19EscRaiz(e.name) === r;
+  }).sort(function(a, b){ return (a.name || "").localeCompare(b.name || "", "es"); });
+}
+
+/* La escalera: mismo gesto (raíz), mismo grupo muscular y mismo patrón,
+   sin los clips de técnica. Eso es lo que conserva el movimiento; sin la
+   raíz salían «alternativas», no una progresión. */
+function u19EscEscalera(base){
+  if (!base) return [];
+  var tb = libTaxDe(base), raiz = u19EscRaiz(base.name);
+  var fam = (state.exercises || []).filter(function(e){
+    if (!e || !e.name || u19EscEsClip(e)) return false;
+    if (e.muscle !== base.muscle) return false;
+    if (u19EscRaiz(e.name) !== raiz) return false;
+    var te = libTaxDe(e);
+    return tb.pat ? (te.pat === tb.pat) : (te.cat === tb.cat);
+  });
+  /* Sin familia no hay escalera: mejor decirlo que enseñar una de uno. */
+  if (fam.length < 2) return [];
+  fam.sort(function(a, b){
+    var pa = u19EscBanda(a, fam), pb = u19EscBanda(b, fam);
+    if (pa !== pb) return pa - pb;
+    var da = u19EscPuntos(a).p, db = u19EscPuntos(b).p;
+    if (da !== db) return da - db;
+    return (a.name || "").localeCompare(b.name || "", "es");
+  });
+  return fam;
+}
+
+/* Cómo se construye cada patrón. No es teoría: es el orden en que se
+   monta el movimiento, qué mirar mientras, y cuándo se ha ganado el
+   escalón siguiente. El criterio de subida es de rendimiento —
+   repeticiones, segundos, control— y se puede comprobar en la sala. */
+var U19_ESC_GUIA = {
+  "Empuje": {
+    que: "Llevar peso lejos del cuerpo. Manda el hombro, y el tronco tiene que quedarse quieto mientras.",
+    pasos: [
+      "La posición antes que el peso: manos, codos y tronco colocados, sin moverse todavía.",
+      "Recorrido corto y controlado, con el ángulo que sí puede sostener.",
+      "El recorrido entero, bajando tan despacio como sube.",
+      "Recién ahí, más carga o menos apoyo."
+    ],
+    mirar: [
+      "Que los codos no se abran del todo hacia los lados.",
+      "Que la cadera no se quede atrás ni el tronco se hunda.",
+      "Que la última repetición se parezca a la primera."
+    ],
+    subir: "Dos series de 12 con el recorrido completo, y la última repetición igual de limpia que la primera."
+  },
+  "Tracción": {
+    que: "Traer peso hacia el cuerpo. Empieza en la espalda; si empieza en el brazo, el ejercicio ya no es este.",
+    pasos: [
+      "Mover el omóplato sin doblar el codo: primero eso, aunque parezca poco.",
+      "Recorrido corto con ayuda o con parte del peso apoyado.",
+      "Recorrido completo, sin balancear el tronco.",
+      "Quitar la ayuda o añadir carga — una cosa cada vez."
+    ],
+    mirar: [
+      "Que los hombros no se suban a las orejas al tirar.",
+      "Que el cuerpo no coja impulso para arrancar.",
+      "Que la vuelta sea tan controlada como el tirón."
+    ],
+    subir: "Dos series de 10 sin balanceo, o tres repeticiones limpias con la ayuda quitada."
+  },
+  "Sentadilla": {
+    que: "Bajar y subir doblando cadera y rodilla a la vez, con el tronco sosteniendo.",
+    pasos: [
+      "La profundidad que controle —aunque sea poca— tocando un banco o un cajón.",
+      "Esa misma profundidad sin tocar nada.",
+      "Bajar un poco más, y solo cuando la anterior sale sola.",
+      "Carga."
+    ],
+    mirar: [
+      "Talones en el suelo todo el rato.",
+      "Rodillas siguiendo la punta del pie, sin irse hacia dentro.",
+      "Que cadera y pecho suban a la vez, no la cadera primero."
+    ],
+    subir: "Diez repeticiones a su profundidad de trabajo, sin apoyo y sin frenarse a media subida."
+  },
+  "Bisagra": {
+    que: "Mover la cadera hacia atrás y hacia adelante con la espalda quieta. Es el patrón del puente y del peso muerto.",
+    pasos: [
+      "Tumbado, donde el suelo hace de guía y no hay que sostener el tronco: ahí se aprende a empujar con la cadera.",
+      "El mismo gesto manteniendo arriba dos o tres segundos, que es donde se nota si aprieta o arquea.",
+      "De pie, con poco recorrido, aprendiendo a llevar la cadera atrás sin doblar la espalda.",
+      "Recorrido completo, y después carga."
+    ],
+    mirar: [
+      "Que el movimiento salga de la cadera y no de la zona baja de la espalda.",
+      "Que las costillas no se abran al llegar arriba.",
+      "Que arriba apriete el glúteo en vez de arquear para llegar más alto."
+    ],
+    subir: "Doce repeticiones seguidas manteniendo dos segundos arriba, sin que cambie la postura en las últimas."
+  },
+  "Zancada": {
+    que: "Un pie delante del otro y el peso repartido. Añade equilibrio a la sentadilla.",
+    pasos: [
+      "Parado, con la mano apoyada en algo, aprendiendo dónde va cada pie.",
+      "Parado, sin apoyo.",
+      "Con desplazamiento, adelante o atrás.",
+      "Carga, o subir la altura del pie de atrás."
+    ],
+    mirar: [
+      "Tronco vertical: si se va adelante, el paso es corto.",
+      "Que la rodilla de atrás baje recta hacia el suelo.",
+      "Que no se tambalee en las últimas repeticiones."
+    ],
+    subir: "Ocho por pierna sin tocar el apoyo y sin perder el equilibrio en la última."
+  },
+  "Core": {
+    que: "Sostener el tronco mientras otra cosa se mueve. Se mide en tiempo y en control, no en repeticiones rápidas.",
+    pasos: [
+      "La posición, corta y quieta.",
+      "La misma posición, más tiempo.",
+      "Mover un brazo o una pierna sin que la posición cambie.",
+      "Palanca más larga o algo de carga."
+    ],
+    mirar: [
+      "Que la zona baja de la espalda no se hunda.",
+      "Que respire con normalidad: si aguanta el aire, la posición le queda grande.",
+      "Que la cadera no se vaya a un lado al mover el brazo."
+    ],
+    subir: "Treinta segundos con respiración normal, o diez movimientos sin que la posición se rompa."
+  },
+  "Locomoción": {
+    que: "Desplazarse llevando el propio cuerpo o un peso. Lo que se entrena es aguantar la postura andando.",
+    pasos: [
+      "Distancia corta y peso cómodo.",
+      "Más distancia con el mismo peso.",
+      "Más peso en la misma distancia.",
+      "Cambiar el ritmo o el terreno."
+    ],
+    mirar: [
+      "Que los hombros no se caigan hacia adelante al final.",
+      "Que el paso sea igual de ancho al terminar que al empezar.",
+      "Que respire durante todo el recorrido."
+    ],
+    subir: "Cubrir la distancia de trabajo dos veces con el mismo paso y la misma postura."
+  },
+  "Accesorio": {
+    que: "Un músculo concreto, poco recorrido y poca carga. Sirve para rellenar lo que el patrón grande no llega a trabajar.",
+    pasos: [
+      "Sin peso, buscando notar dónde trabaja.",
+      "Recorrido completo, despacio.",
+      "Peso ligero.",
+      "Más peso o una serie más."
+    ],
+    mirar: [
+      "Que solo se mueva la articulación que toca.",
+      "Que no coja impulso con el cuerpo.",
+      "Que la última repetición sea la más lenta, no la más rápida."
+    ],
+    subir: "Quince repeticiones controladas sin que el resto del cuerpo ayude."
+  }
+};
+var U19_ESC_GUIA_GENERICA = {
+  que: "Este ejercicio no tiene patrón asignado, así que la guía va por lo general. Ponle patrón en «Editar» y aparecerá la suya.",
+  pasos: [
+    "La posición y el gesto, sin peso y sin prisa.",
+    "El recorrido que controle, aunque sea corto.",
+    "El recorrido completo.",
+    "Carga, velocidad o quitar el apoyo — una cosa cada vez."
+  ],
+  mirar: [
+    "Que la postura de la última repetición sea la de la primera.",
+    "Que no aparezca impulso para completar el movimiento.",
+    "Que respire con normalidad."
+  ],
+  subir: "Dos series completas con la técnica intacta en la última repetición."
+};
+
+function u19EscGuia(base){
+  var t = libTaxDe(base);
+  return U19_ESC_GUIA[t.pat] || U19_ESC_GUIA_GENERICA;
+}
+
+/* ---- El modal ---- */
+window.u19ComoConstruir = function(exId){
+  var base = null, i;
+  for (i = 0; i < state.exercises.length; i++){ if (state.exercises[i].id === exId){ base = state.exercises[i]; break; } }
+  if (!base){ toast("Ejercicio no encontrado", "error"); return; }
+
+  var t = libTaxDe(base), guia = u19EscGuia(base);
+  var escalera = u19EscEscalera(base);
+  var miBanda = u19EscBanda(base, escalera);
+  var pts = u19EscPuntos(base);
+
+  function fila(e){
+    var yo = (e.id === base.id);
+    var te = libTaxDe(e);
+    return '<div style="display:flex;gap:.5rem;align-items:center;padding:.3rem .4rem;border-radius:6px;'
+      + (yo ? 'background:var(--chip,rgba(255,255,255,.06));outline:1px solid var(--accent);' : '')
+      + '">'
+      + '<span style="width:34px;height:34px;flex:0 0 34px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:5px;background:rgba(0,0,0,.25);">'
+      + libThumbHtml(e, 'alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;"') + '</span>'
+      + '<span style="flex:1;min-width:0;font-size:.8rem;cursor:zoom-in;" onclick="showExercisePreview(\'' + escapeAttr(e.id) + '\')" title="Ver en grande">'
+      + (yo ? '<b>' + escapeHtml(e.name) + '</b> <span class="text-xs" style="color:var(--accent);">· estás aquí</span>' : escapeHtml(e.name))
+      + '</span>'
+      + '<span class="text-xs text-muted" style="white-space:nowrap;">' + escapeHtml(e.equipment || "") + '</span>'
+      + '</div>';
+  }
+
+  var h = '';
+
+  /* 1 · Qué es este patrón y cómo se monta */
+  h += '<div style="margin-bottom:1rem;">'
+     + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.15rem;">Cómo se construye'
+     + (t.pat ? ' · <span style="color:var(--accent);">' + escapeHtml(t.pat) + '</span>' : '') + '</div>'
+     + '<div class="text-xs text-muted" style="line-height:1.55;margin-bottom:.5rem;">' + escapeHtml(guia.que) + '</div>'
+     + '<ol style="margin:0;padding-left:1.15rem;font-size:.82rem;line-height:1.65;">'
+     + guia.pasos.map(function(p){ return '<li>' + escapeHtml(p) + '</li>'; }).join('')
+     + '</ol></div>';
+
+  /* 2 · La escalera */
+  if (escalera.length){
+    h += '<div style="font-weight:700;font-size:.9rem;margin-bottom:.15rem;">La escalera</div>'
+       + '<div class="text-xs text-muted" style="line-height:1.55;margin-bottom:.5rem;">'
+       + 'El mismo movimiento (<b>' + escapeHtml(u19EscRaiz(base.name) || "—") + '</b>) dentro de <b>' + escapeHtml(base.muscle || "—") + '</b>, de menos a más. '
+       + 'Si todavía no puede con este, se baja un escalón y se sube cuando cumpla el criterio de abajo.</div>';
+    for (i = 0; i < U19_ESC_BANDAS.length; i++){
+      var b = U19_ESC_BANDAS[i];
+      var enBanda = escalera.filter(function(e){ return u19EscBanda(e, escalera) === b.n; });
+      if (!enBanda.length) continue;
+      var esMio = (b.n === miBanda);
+      h += '<div style="margin-bottom:.7rem;border-left:3px solid ' + (esMio ? 'var(--accent)' : 'var(--border)') + ';padding-left:.6rem;">'
+         + '<div style="font-size:.82rem;font-weight:600;">' + b.n + ' · ' + escapeHtml(b.nom)
+         + ' <span class="text-xs text-muted" style="font-weight:400;">— ' + escapeHtml(b.desc) + '</span></div>'
+         + enBanda.slice(0, 12).map(fila).join('')
+         + (enBanda.length > 12 ? '<div class="text-xs text-muted" style="padding:.2rem .4rem;">y ' + (enBanda.length - 12) + ' más</div>' : '')
+         + '</div>';
+    }
+  } else {
+    h += '<div class="text-xs text-muted" style="margin-bottom:.9rem;">El catálogo no tiene más variantes de <b>'
+       + escapeHtml(u19EscRaiz(base.name) || base.name) + '</b> en este grupo muscular, así que no hay escalera que armar. '
+       + 'Con <b>⇄ Sustitutos</b> salen los ejercicios que trabajan lo mismo por otro camino.</div>';
+  }
+
+  /* 2 bis · Los clips de técnica que ya están en el catálogo */
+  var clips = u19EscClips(base);
+  if (clips.length){
+    h += '<div style="margin:.2rem 0 1rem;">'
+       + '<div style="font-weight:700;font-size:.9rem;margin-bottom:.15rem;">Para enseñarlo · ' + clips.length + ' clip' + (clips.length === 1 ? '' : 's') + '</div>'
+       + '<div class="text-xs text-muted" style="line-height:1.55;margin-bottom:.4rem;">'
+       + 'Vídeos del catálogo que no son variantes sino técnica del mismo gesto: agarre, recorrido, colocación, errores. '
+       + 'Son para mirarlos con la persona delante.</div>'
+       + clips.slice(0, 10).map(fila).join('')
+       + (clips.length > 10 ? '<div class="text-xs text-muted" style="padding:.2rem .4rem;">y ' + (clips.length - 10) + ' más</div>' : '')
+       + '</div>';
+  }
+
+  /* 3 · Qué mirar y cuándo subir */
+  h += '<div style="margin-top:.4rem;padding:.6rem .7rem;border-radius:8px;background:rgba(255,255,255,.04);">'
+     + '<div style="font-weight:700;font-size:.85rem;margin-bottom:.25rem;">Qué mirar mientras lo hace</div>'
+     + '<ul style="margin:0 0 .6rem;padding-left:1.1rem;font-size:.8rem;line-height:1.6;">'
+     + guia.mirar.map(function(m){ return '<li>' + escapeHtml(m) + '</li>'; }).join('')
+     + '</ul>'
+     + '<div style="font-weight:700;font-size:.85rem;margin-bottom:.15rem;">Cuándo pasar al escalón siguiente</div>'
+     + '<div style="font-size:.8rem;line-height:1.6;">' + escapeHtml(guia.subir) + '</div>'
+     + '</div>';
+
+  /* 4 · Por qué está en este escalón, y cómo cambiarlo */
+  h += '<div style="margin-top:.8rem;border-top:1px solid var(--border);padding-top:.6rem;">'
+     + '<div style="font-weight:700;font-size:.85rem;">Por qué está en el escalón ' + miBanda + '</div>';
+  if (base.escManual){
+    h += '<div class="text-xs" style="line-height:1.6;color:var(--accent);">Lo pusiste tú a mano. La cuenta automática lo dejaría en el '
+       + (function(){ var g = base.escManual; delete base.escManual; var r = u19EscBanda(base, escalera); base.escManual = g; return r; })() + '.</div>';
+  } else if (pts.por.length){
+    h += '<ul style="margin:.15rem 0 0;padding-left:1.1rem;font-size:.78rem;line-height:1.55;color:var(--muted);">'
+       + pts.por.map(function(p){
+           return '<li>' + (p.w > 0 ? '↑' : '↓') + ' ' + escapeHtml(p.txt) + '</li>';
+         }).join('') + '</ul>';
+  } else {
+    h += '<div class="text-xs text-muted" style="line-height:1.6;">Nada en el nombre lo hace más fácil ni más difícil: es la versión base del gesto.</div>';
+  }
+  h += '<div style="display:flex;gap:.4rem;margin-top:.5rem;flex-wrap:wrap;">'
+     + '<button class="btn btn-ghost btn-sm" onclick="u19EscMover(\'' + escapeAttr(base.id) + '\',-1)"' + (miBanda <= 1 ? ' disabled' : '') + '>↓ Bajarlo un escalón</button>'
+     + '<button class="btn btn-ghost btn-sm" onclick="u19EscMover(\'' + escapeAttr(base.id) + '\',1)"' + (miBanda >= 4 ? ' disabled' : '') + '>↑ Subirlo un escalón</button>'
+     + (base.escManual ? '<button class="btn btn-ghost btn-sm" onclick="u19EscMover(\'' + escapeAttr(base.id) + '\',0)">Volver al automático</button>' : '')
+     + '</div>'
+     + '<div class="text-xs text-muted" style="margin-top:.35rem;line-height:1.5;">La escalera la propone la app mirando el nombre y el material. '
+     + 'Si en la sala no es así, muévelo: lo que pongas a mano manda y el importador del catálogo no lo pisa.</div>'
+     + '</div>';
+
+  openModal({
+    title: "🪜 Cómo construirlo · " + base.name, large: true,
+    bodyHtml: h,
+    footer: [
+      { label:"⇄ Sustitutos", cls:"btn-ghost", onClick:function(){ closeModal(); u19Sustitutos(base.id); } },
+      { label:"Cerrar", cls:"btn-secondary" }
+    ]
+  });
+};
+
+/* Mover un ejercicio de escalón a mano. delta 0 = volver al automático. */
+window.u19EscMover = function(exId, delta){
+  var e = null, i;
+  for (i = 0; i < state.exercises.length; i++){ if (state.exercises[i].id === exId){ e = state.exercises[i]; break; } }
+  if (!e) return;
+  if (!delta){
+    delete e.escManual;
+    toast("Vuelve a decidirlo la app", "success");
+  } else {
+    var n = u19EscBanda(e, u19EscEscalera(e)) + delta;
+    if (n < 1 || n > 4) return;
+    e.escManual = n;
+    toast("Escalón " + n + " · " + U19_ESC_BANDAS[n - 1].nom, "success");
+  }
+  saveState();
+  u19ComoConstruir(exId);
 };
 
 /* ------------------------------------------------------------

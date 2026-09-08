@@ -15,3 +15,11 @@ index.html text eol=lf
 CLAUDE.md  text eol=crlf
 *.js       text eol=lf
 *.json     text eol=lf
+
+# Los .sh en LF SIEMPRE, y este no es un detalle de estilo: tools/pre-commit.sh
+# se copia tal cual a .git/hooks/pre-commit, y un hook con CRLF puede morir con
+# «bad interpreter: /bin/sh^M» — justo en el momento en que nadie lo mira, que
+# es cuando debía estar frenando un commit malo. Con core.autocrlf=true (el
+# valor de fábrica en Windows, y el que tiene esta máquina en el gitconfig del
+# sistema) salían en CRLF hasta que se declaró aquí.
+*.sh text eol=lf

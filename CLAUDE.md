@@ -103,8 +103,9 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/cifrado.js` | **Ejecuta** el cifrado, no lo lee: activar, cifrar/descifrar, sobre alterado, desbloquear en otro equipo, clave de recuperación y migración de los sobres de 150.000 vueltas |
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
+| `node tools/escalera.js` | **«Cómo construirlo» contra el catálogo real**: que la progresión ordene de menos a más, que no mezcle gestos distintos (un peso muerto no es una progresión de un puente), que toda familia tenga primer y último peldaño, y que la guía **no use lenguaje clínico** |
 | `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
-| `sh tools/instalar_hook.sh` | Deja **las cinco primeras** corriendo en cada commit que toque `index.html` |
+| `sh tools/instalar_hook.sh` | Deja **las seis primeras** corriendo en cada commit que toque `index.html` |
 
 **La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
 pasa en verde.** Si renombras `mediaThumb`, la prueba no se salta silenciosamente: aborta
@@ -177,6 +178,34 @@ dependencia de la app: sin él, `--pegar` da el código para pegar en la consola
   línea, y esos archivos viven en la rama pública. Sin ellos el socio sigue enviando su
   progreso: la vista cae sola al enlace largo `#progreso/`.
 - **El repositorio es público.** Nunca escribas aquí datos de clientes ni credenciales.
+
+## Cómo construirlo: la escalera
+
+`u19ComoConstruir(id)` propone por dónde empezar un ejercicio y cómo ir subiendo. Está en
+el bloque 3, junto a `u19Sustitutos`, y sale de tres piezas:
+
+- **`u19EscPuntos`** puntúa la dificultad leyendo el **nombre**, con las reglas de
+  `U19_ESC_REGLAS` a la vista (unilateral suma, palanca larga suma, carga suma; asistido
+  resta, de rodillas resta, isométrico resta). `niv` no servía para esto: las 17 variantes
+  de puente del catálogo son todas «Principiante», del puente en el suelo al de una pierna
+  en banco con barra.
+- **`u19EscRaiz`** saca el gesto del nombre. **Mismo patrón no es mismo gesto:** un peso
+  muerto comparte patrón (Bisagra) y músculo (Glúteos) con un puente y no es una progresión
+  suya. Sin la raíz, la escalera del puente salían **85 peldaños**.
+- **`u19EscBanda(e, familia)`** reparte los cuatro escalones **sobre el rango de la propia
+  familia**. Con una escala absoluta, «Dominadas asistidas» caía en el segundo escalón y el
+  primero se quedaba vacío — o sea que «si no puede hacerlo, por dónde empieza», que es
+  justo para lo que se hizo esto, no aparecía.
+
+**Dos trampas ya pagadas.** El guion largo **no** basta para reconocer un clip de técnica:
+«Puente de glúteos con banda — activación» lo lleva y es una regresión de verdad, de las
+más útiles. Manda la cola (`U19_ESC_COLA_CLIP`), y «activación» nunca es clip. Y la lista
+de palabras genéricas no puede incluir movimientos que ya son concretos: con «plancha»
+dentro, «Plancha lateral» contaba como otro ejercicio y «Plancha» se quedaba sin escalera.
+
+Lo que Diego mueve a mano vive en `escManual` sobre la ficha, y el importador del catálogo
+no lo pisa (solo toca los campos de `TAXO` y solo si no hay `taxManual`). Todo esto con
+`tools/escalera.js`, 90 comprobaciones contra el catálogo real y seis mutantes.
 
 ## Dos reglas que no son código
 
