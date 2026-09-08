@@ -130,10 +130,16 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad |
 | `node tools/humo_cifrado.js` | La caja fuerte **en el navegador de Diego**: que la llave esté en IndexedDB, no sea exportable y no quede nada en claro. Solo lee |
 | `node tools/escalera.js` | **«Cómo construirlo» contra el catálogo real**: que la progresión ordene de menos a más, que no mezcle gestos distintos (un peso muerto no es una progresión de un puente), que toda familia tenga primer y último peldaño, y que la guía **no use lenguaje clínico** |
-| `node tools/mutantes.js <lista>` | **Pone a prueba las pruebas**: aplica cada mutante y comprueba que la suite se pone roja. Trabaja sobre una COPIA — nunca toca `index.html`. Listas: `tools/mutantes_escalera.json` (24, la escalera) y `tools/mutantes_guardas.json` (6, las guardas de datos) |
+| `node tools/mutantes.js <lista>` | **Pone a prueba las pruebas**: aplica cada mutante y comprueba que la suite se pone roja. Trabaja sobre una COPIA — nunca toca `index.html`. Listas: `mutantes_escalera.json` (24), `mutantes_guardas.json` (7) y `mutantes_arranque.json` (8) |
 | `node tools/telefono.js` | **El teléfono, contra la nube de verdad**: sin token y sin repositorio en ajustes, que el sobre de llaves se lea igual y que un secreto malo falle por cripto y no por «no encuentro la llave». Usa red, por eso no está en el hook |
-| `node tools/arranque.js` | **El arranque, sin navegador**: carga los tres bloques EN ORDEN y en el mismo contexto y dispara `DOMContentLoaded`. Es lo único que ve el fallo del hoisting entre bloques — las demás aplanan justo esa diferencia |
+| `node tools/arranque.js` | **La app EJECUTADA, sin navegador**: los tres bloques en orden, `DOMContentLoaded`, las **10 pestañas pintadas**, la ficha de un cliente con sus 4 solapas, el constructor, la escalera, los sustitutos y la biblioteca filtrada. Lo único que ve el fallo del hoisting **y** una llamada mal formada que parsea: así apareció el `concatu19Arr` |
 | `sh tools/instalar_hook.sh` | Deja **las siete primeras** corriendo en cada commit que toque `index.html` |
+
+**Leer el código no basta.** El 8-sep una conversión mecánica dejó tres
+`out.concat(x || [])` convertidos en `out.concatu19Arr(x)`. **Eso parsea** —es una propiedad
+que no existe— así que ni el validador de bloques ni las seis suites lo vieron: todas leen.
+Lo cazó `arranque.js` **ejecutando**, a los diez minutos de existir. Cuando dudes entre una
+prueba que lee y una que ejecuta, la que ejecuta encuentra otra clase de cosas.
 
 **La regla de oro de `pruebas.js`: una prueba que no encuentra lo que buscaba falla, no
 pasa en verde.** Si renombras `mediaThumb`, la prueba no se salta silenciosamente: aborta

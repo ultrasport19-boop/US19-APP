@@ -90,6 +90,21 @@ function nuevoEl(tag) {
     insertAdjacentHTML: noop, cloneNode: () => nuevoEl(tag), matches: () => false,
     play: () => Promise.resolve(), pause: noop, load: noop,
   };
+  /* Un padre, porque la biblioteca hace `grid.parentNode.insertBefore(...)`
+     para colgar el botón de «mostrar más». Sin esto la vista reventaba y
+     parecía un fallo de la app cuando era un hueco del navegador falso.
+     Se crea al pedirlo para no montar un árbol infinito. */
+  let padre = null;
+  Object.defineProperty(el, 'parentNode', {
+    get() {
+      if (!padre) {
+        padre = { insertBefore: x => x, appendChild: x => x, removeChild: x => x,
+                  querySelector: () => null, querySelectorAll: () => [], children: [] };
+      }
+      return padre;
+    },
+  });
+  Object.defineProperty(el, 'parentElement', { get() { return el.parentNode; } });
   return el;
 }
 
@@ -227,6 +242,12 @@ debenExistir.forEach(f => {
     typeof vm.runInContext('typeof ' + f, ctx) === 'string' && vm.runInContext('typeof ' + f, ctx) === 'function');
 });
 
+/* El arranque lanza promesas —IndexedDB, el catalogo, la llave— asi que
+   TODO lo que mire el estado va aqui dentro. Las secciones 4 y 5 estaban
+   fuera y corrian con `state` todavia vacio: las vistas se pintaban, pero
+   sin un solo cliente ni un solo ejercicio, y no probaban nada. */
+setTimeout(function () {
+
 /* --- 4 · Las vistas, pintadas de verdad -----------------------------
    Esto es lo que de verdad se rompio aquella vez: no que el archivo no
    cargara, sino que una vista quedara en blanco. Se pulsa cada pestana y
@@ -265,11 +286,62 @@ comprobar('vistas · la mayoría deja contenido pintado, no solo no revienta',
   'pintaron ' + conContenido.length + ' de ' + VISTAS.length + ': ' + conContenido.join(', '));
 aviso('vistas con contenido: ' + conContenido.join(' · '));
 
+/* --- 5 · Los caminos que se tocaron hoy, ejecutados -----------------
+   La leccion del `concatu19Arr`: las pruebas que LEEN el codigo no vieron
+   una llamada mal formada porque parseaba. Solo la caza ejecutar. Asi que
+   aqui se recorren los caminos que mas se han movido, no solo la carga. */
+
+function ejecutar(queEs, codigo, dondeMirar) {
+  try {
+    vm.runInContext(codigo, ctx);
+    pasa();
+    if (dondeMirar) {
+      const el = registro[dondeMirar];
+      comprobar('camino · ' + queEs + ' deja algo pintado en #' + dondeMirar,
+        !!el && String(el.innerHTML || '').trim().length > 30,
+        el ? 'innerHTML de ' + String(el.innerHTML || '').length + ' caracteres' : 'ese id no se pidió nunca');
+    }
+  } catch (e) {
+    falla('camino · ' + queEs, String(e && e.message || e).slice(0, 180));
+  }
+}
+
+const idCliente = vm.runInContext('(state.clients[0] || {}).id || ""', ctx);
+comprobar('camino · hay un cliente de la semilla con el que probar', !!idCliente);
+if (idCliente) {
+  ejecutar('abrir la ficha de un cliente',
+    'abrirFicha(' + JSON.stringify(idCliente) + ')', 'view-ficha');
+  ['resumen', 'evaluaciones', 'entrenamiento', 'clinico'].forEach(t => {
+    ejecutar('la pestaña «' + t + '» de la ficha',
+      'fichaTab(' + JSON.stringify(t) + ')');
+  });
+  ejecutar('el constructor de rutinas',
+    'openRoutineBuilder(null, ' + JSON.stringify(idCliente) + ')', 'view-builder');
+}
+
+/* La escalera, que es lo mas nuevo y lo que mas se ha movido hoy. */
+const idEjercicio = vm.runInContext(
+  '(function(){ for (var i=0;i<state.exercises.length;i++){ '
+  + 'if (u19EscEscalera(state.exercises[i]).length) return state.exercises[i].id; } return ""; })()', ctx);
+comprobar('camino · hay un ejercicio con escalera con el que probar', !!idEjercicio, idEjercicio);
+if (idEjercicio) {
+  ejecutar('«Cómo construirlo» desde la biblioteca',
+    'u19ComoConstruir(' + JSON.stringify(idEjercicio) + ')', 'modal-body');
+  ejecutar('los sustitutos',
+    'u19Sustitutos(' + JSON.stringify(idEjercicio) + ')', 'modal-body');
+  ejecutar('la vista previa del ejercicio',
+    'showExercisePreview(' + JSON.stringify(idEjercicio) + ')');
+}
+
+/* Y la biblioteca con un filtro puesto, que recorre las 2.377 fichas. */
+ejecutar('la biblioteca filtrada por patrón',
+  '_libFilter.pat = "Bisagra"; renderLibraryGrid(); _libFilter.pat = "";', 'lib-grid');
+
 /* Y que el estado se haya cargado de verdad, no que solo exista la
    funcion. El arranque lanza promesas —IndexedDB, el catalogo, la
    restauracion de la llave— asi que se le da un respiro: mirar en el
    mismo tick medía otra cosa y daba «0 ejercicios» con el catalogo bien. */
-setTimeout(function () {
+
   try {
     const n = vm.runInContext('Array.isArray(state.exercises) ? state.exercises.length : -1', ctx);
     const c = vm.runInContext('Array.isArray(state.clients) ? state.clients.length : -1', ctx);

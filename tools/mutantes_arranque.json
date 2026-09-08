@@ -22,6 +22,26 @@
       "nombre": "algo revienta dentro de un setTimeout del arranque",
       "de": "function u19Arr(x){",
       "a": "setTimeout(function(){ noExisteEstaFuncion(); }, 5);\nfunction u19Arr(x){"
+    },
+    {
+      "nombre": "una llamada mal formada del tipo que parsea pero no existe (el bug de hoy)",
+      "de": "  var cache = {}, esc = { 1:0, 2:0, 3:0, 4:0 }, conEscalera = 0;",
+      "a": "  var cache = {}, esc = { 1:0, 2:0, 3:0, 4:0 }, conEscalera = 0;\n  var _x = [].concatu19Arr(filas);"
+    },
+    {
+      "nombre": "«Como construirlo» revienta al abrirse",
+      "de": "window.u19ComoConstruir = function(exId, filaRutina){\n  var base = null, i;",
+      "a": "window.u19ComoConstruir = function(exId, filaRutina){\n  noExisteEsto();\n  var base = null, i;"
+    },
+    {
+      "nombre": "la biblioteca deja de pintar la rejilla",
+      "de": "function renderLibraryGrid(){",
+      "a": "function renderLibraryGrid(){\n  return;"
+    },
+    {
+      "nombre": "abrir la ficha de un cliente revienta",
+      "de": "window.abrirFicha = function(clientId, tab){\n  var c = getClient(clientId);",
+      "a": "window.abrirFicha = function(clientId, tab){\n  var c = getClient(clientId); c.noExiste.nada;"
     }
   ]
 }
