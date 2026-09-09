@@ -21,7 +21,12 @@
 #   6. escalera.js        - «cómo construirlo» contra el catálogo real: que la progresión ordene de
 #                           menos a más, que no mezcle gestos distintos y que la guía no use
 #                           lenguaje clínico.
-#   7. arranque.js        - carga los TRES bloques en orden y en el mismo contexto, como hace
+#   7. finanzas.js  - las cifras con las que Diego decide: de cuanta gente
+#                     depende el ingreso, cuanto vence este mes, cuanto dinero
+#                     es de gente que dejo de venir. Una formula mal tocada no
+#                     da error: da un numero distinto, y un numero distinto se
+#                     cree.
+#   8. arranque.js        - carga los TRES bloques en orden y en el mismo contexto, como hace
 #                           el navegador, y dispara DOMContentLoaded. Es lo unico que ve el
 #                           fallo del hoisting entre bloques, que ya dejo el Panel en blanco
 #                           en produccion: las otras seis aplanan justo esa diferencia.
@@ -49,6 +54,9 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
 
   node "$RAIZ/tools/escalera.js" "$RAIZ/index.html" \
     || { echo ""; echo "la escalera de ejercicios no pasa la prueba: commit cancelado."; exit 1; }
+
+  node "$RAIZ/tools/finanzas.js" "$RAIZ/index.html" \
+    || { echo ""; echo "los numeros de Finanzas no pasan la prueba: commit cancelado."; exit 1; }
 
   node "$RAIZ/tools/arranque.js" "$RAIZ/index.html" \
     || { echo ""; echo "la app no arranca: commit cancelado."; exit 1; }

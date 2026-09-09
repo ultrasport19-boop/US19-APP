@@ -1,0 +1,47 @@
+{
+  "suite": "tools/finanzas.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "el «top 3» pasa a ser el top 5 y la concentracion parece peor de lo que es",
+      "de": "  var top3 = conPrecio.slice(0, 3);",
+      "a": "  var top3 = conPrecio.slice(0, 5);"
+    },
+    {
+      "nombre": "sin nadie que pague, el porcentaje sale NaN en vez de cero",
+      "de": "           pctTop3: total > 0 ? (sumaTop3 / total * 100) : 0, sumaTop3: sumaTop3 };",
+      "a": "           pctTop3: (sumaTop3 / total * 100), sumaTop3: sumaTop3 };"
+    },
+    {
+      "nombre": "se cae el Math.max(0) y una fecha futura saca a ese cliente del grafico",
+      "de": "  return Math.max(0, Math.floor((Date.now() - t) / (30.4375 * 86400000)));",
+      "a": "  return Math.floor((Date.now() - t) / (30.4375 * 86400000));"
+    },
+    {
+      "nombre": "la ventana de «vence pronto» se abre a un mes",
+      "de": "    else if (d <= 15) pronto.push({ c: c, dias: d, precio: precio });",
+      "a": "    else if (d <= 30) pronto.push({ c: c, dias: d, precio: precio });"
+    },
+    {
+      "nombre": "quien vence HOY pasa a contarse como vencido",
+      "de": "    if (d < 0) venc.push({ c: c, dias: d, precio: precio });",
+      "a": "    if (d <= 0) venc.push({ c: c, dias: d, precio: precio });"
+    },
+    {
+      "nombre": "quien tiene reservas recientes vuelve a contarse como fuga",
+      "de": "    if (venir == null && Number(c.notionReservas30) > 0) return;",
+      "a": "    if (false) return;"
+    },
+    {
+      "nombre": "se cuenta como riesgo a quien ni siquiera tiene rutina",
+      "de": "    if (!tieneRutina || precio <= 0) return;",
+      "a": "    if (precio <= 0) return;"
+    },
+    {
+      "nombre": "a quien no agenda por Calendly se le empieza a medir la ausencia",
+      "de": "    if (!u19AgendaPorCalendly(c)) return;",
+      "a": "    if (false) return;"
+    }
+  ]
+}
