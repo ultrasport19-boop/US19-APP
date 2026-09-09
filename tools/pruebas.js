@@ -197,7 +197,32 @@ function extraerFuncion(nombre) {
   const sobran = Object.keys(leidas).filter(function (k) { return claves.indexOf(k) === -1; });
   comprobar('ajustes · loadSettings no lee claves inexistentes', sobran.length === 0, sobran.join(', '));
 
-  aviso('ajustes: ' + claves.length + ' claves en settings, ' + Object.keys(leidas).length + ' leidas por loadSettings');
+  /* c) La tercera direccion, que es la que faltaba y por donde se colaron
+     dos ajustes reales.
+
+     `saveSettings()` guarda el objeto settings ENTERO, asi que un
+     `settings.loQueSea = x` escrito en cualquier rincon del archivo se
+     graba igual; la lista blanca de `loadSettings` es la que decide que
+     vuelve. Un ajuste que se escribe pero no esta declarado se guarda y
+     NO vuelve: se pierde en cada recarga, sin decir nada.
+
+     Asi vivieron `calendlyOrgUri` —que costaba una llamada a Calendly por
+     recarga, del presupuesto de 100 al dia que se comparte con el bot— y
+     `dashPanelsOpen`, que volvia a abrir los paneles del tablero. Las dos
+     comprobaciones de arriba pasaban en verde porque ninguna de las dos
+     claves estaba declarada en ningun sitio. */
+  const usadas = {};
+  const reUso = /\bsettings\.([A-Za-z_$][A-Za-z0-9_$]*)/g;
+  let u;
+  while ((u = reUso.exec(src)) !== null) usadas[u[1]] = true;
+  const sinDeclarar = Object.keys(usadas).filter(function (k) { return claves.indexOf(k) === -1; });
+  comprobar('ajustes · no hay ningun settings.X sin declarar arriba',
+    sinDeclarar.length === 0,
+    'se guardan y NO vuelven al recargar: ' + sinDeclarar.join(', ') +
+    ' — anadelos al objeto settings y a loadSettings');
+
+  aviso('ajustes: ' + claves.length + ' claves en settings, ' + Object.keys(leidas).length +
+        ' leidas por loadSettings, ' + Object.keys(usadas).length + ' usadas en el archivo');
 })();
 
 /* =====================================================================

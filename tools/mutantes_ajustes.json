@@ -1,0 +1,27 @@
+{
+  "suite": "tools/pruebas.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "vuelve el fallo: calendlyOrgUri se guarda y no vuelve, y cada recarga gasta una llamada",
+      "de": "calendlyUserUri: \"\", calendlyOrgUri: \"\", dashPanelsOpen: true,",
+      "a": "calendlyUserUri: \"\","
+    },
+    {
+      "nombre": "alguien crea un ajuste nuevo a mitad de una funcion y no lo declara",
+      "de": "  var isOpen = settings.dashPanelsOpen !== false;",
+      "a": "  settings.tableroCompacto = true;\n  var isOpen = settings.dashPanelsOpen !== false;"
+    },
+    {
+      "nombre": "un ajuste declarado deja de leerse al arrancar: se borra solo en cada recarga",
+      "de": "      if (typeof p.dashPanelsOpen === \"boolean\") settings.dashPanelsOpen = p.dashPanelsOpen;\n",
+      "a": ""
+    },
+    {
+      "nombre": "loadSettings lee una clave que ya no existe",
+      "de": "      if (typeof p.bitlyDomain === \"string\") settings.bitlyDomain = p.bitlyDomain;",
+      "a": "      if (typeof p.bitlyDominio === \"string\") settings.bitlyDomain = p.bitlyDominio;"
+    }
+  ]
+}
