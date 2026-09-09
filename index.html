@@ -9230,7 +9230,12 @@ function openSettings(){
       var _bEncForget=document.getElementById("btn-enc-forget");
       if (_bEncForget) _bEncForget.addEventListener("click", function(){
         if (confirm("¿Bloquear el cifrado en este dispositivo?\n\nTendrás que ingresar la contraseña maestra la próxima vez para ver o sincronizar los datos.")){
-          encForgetDevice(); closeModal(); toast("Dispositivo bloqueado 🔒","success");
+          /* Solo se canta victoria si la llave se fue de verdad del disco.
+             Si no, decir «bloqueado» haria creer cerrado algo que en el
+             proximo arranque vuelve a abrirse solo. */
+          var _limpio = encForgetDevice(); closeModal();
+          if (_limpio) toast("Dispositivo bloqueado 🔒","success");
+          else toast("NO pude borrar la llave de este dispositivo. Sigue desbloqueándose solo: revisa el almacenamiento del navegador.","error");
         }
       });
       document.getElementById("btn-gh-test").addEventListener("click", function(){
@@ -9914,13 +9919,21 @@ function _encCache(){
   return _encGuardarMK(_encMkRaw);
 }
 
+/* Devuelve `true` solo si la llave maestra se fue DE VERDAD del disco.
+   Antes borraba en dos try/catch mudos y quien la llamaba cantaba
+   «Dispositivo bloqueado 🔒» pasara lo que pasara: si el borrado fallaba,
+   se creia cerrado algo que en el proximo arranque volvia a abrirse solo. */
 function encForgetDevice(){
   _encMkRaw = null; _encFaltaPin = false;
   try { window._u19PinMem = ""; } catch(e){}
   try { if (_encLockTimer) clearTimeout(_encLockTimer); } catch(e){}
   _encLockTimer = null;
-  try { localStorage.removeItem(ENC_MK_KEY); } catch(e){}
-  try { localStorage.removeItem(ENC_MK_KEY2); } catch(e){}
+  var limpio = true;
+  [ENC_MK_KEY, ENC_MK_KEY2].forEach(function(k){
+    try { localStorage.removeItem(k); if (localStorage.getItem(k) != null) limpio = false; }
+    catch(e){ limpio = false; }
+  });
+  return limpio;
 }
 
 /* Cifra un string JSON -> objeto sobre listo para subir */
@@ -18228,7 +18241,16 @@ window.finSync = function(){
   if (st) st.innerHTML = '<span style="color:var(--muted);">Sincronizando…</span>';
   var inpk = document.getElementById("fin-clave");
   if (inpk) { settings.dashClave = inpk.value.trim(); saveSettings(); }
-  function _ok(){ try { localStorage.setItem("ultrasport19_fin", JSON.stringify(_finData)); } catch(e){} renderFinanzas(); toast("Finanzas sincronizadas desde Notion","success"); }
+  /* Si el guardado falla, la pantalla se ve bien -los datos estan en
+     memoria- pero al recargar vuelven los viejos. Decir «sincronizadas» ahi
+     es prometer algo que no sobrevive a cerrar la app. */
+  function _ok(){
+    var guardado = true;
+    try { localStorage.setItem("ultrasport19_fin", JSON.stringify(_finData)); } catch(e){ guardado = false; }
+    renderFinanzas();
+    if (guardado) toast("Finanzas sincronizadas desde Notion","success");
+    else toast("Finanzas al día en pantalla, pero NO pude guardarlas: al recargar vuelven las de antes.","warn");
+  }
   // 1) intenta el roster por cliente (?tipo=clientes): números REALES
   fetch(u19DashUrl("clientes")).then(function(r){ return r.json(); }).then(function(d){
     var arr = Array.isArray(d) ? d : (Array.isArray(d.clientes) ? d.clientes : null);
@@ -24462,10 +24484,22 @@ var INF_INDIC_TPL = [
   { t: 'Reevaluar 8 sem', txt: 'Reevaluar composición corporal en 8 semanas para ajustar el plan.' }
 ];
 
+/* El folio TIENE que ser correlativo: es lo que distingue un comprobante
+   de otro. Antes, si el guardado fallaba en silencio, la siguiente llamada
+   volvia a leer el mismo numero y salian dos comprobantes con el MISMO
+   folio, sin que nada lo dijera. Ahora se comprueba releyendo, y si no
+   quedo guardado se avisa en vez de entregar un folio que se va a repetir. */
 function infNextFolio(){
   var y = new Date().getFullYear();
   var n = 0; try { n = parseInt(localStorage.getItem('us19_folio') || '0', 10) || 0; } catch (e) {}
-  n += 1; try { localStorage.setItem('us19_folio', String(n)); } catch (e) {}
+  n += 1;
+  var guardado = false;
+  try {
+    localStorage.setItem('us19_folio', String(n));
+    guardado = (parseInt(localStorage.getItem('us19_folio'), 10) === n);
+  } catch (e) { guardado = false; }
+  if (!guardado && typeof toast === "function")
+    toast("Ojo: no pude guardar el correlativo. Este folio se va a repetir en el próximo informe.", "error");
   return 'INF-' + y + '-' + String(n).padStart(3, '0');
 }
 function infSlugName(s){ return (s || 'cliente').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').toLowerCase() || 'cliente'; }

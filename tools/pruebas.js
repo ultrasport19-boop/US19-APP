@@ -616,6 +616,25 @@ console.log('US19-APP · banco de pruebas');
    Mientras esos endpoints no existan, esto es lo unico que separa «no
    funciona» de «dice que funciona». */
 
+/* Tres guardados que se tragaban su fallo y cantaban victoria. El patron
+   es el mismo de las escrituras: cuando algo no se puede comprobar, se
+   responde como si estuviera bien. */
+comprobar('guardado · el folio avisa si no quedó guardado el correlativo',
+  /se va a repetir en el próximo informe/.test(src),
+  'sin eso salen dos comprobantes con el MISMO folio y nada lo dice');
+
+comprobar('guardado · «Dispositivo bloqueado» solo se dice si la llave se fue de verdad',
+  /NO pude borrar la llave de este dispositivo/.test(src),
+  'creer cerrado algo que en el proximo arranque vuelve a abrirse solo es peor que saberlo abierto');
+
+comprobar('guardado · encForgetDevice devuelve si quedó limpio',
+  /var limpio = true;[\s\S]{0,320}return limpio;/.test(src),
+  'si no devuelve nada, quien la llama no puede saber si funciono');
+
+comprobar('guardado · finanzas avisa si no pudo guardar',
+  /NO pude guardarlas/.test(src),
+  'decia «sincronizadas» y al recargar volvian los datos viejos');
+
 comprobar('escritura · existe la guarda que comprueba si contestó alguien',
   /function u19RespuestaValida\(/.test(src),
   'sin ella, un POST que nadie atiende se pinta en verde como si hubiera ido bien');
