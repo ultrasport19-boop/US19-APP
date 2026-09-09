@@ -4803,6 +4803,22 @@ function u19Arr(x){
   return Array.isArray(x) ? x : [];
 }
 
+/* ¿Contestó alguien de verdad?
+ *
+ * El puente responde {status:"ok"} a cualquier POST que no reconoce — cae
+ * en la rama «webhook desconocido» y no pone `error`. Sin esta guarda, la
+ * app leía `res.hechos` como undefined, contaba 0 y pintaba un mensaje
+ * VERDE diciendo «0 reactivados» como si hubiera ido bien.
+ *
+ * Comprobado el 9-sep-2026: de los cuatro POST que manda la app
+ * (cliente_estado, marcar, notion_bio, claude) NINGUNO existe en el bot.
+ * Mientras no existan, esto es lo que evita que un botón roto se vea como
+ * un botón que funciona.
+ */
+function u19RespuestaValida(res, campo){
+  return !!(res && typeof res === "object" && res[campo] !== undefined);
+}
+
 function u19DashUrl(tipo, url, clave){
   url = String(url != null ? url
         : ((typeof settings !== "undefined" && settings.dashApiUrl) || "")).trim();
@@ -20923,6 +20939,12 @@ window.u19ReactAplicar = function(){
     })
   }).then(function(r){ return r.json(); }).then(function(res){
     if (res.error){ di(res.error, "var(--danger)"); return; }
+    if (!u19RespuestaValida(res, "hechos")){
+      di("El puente contestó, pero NO hizo nada: no reconoce «cliente_estado». "
+       + "En Notion no cambió ni una ficha. Hay que reactivarlos a mano.", "var(--danger)");
+      if (typeof toast === "function") toast("El puente no sabe reactivar: nada cambió en Notion", "error");
+      return;
+    }
     var ok = u19Lista(res.hechos).length, mal = u19Lista(res.errores).length;
     di(ok + " reactivado(s)" + (mal ? " · " + mal + " fallaron" : "")
        + ". Vuelve a leer el tablero para verlo.",
@@ -21149,6 +21171,12 @@ window.u19AccAprobar = function(tipo, tarifa){
                            ids: sel.map(function(c){ return c.id; }) })
   }).then(function(r){ return r.json(); }).then(function(res){
     if (res.error){ di(res.error, "var(--danger)"); return; }
+    if (!u19RespuestaValida(res, "hechos")){
+      di("El puente contestó, pero NO marcó nada: no reconoce «marcar». "
+       + "Nadie quedó aprobado y el bot no va a procesar nada. Hay que marcarlo en Notion.", "var(--danger)");
+      if (typeof toast === "function") toast("El puente no sabe marcar: nadie quedó aprobado", "error");
+      return;   /* y NO se borra la cache: los pendientes siguen pendientes */
+    }
     var ok = u19Lista(res.hechos).length, mal = u19Lista(res.errores).length;
     di(ok + " marcado(s)" + (mal ? " · " + mal + " no" : "")
        + (res.costoEstimado ? " · ~" + u19PesosResp(res.costoEstimado) + " en mensajes" : "")
@@ -22304,6 +22332,13 @@ function u19NotionEnviarBio(filas, notionId){
   }).then(function(r){ return r.json(); })
     .then(function(d){
       if (d && d.error) throw new Error(d.error);
+      /* Sin `creadas` no escribió nadie. Antes esto devolvía {} y el
+         mensaje decía «nada que crear, ya estaba todo (0)», que es la
+         mentira más cara de las tres: son datos de composición corporal
+         que Diego cree guardados y no están en ninguna parte. */
+      if (!u19RespuestaValida(d, "creadas"))
+        throw new Error("El puente contestó, pero NO escribió nada: no reconoce «notion_bio». "
+                      + "La evaluación NO quedó guardada en Notion.");
       return d || {};
     });
 }

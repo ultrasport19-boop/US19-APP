@@ -605,6 +605,35 @@ function extraerFuncion(nombre) {
 
 console.log('');
 console.log('US19-APP · banco de pruebas');
+/* --- Los botones que escriben en Notion no pueden mentir -------------
+   Comprobado el 9-sep-2026: la app manda cuatro POST al puente
+   (cliente_estado, marcar, notion_bio, claude) y NINGUNO existe en el bot.
+   El puente responde {status:"ok"} a lo que no reconoce, asi que sin una
+   guarda la app leia `res.hechos` como undefined, contaba 0 y pintaba un
+   mensaje VERDE: «0 cliente(s) reactivado(s)», «Notion: nada que crear, ya
+   estaba todo (0)».
+
+   Mientras esos endpoints no existan, esto es lo unico que separa «no
+   funciona» de «dice que funciona». */
+
+comprobar('escritura · existe la guarda que comprueba si contestó alguien',
+  /function u19RespuestaValida\(/.test(src),
+  'sin ella, un POST que nadie atiende se pinta en verde como si hubiera ido bien');
+
+['hechos', 'creadas'].forEach(function (campo) {
+  comprobar('escritura · la guarda se usa con «' + campo + '»',
+    new RegExp('u19RespuestaValida\\([^)]*"' + campo + '"').test(src),
+    'ese es el campo que solo llega si alguien atendio de verdad la peticion');
+});
+
+comprobar('escritura · el botón de aprobar NO borra la caché si nadie marcó nada',
+  /no reconoce «marcar»[\s\S]{0,400}return;\s*\/\* y NO se borra la cache/.test(src),
+  'borrarla haria desaparecer de la pantalla a los que siguen esperando aprobacion');
+
+comprobar('escritura · el aviso de bioimpedancia dice que NO quedó guardada',
+  /La evaluación NO quedó guardada en Notion/.test(src),
+  'era la mentira mas cara: decia «ya estaba todo» sobre datos que no se escribieron nunca');
+
 console.log('archivo: ' + ruta);
 console.log('');
 avisos.forEach(function (a) { console.log('  · ' + a); });
