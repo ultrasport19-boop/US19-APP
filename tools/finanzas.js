@@ -54,13 +54,14 @@ const ENTORNO = [
 
 const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   fn('u19DiasUmbral'), fn('u19FinRiesgo'), fn('u19FinAntiguedad'),
-  fn('u19FinConcentracion'), fn('u19FinRenovaciones')].join('\n');
+  fn('u19FinConcentracion'), fn('u19FinRenovaciones'),
+  fn('u19SvcProy')].join('\n');
 
 let m;
 try {
   m = new Function(codigo + '\nreturn { poner: function(cl, rt){ state.clients = cl || []; state.routines = rt || []; },'
     + ' mes: u19FinMes, umbral: u19DiasUmbral, riesgo: u19FinRiesgo, antiguedad: u19FinAntiguedad,'
-    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones };')();
+    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones, svc: u19SvcProy };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -225,6 +226,53 @@ m.poner([cli({ n: 'AMano', planPrice: 30000, diasSinVenir: 40, sinCalendly: true
   [rutina('AMano')]);
 igual(m.riesgo().n, 0,
   'riesgo · a quien no agenda por Calendly no se le mide la ausencia');
+
+/* --- proyeccion de un servicio cobrado por sesion ------------------
+   Dinero que todavia no existe y que NO se suma a la cartera. Lo que se
+   comprueba aqui es la aritmetica, sobre todo la de las altas
+   necesarias, que es la menos evidente de las cinco. */
+
+/* El caso con los numeros que puso Diego: tramo 3 del convenio, diez
+   personas en curso, series de diez a dos por semana. */
+const p3 = m.svc(7830, 3560, 10, 10, 2);
+igual(p3.porSesion, 11390, 'proyeccion · por sesion se suma lo que paga la persona y lo que reembolsa el convenio');
+igual(p3.sesMes, 80, 'proyeccion · diez personas a dos sesiones por semana dan ochenta al mes');
+igual(p3.mes, 911200, 'proyeccion · el mes son las sesiones por el valor de cada una');
+igual(p3.ano, 10934400, 'proyeccion · el año son doce meses del mismo ritmo');
+igual(p3.porSerie, 113900, 'proyeccion · la serie completa son diez sesiones');
+
+/* La cifra que decide si la proyeccion se cumple: una serie de diez a
+   dos por semana dura cinco semanas, o sea 1,25 meses; para sostener
+   diez en curso hay que reponer ocho cada mes. */
+igual(p3.semanasSerie, 5, 'proyeccion · una serie de diez a dos por semana dura cinco semanas');
+igual(p3.altasMes, 8, 'proyeccion · para sostener diez en curso hacen falta ocho altas nuevas al mes');
+
+/* El tramo 1 tiene que dar bastante menos por la misma cantidad de
+   trabajo: es toda la decision del nivel en una linea. */
+igual(m.svc(3560, 3560, 10, 10, 2).mes, 569600, 'proyeccion · el tramo 1 da menos por las mismas ochenta sesiones');
+
+/* Vaciar el campo de sesiones por semana no puede reventar dividiendo
+   entre cero: es lo primero que pasa cuando alguien borra el numero. */
+const p0s = m.svc(7830, 3560, 10, 10, 0);
+igual(p0s.sesMes, 0, 'proyeccion · sin sesiones por semana no hay sesiones al mes');
+igual(p0s.altasMes, 0, 'proyeccion · y no se dividen altas entre cero');
+di(isFinite(p0s.mes), 'proyeccion · el ingreso sigue siendo un numero finito con cero sesiones');
+/* Y NINGUN campo puede volver como Infinity. Sin la guardia del divisor,
+   semanasSerie sale Infinity y altasMes sigue dando 0, asi que el fallo no
+   se ve por ninguna otra puerta: lo caza solo esta comprobacion. La tarjeta
+   imprime semanasSerie tal cual y escribiria «Infinity semanas». */
+Object.keys(p0s).forEach(function (k) {
+  di(isFinite(p0s[k]), 'proyeccion · con cero sesiones por semana el campo «' + k + '» sigue siendo finito');
+});
+
+/* Un negativo escrito a mano no puede generar ingresos negativos: en una
+   proyeccion eso no significa nada y ensucia la comparacion. */
+igual(m.svc(-5000, 3560, 10, 10, 2).porSesion, 3560, 'proyeccion · un valor negativo cuenta como cero');
+igual(m.svc(7830, 3560, -4, 10, 2).sesMes, 0, 'proyeccion · personas en curso negativas cuentan como cero');
+
+/* Las sesiones por serie son el divisor de las altas: nunca menos de 1. */
+di(isFinite(m.svc(7830, 3560, 10, 0, 2).altasMes),
+  'proyeccion · una serie de cero sesiones no rompe la cuenta de altas');
 
 /* --- salida --- */
 console.log('\nUS19-APP · números de Finanzas');
