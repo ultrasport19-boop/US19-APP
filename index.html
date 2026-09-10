@@ -20515,8 +20515,10 @@ function u19NoShowsHTML(){
     return '<div class="card" style="margin-top:1rem;"><div class="card-main">'
       + '<div class="card-title">\u{1f6ab} Faltas</div>'
       + '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">'
-      + 'Notion todavía no ha mandado «No-shows 30 d». Sincroniza en '
-      + 'Finanzas → Conexión con Notion y aparecerá aquí.</p></div></div>';
+      + 'Notion todavía no ha mandado «No-shows 30 d». Esa columna la escribe el '
+      + 'asistente al cruzar la asistencia, no la rellena nadie a mano: si '
+      + 'sincronizas y sigue vacía, el problema no está aquí sino en que no se '
+      + 'está escribiendo. Estuvo en 0 de 112 fichas hasta el 10-sep-2026.</p></div></div>';
 
   var col = d.pct >= 15 ? "var(--danger)" : (d.pct >= 8 ? "var(--warn)" : "var(--success)");
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
@@ -20623,7 +20625,8 @@ function u19RetencionHTML(){
       + '<div class="card-title">\u{1f9ed} ¿A quién estoy a punto de perder?</div>'
       + '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">'
       + 'Hace falta que Notion mande «Última reserva» y «Reservas 30 días». '
-      + 'Sincroniza en Finanzas → Conexión con Notion.</p></div></div>';
+      + 'Las escribe el asistente en su lote de las 08:00: si sincronizas y siguen '
+      + 'vacías, mira si ese lote está corriendo antes de volver a pulsar aquí.</p></div></div>';
 
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
   h += '<div style="display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;">'
