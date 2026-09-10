@@ -11323,8 +11323,15 @@ function renderSeries(){
   if (!cont) return;
   var lista = seriesLeer();
   var hoy = seriesHoyISO();
-  var h = ['<div class="section-head"><h2>Series</h2>'
-    + '<button class="btn btn-primary" onclick="seriesNueva()">Nueva serie</button></div>'];
+  var pend = 0;
+  lista.forEach(function(s){
+    if (!s.notionId) pend++;
+    u19Arr(s.sesiones).forEach(function(x){ if (!x.notionId) pend++; });
+  });
+  var h = ['<div class="section-head"><h2>Series</h2><div style="display:flex;gap:.4rem">'
+    + (lista.length ? '<button class="btn" onclick="seriesSincronizar()">Subir a Notion'
+        + (pend ? ' (' + pend + ')' : '') + '</button>' : '')
+    + '<button class="btn btn-primary" onclick="seriesNueva()">Nueva serie</button></div></div>'];
 
   if (!lista.length){
     h.push('<div class="sr-vacio">Todavía no hay ninguna serie.<br>'
@@ -11377,6 +11384,82 @@ function renderSeries(){
   });
   h.push("</div>");
   cont.innerHTML = h.join("");
+}
+
+/* ---------------- llevar las series a Notion ----------------
+
+   La app NO puede escribir en Notion: su repositorio es público y ahí no
+   puede vivir ninguna llave. Escribe a través del asistente, con la misma
+   clave y el mismo puente que ya usan clientes, historial y bioimpedancia.
+
+   Se sube SOLO lo que todavía no tiene id de Notion, y el id vuelve y se
+   guarda: así pulsar dos veces no duplica nada. Y si algo falla, la serie
+   NO se marca como subida — se reintenta a la siguiente. */
+function seriesSincronizar(){
+  var url = u19DashUrl("series");
+  if (!url){
+    window.alert("Falta la dirección del puente.\n\nAjustes → Conexión con Notion.");
+    return;
+  }
+  var lista = seriesLeer();
+  if (!lista.length){ window.alert("No hay ninguna serie que subir."); return; }
+
+  var pendientes = 0;
+  lista.forEach(function(s){
+    if (!s.notionId) pendientes++;
+    u19Arr(s.sesiones).forEach(function(x){ if (!x.notionId) pendientes++; });
+  });
+  if (!pendientes){ window.alert("Todo está ya en Notion. Nada que subir."); return; }
+  if (!window.confirm("Se van a subir " + pendientes + " cosa(s) a Notion. ¿Seguimos?")) return;
+
+  var subidas = 0, fallos = [];
+  var pide = function(cuerpo){
+    try {
+      var r = fetch(url, { method:"POST", body: JSON.stringify(cuerpo) });
+      return r;
+    } catch(e){ return null; }
+  };
+
+  /* Se hace en serie y no en paralelo: la sesión necesita el id de su serie,
+     y lanzarlas todas a la vez crearía sesiones huérfanas. */
+  var cadena = Promise.resolve();
+  lista.forEach(function(s, i){
+    cadena = cadena.then(function(){
+      if (s.notionId) return null;
+      return pide({ op:"crear_serie", nombre:s.nombre, indicadas:s.indicadas,
+                    inicio:s.creada, vence:(s.orden && s.orden.vence) || "" })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j && j.ok && j.id){ lista[i].notionId = j.id; subidas++; }
+          else fallos.push(s.nombre + ": " + ((j && j.error) || "sin respuesta"));
+        })
+        .catch(function(e){ fallos.push(s.nombre + ": " + e.message); });
+    });
+    u19Arr(s.sesiones).forEach(function(x, k){
+      cadena = cadena.then(function(){
+        if (x.notionId || !lista[i].notionId) return null;
+        var c = seriesContar_(s.sesiones.slice(0, k + 1), s.indicadas);
+        return pide({ op:"crear_sesion", serieId:lista[i].notionId,
+                      titulo: s.nombre + " · sesión " + c.hechas + " · " + x.fecha,
+                      asistio: x.asistio === true, numero: c.hechas,
+                      fecha: x.fecha, nota: x.nota || "" })
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (j && j.ok && j.id){ lista[i].sesiones[k].notionId = j.id; subidas++; }
+            else fallos.push(s.nombre + " (sesión): " + ((j && j.error) || "sin respuesta"));
+          })
+          .catch(function(e){ fallos.push(s.nombre + " (sesión): " + e.message); });
+      });
+    });
+  });
+
+  cadena.then(function(){
+    seriesGuardar(lista);
+    renderSeries();
+    var msg = subidas + " subida(s) a Notion.";
+    if (fallos.length) msg += "\n\nNo pude con " + fallos.length + ":\n" + fallos.slice(0,3).join("\n");
+    window.alert(msg);
+  });
 }
 
 function seriesNueva(){
