@@ -3,7 +3,17 @@
    un error de sintaxis en uno tumba solo ese bloque. Se comprueban uno a uno
    para saber cual y en que linea. Uso: node validar_bloques.js <ruta index.html> */
 const fs = require('fs');
-const ruta = process.argv[2];
+const path = require('path');
+/* Los otros nueve tools del repo llevan este mismo valor por defecto. Este
+   era el unico sin el, y sin argumento moria con la traza cruda de node
+   («The "path" argument must be of type string... Received undefined»),
+   que parece la herramienta rota y no lo estaba. */
+const ruta = process.argv[2] || path.join(__dirname, '..', 'index.html');
+if (!fs.existsSync(ruta)) {
+  console.log('no encuentro ' + ruta);
+  console.log('uso: node tools/validar_bloques.js [ruta del index.html]');
+  process.exit(1);
+}
 const html = fs.readFileSync(ruta, 'utf8');
 const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
 let m, n = 0, fallos = 0;
