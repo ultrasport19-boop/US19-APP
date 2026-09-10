@@ -1,0 +1,27 @@
+{
+  "suite": "tools/pruebas.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "el estado vuelve a subirse EN CLARO (la fuga de las ocho semanas)",
+      "de": "  return Promise.reject(new Error(\"Sincronización cifrada obligatoria: falta la clave\"));",
+      "a": "  return Promise.resolve(jsonStr);"
+    },
+    {
+      "nombre": "un dato de disco vuelve a protegerse con (x || []) en vez de u19Arr",
+      "de": "function u19Arr(x){",
+      "a": "function u19Arr(x){ return x || []; }\nfunction u19ArrViejo(x){"
+    },
+    {
+      "nombre": "un ajuste se guarda y no vuelve al recargar",
+      "de": "      if (typeof p.dashClave === \"string\") settings.dashClave = p.dashClave;",
+      "a": ""
+    },
+    {
+      "nombre": "se cuela una funcion top-level duplicada",
+      "de": "function u19Lista(x){",
+      "a": "function u19Arr(x){ return []; }\nfunction u19Lista(x){"
+    }
+  ]
+}

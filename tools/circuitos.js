@@ -85,6 +85,13 @@ const p0 = m.circPosAuto(0, 4, 'circulo'), p1 = m.circPosAuto(1, 4, 'circulo');
 di(p0.y < 0.2 && Math.abs(p0.x - 0.5) < 0.01 && p1.x > 0.85, 'en círculo: la estación 1 arriba y la 2 a la derecha (sentido horario)');
 di(m.circFmt(65) === '1:05' && m.circFmt(0) === '0:00', 'formato de tiempo m:ss');
 
+/* Los dos bordes de abajo salieron el 10-sep-2026 al escribir los mutantes:
+   dos guardas que ningun caso tocaba. Las dos protegen la clase en vivo. */
+di(m.circDuracion({ modo: 'rotacion', rondas: 2, trabajo: 40, cambio: 15, estaciones: [] }) === 0,
+  'un circuito sin estaciones dura cero, no un numero raro');
+di(m.circTrabajoDe({ modo: 'secuencia', trabajo: 0, estaciones: [{ trabajo: 0 }] }, 0) === 1,
+  'una estacion nunca baja de 1 segundo: con cero, el cronometro no avanzaria');
+
 console.log('\nUS19-APP · circuitos y búsqueda');
 console.log('archivo: ' + ruta);
 console.log('  comprobaciones OK: ' + ok + (fallos.length ? '  ·  FALLOS: ' + fallos.length : '  ·  sin fallos'));

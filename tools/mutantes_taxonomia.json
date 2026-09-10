@@ -1,0 +1,37 @@
+{
+  "suite": "tools/taxonomia.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "«pino» vuelve a encontrarse dentro de «supino»",
+      "de": "|(^| )pino|dragon flag|",
+      "a": "|pino|dragon flag|"
+    },
+    {
+      "nombre": "«tibial» vuelve a encontrarse dentro de «isquiotibial»",
+      "de": "[\"Accesorio\", /gemelo|pantorrilla|calf|soleo|(^| )tibial|antebrazo",
+      "a": "[\"Accesorio\", /gemelo|pantorrilla|calf|soleo|tibial|antebrazo"
+    },
+    {
+      "nombre": "un «curl femoral» pasa a contarse como tracción y no como bisagra",
+      "de": "[\"Tracción\", /remo|jalon|dominada|pull ?up|chin ?up|(^| )curl (?!femoral)/],",
+      "a": "[\"Tracción\", /remo|jalon|dominada|pull ?up|chin ?up|(^| )curl /],"
+    },
+    {
+      "nombre": "el veto de «nunca es cardio» deja de aplicarse",
+      "de": "  if ((LIB_RE.cardio.test(n) || grupo === \"Cardio\") && !veto) return \"Cardio\";",
+      "a": "  if (LIB_RE.cardio.test(n) || grupo === \"Cardio\") return \"Cardio\";"
+    },
+    {
+      "nombre": "el veto tampoco frena a strongman",
+      "de": "  if (LIB_RE.strong.test(n) && !veto) return \"Strongman\";",
+      "a": "  if (LIB_RE.strong.test(n)) return \"Strongman\";"
+    },
+    {
+      "nombre": "el músculo deja de decidir el patrón cuando el nombre no basta",
+      "de": "\"Isquiotibiales\":\"Bisagra\"",
+      "a": "\"Isquiotibiales\":\"Sentadilla\""
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+{
+  "suite": "tools/circuitos.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "el reparto de grupos gira al reves y dos grupos caen en la misma estacion",
+      "de": "  var g = ((s - t) % N + N) % N;",
+      "a": "  var g = ((s + t) % N + N) % N;"
+    },
+    {
+      "nombre": "un grupo de mas entra donde no cabe",
+      "de": "  return g < G ? g : -1;",
+      "a": "  return g <= G ? g : -1;"
+    },
+    {
+      "nombre": "la duracion se olvida del cambio entre estaciones",
+      "de": "  return R * t + R * (N - 1) * cmb + (R - 1) * dr;",
+      "a": "  return R * t + (R - 1) * dr;"
+    },
+    {
+      "nombre": "la duracion cuenta un descanso de ronda de mas",
+      "de": "  return R * t + R * (N - 1) * cmb + (R - 1) * dr;",
+      "a": "  return R * t + R * (N - 1) * cmb + R * dr;"
+    },
+    {
+      "nombre": "el tiempo propio de una estacion manda tambien en modo rotacion",
+      "de": "  return Math.max(1, (c.modo === \"secuencia\" && propio > 0) ? propio : circNum(c.trabajo, 40));",
+      "a": "  return Math.max(1, propio > 0 ? propio : circNum(c.trabajo, 40));"
+    },
+    {
+      "nombre": "una estacion puede quedarse en cero segundos de trabajo",
+      "de": "  return Math.max(1, (c.modo === \"secuencia\" && propio > 0) ? propio : circNum(c.trabajo, 40));",
+      "a": "  return ((c.modo === \"secuencia\" && propio > 0) ? propio : circNum(c.trabajo, 40));"
+    },
+    {
+      "nombre": "un circuito sin estaciones deja de durar cero",
+      "de": "  if (!N) return 0;\n  var cmb = circNum(c.cambio, 15)",
+      "a": "  if (!N) return 1;\n  var cmb = circNum(c.cambio, 15)"
+    }
+  ]
+}

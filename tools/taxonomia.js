@@ -60,6 +60,11 @@ const casos = [
   ['Press cubano con mancuernas',              'Hombros',        'Fuerza',       'Accesorio',  '-'],
   ['Remo en sentadilla con peso corporal',     'Espalda',        'Fuerza',       'Tracción',   '-'],
   ['Flexiones en pino',                        'Hombros',        'Fuerza',       'Empuje',     'Avanzado'],
+  /* Los dos de abajo salieron el 10-sep-2026 al escribir los mutantes: dos
+     reglas de verdad que ningun caso tocaba, o sea que se podian romper sin
+     que saltara nada. */
+  ['Plancha con arrastre de trineo',           'Core',           'Fuerza',       'Core',       '-'],            /* el veto de «plancha» manda sobre «trineo»: no es Strongman */
+  ['Trabajo de isquiotibiales',                'Isquiotibiales', 'Fuerza',       'Bisagra',    '-'],            /* el nombre no dice el patron: lo decide el musculo */
 ];
 
 let ok = 0; const fallos = [];
