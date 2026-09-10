@@ -599,6 +599,39 @@ function extraerFuncion(nombre) {
   }
 })();
 
+/* --- La firma de los informes ----------------------------------------
+   El 9-sep-2026 la app firmaba el PDF de bioimpedancia, el informe de
+   rendimiento y el mensaje de compartir un protocolo como «Interno de
+   Kinesiologia, U. de Talca», con un membrete que decia KINESIOLOGIA.
+   Son documentos que se le entregan a la gente, y el titulo no existe
+   todavia: llega a inicios de 2027, unos 30 dias despues de la defensa.
+
+   Arreglar los diez sitios no impide que mañana aparezca una plantilla
+   nueva con la misma firma. Esto barre el archivo entero. */
+{
+  const RE_TITULO = /[Kk]inesiolog[ií]a|KINESIOLOGIA/g;
+  /* La unica excepcion, con su motivo: en la lista de frases debiles del
+     cifrado, «kinesiologia» es un ejemplo de contraseña previsible.
+     Quitarla de ahi debilitaria la comprobacion. */
+  const sueltas = [];
+  let mk;
+  while ((mk = RE_TITULO.exec(src)) !== null) {
+    const ctx = src.slice(Math.max(0, mk.index - 80), mk.index + 40);
+    if (ctx.indexOf('"kinesiologia"]') >= 0) continue;   // lista de frases debiles
+    sueltas.push('...' + ctx.slice(-70).replace(/\n/g, ' '));
+  }
+  comprobar('firma · ningun documento se firma con un titulo que aun no existe',
+    sueltas.length === 0,
+    sueltas.length + ' mencion(es) sin declarar: ' + sueltas.join('  |  '));
+
+  /* Y que la firma que SI se usa sea la que corresponde: es cierta hoy y
+     sigue siendo cierta despues del titulo, asi que no hay que volver a
+     tocarla ese dia — solo se le podra añadir algo. */
+  comprobar('firma · los informes van firmados como Profesor de Educacion Fisica',
+    src.indexOf('Profesor de Educación Física · Personal Trainer') > 0,
+    'la firma de los informes cambio a otra cosa');
+}
+
 /* =====================================================================
  * INFORME
  * ===================================================================== */

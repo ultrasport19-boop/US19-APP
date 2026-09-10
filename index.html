@@ -3529,8 +3529,9 @@ var SEED_VERSION = 20260612;
  * evaluación funcional, semáforo del dolor, reevaluación y alta).
  * true  = capa clínica visible y operativa.
  * false = capa clínica oculta por completo; los protocolos siguen funcionando igual.
- * Recomendado: mantener el uso enmarcado como "readaptación física" hasta la
- * titulación de kinesiología (fin 2026); luego dejar en true de forma definitiva. */
+ * Recomendado: mantener el uso enmarcado como "readaptación física" hasta que el
+ * título esté emitido (inicios de 2027, ~30 dias despues de la defensa
+ * de mediados de diciembre); luego dejar en true de forma definitiva. */
 var MODULO_REHAB_CLINICO_ACTIVO = true;
 function rehabClinicoOn(){ return !!MODULO_REHAB_CLINICO_ACTIVO; }
 
@@ -12112,7 +12113,7 @@ function openPhaseShareModal(protocolId, phaseIdx){
           + "Abrela desde tu celular, mira los videos y marca cada ejercicio que completes.\n"
           + "Registra tus molestias en la escala EVA (0 = sin dolor, 10 = dolor maximo).\n"
           + "Si sientes dolor por sobre lo indicado, detente y avisame.\n\n"
-          + "-- *Ultra-Sport 19* | Kinesiologia";
+          + "-- *Ultra-Sport 19* | Pencahue";
         return msg;
       }
 
@@ -17530,7 +17531,7 @@ function openFichaClinica(clientId){
     + fld("Inicio de síntomas","rcf-inicio",f.inicio,"Ej. hace 3 semanas / 10-06-2026")
     + '</div>'
     + fld("Mecanismo de lesión / evolución","rcf-mecanismo",f.mecanismo,"Cómo ocurrió, cómo ha evolucionado, qué lo agrava y qué lo alivia",true)
-    + fld("Tratamientos previos","rcf-tratamientos",f.tratamientos,"Kinesiología previa, medicamentos, infiltraciones, cirugías por esta lesión...",true)
+    + fld("Tratamientos previos","rcf-tratamientos",f.tratamientos,"Terapias previas, medicamentos, infiltraciones, cirugías por esta lesión...",true)
     + '<div class="form-grid cols-2">'
     + fld("Antecedentes médicos","rcf-antecedentes",f.antecedentes,"HTA, DM2, patologías relevantes")
     + fld("Cirugías previas","rcf-cirugias",f.cirugias,"Tipo y fecha")
@@ -23732,7 +23733,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
 
   const licTxt = ((payload.opts && payload.opts.licencia) || '').trim();
   const showStamp = !!(payload.opts && payload.opts.sello);
-  const stampSVG = showStamp ? `<div class="pr-stamp"><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="47" fill="none" stroke="#0e5132" stroke-width="2.5"/><circle cx="50" cy="50" r="39" fill="none" stroke="#0e5132" stroke-width="1"/><text x="50" y="45" text-anchor="middle" font-family="Inter,sans-serif" font-size="9.5" font-weight="800" fill="#0e5132">ULTRA-SPORT 19</text><text x="50" y="57" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" letter-spacing="1" fill="#0e5132">KINESIOLOGIA</text><line x1="26" y1="63" x2="74" y2="63" stroke="#0e5132" stroke-width="0.8"/><text x="50" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.5" fill="#0e5132">PENCAHUE - MAULE</text></svg></div>` : '';
+  const stampSVG = showStamp ? `<div class="pr-stamp"><svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="47" fill="none" stroke="#0e5132" stroke-width="2.5"/><circle cx="50" cy="50" r="39" fill="none" stroke="#0e5132" stroke-width="1"/><text x="50" y="45" text-anchor="middle" font-family="Inter,sans-serif" font-size="9.5" font-weight="800" fill="#0e5132">ULTRA-SPORT 19</text><text x="50" y="57" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" letter-spacing="1" fill="#0e5132">EVALUACIÓN</text><line x1="26" y1="63" x2="74" y2="63" stroke="#0e5132" stroke-width="0.8"/><text x="50" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.5" fill="#0e5132">PENCAHUE - MAULE</text></svg></div>` : '';
   const licLine = licTxt ? `<div class="pr-slic">Reg. N.º ${escapeHtml(licTxt)}</div>` : '';
   const consentLine = (payload.opts && payload.opts.consent) ? '<div class="pr-consent">El evaluado autoriza el registro y tratamiento de sus datos y mediciones con fines exclusivos de seguimiento del progreso físico.</div>' : '';
   const sigEvalImg = (payload.firmas && payload.firmas.evaluador) ? '<img class="pr-sigimg" src="' + payload.firmas.evaluador + '">' : '';
@@ -23757,7 +23758,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
         <div class="pr-sttl">Evaluador responsable</div>
         <div class="pr-sbody">
           <div class="pr-sname">Diego Valenzuela</div>
-          <div class="pr-srole">Interno de Kinesiología · U. de Talca</div>
+          <div class="pr-srole">Profesor de Educación Física · Personal Trainer</div>
           ${licLine}
           <div class="pr-sline"></div>
           <div class="pr-sigspace" style="height:13mm">${sigEvalImg}</div>
@@ -23792,7 +23793,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
         <div class="pr-sbody">
           <div class="pr-slogo">${USPORT_LOGO_SVG}</div>
           <div class="pr-sname">Diego Valenzuela</div>
-          <div class="pr-srole">Interno de Kinesiología<br>Universidad de Talca</div>
+          <div class="pr-srole">Prof. Educación Física<br>Personal Trainer</div>
           ${licLine}
           <div class="pr-sline"></div>
           <div class="pr-sigspace">${sigEvalImg}</div>
@@ -24508,7 +24509,7 @@ function infReporteDoc(p){
     evaluacion_inicial: E1,
     evaluacion_actual: E2,
     periodo: { dias: p.dias },
-    evaluador: "Diego Valenzuela, Interno de Kinesiología, U. de Talca",
+    evaluador: "Diego Valenzuela, Profesor de Educación Física · Personal Trainer",
     folio: p.folio || null,
     opts: p.opts || { consent: true },
     metas: p.metas || null,
@@ -26815,7 +26816,7 @@ function rndChrome(cli, m, opts){
   var hdr='<div class="pr-pagehdr">'
     +'<div class="pr-logo">'+USPORT_LOGO_SVG+'</div>'
     +'<div class="pr-ttl"><h1>INFORME DE RENDIMIENTO — NEUROMUSCULAR</h1>'
-    +'<p>Ultra-Sport 19 · Diego Valenzuela, Interno de Kinesiología, U. de Talca · Pencahue, Maule</p></div>'
+    +'<p>Ultra-Sport 19 · Diego Valenzuela, Profesor de Educación Física · Personal Trainer · Pencahue, Maule</p></div>'
     +'<div class="pr-pg">'+esc(cli.nombre||'')+'<br><span style="color:#94a3b8;font-weight:400;">'+per+'</span></div></div>';
 
   var foot='<div class="pr-pagefoot">'
@@ -26830,7 +26831,7 @@ function rndChrome(cli, m, opts){
       +'<circle cx="50" cy="50" r="47" fill="none" stroke="#0e5132" stroke-width="2.5"/>'
       +'<circle cx="50" cy="50" r="39" fill="none" stroke="#0e5132" stroke-width="1"/>'
       +'<text x="50" y="45" text-anchor="middle" font-family="Inter,sans-serif" font-size="9.5" font-weight="800" fill="#0e5132">ULTRA-SPORT 19</text>'
-      +'<text x="50" y="57" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" letter-spacing="1" fill="#0e5132">KINESIOLOGIA</text>'
+      +'<text x="50" y="57" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" letter-spacing="1" fill="#0e5132">EVALUACIÓN</text>'
       +'<line x1="26" y1="63" x2="74" y2="63" stroke="#0e5132" stroke-width="0.8"/>'
       +'<text x="50" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-size="5.5" fill="#0e5132">PENCAHUE - MAULE</text></svg></div>'
     : '';
@@ -26855,7 +26856,7 @@ function rndChrome(cli, m, opts){
     +'<div class="pr-sttl">Evaluador responsable</div><div class="pr-sbody">'
     +'<div class="pr-slogo">'+USPORT_LOGO_SVG+'</div>'
     +'<div class="pr-sname">Diego Valenzuela</div>'
-    +'<div class="pr-srole">Interno de Kinesiología<br>Universidad de Talca</div>'
+    +'<div class="pr-srole">Prof. Educación Física<br>Personal Trainer</div>'
     + licLine
     +'<div class="pr-sline"></div><div class="pr-sigspace">'+sigE+'</div>'
     +'<div class="pr-sorg">Ultra-Sport 19 · Pencahue, Maule</div>'
@@ -31909,7 +31910,7 @@ window.u19BateriaInforme = function(clientId){
     + '<h2>B · Historial completo</h2><table><thead><tr><th>Fecha</th><th>Prueba</th><th>Resultado</th><th>Lectura</th></tr></thead><tbody>' + hist + '</tbody></table>'
     + '<div class="leg"><b>Cómo leer este informe.</b> LSI (índice de simetría entre lados): 90 % o más, simetría adecuada · 85–89 %, vigilar · bajo 85 %, asimetría marcada. En las pruebas de tiempo, menos segundos es mejor; en las de nivel y toques, más es mejor. '
     + 'Los valores describen el rendimiento medido con ActivForce 2 y BlazePod en las fechas indicadas y sirven para ajustar el entrenamiento; no constituyen un diagnóstico.</div>'
-    + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Diego Valenzuela</b><span class="sub">Interno de Kinesiología · U. de Talca' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Ultra-Sport 19 · Pencahue, Maule</span></div>'
+    + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Diego Valenzuela</b><span class="sub">Profesor de Educación Física · Personal Trainer' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Ultra-Sport 19 · Pencahue, Maule</span></div>'
     + '<div class="sign"><div class="line"></div><b>' + escapeHtml(c.name || "—") + '</b><span class="sub">Deportista · toma conocimiento de sus resultados</span></div></div>'
     + '<div class="ft"><span>Ultra-Sport 19 · ' + escapeHtml(folio || "") + '</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
