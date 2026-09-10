@@ -624,12 +624,22 @@ function extraerFuncion(nombre) {
     sueltas.length === 0,
     sueltas.length + ' mencion(es) sin declarar: ' + sueltas.join('  |  '));
 
-  /* Y que la firma que SI se usa sea la que corresponde: es cierta hoy y
-     sigue siendo cierta despues del titulo, asi que no hay que volver a
-     tocarla ese dia — solo se le podra añadir algo. */
-  comprobar('firma · los informes van firmados como Profesor de Educacion Fisica',
-    src.indexOf('Profesor de Educación Física · Personal Trainer') > 0,
-    'la firma de los informes cambio a otra cosa');
+  /* Regla de Diego del 9-sep-2026: los informes firman SOLO como la marca.
+     Sin nombre y sin cargo. Un documento firmado por una empresa dice
+     «esto lo emite Ultra-Sport 19»; uno firmado por una persona con un
+     cargo dice «esto lo respalda esta persona en calidad de tal cosa», y
+     esa segunda frase abre preguntas que hoy no conviene abrir. Ademas asi
+     no hay que volver a tocarla nunca: la marca no cambia de titulo. */
+  const PERSONALES = ['Diego Valenzuela', 'Profesor de Educación Física',
+                      'Prof. Educación Física', 'Personal Trainer'];
+  const puestas = PERSONALES.filter(w => src.indexOf(w) >= 0);
+  comprobar('firma · ningun documento lleva nombre ni cargo de una persona',
+    puestas.length === 0,
+    'vuelve a aparecer: ' + puestas.join(', ') + '. Los informes firman solo como Ultra-Sport 19');
+
+  comprobar('firma · y el recuadro de firma dice la marca',
+    /<div class="pr-sname">Ultra-Sport 19<\/div>/.test(src),
+    'el recuadro de firma dejo de decir Ultra-Sport 19');
 }
 
 /* =====================================================================

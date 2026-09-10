@@ -15918,7 +15918,7 @@ window.circImprimirObj = function(c){
     + 'table{border-collapse:collapse;width:100%;margin-top:6px}th,td{border:1px solid #bbb;padding:5px 7px;text-align:left;vertical-align:top}th{background:#f2f2f2;font-size:11px;text-transform:uppercase;letter-spacing:.05em}'
     + '.rot td,.rot th{text-align:center}.firma{margin-top:26px;display:flex;gap:40px}.firma div{flex:1;border-top:1px solid #333;padding-top:4px;font-size:11px;color:#444}@media print{body{margin:12mm}}</style></head><body>'
     + '<h1>' + escapeHtml(c.nombre || "Circuito") + '</h1>'
-    + '<p class="meta">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + 'Fecha: ____ / ____ / ______ · Ultra-Sport 19 · Diego Valenzuela</p>'
+    + '<p class="meta">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + 'Fecha: ____ / ____ / ______ · Ultra-Sport 19</p>'
     + (c.notas ? '<p><b>Objetivo / notas:</b> ' + escapeHtml(c.notas) + '</p>' : '')
     + '<p><b>Material:</b> ' + escapeHtml(circMaterial(c) || "solo peso corporal") + (c.estaciones.some(function(s){ return !s.exerciseId; }) ? ' · estaciones libres: anotar aparte' : '') + '</p>'
     + '<div class="kv"><span>Modo: ' + (c.modo === "secuencia" ? "secuencia" : "rotación por grupos") + '</span><span>Estaciones: ' + N + '</span>'
@@ -23755,10 +23755,10 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
   const firmasCompact = `
     <div class="pr-signs">
       <div class="pr-sign evaluator">${stampSVG}
-        <div class="pr-sttl">Evaluador responsable</div>
+        <div class="pr-sttl">Emitido por</div>
         <div class="pr-sbody">
-          <div class="pr-sname">Diego Valenzuela</div>
-          <div class="pr-srole">Profesor de Educación Física · Personal Trainer</div>
+          <div class="pr-sname">Ultra-Sport 19</div>
+          <div class="pr-srole">Pencahue, Maule</div>
           ${licLine}
           <div class="pr-sline"></div>
           <div class="pr-sigspace" style="height:13mm">${sigEvalImg}</div>
@@ -23789,11 +23789,11 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
     </div>
     <div class="pr-signs pr-signs-page">
       <div class="pr-sign evaluator">${stampSVG}
-        <div class="pr-sttl">Evaluador responsable</div>
+        <div class="pr-sttl">Emitido por</div>
         <div class="pr-sbody">
           <div class="pr-slogo">${USPORT_LOGO_SVG}</div>
-          <div class="pr-sname">Diego Valenzuela</div>
-          <div class="pr-srole">Prof. Educación Física<br>Personal Trainer</div>
+          <div class="pr-sname">Ultra-Sport 19</div>
+          <div class="pr-srole">Pencahue, Maule</div>
           ${licLine}
           <div class="pr-sline"></div>
           <div class="pr-sigspace">${sigEvalImg}</div>
@@ -24509,7 +24509,7 @@ function infReporteDoc(p){
     evaluacion_inicial: E1,
     evaluacion_actual: E2,
     periodo: { dias: p.dias },
-    evaluador: "Diego Valenzuela, Profesor de Educación Física · Personal Trainer",
+    evaluador: "Ultra-Sport 19",
     folio: p.folio || null,
     opts: p.opts || { consent: true },
     metas: p.metas || null,
@@ -26816,7 +26816,7 @@ function rndChrome(cli, m, opts){
   var hdr='<div class="pr-pagehdr">'
     +'<div class="pr-logo">'+USPORT_LOGO_SVG+'</div>'
     +'<div class="pr-ttl"><h1>INFORME DE RENDIMIENTO — NEUROMUSCULAR</h1>'
-    +'<p>Ultra-Sport 19 · Diego Valenzuela, Profesor de Educación Física · Personal Trainer · Pencahue, Maule</p></div>'
+    +'<p>Ultra-Sport 19 · Pencahue, Maule</p></div>'
     +'<div class="pr-pg">'+esc(cli.nombre||'')+'<br><span style="color:#94a3b8;font-weight:400;">'+per+'</span></div></div>';
 
   var foot='<div class="pr-pagefoot">'
@@ -26853,10 +26853,10 @@ function rndChrome(cli, m, opts){
     +'<p>Conformidad con los resultados presentados en el informe</p></div></div>'
     +'<div class="pr-signs pr-signs-page">'
     +'<div class="pr-sign evaluator">'+stamp
-    +'<div class="pr-sttl">Evaluador responsable</div><div class="pr-sbody">'
+    +'<div class="pr-sttl">Emitido por</div><div class="pr-sbody">'
     +'<div class="pr-slogo">'+USPORT_LOGO_SVG+'</div>'
-    +'<div class="pr-sname">Diego Valenzuela</div>'
-    +'<div class="pr-srole">Prof. Educación Física<br>Personal Trainer</div>'
+    +'<div class="pr-sname">Ultra-Sport 19</div>'
+    +'<div class="pr-srole">Pencahue, Maule</div>'
     + licLine
     +'<div class="pr-sline"></div><div class="pr-sigspace">'+sigE+'</div>'
     +'<div class="pr-sorg">Ultra-Sport 19 · Pencahue, Maule</div>'
@@ -31114,7 +31114,7 @@ window.u19PlantelInforme = function(){
     + '</div>'
     + '<h2>Personas</h2><table><thead><tr><th>Persona</th><th>N.º</th><th>Primera</th><th>Última</th><th>Peso (Δ)</th><th>Grasa (Δ)</th><th>Músculo (Δ)</th><th>Lectura</th></tr></thead><tbody>' + filas + '</tbody></table>'
     + '<div class="leg"><b>Cómo leer.</b> Mejora: baja 1 punto o más de grasa, o sube 0,5 kg o más de músculo sin subir grasa. Sube grasa: 1 punto o más. Se estanca: nada de eso en 8 semanas o más. En curso: aún no pasaron 8 semanas. Δ es el cambio entre la primera y la última medición de la ventana. Fuente: bioimpedancia Fitdays registrada en Notion; describe composición corporal y no constituye un diagnóstico.</div>'
-    + '<div class="ft"><span>Ultra-Sport 19 · Diego Valenzuela</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
+    + '<div class="ft"><span>Ultra-Sport 19</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
   w.document.open(); w.document.write(html); w.document.close();
   toast("Resumen del plantel listo: guárdalo como PDF desde el diálogo de impresión", "success");
@@ -31910,7 +31910,7 @@ window.u19BateriaInforme = function(clientId){
     + '<h2>B · Historial completo</h2><table><thead><tr><th>Fecha</th><th>Prueba</th><th>Resultado</th><th>Lectura</th></tr></thead><tbody>' + hist + '</tbody></table>'
     + '<div class="leg"><b>Cómo leer este informe.</b> LSI (índice de simetría entre lados): 90 % o más, simetría adecuada · 85–89 %, vigilar · bajo 85 %, asimetría marcada. En las pruebas de tiempo, menos segundos es mejor; en las de nivel y toques, más es mejor. '
     + 'Los valores describen el rendimiento medido con ActivForce 2 y BlazePod en las fechas indicadas y sirven para ajustar el entrenamiento; no constituyen un diagnóstico.</div>'
-    + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Diego Valenzuela</b><span class="sub">Profesor de Educación Física · Personal Trainer' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Ultra-Sport 19 · Pencahue, Maule</span></div>'
+    + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Ultra-Sport 19</b><span class="sub">Pencahue, Maule' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Informe emitido por el centro</span></div>'
     + '<div class="sign"><div class="line"></div><b>' + escapeHtml(c.name || "—") + '</b><span class="sub">Deportista · toma conocimiento de sus resultados</span></div></div>'
     + '<div class="ft"><span>Ultra-Sport 19 · ' + escapeHtml(folio || "") + '</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
