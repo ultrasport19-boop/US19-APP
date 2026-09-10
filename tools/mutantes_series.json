@@ -1,0 +1,87 @@
+{
+  "suite": "tools/series.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "la sesión a la que no asistió gasta sesión de la serie",
+      "de": "    if (s && s.asistio === true) hechas++;\n    else if (s) faltas++;",
+      "a": "    if (s) hechas++;"
+    },
+    {
+      "nombre": "se quita el tope y once sesiones cuentan como once de diez",
+      "de": "  if (hechas > total) hechas = total;",
+      "a": "  if (false) hechas = total;"
+    },
+    {
+      "nombre": "nueve sesiones ya cuentan como serie completa",
+      "de": "           completa: total > 0 && hechas >= total };",
+      "a": "           completa: total > 0 && hechas >= total - 1 };"
+    },
+    {
+      "nombre": "toda serie se trata como de diez y se ignora lo indicado",
+      "de": "  var total = Number(indicadas) > 0 ? Math.floor(Number(indicadas)) : 0;",
+      "a": "  var total = 10;"
+    },
+    {
+      "nombre": "los días vuelven a contarse restando instantes",
+      "de": "  var ta = Date.UTC(Number(a[0]), Number(a[1]) - 1, Number(a[2]));\n  var tb = Date.UTC(Number(b[0]), Number(b[1]) - 1, Number(b[2]));",
+      "a": "  var ta = new Date(String(desdeISO).slice(0,10) + 'T00:00:00').getTime();\n  var tb = new Date(String(hastaISO).slice(0,10) + 'T12:00:00').getTime();"
+    },
+    {
+      "nombre": "una fecha ilegible pasa por hoy en vez de dar null",
+      "de": "  if (a.length !== 3 || b.length !== 3) return null;",
+      "a": "  if (a.length !== 3 || b.length !== 3) return 0;"
+    },
+    {
+      "nombre": "la orden médica avisa pero ya no bloquea",
+      "de": "    return { bloquea:true, clase:\"bad\", texto:\"FALTA la orden médica: la serie no puede empezar\" };",
+      "a": "    return { bloquea:false, clase:\"warn\", texto:\"FALTA la orden médica: la serie no puede empezar\" };"
+    },
+    {
+      "nombre": "la orden vencida deja de bloquear",
+      "de": "    if (d < 0) return { bloquea:true, clase:\"bad\", texto:\"la orden médica venció hace \" + (-d) + \" días: hay que renovarla\" };",
+      "a": "    if (d < -30) return { bloquea:true, clase:\"bad\", texto:\"la orden médica venció hace \" + (-d) + \" días: hay que renovarla\" };"
+    },
+    {
+      "nombre": "una serie parada un mes se pinta de verde",
+      "de": "  if (d <= 10) return { color:\"v\", texto:\"al día (\" + d + \" d)\" };",
+      "a": "  if (d <= 100) return { color:\"v\", texto:\"al día (\" + d + \" d)\" };"
+    },
+    {
+      "nombre": "la serie sin ninguna sesión se pinta de verde",
+      "de": "  if (!ultimaISO) return { color:\"a\", texto:\"sin ninguna sesión todavía\" };",
+      "a": "  if (!ultimaISO) return { color:\"v\", texto:\"sin ninguna sesión todavía\" };"
+    },
+    {
+      "nombre": "la casilla que toca se adelanta contando también las faltas",
+      "de": "    out.push({ n:i, estado: i <= c.hechas ? \"hecha\" : (i === c.hechas + 1 ? \"hoy\" : \"\") });",
+      "a": "    out.push({ n:i, estado: i <= c.hechas ? \"hecha\" : (i === c.hechas + c.faltas + 1 ? \"hoy\" : \"\") });"
+    },
+    {
+      "nombre": "la evolución sale del revés, con lo más viejo arriba",
+      "de": "    .sort(function(a,b){ return String(a.fecha) < String(b.fecha) ? 1 : -1; });",
+      "a": "    .sort(function(a,b){ return String(a.fecha) < String(b.fecha) ? -1 : 1; });"
+    },
+    {
+      "nombre": "la última sesión cuenta también las faltas",
+      "de": "  return (sesiones || []).filter(function(s){ return s.asistio; })",
+      "a": "  return (sesiones || []).filter(function(s){ return s; })"
+    },
+    {
+      "nombre": "se deja de escapar lo que escribe una persona",
+      "de": "    .replace(/&/g,\"&amp;\").replace(/</g,\"&lt;\").replace(/>/g,\"&gt;\").replace(/\"/g,\"&quot;\");",
+      "a": "    .replace(/&/g,\"&amp;\");"
+    },
+    {
+      "nombre": "la casilla se puede marcar aunque falte la orden médica",
+      "de": "      var puede = !o.bloquea && k.estado === \"hoy\";",
+      "a": "      var puede = k.estado === \"hoy\";"
+    },
+    {
+      "nombre": "el apartado deja de estar enchufado a su vista",
+      "de": "  else if (name===\"series\") renderSeries();",
+      "a": "  else if (name===\"__nada__\") renderSeries();"
+    }
+  ]
+}

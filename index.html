@@ -236,6 +236,34 @@ img{max-width:100%;display:block;}
 .exercise-row .ex-actions{display:flex;gap:.3rem;}
 .exercise-row .ex-actions button{padding:.3rem .5rem;font-size:.72rem;}
 
+/* === MÓDULO SERIES (rehabilitación) ===
+   Una serie es un bloque cerrado de N sesiones con su orden médica. Se
+   cuenta de una en una y hay que poder verlas: casillas, no una barra. */
+.sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:.75rem;margin-top:.8rem}
+.sr-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.55rem}
+.sr-card.sr-bloqueada{border-color:rgba(229,72,77,.45)}
+.sr-nom{font-weight:700;font-size:.95rem;display:flex;justify-content:space-between;gap:.5rem;align-items:center}
+.sr-meta{font-size:.72rem;color:var(--muted);display:flex;gap:.6rem;flex-wrap:wrap}
+.sr-meta b{color:var(--text);font-weight:600}
+.sr-diez{display:flex;gap:.22rem;flex-wrap:wrap}
+.sr-diez button{width:1.5rem;height:1.5rem;border-radius:var(--radius-sm);border:1px solid var(--border);display:grid;place-items:center;font-family:var(--font-mono);font-size:.68rem;color:var(--muted);background:var(--surface-1);cursor:pointer;padding:0}
+.sr-diez button.hecha{background:var(--accent);border-color:var(--accent);color:#0b1014;font-weight:700}
+.sr-diez button.hoy{border-color:var(--accent);border-width:2px;color:var(--accent)}
+.sr-diez button:disabled{cursor:default}
+.sr-linea{font-size:.8rem;display:flex;align-items:center;gap:.4rem}
+.sr-sem{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.sr-sem.v{background:#2fbf71}.sr-sem.a{background:var(--warn)}.sr-sem.r{background:#e5484d}
+.sr-aviso{border-radius:var(--radius);padding:.5rem .7rem;font-size:.76rem;font-weight:600}
+.sr-aviso.bad{background:rgba(229,72,77,.12);border:1px solid rgba(229,72,77,.45);color:#ff8a8e}
+.sr-aviso.warn{background:rgba(234,179,8,.09);border:1px solid rgba(234,179,8,.35);color:var(--warn)}
+.sr-aviso.ok{background:rgba(47,191,113,.1);border:1px solid rgba(47,191,113,.35);color:#6fe0a8}
+.sr-evo{border-top:1px solid var(--border);padding-top:.5rem;display:flex;flex-direction:column;gap:.3rem}
+.sr-evo-item{font-size:.74rem;display:grid;grid-template-columns:auto 1fr;gap:.5rem}
+.sr-evo-item time{font-family:var(--font-mono);font-size:.67rem;color:var(--muted);white-space:nowrap}
+.sr-evo-vacio{font-size:.74rem;color:var(--muted);font-style:italic}
+.sr-vacio{border:1px dashed var(--border);border-radius:var(--radius-lg);padding:1.6rem;text-align:center;color:var(--muted);font-size:.88rem;line-height:1.6}
+.sr-acc{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.2rem}
+
 /* === MÓDULO PROTOCOLOS DE REHABILITACIÓN === */
 .phase-tabs{display:flex;gap:.4rem;margin-bottom:1rem;overflow-x:auto;}
 .phase-tab{flex:1;min-width:120px;padding:.7rem .6rem;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-1);cursor:pointer;text-align:center;transition:all .15s;position:relative;}
@@ -887,6 +915,7 @@ img{max-width:100%;display:block;}
 <button class="tab-btn" data-tab="circuitos">Circuitos</button>
     <button class="tab-btn" data-tab="library">Biblioteca</button>
     <button class="tab-btn" data-tab="rehab">Protocolos</button>
+    <button class="tab-btn" data-tab="series">Series</button>
     <button class="tab-btn" data-tab="finanzas">Finanzas</button>
     <button class="tab-btn" data-tab="horas">Horas</button>
     <button class="tab-btn" data-tab="informes">Informes</button>
@@ -902,6 +931,7 @@ img{max-width:100%;display:block;}
   <section class="view" id="view-circuitos"></section>
   <section class="view" id="view-library"></section>
   <section class="view" id="view-rehab"></section>
+  <section class="view" id="view-series"></section>
   <section class="view" id="view-finanzas"></section>
   <section class="view" id="view-horas"></section>
   <section class="view" id="view-informes"></section>
@@ -4110,6 +4140,7 @@ function showView(name){
   else if (name==="circuitos") renderCircuitos();
   else if (name==="library") renderLibrary();
   else if (name==="rehab") renderRehab();
+  else if (name==="series") renderSeries();
   else if (name==="finanzas") renderBolsillo();
   else if (name==="horas") renderHoras();
   else if (name==="informes") renderInformes();
@@ -11173,6 +11204,230 @@ function makeProtocolPhases(){
   return PHASE_DEFAULTS.map(function(d){
     return { name:d.name, focus:d.focus, objetivo:d.objetivo, criterios:d.criterios, exercises:[] };
   });
+}
+
+/* ============================================================
+   SERIES DE REHABILITACIÓN
+
+   Una serie es un bloque cerrado de N sesiones con su orden médica.
+   Tres reglas que no son evidentes y que están probadas en tools/series.js:
+
+   1. Una sesión a la que la persona NO fue se anota, pero NO gasta sesión
+      de la serie. Es la misma regla que el rollup de Notion, que cuenta
+      números de sesión y no filas. Si aquí se contaran filas, la app y
+      Notion darían números distintos para lo mismo.
+   2. La orden médica BLOQUEA, no avisa. Ausente y vencida se distinguen en
+      el texto porque no se arreglan igual: una hay que pedirla y la otra
+      renovarla.
+   3. El semáforo mide días desde la ÚLTIMA sesión, no desde el inicio: una
+      serie de 10 que tarda seis meses no es una serie, es alguien que dejó
+      de venir.
+
+   Los días se cuentan con Date.UTC y por texto. Nunca restando instantes:
+   el cambio de hora de Chile mueve el resultado un día entero.
+   ============================================================ */
+
+var SERIES_KEY = "US19_SERIES_V1";
+
+function seriesLeer(){
+  try { return JSON.parse(localStorage.getItem(SERIES_KEY) || "[]"); }
+  catch(e){ return []; }
+}
+function seriesGuardar(lista){
+  try { localStorage.setItem(SERIES_KEY, JSON.stringify(lista)); } catch(e){}
+}
+
+/* Días enteros entre dos fechas. null -y no cero- si no se entiende: un
+   cero significaría «hoy», que es justo lo que colaría una fecha rota. */
+function seriesDias_(desdeISO, hastaISO){
+  var a = String(desdeISO || "").slice(0,10).split("-");
+  var b = String(hastaISO || "").slice(0,10).split("-");
+  if (a.length !== 3 || b.length !== 3) return null;
+  var ta = Date.UTC(Number(a[0]), Number(a[1]) - 1, Number(a[2]));
+  var tb = Date.UTC(Number(b[0]), Number(b[1]) - 1, Number(b[2]));
+  if (isNaN(ta) || isNaN(tb)) return null;
+  return Math.round((tb - ta) / 86400000);
+}
+
+function seriesContar_(sesiones, indicadas){
+  var total = Number(indicadas) > 0 ? Math.floor(Number(indicadas)) : 0;
+  var hechas = 0, faltas = 0;
+  (sesiones || []).forEach(function(s){
+    if (s && s.asistio === true) hechas++;
+    else if (s) faltas++;
+  });
+  if (hechas > total) hechas = total;
+  return { indicadas: total, hechas: hechas, faltas: faltas,
+           /* Sin Math.max: `hechas` ya viene topado justo arriba, así que
+              esto no puede salir negativo. Una defensa inalcanzable no
+              protege de nada y hace creer que el tope se puede quitar. */
+           quedan: total - hechas,
+           completa: total > 0 && hechas >= total };
+}
+
+function seriesSemaforo_(ultimaISO, hoyISO, completa){
+  if (completa) return { color:"v", texto:"serie completa" };
+  if (!ultimaISO) return { color:"a", texto:"sin ninguna sesión todavía" };
+  var d = seriesDias_(ultimaISO, hoyISO);
+  if (d === null) return { color:"a", texto:"fecha ilegible" };
+  if (d <= 10) return { color:"v", texto:"al día (" + d + " d)" };
+  if (d <= 21) return { color:"a", texto:"lleva " + d + " días sin sesión" };
+  return { color:"r", texto:"lleva " + d + " días sin sesión" };
+}
+
+function seriesOrden_(orden, hoyISO){
+  if (!orden || !orden.adjunta){
+    return { bloquea:true, clase:"bad", texto:"FALTA la orden médica: la serie no puede empezar" };
+  }
+  if (orden.vence){
+    var d = seriesDias_(hoyISO, orden.vence);
+    if (d === null) return { bloquea:true, clase:"bad", texto:"la orden médica tiene una fecha ilegible" };
+    if (d < 0) return { bloquea:true, clase:"bad", texto:"la orden médica venció hace " + (-d) + " días: hay que renovarla" };
+    if (d <= 15) return { bloquea:false, clase:"warn", texto:"la orden médica vence en " + d + " días" };
+  }
+  return { bloquea:false, clase:"ok", texto:"orden médica al día" };
+}
+
+function seriesCasillas_(sesiones, indicadas){
+  var c = seriesContar_(sesiones, indicadas);
+  var out = [];
+  for (var i = 1; i <= c.indicadas; i++){
+    out.push({ n:i, estado: i <= c.hechas ? "hecha" : (i === c.hechas + 1 ? "hoy" : "") });
+  }
+  return out;
+}
+
+function seriesEvolucion_(sesiones){
+  return (sesiones || []).filter(function(s){ return s && s.nota; }).slice()
+    .sort(function(a,b){ return String(a.fecha) < String(b.fecha) ? 1 : -1; });
+}
+
+function seriesUltima_(sesiones){
+  return (sesiones || []).filter(function(s){ return s.asistio; })
+    .map(function(s){ return s.fecha; }).sort().pop() || "";
+}
+
+function seriesHoyISO(){
+  var d = new Date();
+  return d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
+}
+
+/* Escapar SIEMPRE: aquí entran nombres de personas y notas escritas a mano. */
+function seriesEsc_(t){
+  return String(t === undefined || t === null ? "" : t)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function renderSeries(){
+  var cont = document.getElementById("view-series");
+  if (!cont) return;
+  var lista = seriesLeer();
+  var hoy = seriesHoyISO();
+  var h = ['<div class="section-head"><h2>Series</h2>'
+    + '<button class="btn btn-primary" onclick="seriesNueva()">Nueva serie</button></div>'];
+
+  if (!lista.length){
+    h.push('<div class="sr-vacio">Todavía no hay ninguna serie.<br>'
+      + 'Una serie es un bloque cerrado de sesiones con su orden médica: '
+      + 'se cuenta de una en una y no avanza cuando la persona no viene.<br>'
+      + 'Pulsa <b>Nueva serie</b> para crear la primera.</div>');
+    cont.innerHTML = h.join("");
+    return;
+  }
+
+  h.push('<div class="sr-grid">');
+  lista.forEach(function(p, idx){
+    var c = seriesContar_(p.sesiones, p.indicadas);
+    var o = seriesOrden_(p.orden, hoy);
+    var sem = seriesSemaforo_(seriesUltima_(p.sesiones), hoy, c.completa);
+    var evo = seriesEvolucion_(p.sesiones);
+
+    h.push('<article class="sr-card' + (o.bloquea ? " sr-bloqueada" : "") + '">');
+    h.push('<div class="sr-nom"><span>' + seriesEsc_(p.nombre) + '</span>'
+      + '<button class="btn btn-ghost btn-sm" title="Eliminar esta serie" onclick="seriesEliminar(' + idx + ')">✕</button></div>');
+    h.push('<div class="sr-meta"><span>sesión <b>' + c.hechas + " de " + c.indicadas + '</b></span>'
+      + '<span>quedan <b>' + c.quedan + '</b></span>'
+      + (c.faltas ? '<span>no asistió <b>' + c.faltas + '</b></span>' : "") + '</div>');
+
+    h.push('<div class="sr-diez">');
+    seriesCasillas_(p.sesiones, p.indicadas).forEach(function(k){
+      var puede = !o.bloquea && k.estado === "hoy";
+      h.push('<button class="' + k.estado + '"' + (puede ? ' onclick="seriesMarcar(' + idx + ',true)"' : " disabled")
+        + ' title="' + (puede ? "Marcar esta sesión como hecha" : "") + '">' + k.n + "</button>");
+    });
+    h.push("</div>");
+
+    h.push('<div class="sr-linea"><span class="sr-sem ' + sem.color + '"></span>' + sem.texto + "</div>");
+    h.push('<div class="sr-aviso ' + o.clase + '">' + o.texto + "</div>");
+
+    h.push('<div class="sr-acc">');
+    if (!o.bloquea && !c.completa){
+      h.push('<button class="btn btn-sm" onclick="seriesMarcar(' + idx + ',false)">No vino hoy</button>');
+      h.push('<button class="btn btn-sm" onclick="seriesNota(' + idx + ')">Anotar evolución</button>');
+    }
+    if (o.bloquea) h.push('<button class="btn btn-sm" onclick="seriesOrdenPedir(' + idx + ')">Registrar orden médica</button>');
+    h.push("</div>");
+
+    h.push('<div class="sr-evo">');
+    if (!evo.length) h.push('<div class="sr-evo-vacio">Sin notas de evolución todavía.</div>');
+    else evo.slice(0,3).forEach(function(s){
+      h.push('<div class="sr-evo-item"><time>' + seriesEsc_(s.fecha) + "</time><span>" + seriesEsc_(s.nota) + "</span></div>");
+    });
+    h.push("</div></article>");
+  });
+  h.push("</div>");
+  cont.innerHTML = h.join("");
+}
+
+function seriesNueva(){
+  var nombre = window.prompt("¿De quién es la serie? (nombre y apellido)");
+  if (!nombre || !nombre.trim()) return;
+  var n = window.prompt("¿Cuántas sesiones indicadas?", "10");
+  var total = Number(n);
+  if (!(total > 0)){ window.alert("El número de sesiones tiene que ser mayor que cero."); return; }
+  var lista = seriesLeer();
+  lista.push({ nombre: nombre.trim(), indicadas: Math.floor(total), sesiones: [], orden: null, creada: seriesHoyISO() });
+  seriesGuardar(lista);
+  renderSeries();
+}
+
+function seriesOrdenPedir(idx){
+  var lista = seriesLeer();
+  if (!lista[idx]) return;
+  if (!window.confirm("¿Tienes la orden médica de " + lista[idx].nombre + " a la vista?")) return;
+  var v = window.prompt("¿Hasta cuándo vale? (AAAA-MM-DD, o vacío si no vence)", "");
+  lista[idx].orden = { adjunta:true, vence: (v || "").trim() };
+  seriesGuardar(lista);
+  renderSeries();
+}
+
+function seriesMarcar(idx, asistio){
+  var lista = seriesLeer();
+  if (!lista[idx]) return;
+  lista[idx].sesiones = lista[idx].sesiones || [];
+  lista[idx].sesiones.push({ fecha: seriesHoyISO(), asistio: !!asistio, nota: "" });
+  seriesGuardar(lista);
+  renderSeries();
+}
+
+function seriesNota(idx){
+  var lista = seriesLeer();
+  if (!lista[idx]) return;
+  var t = window.prompt("Evolución de hoy (una línea)");
+  if (!t || !t.trim()) return;
+  lista[idx].sesiones = lista[idx].sesiones || [];
+  lista[idx].sesiones.push({ fecha: seriesHoyISO(), asistio: null, nota: t.trim(), soloNota: true });
+  seriesGuardar(lista);
+  renderSeries();
+}
+
+function seriesEliminar(idx){
+  var lista = seriesLeer();
+  if (!lista[idx]) return;
+  if (!window.confirm("¿Eliminar la serie de " + lista[idx].nombre + "? No se puede deshacer.")) return;
+  lista.splice(idx, 1);
+  seriesGuardar(lista);
+  renderSeries();
 }
 
 function renderRehab(){
