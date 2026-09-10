@@ -1,0 +1,47 @@
+{
+  "suite": "tools/cifrado.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "el estado vuelve a subirse EN CLARO cuando no hay clave",
+      "de": "  return Promise.reject(new Error(\"Sincronización cifrada obligatoria: falta la clave\"));",
+      "a": "  return Promise.resolve(jsonStr);"
+    },
+    {
+      "nombre": "el cifrado deja de ser obligatorio si el ajuste esta apagado",
+      "de": "  if (settings.encEnabled && encUnlocked()) return encEncryptPayload(jsonStr).then(function(env){ return JSON.stringify(env); });",
+      "a": "  if (settings.encEnabled && encUnlocked()) return encEncryptPayload(jsonStr).then(function(env){ return JSON.stringify(env); });\n  if (!settings.encEnabled) return Promise.resolve(jsonStr);"
+    },
+    {
+      "nombre": "las vueltas de PBKDF2 bajan de 1.200.000 a mil",
+      "de": "var ENC_PBKDF2_ITERS = 1200000;",
+      "a": "var ENC_PBKDF2_ITERS = 1000;"
+    },
+    {
+      "nombre": "la sal y el vector de inicializacion dejan de ser aleatorios",
+      "de": "function _encRand(n){ var a=new Uint8Array(n); window.crypto.getRandomValues(a); return a; }",
+      "a": "function _encRand(n){ return new Uint8Array(n); }"
+    },
+    {
+      "nombre": "el sobre del payload reutiliza siempre el mismo vector",
+      "de": "  var iv=_encRand(12);",
+      "a": "  var iv=new Uint8Array(12);"
+    },
+    {
+      "nombre": "la master key deja de generarse al azar",
+      "de": "  var mk=_encRand(32), recovery=encGenRecoveryKey();",
+      "a": "  var mk=new Uint8Array(32), recovery=encGenRecoveryKey();"
+    },
+    {
+      "nombre": "el respaldo cifrado baja sus vueltas a mil",
+      "de": "var RESP_ITERS   = 1200000;",
+      "a": "var RESP_ITERS   = 1000;"
+    },
+    {
+      "nombre": "el sobre del respaldo miente sobre las vueltas que uso",
+      "de": "             kdf: { alg: \"PBKDF2-SHA256\", iters: RESP_ITERS, salt: _encB64(salt) },",
+      "a": "             kdf: { alg: \"PBKDF2-SHA256\", iters: 1000, salt: _encB64(salt) },"
+    }
+  ]
+}

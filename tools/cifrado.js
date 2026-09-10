@@ -50,7 +50,13 @@ function abortar(motivo) {
    se renombra, esto aborta en vez de probar un trozo equivocado. */
 
 const INI = 'var ENC_MK_KEY';
-const FIN = 'function _syncPrepareContent';
+/* El corte llegaba HASTA `_syncPrepareContent`, o sea que la dejaba FUERA.
+   Y esa funcion es la que publico el estado de los socios en claro durante
+   ocho semanas (auditoria del 8-sep-2026): la guarda que lo impide se
+   escribio, pero ninguna de las 121 comprobaciones la miraba. Un mutante
+   que la devolviera a `return Promise.resolve(jsonStr)` pasaba en verde.
+   Ahora el corte la incluye y se ejecuta abajo. */
+const FIN = 'function _syncMaybeDecrypt';
 const iIni = src.indexOf(INI);
 const iFin = src.indexOf(FIN);
 if (iIni < 0) abortar('no encuentro "' + INI + '" en ' + path.basename(ruta) + ' (¿se movio el modulo de cifrado?)');
@@ -67,6 +73,7 @@ const modulo = src.slice(iIni, iFin);
   '_encDevKeyGet', '_encGuardarMK', '_encCargarMKDe', 'encFuerzaFrase',
   'encDesbloquearConPin', 'encCambiarFrase',
   'encOrdenSecretos', 'encFetchEnvelope', 'encNormalizarClaveRec',
+  '_syncPrepareContent',
 ].forEach(function (f) {
   if (modulo.indexOf('function ' + f) < 0) abortar('el modulo extraido no contiene ' + f + '()');
 });
@@ -132,6 +139,7 @@ function nuevoEntorno(store0, idb0) {
     'encFuerzaFrase', 'encPinActivar', 'encPinDesactivar', 'encDesbloquearConPin',
     'encCambiarFrase', 'encRegenerarRecuperacion', 'encNormalizarClaveRec',
     'encOrdenSecretos', 'encFetchEnvelope', '_encFallos', 'ENC_FALLOS_KEY',
+    '_syncPrepareContent',
   ].join(', ') + ' })', ctx);
   const api = vm.runInContext('({ encSetup:encSetup, encUnlock:encUnlock, encEncryptPayload:encEncryptPayload,'
     + ' encDecryptPayload:encDecryptPayload, encGenRecoveryKey:encGenRecoveryKey,'
@@ -142,7 +150,8 @@ function nuevoEntorno(store0, idb0) {
     + ' encCambiarFrase:encCambiarFrase, encRegenerarRecuperacion:encRegenerarRecuperacion,'
     + ' encNormalizarClaveRec:encNormalizarClaveRec,'
     + ' encOrdenSecretos:encOrdenSecretos, encFetchEnvelope:encFetchEnvelope,'
-    + ' _encFallos:_encFallos, ENC_FALLOS_KEY:ENC_FALLOS_KEY })', ctx);
+    + ' _encFallos:_encFallos, ENC_FALLOS_KEY:ENC_FALLOS_KEY,'
+    + ' _syncPrepareContent:_syncPrepareContent })', ctx);
   return { api: api, ctx: ctx, store: store, idb: idb, settings: settings, localStorage: localStorage };
 }
 
@@ -226,6 +235,83 @@ async function principal() {
   comprobar('cifrar · dos cifrados del mismo estado dan resultados distintos',
     sobre.data.ct !== sobre2.data.ct && sobre.data.iv !== sobre2.data.iv,
     'un iv repetido en AES-GCM rompe la confidencialidad');
+
+  /* b bis) EL CERROJO DE LA SUBIDA ---------------------------------
+
+     Esto es lo que fallo de verdad. Hasta el 8-sep-2026,
+     `_syncPrepareContent` devolvia `Promise.resolve(jsonStr)` cuando el
+     cifrado estaba apagado o el equipo bloqueado: PUBLICABA el estado tal
+     cual, y el badge seguia diciendo «Sincronizado». 152 de 207 subidas
+     viajaron en claro a un repositorio publico durante ocho semanas.
+
+     La guarda se escribio ese dia. Lo que faltaba era esto: nadie la
+     probaba, porque el corte del modulo la dejaba fuera. */
+
+  /* Con clave y desbloqueado: sale un sobre, no el texto. */
+  A.settings.encEnabled = true;
+  const preparado = await A.api._syncPrepareContent(ESTADO);
+  comprobar('subida · con la clave puesta devuelve un sobre cifrado',
+    typeof preparado === 'string' && JSON.parse(preparado).enc === 1);
+  comprobar('subida · y lo que se subiria NO lleva el telefono del socio',
+    preparado.indexOf('+56 9 0000 0000') < 0,
+    'esto es exactamente lo que viajo en claro ocho semanas');
+
+  /* Sin cifrado activado: tiene que ROMPER la subida, no publicar. */
+  A.settings.encEnabled = false;
+  let seNego = false, publico = null;
+  try { publico = await A.api._syncPrepareContent(ESTADO); }
+  catch (e) { seNego = true; }
+  comprobar('subida · con el cifrado APAGADO se niega a preparar nada', seNego,
+    'devolvio ' + (publico === ESTADO ? 'EL ESTADO EN CLARO' : 'algo') + ': es la fuga de las ocho semanas');
+
+  /* Con el cifrado puesto pero el equipo bloqueado: tambien se niega. */
+  A.settings.encEnabled = true;
+  A.api.encForgetDevice();
+  let seNego2 = false, publico2 = null;
+  try { publico2 = await A.api._syncPrepareContent(ESTADO); }
+  catch (e) { seNego2 = true; }
+  comprobar('subida · y con el equipo bloqueado tampoco publica', seNego2,
+    'devolvio ' + (publico2 === ESTADO ? 'EL ESTADO EN CLARO' : 'algo'));
+
+  /* Se deja el entorno como estaba para lo que viene despues. */
+  await A.api.encUnlock(FRASE);
+  comprobar('subida · el equipo vuelve a quedar desbloqueado para el resto', A.api.encUnlocked());
+
+  /* b ter) Dos instalaciones no pueden compartir master key ---------
+
+     Si `mk` dejara de generarse al azar, dos gimnasios —o el mismo con la
+     misma frase— tendrian la MISMA llave, y el sobre de uno lo abriria el
+     otro. No lo probaba nadie. */
+  {
+    const B = nuevoEntorno();
+    await B.api.encSetup(FRASE);
+    let abrio = false;
+    try { await B.api.encDecryptPayload(sobre); abrio = true; } catch (e) { abrio = false; }
+    comprobar('activar · otra instalacion con la MISMA frase NO abre este sobre', !abrio,
+      'la master key dejo de ser aleatoria: dos equipos comparten llave');
+  }
+
+  /* b quater) EL RESPALDO, que se queda fuera y hay que decirlo ------
+
+     `u19RespDerivar` y compania viven DESPUES del corte del modulo, en su
+     propio bloque, y no se ejecutan aqui. Eso es un hueco conocido: el
+     respaldo cifrado es la unica copia de todo lo que solo vive en el
+     navegador de Diego, y sus mutantes escapan.
+
+     Mientras no se extraiga tambien ese bloque, al menos esto: que nadie
+     le baje las vueltas sin que salte. Es FORMA, no ejecucion, y se dice. */
+  {
+    const mIters = /var RESP_ITERS\s*=\s*(\d+);/.exec(src);
+    comprobar('respaldo · encuentro las vueltas del respaldo cifrado', !!mIters,
+      'busco «var RESP_ITERS = ...» en index.html');
+    if (mIters) {
+      igual('respaldo · sigue en 1.200.000 vueltas', Number(mIters[1]), 1200000);
+    }
+    comprobar('respaldo · el sobre declara las vueltas que de verdad uso',
+      src.indexOf('iters: RESP_ITERS') > 0,
+      'si el sobre miente sobre sus vueltas, al restaurar se deriva otra llave');
+    aviso('respaldo · vigilado solo por forma: su bloque queda fuera del modulo que esta suite ejecuta');
+  }
 
   /* c) Un sobre manipulado no debe abrirse ------------------------- */
 
