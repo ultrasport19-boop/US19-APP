@@ -11304,7 +11304,9 @@ function seriesContar_(sesiones, indicadas){
   var hechas = 0, faltas = 0;
   (sesiones || []).forEach(function(s){
     if (s && s.asistio === true) hechas++;
-    else if (s) faltas++;
+    /* Solo es falta lo anotado como falta. Una nota de evolucion lleva
+       asistio:null y hasta el 11-sep-2026 contaba aqui como «no asistio». */
+    else if (s && s.asistio === false) faltas++;
   });
   if (hechas > total) hechas = total;
   return { indicadas: total, hechas: hechas, faltas: faltas,
@@ -11357,6 +11359,26 @@ function seriesUltima_(sesiones){
     .map(function(s){ return s.fecha; }).sort().pop() || "";
 }
 
+/* Una nota de evolucion NO es una sesion. Si hoy ya hay una sesion anotada,
+   todavia sin subir y sin nota, la nota se le pega: en Notion es la columna
+   «Respuesta» de esa sesion. Si no, queda como nota suelta, que no cuenta
+   como falta y no se sube como sesion: el puente la guardaria como
+   «No aviso», una ausencia que no ocurrio (11-sep-2026). */
+function seriesConNota_(sesiones, hoyISO, texto){
+  var out = (sesiones || []).slice();
+  var u = out.length ? out[out.length - 1] : null;
+  if (u && u.fecha === hoyISO && (u.asistio === true || u.asistio === false) && !u.notionId && !u.nota){
+    out[out.length - 1] = Object.assign({}, u, { nota: texto });
+  } else {
+    out.push({ fecha: hoyISO, asistio: null, nota: texto, soloNota: true });
+  }
+  return out;
+}
+/* Lo que sube a Notion como sesion: lo que no tiene id y no es nota suelta. */
+function seriesSeSube_(x){
+  return !!x && !x.notionId && !x.soloNota;
+}
+
 function seriesHoyISO(){
   var d = new Date();
   return d.getFullYear() + "-" + ("0"+(d.getMonth()+1)).slice(-2) + "-" + ("0"+d.getDate()).slice(-2);
@@ -11376,7 +11398,7 @@ function renderSeries(){
   var pend = 0;
   lista.forEach(function(s){
     if (!s.notionId) pend++;
-    u19Arr(s.sesiones).forEach(function(x){ if (!x.notionId) pend++; });
+    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pend++; });
   });
   var h = ['<div class="section-head"><h2>Series</h2><div style="display:flex;gap:.4rem">'
     + (lista.length ? '<button class="btn" onclick="seriesSincronizar()">Subir a Notion'
@@ -11457,7 +11479,7 @@ function seriesSincronizar(){
   var pendientes = 0;
   lista.forEach(function(s){
     if (!s.notionId) pendientes++;
-    u19Arr(s.sesiones).forEach(function(x){ if (!x.notionId) pendientes++; });
+    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pendientes++; });
   });
   if (!pendientes){ window.alert("Todo está ya en Notion. Nada que subir."); return; }
   if (!window.confirm("Se van a subir " + pendientes + " cosa(s) a Notion. ¿Seguimos?")) return;
@@ -11487,7 +11509,7 @@ function seriesSincronizar(){
     });
     u19Arr(s.sesiones).forEach(function(x, k){
       cadena = cadena.then(function(){
-        if (x.notionId || !lista[i].notionId) return null;
+        if (!seriesSeSube_(x) || !lista[i].notionId) return null;
         var c = seriesContar_(s.sesiones.slice(0, k + 1), s.indicadas);
         return pide({ op:"crear_sesion", serieId:lista[i].notionId,
                       titulo: s.nombre + " · sesión " + c.hechas + " · " + x.fecha,
@@ -11548,8 +11570,7 @@ function seriesNota(idx){
   if (!lista[idx]) return;
   var t = window.prompt("Evolución de hoy (una línea)");
   if (!t || !t.trim()) return;
-  lista[idx].sesiones = lista[idx].sesiones || [];
-  lista[idx].sesiones.push({ fecha: seriesHoyISO(), asistio: null, nota: t.trim(), soloNota: true });
+  lista[idx].sesiones = seriesConNota_(lista[idx].sesiones, seriesHoyISO(), t.trim());
   seriesGuardar(lista);
   renderSeries();
 }
@@ -17547,8 +17568,8 @@ window.globalSearch = function(q){
         if(d==null||d>14) return null; return d<0 ? ('vencida hace '+Math.abs(d)+' d') : ('en '+d+' d'); } },
     { re:/dolor|eva|bandera|derivar/, lbl:'con dolor o banderas rojas',
       test:function(c){ if(c.redFlags&&c.redFlags.blocked) return 'banderas rojas';
-        var pl=u19Arr(c.painLog); if(!pl.length) return null; var u=pl[pl.length-1];
-        var e=(u.eva!=null)?u.eva:u.valor; return (e!=null&&e>=4) ? ('EVA '+e+'/10') : null; } }
+        var pl=u19Arr(c.painLog); if(!pl.length) return null;
+        var d=u19DolorDe(pl[pl.length-1]); return (d.max!==null&&d.max>=4) ? ('dolor '+d.max+'/10') : null; } }
   ];
   consultas.forEach(function(q){
     if (!q.re.test(q_)) return;
@@ -18163,6 +18184,24 @@ function openReevalCompare(clientId){
   });
 }
 window.openReevalCompare = openReevalCompare;
+
+/* Un registro de dolor tal como lo escribe openPainSession: {fecha, durante,
+   despues, notas}. Hasta el 11-sep-2026 la ficha, la linea de tiempo y el
+   buscador leian {eva, valor, nota}, que no escribe nadie: la ficha decia
+   «—» siempre y buscar «dolor» no encontraba a nadie. Se acepta tambien la
+   forma vieja, por si llego algun registro importado asi. */
+function u19DolorDe(x){
+  x = x || {};
+  var num = function(v){ var n = parseFloat(v); return isNaN(n) ? null : n; };
+  var durante = num(x.durante), despues = num(x.despues);
+  if (durante === null && despues === null) durante = num(x.eva != null ? x.eva : x.valor);
+  var max = (durante === null && despues === null) ? null : Math.max(durante || 0, despues || 0);
+  var partes = [];
+  if (durante !== null) partes.push("durante " + durante + "/10");
+  if (despues !== null) partes.push("24 h después " + despues + "/10");
+  return { fecha: x.fecha || x.date || "", durante: durante, despues: despues, max: max,
+           texto: partes.join(" · "), nota: String(x.notas || x.nota || x.notes || "") };
+}
 
 /* ---------- Registro de sesión / semáforo del dolor ---------- */
 function openPainSession(clientId){
@@ -31090,8 +31129,8 @@ function u19Timeline(c){
     add(t.date, 'Simetría', 'Test manual · ' + (t.name || 'LSI'), 'LSI ' + t.lsi + '%', '#7c3aed');
   });
   u19Arr(c.painLog).forEach(function(pl){
-    add(pl.date || pl.fecha, 'Clínico', 'Registro de dolor',
-      (pl.eva != null ? 'EVA ' + pl.eva + '/10' : ''), '#b91c1c');
+    var d = u19DolorDe(pl);
+    add(d.fecha, 'Clínico', 'Registro de dolor', d.texto, '#b91c1c');
   });
   u19Arr(c.measurements).forEach(function(mm){
     add(mm.date, 'Medidas', 'Medidas corporales', (mm.weight ? mm.weight + ' kg' : ''), '#64748b');
@@ -32579,22 +32618,32 @@ function fichaEntrenamiento(c){
 function fichaClinico(c){
   var out = '';
   var f = c.ficha || null;
+  /* Las mismas etiquetas que el formulario (openFichaClinica): hasta el
+     11-sep-2026 se veian las claves internas, «dx» u «objCorto». Lo que no
+     este aqui se muestra igual, al final, para no esconder nada. */
+  var ETQ = { motivo:"Motivo de consulta", inicio:"Inicio de síntomas", mecanismo:"Mecanismo / evolución",
+    tratamientos:"Tratamientos previos", antecedentes:"Antecedentes médicos", cirugias:"Cirugías previas",
+    medicacion:"Medicación actual", alergias:"Alergias", imagen:"Imagenología / exámenes",
+    dx:"Hipótesis de trabajo", objCorto:"Objetivo corto plazo", objMediano:"Objetivo mediano plazo",
+    objLargo:"Objetivo largo plazo" };
+  var claves = f ? Object.keys(ETQ).concat(Object.keys(f).filter(function(k){ return !ETQ[k] && k !== "updatedAt"; })) : [];
   out += u19Bloque('Ficha clínica', f
-    ? '<div class="u-kvs">' + Object.keys(f).filter(function(k){ return f[k]; }).map(function(k){
-        return '<div class="u-kv2"><span>' + escapeHtml(k) + '</span><b>' + escapeHtml(String(f[k])) + '</b></div>';
+    ? '<div class="u-kvs">' + claves.filter(function(k){ return f[k]; }).map(function(k){
+        return '<div class="u-kv2"><span>' + escapeHtml(ETQ[k] || k) + '</span><b>' + escapeHtml(String(f[k])) + '</b></div>';
       }).join('') + '</div>'
     : '<p class="text-xs text-muted">Sin ficha registrada.</p>',
     (typeof rehabClinicoOn === 'function' && rehabClinicoOn())
       ? '<button class="btn btn-ghost btn-sm" onclick="openPanelClinico(\'' + c.id + '\')">Panel clínico</button>' : '');
 
-  var pl = c.painLog || [];
+  var pl = u19Arr(c.painLog);
   out += u19Bloque('Registro de dolor', pl.length
     ? '<table class="u-tbl"><thead><tr><th>Fecha</th><th>Dolor</th><th>Nota</th></tr></thead><tbody>' + pl.slice().reverse().slice(0, 12).map(function(x){
-        var eva = x.eva != null ? x.eva : (x.valor != null ? x.valor : null);
-        var col = eva == null ? '' : (eva <= 2 ? 'var(--success)' : (eva <= 5 ? '#d97706' : 'var(--danger)'));
-        return '<tr><td>' + rndFdate(x.date || x.fecha) + '</td>'
-          + '<td style="color:' + col + ';font-weight:700;">' + (eva != null ? 'EVA ' + eva + '/10' : '—') + '</td>'
-          + '<td class="text-muted">' + escapeHtml(x.nota || x.notes || '') + '</td></tr>';
+        var d = u19DolorDe(x);
+        /* El mismo semaforo que openPainSession: 0-3 progresar, 4-5 mantener, 6+ bajar. */
+        var col = d.max === null ? '' : (d.max <= 3 ? 'var(--success)' : (d.max <= 5 ? '#d97706' : 'var(--danger)'));
+        return '<tr><td>' + rndFdate(d.fecha) + '</td>'
+          + '<td style="color:' + col + ';font-weight:700;">' + (d.texto ? escapeHtml(d.texto) : '—') + '</td>'
+          + '<td class="text-muted">' + escapeHtml(d.nota) + '</td></tr>';
       }).join('') + '</tbody></table>'
     : '<p class="text-xs text-muted">Sin registros de dolor.</p>');
 

@@ -5,7 +5,7 @@
   "mutantes": [
     {
       "nombre": "la sesión a la que no asistió gasta sesión de la serie",
-      "de": "    if (s && s.asistio === true) hechas++;\n    else if (s) faltas++;",
+      "de": "    if (s && s.asistio === true) hechas++;",
       "a": "    if (s) hechas++;"
     },
     {
@@ -82,6 +82,41 @@
       "nombre": "el apartado deja de estar enchufado a su vista",
       "de": "  else if (name===\"series\") renderSeries();",
       "a": "  else if (name===\"__nada__\") renderSeries();"
+    },
+    {
+      "nombre": "la nota de evolucion vuelve a contar como falta",
+      "de": "    else if (s && s.asistio === false) faltas++;",
+      "a": "    else if (s) faltas++;"
+    },
+    {
+      "nombre": "la nota pisa la que ya tenia la sesion",
+      "de": "&& !u.notionId && !u.nota){",
+      "a": "&& !u.notionId){"
+    },
+    {
+      "nombre": "la nota se pega a una sesion que ya subio a Notion",
+      "de": "(u.asistio === true || u.asistio === false) && !u.notionId && !u.nota){",
+      "a": "(u.asistio === true || u.asistio === false) && !u.nota){"
+    },
+    {
+      "nombre": "las notas sueltas vuelven a subir como sesion",
+      "de": "  return !!x && !x.notionId && !x.soloNota;",
+      "a": "  return !!x && !x.notionId;"
+    },
+    {
+      "nombre": "la subida deja de preguntar y sube las notas",
+      "de": "        if (!seriesSeSube_(x) || !lista[i].notionId) return null;",
+      "a": "        if (x.notionId || !lista[i].notionId) return null;"
+    },
+    {
+      "nombre": "el dolor vuelve a leerse de campos que nadie escribe",
+      "de": "  var durante = num(x.durante), despues = num(x.despues);",
+      "a": "  var durante = num(x.eva), despues = num(x.valor);"
+    },
+    {
+      "nombre": "un cero de dolor pasa a leerse como vacio",
+      "de": "  var num = function(v){ var n = parseFloat(v); return isNaN(n) ? null : n; };",
+      "a": "  var num = function(v){ var n = parseFloat(v); return (isNaN(n) || !n) ? null : n; };"
     }
   ]
 }

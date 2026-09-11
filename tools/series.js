@@ -25,7 +25,8 @@ function tramo(inicio, fin, nombre) {
 function fn(nombre) { return tramo('function ' + nombre + '(', '\n}\n', nombre) + '\n}\n'; }
 
 const NOMBRES = ['seriesDias_', 'seriesContar_', 'seriesSemaforo_', 'seriesOrden_',
-  'seriesCasillas_', 'seriesEvolucion_', 'seriesUltima_', 'seriesEsc_'];
+  'seriesCasillas_', 'seriesEvolucion_', 'seriesUltima_', 'seriesEsc_',
+  'seriesConNota_', 'seriesSeSube_', 'u19DolorDe'];
 
 let M;
 try {
@@ -185,6 +186,70 @@ const aviso = (t) => avisos.push(t);
     src.indexOf('id="view-series"') > 0 &&
     src.indexOf('else if (name==="series") renderSeries();') > 0,
     'sin las tres cosas el apartado existe pero no se abre');
+}
+
+/* --- 8 · Una nota de evolucion no es una sesion (11-sep-2026) --------
+   Hasta ese dia contaba como falta y, al subirla, el puente la habria
+   guardado en Notion como «No aviso»: una ausencia que no ocurrio. */
+{
+  const c = M.seriesContar_, H = '2026-09-11';
+  const suelta = { fecha: '2026-09-05', asistio: null, nota: 'mejor', soloNota: true };
+  const r = c([{ fecha: '2026-09-01', asistio: true }, suelta], 10);
+  igual('nota · una nota suelta no cuenta como falta', r.faltas, 0);
+  igual('nota · ni como sesion hecha', r.hechas, 1);
+  igual('nota · y una falta de verdad sigue contando', c([{ fecha: H, asistio: false }], 10).faltas, 1);
+
+  const orig = [{ fecha: H, asistio: true, nota: '' }];
+  const pegada = M.seriesConNota_(orig, H, 'sin molestias');
+  igual('nota · con una sesion de hoy sin subir, se le pega', pegada.length, 1);
+  igual('nota · y queda como su nota', pegada[0].nota, 'sin molestias');
+  igual('nota · la sesion sigue siendo asistida', pegada[0].asistio, true);
+  igual('nota · no toca la lista original', orig[0].nota, '');
+  igual('nota · una falta de hoy tambien la recibe', M.seriesConNota_([{ fecha: H, asistio: false, nota: '' }], H, 'aviso tarde')[0].nota, 'aviso tarde');
+  const yaSubida = M.seriesConNota_([{ fecha: H, asistio: true, nota: '', notionId: 'x' }], H, 'n');
+  igual('nota · si la sesion ya subio, no se toca: va suelta', yaSubida.length, 2);
+  igual('nota · de otro dia, va suelta', M.seriesConNota_([{ fecha: '2026-09-10', asistio: true, nota: '' }], H, 'n').length, 2);
+  igual('nota · si la sesion ya tenia nota, no la pisa', M.seriesConNota_([{ fecha: H, asistio: true, nota: 'vieja' }], H, 'nueva')[0].nota, 'vieja');
+  igual('nota · sin sesiones, va suelta', M.seriesConNota_([], H, 'n')[0].soloNota, true);
+
+  igual('subida · una sesion sin id se sube', M.seriesSeSube_({ fecha: H, asistio: true }), true);
+  igual('subida · una ya subida no', M.seriesSeSube_({ fecha: H, asistio: true, notionId: 'x' }), false);
+  igual('subida · una nota suelta NO se sube como sesion', M.seriesSeSube_(yaSubida[1]), false);
+  igual('subida · nada no se sube', M.seriesSeSube_(null), false);
+
+  const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
+  comprobar('subida · el sincronizador pregunta a seriesSeSube_ al contar y al subir',
+    (sync.match(/seriesSeSube_\(/g) || []).length >= 2, 'vuelve a subir todo lo que no tiene id, notas sueltas incluidas');
+  comprobar('nota · el boton de evolucion usa seriesConNota_',
+    tramo('function seriesNota(', '\n}\n', 'seriesNota').indexOf('seriesConNota_(') >= 0, 'vuelve a empujar la nota como una sesion');
+  aviso('nota · dieciseis casos');
+}
+
+/* --- 9 · El dolor que se escribe es el que se lee (11-sep-2026) ------- */
+{
+  const D = M.u19DolorDe;
+  const x = D({ fecha: '2026-09-11', durante: 4, despues: 2, notas: 'ultima serie' });
+  igual('dolor · lee «durante»', x.durante, 4);
+  igual('dolor · lee «despues»', x.despues, 2);
+  igual('dolor · manda el mayor', x.max, 4);
+  igual('dolor · la nota se llama «notas»', x.nota, 'ultima serie');
+  igual('dolor · la fecha se llama «fecha»', x.fecha, '2026-09-11');
+  igual('dolor · un cero es un valor, no un vacio', D({ durante: 0 }).max, 0);
+  igual('dolor · sin nada no inventa', D({ fecha: '2026-09-11' }).max, null);
+  igual('dolor · solo el de 24 h', D({ despues: 5 }).texto, '24 h después 5/10');
+  igual('dolor · la forma vieja se sigue leyendo', D({ eva: 6 }).max, 6);
+  igual('dolor · un texto numerico cuenta', D({ durante: '3' }).max, 3);
+
+  comprobar('dolor · nadie vuelve a leer eva/valor por su cuenta',
+    /* Los tres lectores viejos, tal cual estaban. «x.eva» a secas no sirve de
+       patron: u19DolorDe lo lee a proposito, para los registros importados. */
+    src.indexOf('(u.eva!=null)?u.eva:u.valor') < 0 && src.indexOf("pl.eva != null ? 'EVA '") < 0 && src.indexOf('var eva = x.eva != null') < 0,
+    'un lector vuelve a buscar campos que no escribe nadie');
+  comprobar('dolor · ficha, linea de tiempo y buscador leen con u19DolorDe',
+    (src.match(/u19DolorDe\(/g) || []).length >= 4, 'hay ' + (src.match(/u19DolorDe\(/g) || []).length + ' usos (definicion incluida)');
+  comprobar('ficha · muestra etiquetas, no claves internas',
+    src.indexOf('escapeHtml(ETQ[k] || k)') > 0 && src.indexOf('dx:"Hipótesis de trabajo"') > 0, 'vuelven «dx» y «objCorto»');
+  aviso('dolor · diez casos');
 }
 
 /* --- salida ---------------------------------------------------------- */
