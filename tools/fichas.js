@@ -203,14 +203,14 @@ const aviso = (t) => avisos.push(t);
   igual('enlace · con basura no revienta', B(null, { id: 'x' }, null), null);
 
   const R = M._impReparar;
-  const axel = { id: 'a', name: 'Axel Gaete', phone: '+56911112222', notionId: 'N-OLIVER' };
-  const roster = [{ id: 'N-AXEL', nombre: 'Axel Gaete', whatsapp: '+56911112222' }, { id: 'N-OLIVER', nombre: 'Oliver Gaete', whatsapp: '+56911112222' }];
+  const axel = { id: 'a', name: 'Axel Ejemplo', phone: '+56911112222', notionId: 'N-OLIVER' };
+  const roster = [{ id: 'N-AXEL', nombre: 'Axel Ejemplo', whatsapp: '+56911112222' }, { id: 'N-OLIVER', nombre: 'Oliver Ejemplo', whatsapp: '+56911112222' }];
   const mov = R([axel], roster);
   comprobar('reparar · el enlace cruzado que dejó el importador viejo se deshace', axel.notionId === 'N-AXEL' && mov.length === 1,
     'la ficha de Axel escribía en la de Oliver');
-  const lucas = { id: 'l', name: 'Lucas Gaete', phone: '+56911112222', notionId: 'N-OLIVER' };
-  const oliver = { id: 'o', name: 'Oliver Gaete', phone: '+56911112222', notionId: 'N-OLIVER2' };
-  R([lucas, oliver], [{ id: 'N-OLIVER', nombre: 'Oliver Gaete', whatsapp: '+56911112222' }, { id: 'N-OLIVER2', nombre: 'Lucas Gaete', whatsapp: '+56911112222' }]);
+  const lucas = { id: 'l', name: 'Lucas Ejemplo', phone: '+56911112222', notionId: 'N-OLIVER' };
+  const oliver = { id: 'o', name: 'Oliver Ejemplo', phone: '+56911112222', notionId: 'N-OLIVER2' };
+  R([lucas, oliver], [{ id: 'N-OLIVER', nombre: 'Oliver Ejemplo', whatsapp: '+56911112222' }, { id: 'N-OLIVER2', nombre: 'Lucas Ejemplo', whatsapp: '+56911112222' }]);
   comprobar('reparar · solo lo inequívoco: si la fila que le corresponde ya la tiene otra ficha, no se toca', lucas.notionId === 'N-OLIVER' && oliver.notionId === 'N-OLIVER2');
   const renombrada = { id: 'r', name: 'Ana Maria', phone: '+56911112222', notionId: 'N-R' };
   R([renombrada], [{ id: 'N-R', nombre: 'Ana María Soto', whatsapp: '+56911112222' }]);
@@ -222,11 +222,11 @@ const aviso = (t) => avisos.push(t);
 {
   const fila = (id, nombre, tel, extra) => Object.assign({ id: id, nombre: nombre, activo: true, whatsapp: tel, membresia_activa: 'Activo' }, extra || {});
 
-  /* a · la familia Gaete, con el enlace cruzado heredado */
+  /* a · la familia Ejemplo, con el enlace cruzado heredado */
   let W = mundo();
-  W.state.clients = [{ id: 'a', name: 'Axel Gaete', phone: '+56911112222', notionId: 'N-OLIVER', planEndDate: '2026-09-01', planPrice: 30000 }];
-  await W.importar({ clientes: [fila('N-AXEL', 'Axel Gaete', '+56911112222', { termino_plan: '2026-10-01', monto: 25000 }),
-    fila('N-LUCAS', 'Lucas Gaete', '+56911112222'), fila('N-OLIVER', 'Oliver Gaete', '+56911112222', { termino_plan: '2026-10-09', monto: 30000 })], total: 3, completo: true });
+  W.state.clients = [{ id: 'a', name: 'Axel Ejemplo', phone: '+56911112222', notionId: 'N-OLIVER', planEndDate: '2026-09-01', planPrice: 30000 }];
+  await W.importar({ clientes: [fila('N-AXEL', 'Axel Ejemplo', '+56911112222', { termino_plan: '2026-10-01', monto: 25000 }),
+    fila('N-LUCAS', 'Lucas Ejemplo', '+56911112222'), fila('N-OLIVER', 'Oliver Ejemplo', '+56911112222', { termino_plan: '2026-10-09', monto: 30000 })], total: 3, completo: true });
   const ax = W.state.clients.find(c => c.id === 'a');
   const ids = W.state.clients.map(c => c.notionId).filter(Boolean);
   comprobar('importar · Axel vuelve a su ficha de Notion, con SU término', ax.notionId === 'N-AXEL' && ax.planEndDate === '2026-10-01' && ax.planPrice === 25000,
@@ -345,11 +345,11 @@ const aviso = (t) => avisos.push(t);
 /* --- 7 · La vista previa y la escritura, ejecutadas -------------------- */
 {
   let W = mundo();
-  W.state.clients = [{ id: 'c1', name: 'Ana Gaete', notionId: 'N1', notionPend: { datos: { monto: '30000' }, ts: 5 } }];
+  W.state.clients = [{ id: 'c1', name: 'Ana Ejemplo', notionId: 'N1', notionPend: { datos: { monto: '30000' }, ts: 5 } }];
   const cuerpo = { op: 'actualizar', id: 'N1', datos: { monto: '30000' } };
   /* <u> y <s> no los usa la app en ningún sitio de la vista previa: si
      aparecen tal cual, entró HTML del asistente sin escapar. */
-  W.fn.fichaVistaPrevia_('c1', cuerpo, 5, { ok: true, nombreNotion: 'Carla <u>Gaete</u>', cambios: [{ columna: 'Monto <s>', antes: '<u>35000', ahora: '<s>30000' }],
+  W.fn.fichaVistaPrevia_('c1', cuerpo, 5, { ok: true, nombreNotion: 'Carla <u>Ejemplo</u>', cambios: [{ columna: 'Monto <s>', antes: '<u>35000', ahora: '<s>30000' }],
     avisos: ['<u>ojo</u>'], errores: [], duplicados: [] });
   const m1 = W.modales[W.modales.length - 1];
   comprobar('vista previa · todo lo que viene del asistente se escapa', !!m1 && m1.bodyHtml.indexOf('<u>') < 0 && m1.bodyHtml.indexOf('<s>') < 0 && m1.bodyHtml.indexOf('&lt;u&gt;') > 0,

@@ -524,7 +524,7 @@ const aviso = (t) => avisos.push(t);
   comprobar('solo · con errores: no', S({ op: 'crear' }, Object.assign({}, limpio, { errores: ['mal'] }), 'Ana') === false);
   comprobar('solo · crear con una ficha parecida: no', S({ op: 'crear' }, Object.assign({}, limpio, { duplicados: [{ id: 'x' }] }), 'Ana') === false);
   comprobar('solo · salvo que Diego ya dijera que es otra persona', S({ op: 'crear', forzar: true }, Object.assign({}, limpio, { duplicados: [{ id: 'x' }] }), 'Ana') === true);
-  comprobar('solo · a una ficha de Notion con otro nombre: no', S({ op: 'actualizar' }, Object.assign({}, limpio, { nombreNotion: 'Oliver Gaete' }), 'Axel Gaete') === false);
+  comprobar('solo · a una ficha de Notion con otro nombre: no', S({ op: 'actualizar' }, Object.assign({}, limpio, { nombreNotion: 'Oliver Ejemplo' }), 'Axel Ejemplo') === false);
   comprobar('solo · el mismo nombre con otras tildes o el 📱: sí', S({ op: 'actualizar' }, Object.assign({}, limpio, { nombreNotion: '📱 ÁNA' }), 'Ana') === true);
   comprobar('solo · un «ok:false» o «nada»: no', S({ op: 'actualizar' }, { ok: false }, 'A') === false && S({ op: 'actualizar' }, { ok: true, nada: true }, 'A') === false);
 
