@@ -215,15 +215,22 @@ const aviso = (t) => avisos.push(t);
   igual('nota · la sesion sigue siendo asistida', pegada[0].asistio, true);
   igual('nota · no toca la lista original', orig[0].nota, '');
   igual('nota · una falta de hoy tambien la recibe', M.seriesConNota_([{ fecha: H, asistio: false, nota: '' }], H, 'aviso tarde')[0].nota, 'aviso tarde');
+  /* Desde que Series sube sola (11-sep-2026, noche) la sesion de hoy suele
+     estar ya en Notion cuando llega la nota: se le suma, y lo nuevo queda
+     en notaPend para que el asistente lo AÑADA a su «Respuesta». */
   const yaSubida = M.seriesConNota_([{ fecha: H, asistio: true, nota: '', notionId: 'x' }], H, 'n');
-  igual('nota · si la sesion ya subio, no se toca: va suelta', yaSubida.length, 2);
+  igual('nota · a la sesion ya subida tambien se le pega', yaSubida.length, 1);
+  igual('nota · y queda pendiente de añadirse en Notion', [yaSubida[0].nota, yaSubida[0].notaPend, yaSubida[0].notionSucio].join('|'), 'n|n|true');
+  const dos = M.seriesConNota_(yaSubida, H, 'm');
+  igual('nota · dos notas seguidas sin subir se juntan, no se pisan', dos[0].notaPend, 'n · m');
   igual('nota · de otro dia, va suelta', M.seriesConNota_([{ fecha: '2026-09-10', asistio: true, nota: '' }], H, 'n').length, 2);
-  igual('nota · si la sesion ya tenia nota, no la pisa', M.seriesConNota_([{ fecha: H, asistio: true, nota: 'vieja' }], H, 'nueva')[0].nota, 'vieja');
+  igual('nota · si la sesion ya tenia nota, no la pisa: la junta', M.seriesConNota_([{ fecha: H, asistio: true, nota: 'vieja' }], H, 'nueva')[0].nota, 'vieja · nueva');
+  igual('nota · sin subir no queda nada pendiente aparte', M.seriesConNota_([{ fecha: H, asistio: true, nota: 'vieja' }], H, 'nueva')[0].notaPend, undefined);
   igual('nota · sin sesiones, va suelta', M.seriesConNota_([], H, 'n')[0].soloNota, true);
 
   igual('subida · una sesion sin id se sube', M.seriesSeSube_({ fecha: H, asistio: true }), true);
   igual('subida · una ya subida no', M.seriesSeSube_({ fecha: H, asistio: true, notionId: 'x' }), false);
-  igual('subida · una nota suelta NO se sube como sesion', M.seriesSeSube_(yaSubida[1]), false);
+  igual('subida · una nota suelta NO se sube como sesion', M.seriesSeSube_(M.seriesConNota_([], H, 'n')[0]), false);
   igual('subida · nada no se sube', M.seriesSeSube_(null), false);
 
   const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
@@ -260,8 +267,12 @@ const aviso = (t) => avisos.push(t);
     'un lector vuelve a buscar campos que no escribe nadie');
   comprobar('dolor · ficha, linea de tiempo y buscador leen con u19DolorDe',
     (src.match(/u19DolorDe\(/g) || []).length >= 4, 'hay ' + (src.match(/u19DolorDe\(/g) || []).length + ' usos (definicion incluida)');
+  /* Desde el 11-sep-2026 (noche) la pestaña cuenta la historia con
+     historiaSecciones_, la misma que el formulario, la impresion y Notion;
+     tools/historia.js la ejecuta. Aqui: que la pestaña la use y escape. */
+  const fc = tramo('function fichaClinico(', '\n}\n', 'fichaClinico');
   comprobar('ficha · muestra etiquetas, no claves internas',
-    src.indexOf('escapeHtml(ETQ[k] || k)') > 0 && src.indexOf('dx:"Hipótesis de trabajo"') > 0, 'vuelven «dx» y «objCorto»');
+    fc.indexOf('historiaSecciones_(c)') > 0 && fc.indexOf('escapeHtml(r.k)') > 0 && fc.indexOf('escapeHtml(String(r.v))') > 0, 'vuelven las claves internas o sin escapar');
   aviso('dolor · diez casos');
 }
 
@@ -543,8 +554,14 @@ const aviso = (t) => avisos.push(t);
   const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
   comprobar('subida · una a la vez: un segundo clic no lanza otra cadena', sync.indexOf('if (_seriesSubiendo){') > 0 && /_seriesSubiendo = false;/.test(sync),
     'dos cadenas en paralelo ven la serie sin id y las dos crean');
-  comprobar('subida · trabaja sobre el objeto de cada serie, no sobre su posición', sync.indexOf('lista[i]') < 0 && (sync.match(/sigue\(s\)/g) || []).length >= 4,
-    'borrar una serie mientras sube cruzaría ids y fotos entre personas');
+  /* Cada paso mira si su serie sigue ahi: contar las apariciones dejaba
+     escapar que se quitara una (11-sep-2026, noche: habia cinco y bastaban
+     cuatro). historia.js lo EJECUTA borrando una serie a mitad de subida. */
+  const pasos = ['if (!sigue(s) || s.personaId) return null;', 'if (!sigue(s)) return null;', 'if (!sigue(s) || !seriesSeSube_(x) || !s.notionId) return null;',
+    'if (!sigue(s) || !x || !x.notionId || !x.notionSucio || !x.notaPend) return null;', 'if (!sigue(s) || !f || !f.pendiente || !s.notionId) return null;'];
+  const falta = pasos.filter(p => sync.indexOf(p) < 0);
+  comprobar('subida · trabaja sobre el objeto de cada serie, no sobre su posición', sync.indexOf('lista[i]') < 0 && !falta.length,
+    'borrar una serie mientras sube cruzaría ids y fotos entre personas' + (falta.length ? ' · falta: ' + falta[0] : ''));
   comprobar('subida · dice con qué persona quedó cada serie y cuál se parecía', sync.indexOf('j.existia') > 0 && sync.indexOf('j.parecidas') > 0);
   comprobar('borrar todo · se lleva también las fotos de este equipo', tramo('function wipeAll(', '\n}\n', 'wipeAll').indexOf('seriesOrdenBarrer_') > 0);
   aviso('foto, cerrojo y limpieza · diez casos, ejecutados');

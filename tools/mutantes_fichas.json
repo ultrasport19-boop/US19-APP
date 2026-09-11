@@ -3,8 +3,8 @@
   "mutantes": [
     {
       "nombre": "en una edición viaja todo, y la fecha de término vieja pisa la del pago",
-      "de": "    if (nueva || v !== txt(antes ? antes[par[1]] : \"\")) d[par[0]] = v;",
-      "a": "    d[par[0]] = v;"
+      "de": "    if (v === \"\") return;\n    if (nueva || v !== txt(antes ? antes[par[1]] : \"\")) d[par[0]] = v;",
+      "a": "    if (v === \"\") return;\n    d[par[0]] = v;"
     },
     {
       "nombre": "lo vacío viaja y borraría en Notion",
@@ -33,8 +33,8 @@
     },
     {
       "nombre": "un asistente viejo que contesta {status:ok} se lee como éxito",
-      "de": "  if (typeof j.ok !== \"boolean\") throw new Error(",
-      "a": "  if (false) throw new Error("
+      "de": "  if (typeof j.ok !== \"boolean\") throw new Error(\"el asistente contestó, pero no sabe de fichas",
+      "a": "  if (false) throw new Error(\"el asistente contestó, pero no sabe de fichas"
     },
     {
       "nombre": "la importación deja de buscar primero por el id de Notion",
@@ -78,8 +78,8 @@
     },
     {
       "nombre": "se escribe en Notion sin simular antes",
-      "de": "  fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){",
-      "a": "  fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: true })).then(function(r){"
+      "de": "  return fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){",
+      "a": "  return fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: true })).then(function(r){"
     },
     {
       "nombre": "lo pendiente se borra aunque se haya vuelto a editar durante la escritura",

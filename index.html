@@ -5188,10 +5188,10 @@ window.importClientesNotion = async function(silencioso){
     else console.warn("Actualización automática desde Notion:", e);
   }
 };
-/* Actualización automática desde Notion al abrir la app: una vez cada 20 h,
-   en silencio (sin cambiar de vista) y solo si hay puente configurado.
-   Cuesta una llamada al puente por día, contra un tope diario de 500. Un
-   «Importar de Notion» manual también reinicia el reloj. */
+/* Actualización automática desde Notion al abrir la app y al volver a
+   ella: como mucho una vez cada 30 min, en silencio (sin cambiar de vista)
+   y solo si hay puente configurado. Un «Importar de Notion» manual también
+   reinicia el reloj. */
 function u19AutoImportRepintar(){
   try {
     var v = document.querySelector(".view.active"); if (!v) return;
@@ -5207,9 +5207,9 @@ function u19AutoImportarNotion(){
     var url = ((typeof settings !== "undefined" && settings.dashApiUrl) || "").trim();
     if (!url || navigator.onLine === false) return;
     var ult = parseInt(localStorage.getItem("us19_auto_import_at") || "0", 10) || 0;
-    /* 6 h y no 20: la lista viva de Finanzas se alimenta de esto y con 20 h
-       un dia entero podia mostrar datos de ayer. */
-    if (Date.now() - ult < 6 * 3600000) return;
+    /* 30 min (11-sep-2026, noche): Notion es la fuente de verdad y Diego
+       tambien escribe alli; con 6 h la app mostraba horas de retraso. */
+    if (Date.now() - ult < 30 * 60000) return;
     setTimeout(function(){ if (typeof importClientesNotion === "function") importClientesNotion(true); }, 4000);
   } catch (e){}
 }
@@ -5281,7 +5281,7 @@ function fichaLeerRespuesta_(texto){
 }
 function fichaPedir_(cuerpo){
   var url = u19DashUrl("ficha_cliente");
-  if (!url) return Promise.reject(new Error("falta la dirección del puente (Ajustes → Conexión con Notion)"));
+  if (!url) return Promise.reject(new Error("falta la dirección del puente (⚙ Ajustes → Puente con Notion)"));
   /* text/plain a proposito: con application/json el navegador manda un
      preflight que Apps Script no contesta. */
   return fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(cuerpo) })
@@ -5303,7 +5303,7 @@ function fichaSeccionHtml_(c, isEdit){
   };
   return '<details class="u-acc cf-notion"' + (marcar ? ' open' : '') + '><summary>Ficha en Notion'
     + (c.notionId ? ' · enlazada' : ' · todavía sin ficha') + (c.notionPend ? ' · ⏳ cambios sin subir' : '') + '</summary>'
-    + (hayPuente ? '' : '<p class="text-xs text-muted">Falta la dirección del puente (Ajustes → Conexión con Notion).</p>')
+    + (hayPuente ? '' : '<p class="text-xs text-muted">Falta la dirección del puente (⚙ Ajustes → Puente con Notion).</p>')
     + '<label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;">'
     + '<input type="checkbox" id="cf-notion" style="width:auto;margin:0;" onchange="this.dataset.tocado=\'1\'"'
     + ((c.notionId || c.notionPend) ? ' data-enlazada="1"' : '') + (marcar ? ' checked' : '') + (hayPuente ? '' : ' disabled') + '> '
@@ -5317,11 +5317,9 @@ function fichaSeccionHtml_(c, isEdit){
     + '</div><div class="form-grid cols-2">'
     + formField("Cómo nos conoció", sel("cf-n-conocio", FICHA_CONOCIO, c.notionComoConocio || "", true))
     + formField("Recomendado por", '<input type="text" id="cf-n-recom" maxlength="80" value="' + escapeAttr(c.notionRecomendado || "") + '" placeholder="opcional">')
-    + '</div><div class="form-grid cols-2">'
-    + formField("Fecha de nacimiento", '<input type="date" id="cf-n-nac" value="' + escapeAttr(c.notionNacimiento || "") + '">')
-    + formField("Nota para Notion (se añade al final de «Notas»)", '<input type="text" id="cf-n-nota" maxlength="500" placeholder="opcional">')
     + '</div>'
-    + '<p class="text-xs text-muted" style="line-height:1.5;">Antes de escribir verás exactamente qué cambia en Notion. Una ficha nueva nace en «Potencial ingreso»: así pasa por la bienvenida y la ficha de ingreso del asistente. Desde aquí no se borra nada en Notion: un campo vacío no se manda.</p>'
+    + formField("Nota para Notion (se añade al final de «Notas»)", '<input type="text" id="cf-n-nota" maxlength="500" placeholder="opcional">')
+    + '<p class="text-xs text-muted" style="line-height:1.5;">Al guardar se escribe sola en Notion. Solo si hay algo que decidir (un aviso, una ficha parecida) verás antes qué cambia. Una ficha nueva nace en «Potencial ingreso»: así pasa por la bienvenida y la ficha de ingreso del asistente. Desde aquí no se borra nada en Notion: un campo vacío no se manda.</p>'
     + '</details>';
 }
 /* Una persona NUEVA que pasa a «Rehabilitación» no recibe ficha de
@@ -5329,6 +5327,14 @@ function fichaSeccionHtml_(c, isEdit){
 function fichaTipoCambia_(tipo){
   var k = document.getElementById("cf-notion");
   if (k && tipo === "rehab" && !k.dataset.tocado && !k.dataset.enlazada) k.checked = false;
+  /* 11-sep-2026 (noche): la persona de readaptacion va a la base de
+     personas. Su seccion se ve con ese tipo y su casilla se marca sola si
+     nadie la toco: hasta hoy se desmarcaba la de Clientes y no se creaba
+     nada en ningun sitio, sin avisar. */
+  var sec = document.getElementById("cf-persona-sec"), p = document.getElementById("cf-persona");
+  var enl = !!(p && p.dataset.enlazada);
+  if (sec){ sec.hidden = !(tipo === "rehab" || enl); if (tipo === "rehab") sec.open = true; }
+  if (p && !p.disabled && !p.dataset.tocado && !enl) p.checked = (tipo === "rehab");
 }
 /* Lo que el formulario dice de los campos de Notion. En una ficha que ya
    existe, un desplegable en «—» no borra lo que habia. */
@@ -5353,25 +5359,45 @@ function fichaTrasGuardar_(c, antes, form){
   /* La tarjeta se pinto antes de marcarlo: sin repintar, el aviso de
      «Notion pendiente» no aparecia hasta la siguiente vuelta. */
   renderClients();
-  fichaNotionSubir(c.id);
+  fichaNotionSubir(c.id, { auto: true });
 }
 
 /* Sube lo pendiente de una ficha: primero simula, enseña lo que cambiaría
    y solo escribe si Diego confirma. */
 function fichaNotionSubir(id, extra){
   var c = getClient(id);
-  if (!c || !c.notionPend || !c.notionPend.datos){ toast("Esta ficha no tiene nada pendiente para Notion"); return; }
+  var auto = !!(extra && extra.auto), callado = !!(extra && extra.silencioso);
+  if (!c || !c.notionPend || !c.notionPend.datos){ if (!callado) toast("Esta ficha no tiene nada pendiente para Notion"); return Promise.resolve(false); }
   var cuerpo = fichaCuerpo_(c, extra);
   var ts = c.notionPend.ts;
-  toast("Preguntando a Notion qué cambiaría…");
-  fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){
-    fichaVistaPrevia_(id, cuerpo, ts, r);
+  if (!callado) toast(auto ? "Guardando en Notion…" : "Preguntando a Notion qué cambiaría…");
+  return fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){
+    /* 11-sep-2026 (noche), Diego: «si modifico algo en la app, que se envie
+       inmediatamente». Si el asistente no ve nada que decidir -ni avisos,
+       ni fichas parecidas, ni errores, ni una ficha de Notion con otro
+       nombre-, se escribe sin preguntar. Si ve algo, la vista previa. */
+    if (auto && fichaSoloOk_(cuerpo, r, c.name)) return fichaEscribir_(id, cuerpo, ts, extra);
+    if (callado){
+      if (r && r.nada && !u19Lista(r.errores).length && c.notionPend && c.notionPend.ts === ts){ delete c.notionPend; saveState(); renderClients(); return true; }
+      return false;
+    }
+    fichaVistaPrevia_(id, cuerpo, ts, r, extra);
+    return false;
   }).catch(function(e){
-    toast("No pude hablar con el asistente: " + ((e && e.message) || e) + ". Queda pendiente.", "warn");
+    if (!callado) toast("No pude hablar con el asistente: " + ((e && e.message) || e) + ". Queda pendiente.", "warn");
+    return false;
   });
 }
+/* ¿Se puede escribir sin enseñar nada? Solo si la simulacion salio limpia. */
+function fichaSoloOk_(cuerpo, r, nombreApp){
+  if (!r || r.ok === false || r.nada) return false;
+  if (u19Lista(r.errores).length || u19Lista(r.avisos).length) return false;
+  if (cuerpo.op === "crear" && u19Lista(r.duplicados).length && !cuerpo.forzar) return false;
+  if (cuerpo.op === "actualizar" && r.nombreNotion && _impNom(r.nombreNotion) !== _impNom(nombreApp)) return false;
+  return true;
+}
 var _fichaDups = null;
-function fichaVistaPrevia_(id, cuerpo, ts, r){
+function fichaVistaPrevia_(id, cuerpo, ts, r, extra){
   var c = getClient(id);
   if (!c || !r) return;
   var e = escapeHtml;
@@ -5432,6 +5458,7 @@ function fichaVistaPrevia_(id, cuerpo, ts, r){
         fichaEscribir_(id, cuerpo, ts);
       } }];
   }
+  if (extra && extra.auto) html = '<p class="text-xs text-muted" style="margin-top:0;">Se guardó en la app. En Notion no lo escribí solo porque hay algo que decidir:</p>' + html;
   openModal({ title: "Notion · " + nombre, bodyHtml: html, footer: botones });
 }
 /* «Es esta: completarla»: la ficha de la app se enlaza a la que ya estaba
@@ -5456,13 +5483,15 @@ function fichaEnlazar_(id, i){
   closeModal();
   fichaNotionSubir(id);
 }
-function fichaEscribir_(id, cuerpo, ts){
-  closeModal();
-  toast("Escribiendo en Notion…");
-  fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: true })).then(function(r){
-    if (!r.ok){ toast("Notion no cambió: " + (r.error || "sin respuesta") + ". Queda pendiente.", "error"); return; }
+function fichaEscribir_(id, cuerpo, ts, extra){
+  var auto = !!(extra && extra.auto), callado = !!(extra && extra.silencioso);
+  if (!auto){ closeModal(); toast("Escribiendo en Notion…"); }
+  /* Sin vista previa no se aceptan avisos por Diego: si aparecen entre la
+     simulacion y la escritura, el asistente no escribe y queda pendiente. */
+  return fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: !auto })).then(function(r){
+    if (!r.ok){ if (!callado) toast("Notion no cambió: " + (r.error || "sin respuesta") + ". Queda pendiente.", "error"); return false; }
     var c = getClient(id);
-    if (!c) return;
+    if (!c) return false;
     if (r.id && !c.notionId) c.notionId = r.id;
     var mem = cuerpo.datos && cuerpo.datos.membresia;
     if (mem){ c.notionEstado = mem; c.activo = (mem === "Activo"); }
@@ -5474,11 +5503,13 @@ function fichaEscribir_(id, cuerpo, ts){
     /* Una alta nueva no es Activo: esta en «Potencial ingreso», que la app
        cuenta fuera de Finanzas (en Inactivos) hasta que se active. Se dice,
        para que no parezca que se perdio. */
-    toast(cuerpo.op !== "crear" ? "Ficha actualizada en Notion"
+    if (!callado) toast(cuerpo.op !== "crear" ? (auto ? "Guardado en Notion ✓" : "Ficha actualizada en Notion")
       : (mem && mem !== "Activo" ? "Ficha creada en Notion en «" + mem + "»: sale en «Esperando tu visto bueno» y aquí en Inactivos hasta que se active"
         : "Ficha creada en Notion"), "success");
+    return true;
   }).catch(function(e){
-    toast("No pude escribir en Notion: " + ((e && e.message) || e) + ". Queda pendiente.", "error");
+    if (!callado) toast("No pude escribir en Notion: " + ((e && e.message) || e) + ". Queda pendiente.", "error");
+    return false;
   });
 }
 
@@ -5583,6 +5614,278 @@ function fichaAplicar_(c, data, antes){
 }
 /* ===FICHA_NOTION_END=== */
 
+/* ===PERSONA_NOTION===
+   La ficha de la persona en la base de personas de Notion, desde el
+   formulario del cliente (11-sep-2026). Diego agrego a una persona de
+   readaptacion y no aparecio en Notion: esa base solo se llenaba desde
+   Series con «Subir a Notion», y en el formulario, al elegir el tipo, la
+   casilla de Notion se desmarcaba sola y sin avisar (y aunque se marcara,
+   iba a la base del gimnasio). Ahora, al guardar a una persona de
+   readaptacion, su ficha se crea o se actualiza AL INSTANTE.
+
+   Crear usa «crear_persona», el mismo camino que Series: el asistente busca
+   antes por RUT, por la ficha de socio enlazada y por telefono con el
+   nombre entero, y si la encuentra la reusa en vez de duplicar. Actualizar
+   usa «actualizar_persona». Lo que no se pudo subir queda en personaPend y
+   se ve en la tarjeta. Desde aqui no se borra nada en Notion. */
+var PERSONA_ESTADOS = ["En tratamiento", "De alta", "Solo evaluado", "Abandono", "Derivado a otro"];
+/* dato que entiende el asistente -> campo del cliente en la app */
+var PERSONA_CAMPOS = [["nombre", "name"], ["whatsapp", "phone"], ["rut", "rut"], ["nacimiento", "notionNacimiento"],
+  ["comoLlego", "personaLlegada"], ["estado", "personaEstado"], ["primera", "personaPrimera"], ["socioId", "notionId"]];
+
+/* El puente de Series, con la misma lectura estricta que las fichas: una
+   respuesta sin «ok» booleano no es un exito. «operacion desconocida» es un
+   asistente sin publicar, y se dice asi. */
+function u19SeriesPedir_(cuerpo){
+  var url = u19DashUrl("series");
+  if (!url) return Promise.reject(new Error("falta la dirección del puente (⚙ Ajustes → Puente con Notion)"));
+  return fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(cuerpo) })
+    .then(function(r){ return r.text(); })
+    .then(function(t){
+      var j;
+      try { j = JSON.parse(t); } catch (e){ throw new Error("el asistente no contestó con datos"); }
+      if (!j || typeof j !== "object") throw new Error("respuesta vacía del asistente");
+      if (j.error === "clave_invalida") throw new Error("la clave de la app no coincide con la del asistente");
+      if (typeof j.ok !== "boolean") throw new Error((typeof j.error === "string" && j.error) ? "el asistente falló: " + j.error : "el asistente contestó sin saber de esto: falta publicarlo");
+      if (!j.ok && /operacion desconocida/i.test(String(j.error || ""))) j.desconocida = true;
+      return j;
+    });
+}
+/* Dos ediciones seguidas sin subir se suman; la mas nueva gana campo a
+   campo, salvo la nota, que se junta: son dos cosas que Diego escribio. */
+function personaPendMezclar_(pend, datos, ts){
+  var previos = (pend && typeof pend === "object" && pend.datos && typeof pend.datos === "object") ? pend.datos : {};
+  var d = Object.assign({}, previos, datos || {});
+  if (previos.nota && datos && datos.nota && previos.nota !== datos.nota) d.nota = previos.nota + " · " + datos.nota;
+  return { datos: d, ts: ts || Date.now() };
+}
+/* Lo que se manda: en una ficha nueva, todo lo que tenga valor; en una que
+   ya existe, solo lo que cambio en esta edicion. Lo vacio no viaja, y una
+   opcion que Notion no tiene tampoco. */
+function personaPayload_(antes, despues, nueva){
+  var txt = function(v){ return (v === undefined || v === null) ? "" : String(v).trim(); };
+  var d = {};
+  PERSONA_CAMPOS.forEach(function(par){
+    var v = txt(despues ? despues[par[1]] : "");
+    if (v === "") return;
+    if (par[0] === "comoLlego" && SERIES_LLEGADAS.indexOf(v) < 0) return;
+    if (par[0] === "estado" && PERSONA_ESTADOS.indexOf(v) < 0) return;
+    if (nueva || v !== txt(antes ? antes[par[1]] : "")) d[par[0]] = v;
+  });
+  return d;
+}
+/* Lo que acepta «crear_persona»: el mismo cuerpo que arma Series, para que
+   los dos caminos no cuenten a la misma persona de dos formas. */
+function personaCrearCuerpo_(c){
+  c = c || {};
+  return Object.assign({ op: "crear_persona" }, seriesPayloadPersona_({ nombre: c.name || "", creada: c.personaPrimera || seriesHoyISO(), comoLlego: c.personaLlegada || "" }, c));
+}
+/* La parte del formulario que va a la base de personas. Se ve con el tipo
+   Readaptacion o si la persona ya tiene su ficha ahi. */
+function personaSeccionHtml_(c, isEdit){
+  c = c || {};
+  var hayPuente = !!u19DashUrl("series");
+  var rehab = getClientType(c) === "rehab";
+  var ver = rehab || !!c.personaNotionId || !!c.personaPend;
+  var marcar = hayPuente && ver;
+  var sel = function(id, lista, val){
+    return '<select id="' + id + '"><option value="">—</option>'
+      + lista.map(function(v){ return '<option value="' + escapeAttr(v) + '"' + (v === val ? ' selected' : '') + '>' + escapeHtml((typeof SERIES_ETIQ !== "undefined" && SERIES_ETIQ[v]) || v) + '</option>'; }).join("")
+      + '</select>';
+  };
+  return '<details class="u-acc" id="cf-persona-sec"' + (ver ? ' open' : ' hidden') + '><summary>Ficha en Notion · base de personas'
+    + ' <span>' + (c.personaNotionId ? 'enlazada' : 'todavía sin ficha') + (c.personaPend ? ' · ⏳ cambios sin subir' : '') + '</span></summary><div class="u-acc-body">'
+    + (hayPuente ? '' : '<p class="text-xs text-muted">Falta la dirección del puente (⚙ Ajustes → Puente con Notion).</p>')
+    + '<label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;">'
+    + '<input type="checkbox" id="cf-persona" style="width:auto;margin:0;" onchange="this.dataset.tocado=\'1\'"'
+    + ((c.personaNotionId || c.personaPend) ? ' data-enlazada="1"' : '') + (marcar ? ' checked' : '') + (hayPuente ? '' : ' disabled') + '> '
+    + (c.personaNotionId ? 'Actualizar también su ficha en la base de personas' : 'Crear su ficha en la base de personas de Notion') + '</label>'
+    + '<div class="form-grid cols-2">'
+    + formField("¿Cómo llegó?", sel("cf-p-llega", SERIES_LLEGADAS, c.personaLlegada || ""))
+    + formField("Estado", sel("cf-p-est", PERSONA_ESTADOS, c.personaEstado || (isEdit ? "" : "En tratamiento")))
+    + '</div><div class="form-grid cols-2">'
+    + formField("Primera consulta", '<input type="date" id="cf-p-pri" value="' + escapeAttr(c.personaPrimera || (isEdit ? "" : seriesHoyISO())) + '">')
+    + formField("Nota para Notion (se añade al final de «Notas»)", '<input type="text" id="cf-p-nota" maxlength="500" placeholder="opcional">')
+    + '</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;">Al guardar se escribe al instante: nombre, teléfono, RUT, nacimiento y lo de arriba. Si ya está en Notion (mismo RUT, la misma ficha de socio, o el mismo teléfono con el nombre completo) se enlaza a esa y no se duplica. Desde aquí no se borra nada en Notion.</p>'
+    + '</div></details>';
+}
+function personaLeerFormulario_(isEdit){
+  var v = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  var nf = { personaLlegada: v("cf-p-llega"), personaEstado: v("cf-p-est"), personaPrimera: v("cf-p-pri") };
+  var campos = {};
+  /* En una ficha que ya existe, un desplegable en «—» no borra lo que habia. */
+  Object.keys(nf).forEach(function(k){ if (nf[k] || !isEdit) campos[k] = nf[k]; });
+  var k = document.getElementById("cf-persona");
+  return { campos: campos, nota: v("cf-p-nota"), subir: !!(k && k.checked && !k.disabled) };
+}
+function personaTrasGuardar_(c, antes, form){
+  if (!c || !form || !form.subir) return;
+  var datos = personaPayload_(antes, c, !c.personaNotionId);
+  if (form.nota) datos.nota = form.nota;
+  if (!Object.keys(datos).length && !c.personaPend && c.personaNotionId) return;
+  c.personaPend = personaPendMezclar_(c.personaPend, datos);
+  saveState();
+  renderClients();
+  personaNotionSubir(c.id, { auto: true });
+}
+/* Sus series quedan con esta persona: asi Series no la pide otra vez, y la
+   que ya estaba en Notion se enlaza al actualizarla. */
+function personaEnlazarSeries_(c){
+  var n = 0;
+  seriesDeCliente_(u19Arr(state.series), c && c.id).forEach(function(s){
+    if (s.personaId) return;
+    s.personaId = c.personaNotionId;
+    if (s.notionId) s.notionSucio = true;
+    n++;
+  });
+  if (n && typeof seriesAutoSubir_ === "function") seriesAutoSubir_();
+  return n;
+}
+var _personaSubiendo = {};
+/* Crea la ficha si no la tiene; si la tiene, sube lo pendiente. Una sola
+   subida por persona a la vez: dos creaciones seguidas harian dos fichas. */
+function personaNotionSubir(id, opts){
+  opts = opts || {};
+  var c = getClient(id);
+  if (!c) return Promise.resolve(null);
+  if (_personaSubiendo[id]) return _personaSubiendo[id];
+  if (c.personaNotionId && !c.personaPend) return Promise.resolve(c.personaNotionId);
+  if (!u19DashUrl("series")) return Promise.resolve(null);
+  if (c.personaPend && c.personaPend.dudoso){
+    /* Notion pudo haberla creado: no se reintenta solo, y a mano se pregunta. */
+    if (opts.auto) return Promise.resolve(null);
+    if (!window.confirm("La última vez Notion no confirmó si creó la ficha de «" + (c.name || "") + "».\n\nMira primero la base de personas en Notion. ¿Reintento igual? (si ya está, el asistente la reconoce por RUT o por teléfono y nombre)")) return Promise.resolve(null);
+    delete c.personaPend.dudoso;
+  }
+  var p = (c.personaNotionId ? personaActualizar_(c, opts) : personaCrear_(c, opts));
+  _personaSubiendo[id] = p.then(function(r){ delete _personaSubiendo[id]; return r; }, function(){ delete _personaSubiendo[id]; return null; });
+  return _personaSubiendo[id];
+}
+window.personaNotionSubir = personaNotionSubir;
+function personaAsegurar_(c){
+  if (!c) return Promise.resolve(null);
+  if (c.personaNotionId) return Promise.resolve(c.personaNotionId);
+  return personaNotionSubir(c.id, { auto: true });
+}
+function personaFallo_(c, ts, motivo, dudoso){
+  var c2 = getClient(c.id); if (!c2) return;
+  if (!c2.personaPend) c2.personaPend = { datos: {}, ts: ts || Date.now() };
+  c2.personaPend.motivo = String(motivo || "sin respuesta").slice(0, 200);
+  if (dudoso) c2.personaPend.dudoso = true;
+  saveState(); renderClients();
+}
+function personaCrear_(c, opts){
+  var ts = c.personaPend ? c.personaPend.ts : 0;
+  var pend = (c.personaPend && c.personaPend.datos) || {};
+  return u19SeriesPedir_(personaCrearCuerpo_(c)).then(function(j){
+    var c2 = getClient(c.id); if (!c2) return null;
+    if (j.ok && j.id){
+      c2.personaNotionId = j.id;
+      c2.updatedAt = Date.now();
+      personaEnlazarSeries_(c2);
+      /* «crear_persona» no escribe el estado ni la nota: si hay, siguen pendientes. */
+      var resto = {};
+      if (pend.estado && pend.estado !== "En tratamiento") resto.estado = pend.estado;
+      if (pend.nota) resto.nota = pend.nota;
+      if (c2.personaPend && c2.personaPend.ts === ts) delete c2.personaPend;
+      if (Object.keys(resto).length) c2.personaPend = personaPendMezclar_(c2.personaPend, resto);
+      saveState(); renderClients();
+      if (!opts.silencioso){
+        var otroNombre = j.existia && j.nombre && _impNom(j.nombre) !== _impNom(c2.name);
+        toast(j.existia ? "Ya estaba en Notion: quedó enlazada a «" + (j.nombre || "sin nombre") + "»" + (otroNombre ? ". Se llama distinto: compruébalo" : "")
+          : "Ficha creada en Notion, en la base de personas", otroNombre ? "warn" : "success");
+        var par = u19Lista(j.parecidas).map(function(x){ return x && x.nombre; }).filter(Boolean);
+        if (par.length) toast("Ojo: en Notion hay otra parecida (" + par.join(", ") + "). Si es la misma persona, se fusionan en Notion.", "warn");
+      }
+      if (c2.personaPend) return personaActualizar_(c2, opts).then(function(){ return j.id; });
+      return j.id;
+    }
+    personaFallo_(c, ts, j.error, j.dudoso);
+    if (!opts.silencioso) toast(j.dudoso ? "Notion no confirmó si creó la ficha: mira la base de personas antes de reintentar" : "No se creó la ficha en Notion: " + (j.error || "sin respuesta") + ". Queda pendiente.", "error");
+    return null;
+  }).catch(function(e){
+    personaFallo_(c, ts, "sin conexión con el asistente");
+    if (!opts.silencioso) toast("Guardado en la app; no pude hablar con el asistente (" + ((e && e.message) || e) + "). Queda pendiente.", "warn");
+    return null;
+  });
+}
+function personaActualizar_(c, opts){
+  var pend = c.personaPend;
+  if (!pend || !pend.datos || !Object.keys(pend.datos).length){ if (pend) { delete c.personaPend; saveState(); } return Promise.resolve(c.personaNotionId); }
+  var ts = pend.ts;
+  return u19SeriesPedir_({ op: "actualizar_persona", personaId: c.personaNotionId, datos: Object.assign({}, pend.datos) }).then(function(j){
+    var c2 = getClient(c.id); if (!c2) return null;
+    if (j.ok){
+      if (c2.personaPend && c2.personaPend.ts === ts) delete c2.personaPend;
+      saveState(); renderClients();
+      if (!opts.silencioso && !j.nada) toast("Ficha de la persona actualizada en Notion", "success");
+      if (!opts.silencioso && u19Lista(j.avisos).length) toast(u19Lista(j.avisos).map(String).join(" · "), "warn");
+      return c2.personaNotionId;
+    }
+    personaFallo_(c, ts, j.desconocida ? "falta publicar el asistente" : j.error);
+    if (!opts.silencioso) toast(j.desconocida ? "Guardado en la app. Para actualizar la ficha de la persona en Notion falta publicar el asistente: queda pendiente."
+      : "Notion no aceptó el cambio de la persona: " + (j.error || "sin respuesta") + ". Queda pendiente.", j.desconocida ? "warn" : "error");
+    return c2.personaNotionId;
+  }).catch(function(e){
+    personaFallo_(c, ts, "sin conexión con el asistente");
+    if (!opts.silencioso) toast("Guardado en la app; no pude hablar con el asistente (" + ((e && e.message) || e) + "). Queda pendiente.", "warn");
+    return c.personaNotionId;
+  });
+}
+/* Lo que la tarjeta dice de la ficha de la persona y de su historia. */
+function personaTarjetaHtml_(c){
+  if (!c) return "";
+  var h = "";
+  if (c.personaPend) h += '<button type="button" class="badge warn" style="cursor:pointer;" onclick="personaNotionSubir(\'' + escapeAttr(String(c.id)) + '\')" title="' + escapeAttr("Cambios de la ficha de la persona sin subir a Notion" + (c.personaPend.motivo ? ": " + c.personaPend.motivo : "") + ". Pulsa para reintentar.") + '">⏳ Notion · persona</button>';
+  else if (c.personaNotionId) h += '<span class="badge teal" title="Tiene su ficha en la base de personas de Notion">🟢 Notion · persona</span>';
+  else if (getClientType(c) === "rehab" && u19DashUrl("series")) h += '<button type="button" class="badge muted" style="cursor:pointer;" onclick="personaNotionSubir(\'' + escapeAttr(String(c.id)) + '\')" title="Todavía no está en la base de personas de Notion: pulsa para crear su ficha">＋ Crear en Notion</button>';
+  if (c.historiaPend) h += '<button type="button" class="badge warn" style="cursor:pointer;" onclick="historiaReintentar(\'' + escapeAttr(String(c.id)) + '\')" title="' + escapeAttr("La historia está guardada en la app y falta en Notion" + (c.historiaPend.motivo ? ": " + c.historiaPend.motivo : "") + ". Pulsa para reintentar.") + '">⏳ Historia sin subir</button>';
+  return h;
+}
+function historiaReintentar(id){
+  var c = getClient(id); if (!c) return;
+  if (c.historiaPend && c.historiaPend.dudoso) delete c.historiaPend.dudoso;
+  personaAsegurar_(c).then(function(pid){ if (pid) historiaNotionSubir(id); });
+}
+window.historiaReintentar = historiaReintentar;
+
+/* Lo que quedo pendiente se reintenta solo al abrir la app y al volver la
+   conexion o la pestaña, sin preguntar nada: una ficha con avisos o una
+   creacion dudosa esperan a Diego en su tarjeta. Una vez cada dos minutos
+   como mucho, y de una en una. */
+var _u19ReintentoAt = 0;
+function u19NotionReintentar_(){
+  if (!u19DashUrl("series") && !u19DashUrl("ficha_cliente")) return Promise.resolve(0);
+  if (typeof navigator !== "undefined" && navigator.onLine === false) return Promise.resolve(0);
+  if (Date.now() - _u19ReintentoAt < 120000) return Promise.resolve(0);
+  _u19ReintentoAt = Date.now();
+  var tareas = [];
+  u19Arr(state.clients).forEach(function(c){
+    if (!c || !c.id) return;
+    if (c.notionPend && c.notionPend.datos) tareas.push(function(){ return fichaNotionSubir(c.id, { auto: true, silencioso: true }); });
+    if (c.personaPend && !c.personaPend.dudoso) tareas.push(function(){ return personaNotionSubir(c.id, { auto: true, silencioso: true }); });
+    if (c.historiaPend && !c.historiaPend.dudoso && c.personaNotionId) tareas.push(function(){ return historiaNotionSubir(c.id, { auto: true, silencioso: true }); });
+  });
+  var cadena = Promise.resolve();
+  tareas.forEach(function(t){ cadena = cadena.then(function(){ return Promise.resolve(t()).catch(function(){}); }); });
+  return cadena.then(function(){ if (typeof seriesAutoSubir_ === "function") seriesAutoSubir_(); return tareas.length; });
+}
+/* Al volver a la pestaña o a la red: se mira Notion otra vez y se reintenta
+   lo pendiente. Se engancha una sola vez. */
+var _u19AlVolverListo = false;
+function u19NotionAlVolver_(){
+  if (_u19AlVolverListo || typeof document === "undefined" || !document.addEventListener) return;
+  _u19AlVolverListo = true;
+  var vuelve = function(){
+    if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion();
+    u19NotionReintentar_();
+  };
+  document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") vuelve(); });
+  window.addEventListener("online", vuelve);
+}
+/* ===PERSONA_NOTION_END=== */
+
 function clientCardHtml(c){
   var type = getClientType(c);
   var phoneClean = (c.phone || "").replace(/[^\d+]/g, "");
@@ -5636,6 +5939,7 @@ function clientCardHtml(c){
         + clientTypeBadge(type)
         + (c.notionId ? '<span class="badge teal">🟢 Notion</span>' : '')
         + (c.notionPend ? '<button type="button" class="badge warn" style="cursor:pointer;" onclick="fichaNotionSubir(\''+c.id+'\')" title="Hay cambios de esta ficha sin subir a Notion: pulsa para verlos y subirlos">⏳ Notion pendiente</button>' : '')
+        + personaTarjetaHtml_(c)
         + (c.activo === false && c.notionEstado && c.notionEstado !== "Inactivo" ? '<span class="badge warn" title="Así está su membresía en Notion">'+escapeHtml(c.notionEstado)+'</span>' : '')
         + (c.notionPlan ? '<span class="badge muted">'+escapeHtml(c.notionPlan)+(c.planPrice?' · $'+Number(c.planPrice).toLocaleString("es-CL"):'')+'</span>' : '')
         + (c.phone ? '<span>📱 '+escapeHtml(c.phone)+'</span>' : '')
@@ -5696,7 +6000,10 @@ function openClientForm(id){
       + formField("RUT", '<input type="text" id="cf-rut" value="'+escapeAttr(c.rut||"")+'" placeholder="12.345.678-9">')
       + formField("Teléfono", '<input type="text" id="cf-phone" value="'+escapeAttr(c.phone)+'" placeholder="+56 9 1234 5678">')
       + '</div>'
+      + '<div class="form-grid cols-2">'
       + formField("Email", '<input type="email" id="cf-email" value="'+escapeAttr(c.email||"")+'" placeholder="opcional">')
+      + formField("Fecha de nacimiento", '<input type="date" id="cf-n-nac" value="'+escapeAttr(c.notionNacimiento||"")+'">')
+      + '</div>'
       + '<div class="form-grid cols-2">'
       + formField("Próxima reevaluación", '<input type="date" id="cf-reeval" value="'+escapeAttr(c.reevalDate||"")+'">')
       + formField("Vencimiento de plan / pago", '<input type="date" id="cf-planend" value="'+escapeAttr(c.planEndDate||"")+'">')
@@ -5708,7 +6015,8 @@ function openClientForm(id){
       + formField("Precio del plan (mensual, CLP)", '<input type="number" step="1000" id="cf-plan-price" value="'+escapeAttr(c.planPrice||"")+'" placeholder="opcional">')
       + formField("Objetivo", '<input type="text" id="cf-goal" value="'+escapeAttr(c.goal)+'" placeholder="Hipertrofia, Pérdida de grasa, Rehabilitar hombro...">')
       + formField("Notas", '<textarea id="cf-notes" placeholder="Lesiones, restricciones, etc.">'+escapeHtml(c.notes||"")+'</textarea>')
-      + fichaSeccionHtml_(c, isEdit),
+      + fichaSeccionHtml_(c, isEdit)
+      + personaSeccionHtml_(c, isEdit),
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
       { label: isEdit ? "Guardar" : "Crear", cls:"btn-primary", onClick: function(){
@@ -5736,6 +6044,9 @@ function openClientForm(id){
         /* 11-sep-2026: la ficha en Notion. */
         var _fichaForm = fichaLeerFormulario_(isEdit);
         Object.assign(data, _fichaForm.campos);
+        /* Y la de la persona, en la base de personas (readaptacion). */
+        var _personaForm = personaLeerFormulario_(isEdit);
+        Object.assign(data, _personaForm.campos);
         if (isEdit){
           /* Solo lo que el formulario cambio: lo que la importacion trajo
              con el formulario abierto no se pisa con el valor viejo. */
@@ -5756,6 +6067,7 @@ function openClientForm(id){
         renderClients();
         toast(isEdit ? "Cliente actualizado" : "Cliente creado", "success");
         fichaTrasGuardar_(isEdit ? client : data, _fichaAntes, _fichaForm);
+        personaTrasGuardar_(isEdit ? client : data, _fichaAntes, _personaForm);
       }}
     ]
   });
@@ -11808,8 +12120,15 @@ function seriesUltima_(sesiones){
 function seriesConNota_(sesiones, hoyISO, texto){
   var out = (sesiones || []).slice();
   var u = out.length ? out[out.length - 1] : null;
-  if (u && u.fecha === hoyISO && (u.asistio === true || u.asistio === false) && !u.notionId && !u.nota){
-    out[out.length - 1] = Object.assign({}, u, { nota: texto });
+  var junta = function(a, b){ return a ? a + " · " + b : b; };
+  /* Desde que Series sube sola (11-sep-2026, noche) la sesion de hoy suele
+     estar ya en Notion cuando llega la nota: se le suma igual, y lo nuevo
+     queda en notaPend para que el asistente lo AÑADA a su «Respuesta». La
+     nota que ya tenia no se pisa: se junta. */
+  if (u && u.fecha === hoyISO && (u.asistio === true || u.asistio === false)){
+    out[out.length - 1] = u.notionId
+      ? Object.assign({}, u, { nota: junta(u.nota, texto), notaPend: junta(u.notaPend, texto), notionSucio: true })
+      : Object.assign({}, u, { nota: junta(u.nota, texto) });
   } else {
     out.push({ fecha: hoyISO, asistio: null, nota: texto, soloNota: true });
   }
@@ -11972,7 +12291,7 @@ function seriesPendientes_(lista){
   u19Arr(lista).forEach(function(s){
     if (!s || typeof s !== "object") return;
     if (!s.notionId || s.notionSucio || !s.personaId) n++;
-    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) n++; });
+    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x) || (x && x.notionId && x.notionSucio)) n++; });
     if (s.orden && s.orden.foto && s.orden.foto.pendiente) n++;
   });
   return n;
@@ -12047,7 +12366,8 @@ function seriesOrdenGuardarFoto_(s, archivo){
       s.orden.foto = { nombre: nombre, tipo: p.tipo, bytes: p.bytes, n: n, pendiente: true, fecha: seriesHoyISO() };
       seriesGuardar(seriesLeer());
       renderSeries();
-      toast("Foto guardada (" + Math.round(p.bytes / 1024) + " KB). Se sube con «Subir a Notion».", "success");
+      toast("Foto guardada (" + Math.round(p.bytes / 1024) + " KB): se sube sola a Notion, a «Orden médica» de la serie.", "success");
+      if (typeof seriesAutoSubir_ === "function") seriesAutoSubir_();
     });
   }).catch(function(e){ toast("La foto no se guardó: " + ((e && e.message) || e), "error"); });
 }
@@ -12110,6 +12430,7 @@ function renderSeries(){
       + (c.canceladas ? '<span>cancelé <b>' + c.canceladas + '</b></span>' : "")
       + (p.via ? '<span>' + seriesEsc_(SERIES_ETIQ[p.via] || p.via) + '</span>' : "")
       + (p.orden && p.orden.foto && p.orden.foto.pendiente ? '<span title="La foto de la orden está en este equipo, sin subir a Notion">📎 foto sin subir</span>' : "")
+      + (seriesPendientes_([p]) ? '<span title="Hay cambios de esta serie que todavía no están en Notion: se suben solos al guardar; si falla, «Subir a Notion»">⏳ sin subir a Notion</span>' : (p.notionId ? '<span title="Al día en Notion">✓ en Notion</span>' : ""))
       + (!abierta ? '<span><b>' + seriesEsc_(p.estado) + (p.alta ? ' · alta ' + seriesEsc_(p.alta) : '') + '</b></span>' : "") + '</div>');
 
     h.push('<div class="sr-diez">');
@@ -12130,8 +12451,8 @@ function renderSeries(){
       h.push('<button class="btn btn-sm" onclick="seriesNota(' + idx + ')">Anotar evolución</button>');
     }
     if (abierta && c.completa) h.push('<button class="btn btn-sm btn-primary" onclick="seriesAlta(' + idx + ')">Dar de alta</button>');
-    if (o.bloquea) h.push('<button class="btn btn-sm" onclick="seriesOrdenPedir(' + idx + ')">Registrar orden médica</button>');
-    else if (abierta) h.push('<button class="btn btn-sm btn-ghost" onclick="seriesOrdenPedir(' + idx + ')">Orden</button>');
+    if (o.bloquea) h.push('<button class="btn btn-sm" onclick="seriesOrdenPedir(' + idx + ')">Registrar orden médica y su foto</button>');
+    else h.push('<button class="btn btn-sm btn-ghost" onclick="seriesOrdenPedir(' + idx + ')" title="Datos de la orden y su foto: la foto va a Notion, a «Orden médica» de esta serie">📎 Orden y foto</button>');
     if (!p.clienteId || !getClient(p.clienteId)) h.push('<button class="btn btn-sm btn-ghost" onclick="seriesEnlazar(' + idx + ')">Enlazar a una ficha</button>');
     h.push("</div>");
 
@@ -12158,27 +12479,42 @@ function renderSeries(){
 /* Una subida a la vez: con dos cadenas en paralelo, las dos ven la serie
    sin id mientras la otra espera, y las dos crean (revision del 11-sep-2026). */
 var _seriesSubiendo = false;
-function seriesSincronizar(){
-  if (_seriesSubiendo){ toast("Ya se está subiendo: espera a que termine"); return; }
+/* 11-sep-2026 (noche), Diego: «si yo modifico algo en la app, que se envie
+   inmediatamente y se actualice en Notion». Cada cambio de Series llama a
+   seriesAutoSubir_, que espera un momento (varios cambios seguidos van en
+   una sola subida) y sube sin preguntar. El boton «Subir a Notion» queda
+   para reintentar a mano. Si llega un cambio mientras sube, se sube al
+   terminar: no se pierde ni se lanza una segunda cadena. */
+var _seriesAutoT = null, _seriesOtraVez = false;
+function seriesAutoSubir_(){
+  if (!u19DashUrl("series")) return;
+  if (_seriesAutoT) clearTimeout(_seriesAutoT);
+  _seriesAutoT = setTimeout(function(){ _seriesAutoT = null; seriesSincronizar({ auto: true }); }, 1200);
+}
+function seriesSincronizar(opts){
+  var auto = !!(opts && opts.auto === true);
+  if (_seriesSubiendo){ if (auto) _seriesOtraVez = true; else toast("Ya se está subiendo: espera a que termine"); return; }
   var url = u19DashUrl("series");
   if (!url){
-    window.alert("Falta la dirección del puente.\n\nAjustes → Conexión con Notion.");
+    if (!auto) window.alert("Falta la dirección del puente.\n\n⚙ Ajustes → Puente con Notion.");
     return;
   }
   var lista = seriesLeer();
-  if (!lista.length){ window.alert("No hay ninguna serie que subir."); return; }
+  if (!lista.length){ if (!auto) window.alert("No hay ninguna serie que subir."); return; }
 
   var pendientes = seriesPendientes_(lista);
-  if (!pendientes){ window.alert("Todo está ya en Notion. Nada que subir."); return; }
-  if (!window.confirm("Se van a subir " + pendientes + " cosa(s) a Notion. ¿Seguimos?")) return;
+  if (!pendientes){ if (!auto) window.alert("Todo está ya en Notion. Nada que subir."); return; }
+  if (auto && typeof navigator !== "undefined" && navigator.onLine === false) return;
+  if (!auto && !window.confirm("Se van a subir " + pendientes + " cosa(s) a Notion. ¿Seguimos?")) return;
   _seriesSubiendo = true;
-  toast("Subiendo a Notion…");
+  if (!auto) toast("Subiendo a Notion…");
 
   var subidas = 0, fallos = [], notas = [];
   var hoy = seriesHoyISO();
-  var pide = function(cuerpo){
-    return fetch(url, { method:"POST", body: JSON.stringify(cuerpo) }).then(function(r){ return r.json(); });
-  };
+  /* La misma lectura estricta que las fichas: una respuesta sin «ok»
+     booleano no es un exito, y un asistente sin publicar se dice asi. */
+  var pide = function(cuerpo){ return u19SeriesPedir_(cuerpo); };
+  var motivo = function(j){ return (j && j.desconocida) ? "falta publicar el asistente" : ((j && j.error) || "sin respuesta"); };
   /* Se trabaja sobre el OBJETO de cada serie, no sobre su posicion: si se
      borra una serie mientras sube, la posicion de las demas cambia y se
      cruzarian ids y fotos entre personas. Una serie borrada se salta. */
@@ -12205,12 +12541,14 @@ function seriesSincronizar(){
           if (j && j.ok && j.id){
             s.personaId = j.id;
             if (cli) cli.personaNotionId = j.id;
+            /* Sin esto la sincronizacion podia dar por mas nueva la copia sin el enlace. */
+            if (cli) cli.updatedAt = Date.now();
             /* Una serie que ya estaba en Notion se enlaza a su persona al actualizarla. */
             if (s.notionId) s.notionSucio = true;
             subidas++;
             if (j.existia) notas.push("«" + s.nombre + "» quedó con la persona que ya estaba en Notion: " + (j.nombre || "sin nombre"));
             if (u19Lista(j.parecidas).length) notas.push("Para «" + s.nombre + "» se creó una persona nueva; en Notion hay otra parecida (" + u19Lista(j.parecidas).map(function(p){ return p.nombre; }).join(", ") + "). Si es la misma, se fusionan en Notion.");
-          } else fallos.push(s.nombre + " (persona): " + ((j && j.error) || "sin respuesta"));
+          } else fallos.push(s.nombre + " (persona): " + motivo(j));
         })
         .catch(function(e){ fallos.push(s.nombre + " (persona): " + e.message); });
     });
@@ -12223,7 +12561,7 @@ function seriesSincronizar(){
         return pide(Object.assign({ op:"actualizar_serie", serieId: s.notionId }, seriesPayloadSerie_(s)))
           .then(function(j){
             if (j && j.ok){ s.notionSucio = false; subidas++; }
-            else fallos.push(s.nombre + " (actualizar): " + ((j && j.error) || "sin respuesta"));
+            else fallos.push(s.nombre + " (actualizar): " + motivo(j));
           })
           .catch(function(e){ fallos.push(s.nombre + " (actualizar): " + e.message); });
       }
@@ -12232,7 +12570,7 @@ function seriesSincronizar(){
       return pide(Object.assign({ op:"crear_serie" }, seriesPayloadSerie_(s)))
         .then(function(j){
           if (j && j.ok && j.id){ s.notionId = j.id; s.notionSucio = false; subidas++; }
-          else fallos.push(s.nombre + ": " + ((j && j.error) || "sin respuesta"));
+          else fallos.push(s.nombre + ": " + motivo(j));
         })
         .catch(function(e){ fallos.push(s.nombre + ": " + e.message); });
     });
@@ -12243,10 +12581,24 @@ function seriesSincronizar(){
         var c = seriesContar_(s.sesiones.slice(0, k + 1), s.indicadas);
         return pide(Object.assign({ op:"crear_sesion", serieId: s.notionId }, seriesPayloadSesion_(s, x, c.hechas)))
           .then(function(j){
-            if (j && j.ok && j.id){ x.notionId = j.id; subidas++; }
-            else fallos.push(s.nombre + " (sesión): " + ((j && j.error) || "sin respuesta"));
+            if (j && j.ok && j.id){ x.notionId = j.id; x.notaPend = ""; x.notionSucio = false; subidas++; }
+            else fallos.push(s.nombre + " (sesión): " + motivo(j));
           })
           .catch(function(e){ fallos.push(s.nombre + " (sesión): " + e.message); });
+      });
+    });
+    /* 3b · la evolucion que llego despues de subir la sesion: el asistente
+       la AÑADE a su «Respuesta» (op «actualizar_sesion»), no la pisa. */
+    u19Arr(s.sesiones).forEach(function(x){
+      cadena = cadena.then(function(){
+        if (!sigue(s) || !x || !x.notionId || !x.notionSucio || !x.notaPend) return null;
+        var nota = x.notaPend;
+        return pide({ op:"actualizar_sesion", sesionId: x.notionId, datos: { nota: nota } })
+          .then(function(j){
+            if (j && j.ok){ if (x.notaPend === nota){ x.notaPend = ""; x.notionSucio = false; } subidas++; }
+            else fallos.push(s.nombre + " (evolución): " + motivo(j));
+          })
+          .catch(function(e){ fallos.push(s.nombre + " (evolución): " + e.message); });
       });
     });
     /* 4 · la foto de la orden, que espera en este equipo. Solo se borra de
@@ -12262,7 +12614,7 @@ function seriesSincronizar(){
               f.pendiente = false; f.subida = hoy; subidas++;
               return u19IdbBorrar(seriesOrdenClave_(s)).catch(function(){});
             }
-            fallos.push(s.nombre + " (orden): " + ((j && j.error) || "sin respuesta"));
+            fallos.push(s.nombre + " (orden): " + motivo(j));
           });
       }).catch(function(e){ fallos.push(s.nombre + " (orden): " + ((e && e.message) || e)); });
     });
@@ -12272,10 +12624,18 @@ function seriesSincronizar(){
     _seriesSubiendo = false;
     seriesGuardar(seriesLeer());
     renderSeries();
-    var msg = subidas + " subida(s) a Notion.";
-    if (notas.length) msg += "\n\n" + notas.slice(0, 3).join("\n");
-    if (fallos.length) msg += "\n\nNo pude con " + fallos.length + ":\n" + fallos.slice(0,3).join("\n");
-    window.alert(msg);
+    if (auto){
+      /* Sin ventanas: un aviso corto, y el detalle en la tarjeta. */
+      if (fallos.length) toast("Series: " + (subidas ? subidas + " subida(s) a Notion; " : "") + "no pude con " + fallos.length + " (queda pendiente) · " + fallos[0], "warn");
+      else if (subidas) toast("Series en Notion ✓ (" + subidas + ")", "success");
+      notas.slice(0, 2).forEach(function(t){ toast(t, "warn"); });
+    } else {
+      var msg = subidas + " subida(s) a Notion.";
+      if (notas.length) msg += "\n\n" + notas.slice(0, 3).join("\n");
+      if (fallos.length) msg += "\n\nNo pude con " + fallos.length + ":\n" + fallos.slice(0,3).join("\n");
+      window.alert(msg);
+    }
+    if (_seriesOtraVez){ _seriesOtraVez = false; seriesAutoSubir_(); }
   });
 }
 
@@ -12313,7 +12673,7 @@ function seriesNueva(){
         lista.push({ id: genId(), clienteId: c ? c.id : "", nombre: nombre, indicadas: Math.floor(total),
                      sesiones: [], orden: null, creada: seriesHoyISO(),
                      comoLlego: SERIES_LLEGADAS.indexOf(llega) >= 0 ? llega : "" });
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
       }}
     ]
   });
@@ -12330,7 +12690,7 @@ function seriesEnlazar(idx){
       { label:"Enlazar", cls:"btn-primary", onClick: function(){
         var cid = document.getElementById("sr-e-cli").value;
         lista[idx].clienteId = (cid && getClient(cid)) ? cid : "";
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
       }}
     ]
   });
@@ -12391,7 +12751,7 @@ function seriesOrdenPedir(idx){
         s.orden = Object.assign({}, s.orden || {}, { adjunta: !!(el && el.checked) || !!(s.orden && s.orden.adjunta), fecha: fecha, vence: vence });
         s.medico = seriesVal_("sr-o-medico");
         seriesTocar_(s);
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
         if (archivo) seriesOrdenGuardarFoto_(s, archivo);
       }}
     ]
@@ -12439,7 +12799,7 @@ function seriesSesion(idx){
         s.sesiones.push({ fecha: seriesHoyISO(), asistio: true, nota: seriesVal_("sr-s-resp"), aplicado: seriesVal_("sr-s-apl"),
           dolorAntes: d1, dolorDespues: d2, cobro: SERIES_COBROS.indexOf(cb) >= 0 ? cb : "Pendiente", bono: bono,
           monto: Number(seriesVal_("sr-s-monto")) > 0 ? Number(seriesVal_("sr-s-monto")) : 0 });
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
       }}
     ]
   });
@@ -12460,7 +12820,7 @@ function seriesAusencia(idx){
         var m = seriesVal_("sr-a-mot");
         s.sesiones = u19Arr(s.sesiones);
         s.sesiones.push({ fecha: seriesHoyISO(), asistio: false, ausencia: SERIES_AUSENCIAS.indexOf(m) >= 0 ? m : "No aviso", nota: "" });
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
       }}
     ]
   });
@@ -12502,7 +12862,7 @@ function seriesDatos(idx){
         s.alta = alta || (s.estado === "Terminada" ? seriesHoyISO() : "");
         s.obs = seriesVal_("sr-d-obs");
         seriesTocar_(s);
-        seriesGuardar(lista); closeModal(); renderSeries();
+        seriesGuardar(lista); closeModal(); renderSeries(); seriesAutoSubir_();
       }}
     ]
   });
@@ -12516,7 +12876,7 @@ function seriesAlta(idx){
   if (!window.confirm("¿Dar de alta a " + (s.nombre || "") + "? La serie queda Terminada con fecha de hoy.")) return;
   s.estado = "Terminada"; s.alta = seriesHoyISO();
   seriesTocar_(s);
-  seriesGuardar(lista); renderSeries();
+  seriesGuardar(lista); renderSeries(); seriesAutoSubir_();
 }
 
 function seriesNota(idx){
@@ -12527,6 +12887,7 @@ function seriesNota(idx){
   lista[idx].sesiones = seriesConNota_(lista[idx].sesiones, seriesHoyISO(), t.trim());
   seriesGuardar(lista);
   renderSeries();
+  seriesAutoSubir_();
 }
 
 function seriesEliminar(idx){
@@ -18819,7 +19180,10 @@ var RC_RED_FLAGS = [
   "Dolor torácico o abdominal asociado, disnea o síntomas cardiovasculares con el esfuerzo",
   "Deformidad evidente, bloqueo articular completo o incapacidad total de carga",
   "Signos inflamatorios severos sin causa clara (calor, rubor, edema marcado)",
-  "Dolor que no ha cambiado nada tras 4-6 semanas de manejo conservador bien llevado"
+  "Dolor que no ha cambiado nada tras 4-6 semanas de manejo conservador bien llevado",
+  /* 11-sep-2026: estaba en su plantilla de Notion y faltaba aqui. Va AL
+     FINAL: se guardan indices, y meterla en medio cambiaria lo registrado. */
+  "Sospecha de trombosis venosa profunda (pantorrilla dolorosa, hinchada y caliente de un lado)"
 ];
 
 function openRedFlags(clientId, onDone){
@@ -18858,64 +19222,538 @@ function openRedFlags(clientId, onDone){
 }
 window.openRedFlags = openRedFlags;
 
-/* ---------- Ficha clínica ---------- */
+/* ===HISTORIA===
+   La historia de la persona, ordenada por el modelo CIF (11-sep-2026).
+   Diego pidio basarla en el modelo CIF y hacerla mas completa con lo que ya
+   tiene en su Notion: su plantilla «Nueva Historia Clinica» (datos,
+   derivacion, PSFS, PQRST, screening, antecedentes, examen, impresion, CIF,
+   plan) y sus apuntes (un problema principal por nivel, la meta en palabras
+   de la persona, el contexto con facilitadores y barreras por separado,
+   «escala + valor» en cada hallazgo). Lo que la plantilla no pedia y el
+   material si -contexto, participacion concreta, PSFS con puntaje,
+   cuestionarios con fecha- esta aqui. En sus dos historias de mayo quedaron
+   siempre vacios la seguridad y el puntaje del PSFS: por eso cuentan en el
+   nucleo.
+
+   Vive en c.ficha, la de siempre: las 13 claves de antes (motivo, inicio,
+   mecanismo, tratamientos, antecedentes, cirugias, medicacion, alergias,
+   imagen, dx, objCorto, objMediano, objLargo) conservan su nombre y las
+   nuevas se suman al lado. Asi viaja cifrada en la sincronizacion y en el
+   respaldo sin tocar nada. Guardar FUSIONA: hasta hoy el formulario
+   reemplazaba el objeto entero y borraba lo que no conocia.
+
+   Lo vacio no se inventa. En la sintesis CIF un componente sin rellenar
+   sale como «No evaluado», que es como lo pide su propio material. */
+var HC_FASES = ["Agudo (menos de 6 semanas)", "Subagudo (6 a 12 semanas)", "Crónico (más de 12 semanas)", "Post-operatorio", "Traumático reciente"];
+var HC_IRRITA = ["Baja", "Media", "Alta"];
+var HC_SINO = ["Sí", "No"];
+var HC_LADO = ["Derecha", "Izquierda", "Ambidiestra"];
+var HC_NIVEL = ["Bajo", "Moderado", "Alto"];
+/* Cuestionarios y tests con su rango y su direccion. La direccion importa
+   mas que el rango: un 40 en el ODI es peor que un 20; en el LEFS, mejor. */
+var HC_ESCALAS = [
+  ["EVA / NPRS", "0–10 · más alto = peor"], ["PSFS (promedio)", "0–10 · más alto = mejor"],
+  ["ODI", "0–100 % · más alto = peor"], ["RMDQ", "0–24 · más alto = peor · cambio importante ≥5"],
+  ["NDI", "0–50 · más alto = peor"], ["DASH", "0–100 · más alto = peor"], ["QuickDASH", "0–100 · más alto = peor"],
+  ["SPADI", "0–100 · más alto = peor"], ["LEFS", "0–80 · más alto = mejor"], ["KOOS", "0–100 · más alto = mejor"],
+  ["IKDC", "0–100 · más alto = mejor"], ["Lysholm", "0–100 · más alto = mejor"], ["ACL-RSI", "0–100 · más alto = mejor"],
+  ["TSK", "TSK-17: 17–68 · TSK-11: 11–44 · más alto = peor"], ["PCS", "0–52 · más alto = peor"],
+  ["STarT Back", "0–9 · más alto = peor"], ["Sit-to-Stand 5 rep.", "segundos · más alto = peor"],
+  ["TUG", "segundos · más alto = peor"], ["Marcha 2 min", "metros · más alto = mejor"], ["LSI", "% · 90 % o más para volver al deporte"]
+];
+var HC_PSFS_FILAS = 5, HC_CUEST_FILAS = 8;
+/* Las secciones, en el orden de su plantilla. «t»: txt, area, sel, fecha,
+   num (0-10) o sino. */
+var HC_SECCIONES = [
+  { id:"ident", titulo:"Identificación y vida diaria", campos:[
+    { k:"ocupacion", lb:"Ocupación / estudios", t:"txt", ph:"Ej. operario agrícola, turnos de 12 h" },
+    { k:"deporte", lb:"Deporte o actividad física", t:"txt", ph:"Ej. fútbol amateur, 2 veces por semana" },
+    { k:"dominancia", lb:"Lado dominante", t:"sel", ops:HC_LADO },
+    { k:"contacto", lb:"Contacto / acompañante", t:"txt", ph:"Nombre y teléfono, si viene acompañada" },
+    { k:"ingreso", lb:"Fecha de ingreso", t:"fecha" },
+    { k:"consentimiento", lb:"Consentimiento verbal para evaluar", t:"sino" } ]},
+  { id:"deriv", titulo:"Derivación médica (si aplica)", campos:[
+    { k:"dxMedico", lb:"Diagnóstico médico", t:"txt", ph:"Tal como viene en la orden" },
+    { k:"restricciones", lb:"Restricciones indicadas", t:"area", ph:"Carga, rango, apoyo, tiempo desde la operación…" },
+    { k:"imagen", lb:"Exámenes (Rx / RM / Eco): fecha y hallazgo", t:"area", ph:"Ej. RM rodilla (05-2026): rotura del LCA" } ]},
+  { id:"motivo", titulo:"Motivo y meta", psfs:true, campos:[
+    { k:"motivo", lb:"Consulta por", t:"txt", ph:"Consulta por ___ que limita ___ desde hace ___" },
+    { k:"meta", lb:"Meta en sus palabras (textual)", t:"area", ph:"«Ir sola al almacén, dos cuadras, sin que mi hija me acompañe»" } ]},
+  { id:"actual", titulo:"Historia del problema actual (PQRST)", campos:[
+    { k:"inicio", lb:"Inicio", t:"txt", ph:"Ej. hace 3 semanas / 10-06-2026" },
+    { k:"fase", lb:"Tiempo de evolución", t:"sel", ops:HC_FASES },
+    { k:"mecanismo", lb:"Mecanismo y evolución", t:"area", ph:"Cómo empezó y cómo ha cambiado" },
+    { k:"agrava", lb:"P · Qué lo provoca", t:"txt", ph:"Tres cosas, de más a menos" },
+    { k:"alivia", lb:"P · Qué lo alivia", t:"txt", ph:"Tres cosas, de más a menos" },
+    { k:"calidad", lb:"Q · Cómo es", t:"txt", ph:"Punzante, quemante, opresivo, eléctrico…" },
+    { k:"region", lb:"R · Dónde", t:"txt", ph:"Zona exacta y hacia dónde va" },
+    { k:"irradia", lb:"¿Se irradia?", t:"sino" },
+    { k:"parestesias", lb:"¿Hormigueo o adormecimiento?", t:"sino" },
+    { k:"evaAct", lb:"S · Dolor ahora (0–10)", t:"num" },
+    { k:"evaPeor", lb:"S · En su peor momento (0–10)", t:"num" },
+    { k:"evaMejor", lb:"S · En su mejor momento (0–10)", t:"num" },
+    { k:"irritabilidad", lb:"Irritabilidad (cuánto se enciende con la carga y cuánto tarda en volver)", lc:"Irritabilidad", t:"sel", ops:HC_IRRITA },
+    { k:"patron24", lb:"Patrón de 24 horas", t:"txt", ph:"Rigidez al despertar, empeora en la tarde, despierta de noche…" },
+    { k:"limitaciones", lb:"Limitaciones clave (2 o 3)", t:"area" },
+    { k:"tratamientos", lb:"Tratamientos previos y cómo respondió", t:"area", ph:"Terapias, medicamentos, infiltraciones, cirugías por esto…" } ]},
+  { id:"psico", titulo:"Factores psicosociales (banderas amarillas)", campos:[
+    { k:"amarillas", lb:"Creencias y cómo lo enfrenta", t:"area", ph:"Qué cree que tiene, miedo a moverse, qué hace cuando duele" },
+    { k:"amarillasNivel", lb:"Carga psicosocial", t:"sel", ops:HC_NIVEL },
+    { k:"sueno", lb:"Sueño", t:"txt" },
+    { k:"estres", lb:"Estrés", t:"txt" },
+    { k:"animo", lb:"Ánimo", t:"txt" },
+    { k:"expectativas", lb:"Expectativas", t:"txt", ph:"Qué espera lograr y en cuánto tiempo" } ]},
+  { id:"antec", titulo:"Antecedentes", campos:[
+    { k:"episodios", lb:"Episodios previos", t:"txt" },
+    { k:"cirugias", lb:"Cirugías / fracturas", t:"txt", ph:"Tipo y fecha" },
+    { k:"antecedentes", lb:"Enfermedades crónicas", t:"txt", ph:"HTA, DM2, otras relevantes" },
+    { k:"medicacion", lb:"Medicamentos (dosis y horario)", t:"txt" },
+    { k:"alergias", lb:"Alergias", t:"txt" },
+    { k:"habitos", lb:"Hábitos", t:"txt", ph:"Tabaco, alcohol, actividad física habitual" } ]},
+  { id:"examen", titulo:"Examen físico", evals:true, campos:[
+    { k:"observacion", lb:"Observación", t:"area", ph:"Postura, edema, atrofia o deformidad, patrón de movimiento" },
+    { k:"pa", lb:"Presión arterial", t:"txt", ph:"120/80" },
+    { k:"fc", lb:"FC (lpm)", t:"txt" },
+    { k:"fr", lb:"FR (rpm)", t:"txt" },
+    { k:"spo2", lb:"SpO₂ (%)", t:"txt" },
+    { k:"palpacion", lb:"Palpación", t:"txt", ph:"Solo si cambia la decisión · + / ++ / +++" },
+    { k:"neuro", lb:"Screening neurológico", t:"area", ph:"Miotomas, dermatomas, reflejos (0–4), neurodinamia (SLR, Slump, ULTT)" },
+    { k:"pruebas", lb:"Pruebas especiales: resultado → qué indica", t:"area", ph:"De 2 a 5, solo las que cambian la decisión" } ]},
+  { id:"cuest", titulo:"Cuestionarios y tests con puntaje", cuest:true, campos:[] },
+  { id:"impresion", titulo:"Impresión", campos:[
+    { k:"dx", lb:"Hipótesis principal", t:"area", ph:"Ej. tendinopatía del manguito rotador en etapa reactiva" },
+    { k:"fundamentos", lb:"Lo que la sostiene (3 hallazgos)", t:"area" },
+    { k:"diferenciales", lb:"Diferenciales: por qué sí / por qué no", t:"area" } ]},
+  { id:"cif", titulo:"Síntesis funcional (CIF)", cif:true, campos:[
+    { k:"condicion", lb:"Condición de salud", t:"txt", ph:"La condición y su tiempo de evolución" },
+    { k:"estructuras", lb:"Estructuras corporales", t:"area", ph:"Primero la estructura: ej. rodilla derecha, menisco medial" },
+    { k:"funciones", lb:"Funciones corporales (deficiencias)", t:"area", ph:"Hallazgo + escala y valor: dolor EVA 6/10, fuerza del cuádriceps 4/5" },
+    { k:"actividades", lb:"Actividades (limitaciones)", t:"area", ph:"Lo que no puede hacer: subir escaleras sin apoyo (PSFS 3/10)" },
+    { k:"participacion", lb:"Participación (restricciones)", t:"area", ph:"El rol que perdió: trabajo, deporte, familia, vida social" },
+    { k:"ambFac", lb:"Ambientales · facilitadores", t:"txt", ph:"Apoyo de la familia, acceso, ayudas técnicas" },
+    { k:"ambBar", lb:"Ambientales · barreras", t:"txt", ph:"Escaleras en casa, trabajo de pie, distancia" },
+    { k:"perFac", lb:"Personales · facilitadores", t:"txt", ph:"Motivación, experiencia deportiva" },
+    { k:"perBar", lb:"Personales · barreras", t:"txt", ph:"Miedo a moverse, turnos, otras enfermedades" },
+    { k:"sintesis", lb:"Síntesis: la actividad, lo que la explica y lo que la modula", lc:"Síntesis", t:"area", ph:"La limitación de ___ se explica por ___, modulada por ___" } ]},
+  { id:"objetivos", titulo:"Objetivos", campos:[
+    { k:"objCorto", lb:"Corto plazo (0–2 semanas)", t:"txt", ph:"Verbo + tarea + criterio medible" },
+    { k:"objMediano", lb:"Mediano plazo (2–6 semanas)", t:"txt", ph:"Ej. fuerza al 80 % del lado sano" },
+    { k:"objLargo", lb:"Largo plazo / retorno (6 semanas o más)", t:"txt", ph:"Ej. volver al fútbol amateur sin dolor" } ]},
+  { id:"plan", titulo:"Plan", campos:[
+    { k:"educacion", lb:"Educación", t:"area" },
+    { k:"carga", lb:"Regla de carga", t:"txt", ph:"Dolor ≤4/10 durante y vuelve a su nivel en 24 h" },
+    { k:"intervencion", lb:"Intervención", t:"area", ph:"Ejercicio, terapia manual… cada uno con su objetivo" },
+    { k:"puente", lb:"Puente a la meta", t:"area", ph:"Trabajo ___ para reducir ___ y acercarla a ___" },
+    { k:"domicilio", lb:"Programa en casa", t:"area" },
+    { k:"progresar", lb:"Progresar si", t:"txt", ph:"Dolor ≤4/10 + mejora del rango + tolerancia" },
+    { k:"derivar", lb:"Derivar si", t:"txt", ph:"Dolor que avanza, síntomas neurológicos, inflamación severa" },
+    { k:"frecuencia", lb:"Frecuencia y duración estimada", t:"txt" },
+    { k:"proxima", lb:"Próxima sesión: qué medir", t:"txt" } ]}
+];
+/* El nucleo: lo minimo para que la historia sirva para decidir. */
+var HC_NUCLEO = ["motivo", "meta", "psfs", "fase", "evaAct", "irritabilidad", "seguridad", "dx",
+  "condicion", "estructuras", "funciones", "actividades", "participacion", "ambiental", "personal", "objCorto", "carga"];
+
+function hcTxt_(v){ return (v === undefined || v === null) ? "" : String(v).trim(); }
+/* Un 0-10 escrito a mano. "" es no evaluado; lo demas tiene que ser un
+   numero entre 0 y 10 (el 0 vale); si no, null. */
+function hcNum010_(v){
+  var s = hcTxt_(v).replace(",", ".");
+  if (s === "") return "";
+  var n = Number(s);
+  return (isNaN(n) || n < 0 || n > 10) ? null : String(n);
+}
+function hcPsfs_(f){
+  return u19Arr(f && f.psfs).filter(function(p){ return !!p && typeof p === "object" && hcTxt_(p.a) !== ""; });
+}
+function hcCuest_(f){
+  return u19Arr(f && f.cuest).filter(function(q){ return !!q && typeof q === "object" && hcTxt_(q.e) !== "" && hcTxt_(q.v) !== ""; });
+}
+/* Lo nuevo sobre lo que habia: lo que el formulario no conoce se queda. Un
+   campo vaciado a proposito queda vacio. */
+function historiaFusionar_(prev, nuevos, ahora){
+  var base = (prev && typeof prev === "object" && !Array.isArray(prev)) ? prev : {};
+  return Object.assign({}, base, nuevos || {}, { updatedAt: ahora || Date.now(), v: 2 });
+}
+function hcEtiquetas_(){
+  var lb = {};
+  /* Las cortas: en «falta: …» una etiqueta de tres lineas no se lee. */
+  HC_SECCIONES.forEach(function(s){ s.campos.forEach(function(cp){ lb[cp.k] = cp.lc || cp.lb.replace(/ \(0–10\)$/, ""); }); });
+  return lb;
+}
+/* La historia como texto ordenado: [{titulo, filas:[{k, v}]}]. Lo mismo
+   alimenta la pestaña de la ficha, la impresion, el «Copiar» y lo que va a
+   Notion, asi que no pueden contar cosas distintas. */
+function historiaSecciones_(c){
+  var f = (c && c.ficha && typeof c.ficha === "object" && !Array.isArray(c.ficha)) ? c.ficha : {};
+  var out = [], algo = false;
+  HC_SECCIONES.forEach(function(sec){
+    var filas = [];
+    sec.campos.forEach(function(cp){
+      var v = hcTxt_(f[cp.k]);
+      if (v !== ""){ filas.push({ k: cp.lc || cp.lb.replace(/ \(0–10\)$/, ""), v: cp.t === "num" ? v + "/10" : v }); algo = true; }
+      else if (sec.cif) filas.push({ k: cp.lc || cp.lb, v: "No evaluado" });
+    });
+    if (sec.psfs) hcPsfs_(f).forEach(function(p){
+      var i = hcTxt_(p.i), fi = hcTxt_(p.f);
+      filas.push({ k: "PSFS · " + hcTxt_(p.a), v: (i !== "" ? "ingreso " + i + "/10" : "ingreso sin puntaje") + (fi !== "" ? " · ahora " + fi + "/10" : "") });
+      algo = true;
+    });
+    if (sec.cuest) hcCuest_(f).forEach(function(q){
+      filas.push({ k: hcTxt_(q.e) + (hcTxt_(q.f) ? " · " + hcTxt_(q.f) : ""), v: hcTxt_(q.v) + (hcTxt_(q.n) ? " — " + hcTxt_(q.n) : "") });
+      algo = true;
+    });
+    if (sec.evals){
+      var evs = u19Arr(c && c.evals);
+      if (evs.length){
+        var ue = evs[evs.length - 1] || {};
+        filas.push({ k: "Evaluación funcional", v: evs.length + " registrada(s) · última " + hcTxt_(ue.fecha || ue.date) });
+      }
+    }
+    if (filas.length) out.push({ titulo: sec.titulo, filas: filas, id: sec.id });
+    /* La seguridad va despues del problema actual, como en su plantilla. */
+    if (sec.id === "actual") out.push({ titulo: "Seguridad (banderas rojas)", filas: [{ k: "Tamizaje", v: hcSeguridadTexto_(c) }], id: "seguridad" });
+  });
+  /* Una historia sin nada escrito no es una historia de «No evaluado». */
+  if (!algo) return [];
+  return out;
+}
+function hcSeguridadTexto_(c){
+  var rf = c && c.redFlags;
+  if (!rf || !rf.fecha) return "No evaluado";
+  if (!rf.blocked) return "Sin banderas rojas (" + hcTxt_(rf.fecha) + ")";
+  var nombres = u19Arr(rf.flags).map(function(i){ return (typeof RC_RED_FLAGS !== "undefined" && RC_RED_FLAGS[i]) || ""; }).filter(Boolean);
+  return "Con banderas rojas (" + hcTxt_(rf.fecha) + "): derivar" + (nombres.length ? " · " + nombres.join("; ") : "");
+}
+/* Cuanto del nucleo esta hecho y que falta, con las etiquetas del formulario. */
+function historiaCompletitud_(c){
+  var f = (c && c.ficha && typeof c.ficha === "object") ? c.ficha : {};
+  var lb = hcEtiquetas_();
+  var etq = { psfs: "PSFS con puntaje", seguridad: "banderas rojas", ambiental: "contexto ambiental", personal: "contexto personal" };
+  var hecho = function(k){
+    if (k === "psfs") return hcPsfs_(f).some(function(p){ return hcTxt_(p.i) !== ""; });
+    if (k === "seguridad") return !!(c && c.redFlags && c.redFlags.fecha);
+    if (k === "ambiental") return hcTxt_(f.ambFac) !== "" || hcTxt_(f.ambBar) !== "";
+    if (k === "personal") return hcTxt_(f.perFac) !== "" || hcTxt_(f.perBar) !== "";
+    return hcTxt_(f[k]) !== "";
+  };
+  var faltan = HC_NUCLEO.filter(function(k){ return !hecho(k); }).map(function(k){ return etq[k] || lb[k] || k; });
+  return { hechos: HC_NUCLEO.length - faltan.length, total: HC_NUCLEO.length, faltan: faltan };
+}
+/* La sintesis que propone la app con lo escrito: la actividad limitada, la
+   deficiencia que la explica y el contexto que la modula, en la frase de su
+   material. Es una propuesta: Diego la edita. */
+function historiaProponerSintesis_(f){
+  f = f || {};
+  var t = function(k){ return hcTxt_(f[k]).replace(/\s+/g, " "); };
+  var corta = function(s){ s = String(s).split(/[;\n]/)[0].trim(); return s.length > 140 ? s.slice(0, 140).trim() + "…" : s; };
+  if (!t("actividades") || !t("funciones")) return "";
+  var contra = [t("perBar"), t("ambBar")].filter(Boolean).map(corta);
+  var favor = [t("perFac"), t("ambFac")].filter(Boolean).map(corta);
+  return "La limitación de " + corta(t("actividades")) + " se explica por " + corta(t("funciones"))
+    + (t("estructuras") ? " (" + corta(t("estructuras")) + ")" : "")
+    + (contra.length ? ", modulada por " + contra.join(" y ") : "")
+    + (t("participacion") ? "; hoy le restringe " + corta(t("participacion")) : "") + "."
+    + (favor.length ? " A favor: " + favor.join("; ") + "." : "");
+}
+/* Lo que se manda al asistente para la ficha de la persona en Notion: solo
+   texto, en secciones. */
+function historiaDoc_(c){
+  return { secciones: historiaSecciones_(c).map(function(s){
+    return { titulo: s.titulo, filas: s.filas.map(function(r){ return { k: String(r.k), v: String(r.v) }; }) };
+  }) };
+}
+function historiaTexto_(c){
+  var secs = historiaSecciones_(c);
+  if (!secs.length) return "";
+  var t = ["# Historia · " + hcTxt_(c && c.name) + " · " + seriesHoyISO()];
+  secs.forEach(function(s){
+    t.push("", "## " + s.titulo);
+    s.filas.forEach(function(r){ t.push("- **" + r.k + ":** " + String(r.v).replace(/\n+/g, " / ")); });
+  });
+  return t.join("\n");
+}
+
+/* ---------- el formulario ---------- */
+function hcControl_(cp, v){
+  var e = escapeHtml, a = escapeAttr, id = "hc-" + cp.k;
+  if (cp.t === "area") return '<textarea id="' + id + '" style="min-height:52px;" placeholder="' + a(cp.ph || "") + '">' + e(v) + '</textarea>';
+  if (cp.t === "sel" || cp.t === "sino"){
+    var ops = cp.t === "sino" ? HC_SINO : u19Arr(cp.ops);
+    return '<select id="' + id + '"><option value="">—</option>'
+      + ops.map(function(o){ return '<option value="' + a(o) + '"' + (o === v ? " selected" : "") + '>' + e(o) + '</option>'; }).join("")
+      /* Un valor que ya no esta en la lista no se pierde al guardar. */
+      + (v && ops.indexOf(v) < 0 ? '<option value="' + a(v) + '" selected>' + e(v) + '</option>' : '') + '</select>';
+  }
+  if (cp.t === "fecha") return '<input type="date" id="' + id + '" value="' + a(v) + '">';
+  if (cp.t === "num") return '<input type="text" inputmode="decimal" id="' + id + '" value="' + a(v) + '" placeholder="0–10">';
+  return '<input type="text" id="' + id + '" value="' + a(v) + '" placeholder="' + a(cp.ph || "") + '">';
+}
+function hcPsfsHtml_(f){
+  var ps = hcPsfs_(f), n = Math.max(HC_PSFS_FILAS, ps.length);
+  var h = '<div class="form-label" style="margin-top:.6rem;">PSFS · de 3 a 5 actividades que le cuestan <span class="text-muted" style="text-transform:none;letter-spacing:0;">(0 = no puede · 10 = como antes; más alto = mejor)</span></div>'
+    + '<div class="u19-scrollx"><table class="rc-cmp fin-tbl"><tr><th>Actividad</th><th>Ingreso</th><th>Ahora</th></tr>';
+  for (var i = 0; i < n; i++){
+    var p = ps[i] || {};
+    h += '<tr><td><input type="text" id="hc-psfs-a-' + i + '" value="' + escapeAttr(hcTxt_(p.a)) + '" placeholder="' + (i === 0 ? 'Ej. subir la escalera de la casa' : '') + '"></td>'
+      + '<td><input type="text" inputmode="decimal" id="hc-psfs-i-' + i + '" value="' + escapeAttr(hcTxt_(p.i)) + '" placeholder="0–10" style="width:4.5rem;"></td>'
+      + '<td><input type="text" inputmode="decimal" id="hc-psfs-f-' + i + '" value="' + escapeAttr(hcTxt_(p.f)) + '" placeholder="0–10" style="width:4.5rem;"></td></tr>';
+  }
+  return h + '</table></div>';
+}
+function hcCuestHtml_(f){
+  var qs = hcCuest_(f), n = Math.max(HC_CUEST_FILAS, qs.length + 2);
+  var h = '<p class="text-xs text-muted" style="margin:.2rem 0 .4rem;line-height:1.5;">Siempre el mismo instrumento y con fecha: así la reevaluación compara lo mismo. Al escribir la escala se ve su rango y su dirección.</p>'
+    + '<datalist id="hc-escalas">' + HC_ESCALAS.map(function(x){ return '<option value="' + escapeAttr(x[0]) + '">' + escapeHtml(x[1]) + '</option>'; }).join("") + '</datalist>'
+    + '<div class="u19-scrollx"><table class="rc-cmp fin-tbl"><tr><th>Escala o test</th><th>Fecha</th><th>Puntaje</th><th>Nota</th></tr>';
+  for (var i = 0; i < n; i++){
+    var q = qs[i] || {};
+    h += '<tr><td><input type="text" list="hc-escalas" id="hc-cu-e-' + i + '" value="' + escapeAttr(hcTxt_(q.e)) + '"></td>'
+      + '<td><input type="date" id="hc-cu-f-' + i + '" value="' + escapeAttr(hcTxt_(q.f)) + '"></td>'
+      + '<td><input type="text" id="hc-cu-v-' + i + '" value="' + escapeAttr(hcTxt_(q.v)) + '" style="width:6rem;"></td>'
+      + '<td><input type="text" id="hc-cu-n-' + i + '" value="' + escapeAttr(hcTxt_(q.n)) + '"></td></tr>';
+  }
+  return h + '</table></div>';
+}
+function hcSeguridadHtml_(c){
+  var rf = c && c.redFlags, hay = !!(rf && rf.fecha);
+  return '<div class="rc-banner ' + (!hay ? 'warn' : (rf.blocked ? 'bad' : 'ok')) + '" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:1rem 0 0;">'
+    + '<span style="flex:1;min-width:12rem;"><b>Seguridad</b> · ' + escapeHtml(!hay ? "sin tamizaje de banderas rojas: hazlo antes de prescribir" : hcSeguridadTexto_(c)) + '</span>'
+    + '<button type="button" class="btn btn-ghost btn-sm" onclick="hcGuardarY_(\'' + escapeAttr(String(c.id)) + '\',\'banderas\')">Guardar y abrir el tamizaje</button></div>';
+}
+function hcEvalsHtml_(c){
+  var evs = u19Arr(c && c.evals), ue = evs.length ? (evs[evs.length - 1] || {}) : null;
+  return '<div class="text-xs" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-top:.5rem;">'
+    + '<span style="flex:1;min-width:12rem;">Rango, fuerza y tests con histórico: ' + (ue ? evs.length + ' evaluación(es) · última ' + escapeHtml(hcTxt_(ue.fecha || ue.date)) : 'ninguna todavía') + '</span>'
+    + '<button type="button" class="btn btn-ghost btn-sm" onclick="hcGuardarY_(\'' + escapeAttr(String(c.id)) + '\',\'evaluacion\')">Guardar y abrir la evaluación funcional</button></div>';
+}
 function openFichaClinica(clientId){
   var c = getClient(clientId); if (!c) return;
-  var f = c.ficha || {};
-  function fld(label, id, val, ph, area){
-    return '<div class="form-row"><label class="form-label">'+escapeHtml(label)+'</label>'
-      + (area
-        ? '<textarea id="'+id+'" style="min-height:56px;" placeholder="'+escapeAttr(ph||"")+'">'+escapeHtml(val||"")+'</textarea>'
-        : '<input type="text" id="'+id+'" value="'+escapeAttr(val||"")+'" placeholder="'+escapeAttr(ph||"")+'">')
-      + '</div>';
-  }
-  var body = ''
-    + '<div class="form-grid cols-2">'
-    + fld("Motivo de consulta","rcf-motivo",f.motivo,"Ej. dolor de hombro derecho al elevar el brazo")
-    + fld("Inicio de síntomas","rcf-inicio",f.inicio,"Ej. hace 3 semanas / 10-06-2026")
-    + '</div>'
-    + fld("Mecanismo de lesión / evolución","rcf-mecanismo",f.mecanismo,"Cómo ocurrió, cómo ha evolucionado, qué lo agrava y qué lo alivia",true)
-    + fld("Tratamientos previos","rcf-tratamientos",f.tratamientos,"Terapias previas, medicamentos, infiltraciones, cirugías por esta lesión...",true)
-    + '<div class="form-grid cols-2">'
-    + fld("Antecedentes médicos","rcf-antecedentes",f.antecedentes,"HTA, DM2, patologías relevantes")
-    + fld("Cirugías previas","rcf-cirugias",f.cirugias,"Tipo y fecha")
-    + '</div>'
-    + '<div class="form-grid cols-2">'
-    + fld("Medicación actual","rcf-medicacion",f.medicacion,"")
-    + fld("Alergias","rcf-alergias",f.alergias,"")
-    + '</div>'
-    + fld("Imagenología / exámenes","rcf-imagen",f.imagen,"Ej. RM rodilla (05-2026): rotura LCA + asa de balde menisco medial",true)
-    + fld("Hipótesis de trabajo","rcf-dx",f.dx,"Ej. tendinopatía de manguito rotador en etapa reactiva",true)
-    + '<div class="form-grid cols-2">'
-    + fld("Objetivo corto plazo (2-4 sem)","rcf-obj-c",f.objCorto,"Ej. EVA ≤3, ROM funcional")
-    + fld("Objetivo mediano plazo (1-2 m)","rcf-obj-m",f.objMediano,"Ej. fuerza 80% vs lado sano")
-    + '</div>'
-    + fld("Objetivo largo plazo / retorno","rcf-obj-l",f.objLargo,"Ej. retorno al fútbol amateur sin dolor")
-    + '<p class="rc-disclaimer">⚕ Registro interno del profesional. No se comparte con el paciente en los enlaces de fase.</p>';
+  var f = (c.ficha && typeof c.ficha === "object" && !Array.isArray(c.ficha)) ? c.ficha : {};
+  var e = escapeHtml;
+  var fila = function(cp){ return '<div class="form-row"><label class="form-label" for="hc-' + cp.k + '">' + e(cp.lb) + '</label>' + hcControl_(cp, hcTxt_(f[cp.k])) + '</div>'; };
+  var cuenta = function(sec){
+    var n = 0, t = sec.campos.length;
+    sec.campos.forEach(function(cp){ if (hcTxt_(f[cp.k]) !== "") n++; });
+    if (sec.psfs){ t++; if (hcPsfs_(f).length) n++; }
+    if (sec.cuest){ t++; if (hcCuest_(f).length) n++; }
+    return n + "/" + t;
+  };
+  var comp = historiaCompletitud_(c);
+  var puente = !!u19DashUrl("series");
+  var h = '<p class="text-xs text-muted" style="line-height:1.5;margin:0 0 .6rem;">Ordenada por el modelo CIF. Lo que no evalúes queda como «No evaluado». '
+    + 'Se guarda en la app (cifrada al sincronizar)' + (puente ? ' y se envía sola a Notion, a la ficha de la persona.' : '. Con el puente configurado se envía también a Notion.') + '</p>'
+    + '<div class="rc-banner ' + (comp.faltan.length ? 'warn' : 'ok') + '"><b>Núcleo ' + comp.hechos + ' de ' + comp.total + '</b>'
+    + (comp.faltan.length ? ' · falta: ' + e(comp.faltan.slice(0, 7).join(", ")) + (comp.faltan.length > 7 ? "…" : "") : ' · completo') + '</div>';
+  HC_SECCIONES.forEach(function(sec){
+    var abrir = (sec.id === "motivo" || sec.id === "cif");
+    h += '<details class="u-acc"' + (abrir ? " open" : "") + '><summary>' + e(sec.titulo) + ' <span>' + cuenta(sec) + '</span></summary><div class="u-acc-body">';
+    var grid = [];
+    var vaciar = function(){ if (grid.length){ h += '<div class="form-grid cols-2">' + grid.join("") + '</div>'; grid = []; } };
+    sec.campos.forEach(function(cp){ if (cp.t === "area"){ vaciar(); h += fila(cp); } else grid.push(fila(cp)); });
+    vaciar();
+    if (sec.psfs) h += hcPsfsHtml_(f);
+    if (sec.cuest) h += hcCuestHtml_(f);
+    if (sec.evals) h += hcEvalsHtml_(c);
+    if (sec.cif) h += '<button type="button" class="btn btn-ghost btn-sm" onclick="hcProponer_()">Proponer la síntesis con lo escrito</button>';
+    h += '</div></details>';
+    if (sec.id === "actual") h += hcSeguridadHtml_(c);
+  });
   openModal({
-    title: "📄 Ficha clínica · " + (c.name||""),
+    title: "📄 Historia clínica · " + (c.name || ""),
     large: true,
-    bodyHtml: body,
+    bodyHtml: h,
     footer: [
-      { label:"Cancelar", cls:"btn-ghost" },
-      { label:"Guardar ficha", cls:"btn-primary", onClick: function(){
-        function gv(id){ var el = document.getElementById(id); return el ? el.value.trim() : ""; }
-        c.ficha = {
-          motivo: gv("rcf-motivo"), inicio: gv("rcf-inicio"), mecanismo: gv("rcf-mecanismo"),
-          tratamientos: gv("rcf-tratamientos"), antecedentes: gv("rcf-antecedentes"),
-          cirugias: gv("rcf-cirugias"), medicacion: gv("rcf-medicacion"), alergias: gv("rcf-alergias"),
-          imagen: gv("rcf-imagen"), dx: gv("rcf-dx"),
-          objCorto: gv("rcf-obj-c"), objMediano: gv("rcf-obj-m"), objLargo: gv("rcf-obj-l"),
-          updatedAt: Date.now()
-        };
-        saveState(); closeModal(); toast("Ficha clínica guardada","success"); openPanelClinico(clientId);
-      }}
+      { label: "Cancelar", cls: "btn-ghost" },
+      { label: "🖨 Imprimir", cls: "btn-secondary", onClick: function(){ hcGuardar_(clientId, function(){ historiaImprimir_(clientId); }); } },
+      { label: "📋 Copiar", cls: "btn-secondary", onClick: function(){ hcGuardar_(clientId, function(){ historiaCopiar_(clientId); }); } },
+      { label: "Guardar historia", cls: "btn-primary", onClick: function(){
+        hcGuardar_(clientId, function(){ if (typeof rehabClinicoOn === "function" && rehabClinicoOn()) openPanelClinico(clientId); });
+      } }
     ]
   });
 }
 window.openFichaClinica = openFichaClinica;
+/* Lee el formulario entero. Los puntajes 0-10 se validan: un «11» o una
+   letra no se guardan callados como si fueran un dato. */
+function hcLeerFormulario_(){
+  var v = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  var existe = function(id){ return !!document.getElementById(id); };
+  var datos = {}, errores = [];
+  HC_SECCIONES.forEach(function(sec){
+    sec.campos.forEach(function(cp){
+      var x = v("hc-" + cp.k);
+      if (cp.t === "num"){
+        var n = hcNum010_(x);
+        if (n === null){ errores.push(cp.lb.replace(/ \(0–10\)$/, "") + ": va de 0 a 10"); return; }
+        x = n;
+      }
+      datos[cp.k] = x;
+    });
+  });
+  var psfs = [];
+  for (var i = 0; i < 40 && existe("hc-psfs-a-" + i); i++){
+    var act = v("hc-psfs-a-" + i);
+    var pi = hcNum010_(v("hc-psfs-i-" + i)), pf = hcNum010_(v("hc-psfs-f-" + i));
+    if (!act){ if (pi || pf) errores.push("PSFS fila " + (i + 1) + ": falta la actividad"); continue; }
+    if (pi === null || pf === null){ errores.push("PSFS «" + act + "»: el puntaje va de 0 a 10"); continue; }
+    psfs.push({ a: act, i: pi, f: pf });
+  }
+  var cuest = [];
+  for (var j = 0; j < 40 && existe("hc-cu-e-" + j); j++){
+    var es = v("hc-cu-e-" + j), va = v("hc-cu-v-" + j), fe = v("hc-cu-f-" + j), no = v("hc-cu-n-" + j);
+    if (!es && !va && !fe && !no) continue;
+    if (!es || !va){ errores.push("Cuestionario " + (j + 1) + ": falta " + (es ? "el puntaje" : "la escala")); continue; }
+    if (fe && !/^\d{4}-\d{2}-\d{2}$/.test(fe)){ errores.push("Cuestionario «" + es + "»: la fecha va como AAAA-MM-DD"); continue; }
+    cuest.push({ e: es, f: fe, v: va, n: no });
+  }
+  datos.psfs = psfs;
+  datos.cuest = cuest;
+  return { datos: datos, errores: errores };
+}
+function hcGuardar_(clientId, luego){
+  var c = getClient(clientId); if (!c) return false;
+  var r = hcLeerFormulario_();
+  if (r.errores.length){ toast(r.errores[0] + (r.errores.length > 1 ? " (y " + (r.errores.length - 1) + " más)" : ""), "error"); return false; }
+  c.ficha = historiaFusionar_(c.ficha, r.datos);
+  c.updatedAt = Date.now();
+  saveState();
+  closeModal();
+  toast("Historia guardada", "success");
+  historiaTrasGuardar_(c);
+  if (typeof luego === "function") luego(c);
+  return true;
+}
+function hcGuardarY_(clientId, que){
+  hcGuardar_(clientId, function(){
+    if (que === "banderas") openRedFlags(clientId);
+    else if (que === "evaluacion") openEvalForm(clientId);
+  });
+}
+window.hcGuardarY_ = hcGuardarY_;
+function hcProponer_(){
+  var v = function(k){ var el = document.getElementById("hc-" + k); return el ? el.value : ""; };
+  var s = historiaProponerSintesis_({ actividades: v("actividades"), funciones: v("funciones"), estructuras: v("estructuras"),
+    participacion: v("participacion"), ambFac: v("ambFac"), ambBar: v("ambBar"), perFac: v("perFac"), perBar: v("perBar") });
+  if (!s){ toast("Para proponerla hacen falta al menos las actividades y las funciones", "warn"); return; }
+  var el = document.getElementById("hc-sintesis"); if (!el) return;
+  if (el.value.trim() && !window.confirm("Ya hay una síntesis escrita. ¿Reemplazarla por la propuesta?")) return;
+  el.value = s;
+}
+window.hcProponer_ = hcProponer_;
+function historiaCopiar_(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var t = historiaTexto_(c);
+  if (!t){ toast("La historia está vacía", "warn"); return; }
+  var ok = function(){ toast("Historia copiada: al pegarla en Notion quedan sus títulos", "success"); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok).catch(function(){ window.prompt("Copia el texto:", t); });
+  else window.prompt("Copia el texto:", t);
+}
+/* Para imprimir o guardar en PDF. Documento interno: sin firma de nadie y
+   con el aviso de confidencialidad. */
+function historiaImprimir_(clientId){
+  var c = getClient(clientId); if (!c) return;
+  var secs = historiaSecciones_(c);
+  if (!secs.length){ toast("La historia está vacía", "warn"); return; }
+  var w = window.open("", "_blank");
+  if (!w){ toast("El navegador bloqueó la ventana: permite ventanas emergentes para imprimir", "error"); return; }
+  var e = escapeHtml;
+  var css = 'body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:#15241c;margin:0;padding:24px 28px;font-size:10.5pt;line-height:1.45;}'
+    + '.hd{border-bottom:3px solid #0e5132;padding-bottom:8px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:flex-end;gap:16px;}'
+    + '.brand{font-weight:800;font-size:18pt;letter-spacing:.04em;color:#0e5132;line-height:1;}.meta{text-align:right;font-size:8.5pt;color:#627d98;}'
+    + 'h1{font-size:13pt;margin:6px 0 0;color:#334e68;}h2{font-size:10pt;text-transform:uppercase;letter-spacing:.04em;color:#0e5132;border-bottom:2px solid #0e5132;padding-bottom:3px;margin:14px 0 6px;page-break-after:avoid;}'
+    + 'table{width:100%;border-collapse:collapse;font-size:9.5pt;}td{padding:4px 7px;border-top:1px solid #e2e8f0;vertical-align:top;}td.k{width:33%;color:#46544c;font-weight:600;}'
+    + '.ft{margin-top:18px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;}.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+    + '@media print{body{padding:0;}@page{size:A4;margin:12mm;}}';
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historia · ' + e(c.name || "") + ' · Ultra-Sport 19</title><style>' + css + '</style></head><body>'
+    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><h1>Historia · ' + e(c.name || "") + '</h1></div>'
+    + '<div class="meta">' + e(seriesHoyISO()) + (c.rut ? '<br>RUT ' + e(c.rut) : '') + '<br>Confidencial</div></div>';
+  secs.forEach(function(s){
+    html += '<h2>' + e(s.titulo) + '</h2><table>' + s.filas.map(function(r){
+      return '<tr><td class="k">' + e(r.k) + '</td><td>' + e(r.v).replace(/\n/g, "<br>") + '</td></tr>';
+    }).join("") + '</table>';
+  });
+  html += '<div class="ft">Documento de uso interno. Contiene datos de salud: no se entrega a terceros sin el consentimiento de la persona.</div>'
+    + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+/* ---------- la historia en Notion ----------
+   Va a la ficha de la persona en la base de personas, dentro de un bloque
+   que escribe y reescribe solo el asistente (op «historia»). Lo que Diego
+   escriba a mano FUERA de ese bloque no se toca; si edita el bloque, el
+   asistente lo conserva como copia y pregunta antes. Sin la ficha de la
+   persona no hay donde escribirla: con una persona de readaptacion se crea
+   primero; con otra, se pregunta. */
+var _hcSubiendo = {};
+function historiaTrasGuardar_(c){
+  if (!c || !u19DashUrl("series") || !historiaSecciones_(c).length) return;
+  c.historiaPend = { version: (c.ficha && c.ficha.updatedAt) || Date.now(), ts: Date.now() };
+  saveState();
+  renderClients();
+  if (c.personaNotionId) { historiaNotionSubir(c.id, { auto: true }); return; }
+  if (getClientType(c) === "rehab" || window.confirm("Para guardar la historia también en Notion, «" + (c.name || "") + "» necesita su ficha en la base de personas. ¿La creo ahora?")){
+    personaAsegurar_(c).then(function(id){ if (id) historiaNotionSubir(c.id, { auto: true }); });
+  }
+}
+function historiaNotionSubir(id, opts){
+  opts = opts || {};
+  var c = getClient(id);
+  if (!c || !c.personaNotionId || !c.historiaPend) return Promise.resolve(false);
+  if (_hcSubiendo[id]){ _hcSubiendo[id] = "otra"; return Promise.resolve(false); }
+  var version = Number(c.historiaPend.version) || Number(c.ficha && c.ficha.updatedAt) || Date.now();
+  var cuerpo = { op: "historia", personaId: c.personaNotionId, version: version, doc: historiaDoc_(c) };
+  if (opts.acepto) cuerpo.aceptoAvisos = true;
+  _hcSubiendo[id] = true;
+  var fin = function(){ var otra = _hcSubiendo[id] === "otra"; delete _hcSubiendo[id]; if (otra) historiaNotionSubir(id, { auto: true, silencioso: true }); };
+  return u19SeriesPedir_(cuerpo).then(function(j){
+    var c2 = getClient(id);
+    if (!c2) return false;
+    var mismo = c2.historiaPend && Number(c2.historiaPend.version) === version;
+    if (j.ok){
+      if (mismo) delete c2.historiaPend;
+      c2.historiaNotion = { version: version, fecha: seriesHoyISO() };
+      saveState(); renderClients();
+      if (!opts.silencioso) toast(j.accion === "nada" ? "La historia ya estaba así en Notion" : "Historia en Notion ✓", "success");
+      if (u19Lista(j.avisos).length && !opts.silencioso) toast(u19Lista(j.avisos).map(String).join(" · "), "warn");
+      return true;
+    }
+    if (mismo){
+      c2.historiaPend.motivo = j.desconocida ? "falta publicar el asistente" : String(j.error || "Notion no la aceptó").slice(0, 200);
+      if (j.dudoso) c2.historiaPend.dudoso = true;
+      saveState(); renderClients();
+    }
+    /* La historia de Notion la editaron a mano: se pregunta antes. */
+    if (!j.ok && u19Lista(j.avisos).length && !opts.silencioso && !j.desconocida){
+      if (window.confirm("La historia de «" + (c2.name || "") + "» en Notion se editó a mano.\n\n" + u19Lista(j.avisos).map(String).join("\n")
+          + "\n\nSi sigues, la de Notion queda como copia y se escribe la de la app. ¿Sigo?")){
+        delete _hcSubiendo[id];
+        return historiaNotionSubir(id, { acepto: true });
+      }
+      return false;
+    }
+    if (!opts.silencioso) toast("Historia guardada en la app; en Notion " + (j.desconocida ? "falta publicar el asistente: queda pendiente" : "no: " + (j.error || "sin respuesta") + ". Queda pendiente."), j.desconocida ? "warn" : "error");
+    return false;
+  }).catch(function(e){
+    var c3 = getClient(id);
+    if (c3 && c3.historiaPend){ c3.historiaPend.motivo = "sin conexión con el asistente"; saveState(); }
+    if (!opts.silencioso) toast("Historia guardada en la app; no pude hablar con el asistente (" + ((e && e.message) || e) + "). Queda pendiente.", "warn");
+    return false;
+  }).then(function(r){ fin(); return r; });
+}
+window.historiaNotionSubir = historiaNotionSubir;
+/* ===HISTORIA_END=== */
 
 /* ---------- Evaluación funcional (con histórico) ---------- */
+/* Un numero escrito a mano: vacio es «sin dato» y el 0 es un valor. Con
+   `parseFloat(x)||null` una extension de rodilla de 0° se guardaba vacia y
+   la reevaluacion la mostraba como «—» (11-sep-2026). */
+function rcNum_(v){
+  var s = String(v === undefined || v === null ? "" : v).trim().replace(",", ".");
+  if (s === "") return null;
+  var n = parseFloat(s);
+  return isNaN(n) ? null : n;
+}
 var RC_ROM_SUGERENCIAS = ["Hombro — Flexión","Hombro — Abducción","Hombro — Rot. externa","Hombro — Rot. interna","Codo — Flexión","Codo — Extensión","Muñeca — Extensión","Muñeca — Flexión","Cadera — Flexión","Rodilla — Flexión","Rodilla — Extensión","Tobillo — Dorsiflexión","Tobillo — Flexión plantar","Columna lumbar — Flexión"];
 var RC_TESTS_SUGERENCIAS = ["Jobe (empty can)","Hawkins-Kennedy","Neer","Speed","Test de aprensión","Lachman","Cajón anterior rodilla","Pivot shift","McMurray","Thessaly","Apley","Cajón anterior tobillo","Talar tilt","Squeeze test","Cozen","Mill","Maudsley","SLR / Lasègue","FABER","Thomas","Ober","Single leg hop test","Y-Balance"];
 
@@ -19015,8 +19853,8 @@ function openEvalForm(clientId, evalId){
           var mov = rr[a].querySelector(".rc-mov").value.trim();
           if (!mov) continue;
           rom.push({ mov: mov, lado: rr[a].querySelector(".rc-lado").value,
-            grados: parseFloat(rr[a].querySelector(".rc-grados").value)||null,
-            sano: parseFloat(rr[a].querySelector(".rc-sano").value)||null });
+            grados: rcNum_(rr[a].querySelector(".rc-grados").value),
+            sano: rcNum_(rr[a].querySelector(".rc-sano").value) });
         }
         var fr = document.querySelectorAll(".rc-fza-row");
         for (var b=0;b<fr.length;b++){
@@ -19232,7 +20070,13 @@ function darAltaClinica(clientId){
 function _u19FinalizarAlta(c, crit){
   var clientId = c.id;
   c.alta = { fecha: new Date().toISOString().slice(0,10), criterios: crit };
+  /* La ficha de la persona en Notion pasa a «De alta» (11-sep-2026). */
+  if (c.personaNotionId || c.personaPend){
+    c.personaEstado = "De alta";
+    c.personaPend = personaPendMezclar_(c.personaPend, { estado: "De alta" });
+  }
   saveState(); closeModal(); renderClients();
+  if (c.personaPend) personaNotionSubir(c.id, { auto: true });
   toast("✔ Alta terapéutica registrada","success");
   setTimeout(function(){
     if (confirm("Paciente dado de alta.\n\n¿Convertirlo a cliente de ENTRENAMIENTO (plan de mantención)?\nSu protocolo y registros clínicos se conservan.")){
@@ -19268,7 +20112,7 @@ function openPanelClinico(clientId){
   }
   var body = banner
     + '<div class="rc-tiles">'
-    + tile("📄","Ficha clínica", (c.ficha && c.ficha.dx) ? "Dx: "+escapeHtml(c.ficha.dx.slice(0,34)) : (c.ficha ? "Registrada" : "Sin registrar"), "openFichaClinica('"+clientId+"')")
+    + tile("📄","Historia clínica", (c.ficha && typeof c.ficha === "object") ? (function(){ var k = historiaCompletitud_(c); return "Núcleo " + k.hechos + " de " + k.total; })() : "Sin registrar", "openFichaClinica('"+clientId+"')")
     + tile("🚩","Banderas rojas", (c.redFlags&&c.redFlags.fecha) ? "Último: "+escapeHtml(c.redFlags.fecha) : "Pendiente", "openRedFlags('"+clientId+"')")
     + tile("📐","Nueva evaluación","EVA · ROM · Daniels · tests","openEvalForm('"+clientId+"')")
     + tile("🔁","Reevaluación", evs.length>=2 ? "Comparar inicial vs actual" : "Requiere ≥2 evaluaciones","openReevalCompare('"+clientId+"')")
@@ -27409,6 +28253,10 @@ function u19Arrancar(){
     if (_arrancado) return;
     _arrancado = true;
     init(); observarAppTop(); if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion();
+    /* Lo pendiente para Notion se reintenta solo, y al volver a la app se
+       mira otra vez (11-sep-2026). */
+    if (typeof u19NotionReintentar_ === "function") setTimeout(u19NotionReintentar_, 9000);
+    if (typeof u19NotionAlVolver_ === "function") u19NotionAlVolver_();
     /* Fotos de orden huerfanas (una copia de la nube o un respaldo reemplazo las series). */
     if (typeof seriesOrdenBarrer_ === "function") setTimeout(seriesOrdenBarrer_, 8000);
   };
@@ -33669,23 +34517,20 @@ function fichaClinico(c){
     out += u19Bloque('Readaptación en curso', '<div class="u-kvs">' + lin.join('') + '</div>',
       sers.length ? '<button class="btn btn-ghost btn-sm" onclick="showView(\'series\')">Series</button>' : '');
   }
-  var f = c.ficha || null;
-  /* Las mismas etiquetas que el formulario (openFichaClinica): hasta el
-     11-sep-2026 se veian las claves internas, «dx» u «objCorto». Lo que no
-     este aqui se muestra igual, al final, para no esconder nada. */
-  var ETQ = { motivo:"Motivo de consulta", inicio:"Inicio de síntomas", mecanismo:"Mecanismo / evolución",
-    tratamientos:"Tratamientos previos", antecedentes:"Antecedentes médicos", cirugias:"Cirugías previas",
-    medicacion:"Medicación actual", alergias:"Alergias", imagen:"Imagenología / exámenes",
-    dx:"Hipótesis de trabajo", objCorto:"Objetivo corto plazo", objMediano:"Objetivo mediano plazo",
-    objLargo:"Objetivo largo plazo" };
-  var claves = f ? Object.keys(ETQ).concat(Object.keys(f).filter(function(k){ return !ETQ[k] && k !== "updatedAt"; })) : [];
-  out += u19Bloque('Ficha clínica', f
-    ? '<div class="u-kvs">' + claves.filter(function(k){ return f[k]; }).map(function(k){
-        return '<div class="u-kv2"><span>' + escapeHtml(ETQ[k] || k) + '</span><b>' + escapeHtml(String(f[k])) + '</b></div>';
-      }).join('') + '</div>'
-    : '<p class="text-xs text-muted">Sin ficha registrada.</p>',
-    (typeof rehabClinicoOn === 'function' && rehabClinicoOn())
-      ? '<button class="btn btn-ghost btn-sm" onclick="openPanelClinico(\'' + c.id + '\')">Panel clínico</button>' : '');
+  /* La historia con las mismas secciones que el formulario, la impresion y
+     Notion (historiaSecciones_): una sola forma de contarla. */
+  var secs = historiaSecciones_(c), comp = historiaCompletitud_(c);
+  var estadoN = c.historiaPend ? '<p class="text-xs" style="color:var(--warn);margin:.2rem 0 .5rem;">⏳ Guardada en la app, falta en Notion' + (c.historiaPend.motivo ? ': ' + escapeHtml(String(c.historiaPend.motivo)) : '') + '</p>'
+    : (c.historiaNotion ? '<p class="text-xs text-muted" style="margin:.2rem 0 .5rem;">🟢 En Notion, actualizada el ' + escapeHtml(String(c.historiaNotion.fecha || '')) + '</p>' : '');
+  out += u19Bloque('Historia clínica', secs.length
+    ? '<p class="text-xs text-muted" style="margin:0 0 .4rem;">Núcleo ' + comp.hechos + ' de ' + comp.total + (comp.faltan.length ? ' · falta: ' + escapeHtml(comp.faltan.slice(0, 5).join(', ')) + (comp.faltan.length > 5 ? '…' : '') : ' · completo') + '</p>' + estadoN
+      + secs.map(function(sc){
+          return '<div class="form-label" style="margin:.7rem 0 .2rem;">' + escapeHtml(sc.titulo) + '</div><div class="u-kvs">'
+            + sc.filas.map(function(r){ return '<div class="u-kv2"><span>' + escapeHtml(r.k) + '</span><b>' + escapeHtml(String(r.v)) + '</b></div>'; }).join('') + '</div>';
+        }).join('')
+    : '<p class="text-xs text-muted">Sin historia registrada.</p>',
+    '<button class="btn btn-ghost btn-sm" onclick="openFichaClinica(\'' + c.id + '\')">' + (secs.length ? 'Editar' : 'Escribir') + '</button>'
+    + ((typeof rehabClinicoOn === 'function' && rehabClinicoOn()) ? '<button class="btn btn-ghost btn-sm" onclick="openPanelClinico(\'' + c.id + '\')">Panel clínico</button>' : ''));
 
   var pl = u19Arr(c.painLog);
   out += u19Bloque('Registro de dolor', pl.length

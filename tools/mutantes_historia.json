@@ -1,0 +1,237 @@
+{
+  "suite": "tools/historia.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "guardar la historia vuelve a pisar la ficha entera",
+      "de": "  c.ficha = historiaFusionar_(c.ficha, r.datos);",
+      "a": "  c.ficha = historiaFusionar_({}, r.datos);"
+    },
+    {
+      "nombre": "fusionar ignora lo que habia",
+      "de": "  return Object.assign({}, base, nuevos || {}, { updatedAt: ahora || Date.now(), v: 2 });",
+      "a": "  return Object.assign({}, nuevos || {}, { updatedAt: ahora || Date.now(), v: 2 });"
+    },
+    {
+      "nombre": "un dolor de 11 pasa como dato",
+      "de": "  return (isNaN(n) || n < 0 || n > 10) ? null : String(n);",
+      "a": "  return (isNaN(n) || n < 0) ? null : String(n);"
+    },
+    {
+      "nombre": "el CIF vacio desaparece en vez de decir «No evaluado»",
+      "de": "      else if (sec.cif) filas.push({ k: cp.lc || cp.lb, v: \"No evaluado\" });",
+      "a": ""
+    },
+    {
+      "nombre": "una historia vacia se cuenta como una de «No evaluado»",
+      "de": "  if (!algo) return [];",
+      "a": ""
+    },
+    {
+      "nombre": "la seguridad deja de contarse",
+      "de": "    if (sec.id === \"actual\") out.push({ titulo: \"Seguridad (banderas rojas)\"",
+      "a": "    if (sec.id === \"nunca\") out.push({ titulo: \"Seguridad (banderas rojas)\""
+    },
+    {
+      "nombre": "el dolor sale sin su escala",
+      "de": "v: cp.t === \"num\" ? v + \"/10\" : v }",
+      "a": "v: v }"
+    },
+    {
+      "nombre": "una fila de PSFS sin actividad cuenta",
+      "de": "  return u19Arr(f && f.psfs).filter(function(p){ return !!p && typeof p === \"object\" && hcTxt_(p.a) !== \"\"; });",
+      "a": "  return u19Arr(f && f.psfs).filter(function(p){ return !!p && typeof p === \"object\"; });"
+    },
+    {
+      "nombre": "el nucleo da por hecho un PSFS sin puntaje",
+      "de": "    if (k === \"psfs\") return hcPsfs_(f).some(function(p){ return hcTxt_(p.i) !== \"\"; });",
+      "a": "    if (k === \"psfs\") return hcPsfs_(f).length > 0;"
+    },
+    {
+      "nombre": "la sintesis pierde el contexto que modula",
+      "de": "    + (contra.length ? \", modulada por \" + contra.join(\" y \") : \"\")",
+      "a": "    + \"\""
+    },
+    {
+      "nombre": "el texto de la historia se pinta sin escapar",
+      "de": "'\">' + e(v) + '</textarea>'",
+      "a": "'\">' + v + '</textarea>'"
+    },
+    {
+      "nombre": "un valor que ya no esta en la lista se pierde al guardar",
+      "de": "      + (v && ops.indexOf(v) < 0 ? '<option value=\"' + a(v) + '\" selected>' + e(v) + '</option>' : '') + '</select>';",
+      "a": "      + '</select>';"
+    },
+    {
+      "nombre": "un dolor fuera de rango se descarta callado",
+      "de": "        if (n === null){ errores.push(cp.lb.replace(/ \\(0–10\\)$/, \"\") + \": va de 0 a 10\"); return; }",
+      "a": "        if (n === null){ return; }"
+    },
+    {
+      "nombre": "se guarda aunque haya errores",
+      "de": "  if (r.errores.length){ toast(r.errores[0] + (r.errores.length > 1 ? \" (y \" + (r.errores.length - 1) + \" más)\" : \"\"), \"error\"); return false; }",
+      "a": ""
+    },
+    {
+      "nombre": "la historia acepta sola los avisos de Notion",
+      "de": "  if (opts.acepto) cuerpo.aceptoAvisos = true;",
+      "a": "  cuerpo.aceptoAvisos = true;"
+    },
+    {
+      "nombre": "un ok de la version vieja borra lo nuevo",
+      "de": "      if (mismo) delete c2.historiaPend;",
+      "a": "      delete c2.historiaPend;"
+    },
+    {
+      "nombre": "dos subidas de la historia a la vez",
+      "de": "  if (_hcSubiendo[id]){ _hcSubiendo[id] = \"otra\"; return Promise.resolve(false); }",
+      "a": ""
+    },
+    {
+      "nombre": "a un socio del gimnasio se le crea ficha de persona sin preguntar",
+      "de": "  if (getClientType(c) === \"rehab\" || window.confirm(",
+      "a": "  if (true || window.confirm("
+    },
+    {
+      "nombre": "en una edicion de la persona viaja todo",
+      "de": "    if (par[0] === \"estado\" && PERSONA_ESTADOS.indexOf(v) < 0) return;\n    if (nueva || v !== txt(antes ? antes[par[1]] : \"\")) d[par[0]] = v;",
+      "a": "    if (par[0] === \"estado\" && PERSONA_ESTADOS.indexOf(v) < 0) return;\n    d[par[0]] = v;"
+    },
+    {
+      "nombre": "un estado que Notion no tiene viaja",
+      "de": "    if (par[0] === \"estado\" && PERSONA_ESTADOS.indexOf(v) < 0) return;\n",
+      "a": ""
+    },
+    {
+      "nombre": "la segunda nota pisa a la primera",
+      "de": "  if (previos.nota && datos && datos.nota && previos.nota !== datos.nota) d.nota = previos.nota + \" · \" + datos.nota;",
+      "a": ""
+    },
+    {
+      "nombre": "el estado de la persona se pierde al crearla",
+      "de": "      if (pend.estado && pend.estado !== \"En tratamiento\") resto.estado = pend.estado;",
+      "a": ""
+    },
+    {
+      "nombre": "la serie ya subida no se enlaza a su persona",
+      "de": "    s.personaId = c.personaNotionId;\n    if (s.notionId) s.notionSucio = true;\n    n++;",
+      "a": "    s.personaId = c.personaNotionId;\n    n++;"
+    },
+    {
+      "nombre": "dos creaciones de la misma persona a la vez",
+      "de": "  if (_personaSubiendo[id]) return _personaSubiendo[id];",
+      "a": ""
+    },
+    {
+      "nombre": "una creacion dudosa se reintenta sola",
+      "de": "    if (opts.auto) return Promise.resolve(null);\n    if (!window.confirm(\"La última vez",
+      "a": "    if (!window.confirm(\"La última vez"
+    },
+    {
+      "nombre": "un asistente viejo con «status ok» cuenta como exito",
+      "de": "      if (typeof j.ok !== \"boolean\") throw new Error((typeof j.error",
+      "a": "      if (false) throw new Error((typeof j.error"
+    },
+    {
+      "nombre": "un asistente sin publicar no se reconoce",
+      "de": "      if (!j.ok && /operacion desconocida/i.test(String(j.error || \"\"))) j.desconocida = true;",
+      "a": ""
+    },
+    {
+      "nombre": "la ficha se escribe sola aunque haya avisos",
+      "de": "  if (u19Lista(r.errores).length || u19Lista(r.avisos).length) return false;",
+      "a": "  if (u19Lista(r.errores).length) return false;"
+    },
+    {
+      "nombre": "la ficha se crea sola aunque se parezca a otra",
+      "de": "  if (cuerpo.op === \"crear\" && u19Lista(r.duplicados).length && !cuerpo.forzar) return false;",
+      "a": ""
+    },
+    {
+      "nombre": "se escribe sola en la ficha de otra persona",
+      "de": "  if (cuerpo.op === \"actualizar\" && r.nombreNotion && _impNom(r.nombreNotion) !== _impNom(nombreApp)) return false;",
+      "a": ""
+    },
+    {
+      "nombre": "sin vista previa se aceptan avisos",
+      "de": "aceptoAvisos: !auto",
+      "a": "aceptoAvisos: true"
+    },
+    {
+      "nombre": "el envio solo cierra otra ventana abierta",
+      "de": "  if (!auto){ closeModal(); toast(\"Escribiendo en Notion…\"); }",
+      "a": "  closeModal(); if (!auto){ toast(\"Escribiendo en Notion…\"); }"
+    },
+    {
+      "nombre": "el reintento callado abre ventanas",
+      "de": "      return false;\n    }\n    fichaVistaPrevia_(id, cuerpo, ts, r, extra);",
+      "a": "    }\n    fichaVistaPrevia_(id, cuerpo, ts, r, extra);"
+    },
+    {
+      "nombre": "cada cambio de Series lanza su propia subida",
+      "de": "  if (_seriesAutoT) clearTimeout(_seriesAutoT);",
+      "a": ""
+    },
+    {
+      "nombre": "la subida automatica pregunta",
+      "de": "  if (!auto && !window.confirm(\"Se van a subir \"",
+      "a": "  if (!window.confirm(\"Se van a subir \""
+    },
+    {
+      "nombre": "un cambio a mitad de subida se pierde",
+      "de": "  if (_seriesSubiendo){ if (auto) _seriesOtraVez = true; else toast(",
+      "a": "  if (_seriesSubiendo){ if (false) _seriesOtraVez = true; else toast("
+    },
+    {
+      "nombre": "la evolucion de una sesion subida no llega a Notion",
+      "de": "        if (!sigue(s) || !x || !x.notionId || !x.notionSucio || !x.notaPend) return null;",
+      "a": "        return null;"
+    },
+    {
+      "nombre": "la nota de una sesion subida no queda pendiente",
+      "de": "      ? Object.assign({}, u, { nota: junta(u.nota, texto), notaPend: junta(u.notaPend, texto), notionSucio: true })",
+      "a": "      ? Object.assign({}, u, { nota: junta(u.nota, texto) })"
+    },
+    {
+      "nombre": "la sesion con evolucion sin subir no cuenta como pendiente",
+      "de": "if (seriesSeSube_(x) || (x && x.notionId && x.notionSucio)) n++;",
+      "a": "if (seriesSeSube_(x)) n++;"
+    },
+    {
+      "nombre": "el reintento incluye la creacion dudosa",
+      "de": "    if (c.personaPend && !c.personaPend.dudoso) tareas.push(",
+      "a": "    if (c.personaPend) tareas.push("
+    },
+    {
+      "nombre": "el reintento sin freno",
+      "de": "  if (Date.now() - _u19ReintentoAt < 120000) return Promise.resolve(0);",
+      "a": ""
+    },
+    {
+      "nombre": "un 0° de rango vuelve a ser vacio",
+      "de": "  var n = parseFloat(s);\n  return isNaN(n) ? null : n;",
+      "a": "  var n = parseFloat(s);\n  return n || null;"
+    },
+    {
+      "nombre": "cambiar a readaptacion no muestra la seccion",
+      "de": "  if (sec){ sec.hidden = !(tipo === \"rehab\" || enl); if (tipo === \"rehab\") sec.open = true; }",
+      "a": ""
+    },
+    {
+      "nombre": "la casilla de la persona nace desmarcada en readaptacion",
+      "de": "  var marcar = hayPuente && ver;",
+      "a": "  var marcar = hayPuente && !!c.personaNotionId;"
+    },
+    {
+      "nombre": "lo que va a Notion lleva claves de mas",
+      "de": "    return { titulo: s.titulo, filas: s.filas.map(",
+      "a": "    return { titulo: s.titulo, id: s.id, filas: s.filas.map("
+    },
+    {
+      "nombre": "el motivo del pendiente se pinta sin escapar",
+      "de": "title=\"' + escapeAttr(\"Cambios de la ficha de la persona sin subir a Notion\" + (c.personaPend.motivo ? \": \" + c.personaPend.motivo : \"\") + \". Pulsa para reintentar.\") + '\"",
+      "a": "title=\"' + (\"Cambios de la ficha de la persona sin subir a Notion\" + (c.personaPend.motivo ? \": \" + c.personaPend.motivo : \"\") + \". Pulsa para reintentar.\") + '\""
+    }
+  ]
+}

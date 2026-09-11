@@ -100,8 +100,8 @@
     },
     {
       "nombre": "vuelve «Diagnostico kinesico» a la ficha, en un repositorio publico",
-      "de": "fld(\"Hipótesis de trabajo\",\"rcf-dx\"",
-      "a": "fld(\"Diagnóstico kinésico / hipótesis\",\"rcf-dx\""
+      "de": "{ k:\"dx\", lb:\"Hipótesis principal\", t:\"area\",",
+      "a": "{ k:\"dx\", lb:\"Diagnóstico kinésico\", t:\"area\","
     }
   ]
 }

@@ -77,5 +77,12 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   node "$RAIZ/tools/fichas.js" "$RAIZ/index.html" \
     || { echo ""; echo "las fichas que van a Notion no pasan la prueba: commit cancelado."; exit 1; }
 
+  # 12. historia.js - la historia por componentes (que guardar no borre lo
+  #     que no conoce), la ficha de la persona en Notion sin duplicar y el
+  #     envio inmediato: que se escriba solo SOLO cuando no hay nada que
+  #     decidir (11-sep-2026).
+  node "$RAIZ/tools/historia.js" "$RAIZ/index.html" \
+    || { echo ""; echo "la historia o el envio a Notion no pasan la prueba: commit cancelado."; exit 1; }
+
 fi
 exit 0

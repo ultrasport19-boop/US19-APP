@@ -90,13 +90,13 @@
     },
     {
       "nombre": "la nota pisa la que ya tenia la sesion",
-      "de": "&& !u.notionId && !u.nota){",
-      "a": "&& !u.notionId){"
+      "de": "      : Object.assign({}, u, { nota: junta(u.nota, texto) });",
+      "a": "      : Object.assign({}, u, { nota: texto });"
     },
     {
-      "nombre": "la nota se pega a una sesion que ya subio a Notion",
-      "de": "(u.asistio === true || u.asistio === false) && !u.notionId && !u.nota){",
-      "a": "(u.asistio === true || u.asistio === false) && !u.nota){"
+      "nombre": "dos notas de una sesion ya subida: la segunda pisa a la primera pendiente",
+      "de": "notaPend: junta(u.notaPend, texto)",
+      "a": "notaPend: texto"
     },
     {
       "nombre": "las notas sueltas vuelven a subir como sesion",
@@ -335,8 +335,8 @@
     },
     {
       "nombre": "dos clics lanzan dos subidas en paralelo",
-      "de": "  if (_seriesSubiendo){ toast(",
-      "a": "  if (false){ toast("
+      "de": "  if (_seriesSubiendo){ if (auto) _seriesOtraVez = true; else toast(",
+      "a": "  if (false){ if (auto) _seriesOtraVez = true; else toast("
     },
     {
       "nombre": "la subida vuelve a escribir por posición y cruza series borradas",
