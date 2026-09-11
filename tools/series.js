@@ -358,7 +358,13 @@ const aviso = (t) => avisos.push(t);
   igual('mes · cuenta las sesiones hechas del mes', r.asistidas, 3);
   igual('mes · lo recibido: la sesión con bono y el pack pagado este mes', r.recibido, 111390);
   igual('mes · una pendiente de cobro', r.pendientes, 1);
-  igual('mes · y lo que falta cobrar sale del valor de la serie', r.porCobrar, 11390);
+  /* El valor por sesion es PROYECCION (Diego, 11-sep-2026): nunca recibido. */
+  igual('mes · la proyección usa el valor solo donde no hay monto anotado', r.proyeccion, 22780);
+  const soloValor = M.seriesResumenMes_([{ valor: 5000, sesiones: [{ fecha: '2026-09-02', asistio: true, cobro: 'Particular', monto: 0 }] }], '2026-09');
+  igual('mes · el valor de la serie NUNCA cuenta como recibido', soloValor.recibido, 0);
+  igual('mes · pero sí como proyección', soloValor.proyeccion, 5000);
+  comprobar('forma · el registro de la sesión no rellena el monto con la proyección',
+    tramo('function seriesSesion(', '\n}\n', 'seriesSesion').indexOf('id="sr-s-monto" value=""') > 0, 'vuelve a rellenarse: una proyección parecería dinero recibido');
   igual('mes · con basura no revienta', M.seriesResumenMes_(null, '2026-09').asistidas, 0);
 
   const ps = M.seriesPayloadSerie_({ nombre: 'Ana', indicadas: 10, creada: '2026-09-10', orden: { adjunta: true, fecha: '2026-09-01', vence: '2026-12-01' },

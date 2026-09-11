@@ -210,8 +210,8 @@
     },
     {
       "nombre": "lo pendiente se cuenta como recibido",
-      "de": "      if (x.cobro === \"Pendiente\"){",
-      "a": "      if (false){"
+      "de": "      if (x.cobro === \"Pendiente\") r.pendientes++;",
+      "a": "      if (false) r.pendientes++;"
     },
     {
       "nombre": "el pack pagado no suma",
@@ -242,6 +242,16 @@
       "nombre": "la serie cambiada nunca se actualiza",
       "de": "        if (!s.notionSucio) return null;",
       "a": "        return null;"
+    },
+    {
+      "nombre": "la proyección se cuenta como dinero recibido",
+      "de": "      else r.recibido += m;",
+      "a": "      else r.recibido += (m || v);"
+    },
+    {
+      "nombre": "la proyección deja de contar las sesiones sin monto",
+      "de": "&& x.cobro !== \"Sin costo\") r.proyeccion += (m || v);",
+      "a": "&& x.cobro !== \"Sin costo\") r.proyeccion += m;"
     }
   ]
 }

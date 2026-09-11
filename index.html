@@ -11464,11 +11464,15 @@ function seriesCobroDefecto_(via){
   if (via === "Pack particular") return "Incluido en el pack";
   return "Pendiente";
 }
-/* El mes de una seccion de Series: lo hecho, lo recibido y lo que falta
-   cobrar. NO se suma al dinero del gimnasio en ningun sitio. Un pack se
-   cuenta el mes en que se pago, no sesion a sesion. */
+/* El mes de una seccion de Series: lo hecho, lo recibido y la proyeccion.
+   NO se suma al dinero del gimnasio en ningun sitio. Un pack se cuenta el
+   mes en que se pago, no sesion a sesion.
+   «Valor por sesion» es una PROYECCION, no dinero: Diego, 11-sep-2026,
+   «dejalo como proyecciones no mas, aun no tenemos esto». Recibido es SOLO
+   lo anotado a mano en cada sesion; la proyeccion usa el valor donde no
+   hay monto anotado. */
 function seriesResumenMes_(lista, mes){
-  var r = { asistidas: 0, recibido: 0, pendientes: 0, porCobrar: 0 };
+  var r = { asistidas: 0, recibido: 0, pendientes: 0, proyeccion: 0 };
   (Array.isArray(lista) ? lista : []).forEach(function(s){
     if (!s || s.estado === "Anulada") return;
     if (s.pack && String(s.pack.fecha || "").slice(0, 7) === mes && Number(s.pack.monto) > 0) r.recibido += Number(s.pack.monto);
@@ -11476,8 +11480,10 @@ function seriesResumenMes_(lista, mes){
       if (!x || x.asistio !== true || String(x.fecha || "").slice(0, 7) !== mes) return;
       r.asistidas++;
       var m = Number(x.monto) > 0 ? Number(x.monto) : 0;
-      if (x.cobro === "Pendiente"){ r.pendientes++; r.porCobrar += (m || (Number(s.valor) > 0 ? Number(s.valor) : 0)); }
+      var v = Number(s.valor) > 0 ? Number(s.valor) : 0;
+      if (x.cobro === "Pendiente") r.pendientes++;
       else r.recibido += m;
+      if (x.cobro !== "Incluido en el pack" && x.cobro !== "Sin costo") r.proyeccion += (m || v);
     });
   });
   return r;
@@ -11544,7 +11550,8 @@ function renderSeries(){
     + '<button class="btn btn-primary" onclick="seriesNueva()">Nueva serie</button></div></div>'];
   if (lista.length){
     h.push('<div class="sr-mes">Este mes: <b>' + mes.asistidas + '</b> sesión(es) · recibido <b>$' + mes.recibido.toLocaleString("es-CL") + '</b>'
-      + (mes.pendientes ? ' · <b>' + mes.pendientes + '</b> por cobrar ($' + mes.porCobrar.toLocaleString("es-CL") + ')' : '')
+      + (mes.pendientes ? ' · <b>' + mes.pendientes + '</b> por cobrar' : '')
+      + (mes.proyeccion ? ' · <span title="Con el valor por sesión: es una proyección, no dinero recibido">proyección $' + mes.proyeccion.toLocaleString("es-CL") + '</span>' : '')
       + ' <span title="No se suma al dinero del gimnasio en ningún sitio">· aparte de la caja del gimnasio</span></div>');
   }
 
@@ -11807,7 +11814,9 @@ function seriesSesion(idx){
   var c = seriesContar_(s.sesiones, s.indicadas);
   if (c.completa){ toast("La serie ya tiene sus " + c.indicadas + " sesiones", "warn"); return; }
   var cobro = seriesCobroDefecto_(s.via);
-  var monto = (cobro === "Incluido en el pack" || cobro === "Sin costo") ? "" : (Number(s.valor) > 0 ? String(s.valor) : "");
+  /* El valor por sesion es una proyeccion: se muestra como pista, nunca se
+     rellena como si fuera dinero recibido. */
+  var proy = Number(s.valor) > 0 ? Number(s.valor) : 0;
   openModal({
     title: "Sesión " + (c.hechas + 1) + " de " + c.indicadas + " · " + (s.nombre || ""),
     bodyHtml: '<div class="form-grid cols-2">'
@@ -11818,7 +11827,7 @@ function seriesSesion(idx){
       + '<div class="form-row"><label class="form-label">Cómo respondió</label><input type="text" id="sr-s-resp" placeholder="opcional"></div>'
       + '<div class="form-grid cols-2">'
       + '<div class="form-row"><label class="form-label">Cómo se cobró</label><select id="sr-s-cobro">' + seriesOpciones_(SERIES_COBROS, cobro) + '</select></div>'
-      + '<div class="form-row"><label class="form-label">Monto recibido</label><input type="number" min="0" id="sr-s-monto" value="' + seriesEsc_(monto) + '"></div>'
+      + '<div class="form-row"><label class="form-label">Monto recibido (real)</label><input type="number" min="0" id="sr-s-monto" value="" placeholder="' + seriesEsc_(proy ? "proyección $" + proy.toLocaleString("es-CL") : "lo que se recibió") + '"></div>'
       + '</div>'
       + '<div class="form-row"><label class="form-label">N.º de bono (si fue con bono)</label><input type="text" id="sr-s-bono" placeholder="evita cobrar dos veces la misma atención"></div>',
     footer: [
@@ -11873,7 +11882,7 @@ function seriesDatos(idx){
     bodyHtml: '<div class="form-row"><label class="form-label">Motivo de consulta</label><input type="text" id="sr-d-mot" value="' + seriesEsc_(s.motivo || "") + '"></div>'
       + '<div class="form-grid cols-2">'
       + '<div class="form-row"><label class="form-label">Vía de cobro</label><select id="sr-d-via">' + seriesOpciones_(SERIES_VIAS, s.via || "Sin definir") + '</select></div>'
-      + '<div class="form-row"><label class="form-label">Valor por sesión (total recibido)</label><input type="number" min="0" id="sr-d-valor" value="' + seriesEsc_(s.valor || "") + '"></div>'
+      + '<div class="form-row"><label class="form-label">Valor por sesión (proyección)</label><input type="number" min="0" id="sr-d-valor" value="' + seriesEsc_(s.valor || "") + '"></div>'
       + '</div><div class="form-grid cols-2">'
       + '<div class="form-row"><label class="form-label">Pack: monto pagado</label><input type="number" min="0" id="sr-d-pk" value="' + seriesEsc_(pk.monto || "") + '" placeholder="solo si es pack"></div>'
       + '<div class="form-row"><label class="form-label">Pack: fecha de pago</label><input type="date" id="sr-d-pkf" value="' + seriesEsc_(pk.fecha || "") + '"></div>'
