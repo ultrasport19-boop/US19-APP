@@ -117,6 +117,56 @@
       "nombre": "un cero de dolor pasa a leerse como vacio",
       "de": "  var num = function(v){ var n = parseFloat(v); return isNaN(n) ? null : n; };",
       "a": "  var num = function(v){ var n = parseFloat(v); return (isNaN(n) || !n) ? null : n; };"
+    },
+    {
+      "nombre": "la migracion duplica las series que ya estaban",
+      "de": "    if (!out.some(function(a){ return a && mismo(a, v); })) out.push(v);",
+      "a": "    out.push(v);"
+    },
+    {
+      "nombre": "las series migradas se quedan sin id",
+      "de": "    if (s && !s.id) s.id = ",
+      "a": "    if (false) s.id = "
+    },
+    {
+      "nombre": "dos series distintas del mismo dia se funden",
+      "de": "      : (a.nombre === b.nombre && a.creada === b.creada && a.indicadas === b.indicadas);",
+      "a": "      : (a.nombre === b.nombre && a.creada === b.creada);"
+    },
+    {
+      "nombre": "la ficha ve las series de todo el mundo",
+      "de": "  return (Array.isArray(lista) ? lista : []).filter(function(s){ return !!s && s.clienteId === clienteId; });",
+      "a": "  return (Array.isArray(lista) ? lista : []).filter(function(s){ return !!s; });"
+    },
+    {
+      "nombre": "sin cliente se devuelven las series sueltas",
+      "de": "  if (!clienteId) return [];",
+      "a": "  if (false) return [];"
+    },
+    {
+      "nombre": "la molestia se queda con la mas baja",
+      "de": "(max === null || v > max)) max = v;",
+      "a": "(max === null || v < max)) max = v;"
+    },
+    {
+      "nombre": "las series vuelven a la clave suelta de localStorage",
+      "de": "  if (!Array.isArray(state.series)) state.series = [];\n  return state.series;",
+      "a": "  try { return JSON.parse(localStorage.getItem(SERIES_KEY) || \"[]\"); } catch(e){ return []; }"
+    },
+    {
+      "nombre": "borrar a una persona deja sus series",
+      "de": "        if (Array.isArray(state.series)) state.series = state.series.filter(function(s){ return !s || s.clienteId !== id; });",
+      "a": ""
+    },
+    {
+      "nombre": "exportar sus datos deja fuera las series",
+      "de": "    series: seriesDeCliente_(u19Arr(state.series), c.id),",
+      "a": ""
+    },
+    {
+      "nombre": "la molestia del enlace deja de ir al registro de dolor",
+      "de": "  if (_mol !== null && _enRead){",
+      "a": "  if (false){"
     }
   ]
 }

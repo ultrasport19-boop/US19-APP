@@ -26,11 +26,13 @@ function fn(nombre) { return tramo('function ' + nombre + '(', '\n}\n', nombre) 
 
 const NOMBRES = ['seriesDias_', 'seriesContar_', 'seriesSemaforo_', 'seriesOrden_',
   'seriesCasillas_', 'seriesEvolucion_', 'seriesUltima_', 'seriesEsc_',
-  'seriesConNota_', 'seriesSeSube_', 'u19DolorDe'];
+  'seriesConNota_', 'seriesSeSube_', 'u19DolorDe',
+  'seriesMigrar_', 'seriesDeCliente_', 'u19MolestiaMax_'];
 
 let M;
 try {
-  M = new Function(NOMBRES.map(fn).join('\n')
+  /* u19Arr es de una linea: se da hecha, igual que en la app. */
+  M = new Function('function u19Arr(x){ return Array.isArray(x) ? x : []; }\n' + NOMBRES.map(fn).join('\n')
     + '\nreturn {' + NOMBRES.map(n => n + ':' + n).join(',') + '};')();
 } catch (e) {
   console.error('series: el código no evalúa aislado: ' + e.message);
@@ -250,6 +252,64 @@ const aviso = (t) => avisos.push(t);
   comprobar('ficha · muestra etiquetas, no claves internas',
     src.indexOf('escapeHtml(ETQ[k] || k)') > 0 && src.indexOf('dx:"Hipótesis de trabajo"') > 0, 'vuelven «dx» y «objCorto»');
   aviso('dolor · diez casos');
+}
+
+/* --- 10 · Las series en el estado y enlazadas a su ficha (11-sep-2026)
+   Hasta ese dia vivian en una clave suelta de localStorage: no viajaban
+   con la sincronizacion ni con el respaldo, y no se enlazaban a nadie. */
+{
+  const mig = M.seriesMigrar_;
+  const ana = { id: 's1', nombre: 'Ana', creada: '2026-09-10', indicadas: 10, sesiones: [] };
+  const vieja = () => ({ nombre: 'Luis', creada: '2026-09-10', indicadas: 8, sesiones: [{ fecha: '2026-09-10', asistio: true }] });
+  const r = mig([ana], [vieja(), { nombre: 'Ana', creada: '2026-09-10', indicadas: 10 }]);
+  igual('migrar · entra la que no estaba', r.length, 2);
+  igual('migrar · no duplica la que ya estaba', r.filter(x => x.nombre === 'Ana').length, 1);
+  comprobar('migrar · todas quedan con id', r.every(x => !!x.id), 'alguna sin id');
+  igual('migrar · conserva sus sesiones', (r.find(x => x.nombre === 'Luis') || {}).sesiones.length, 1);
+  igual('migrar · lo que no es serie no entra', mig([], [null, 'x', [1], 5]).length, 0);
+  igual('migrar · sin nada viejo, lo del estado queda', mig([ana], null).length, 1);
+  igual('migrar · dos cargas seguidas no duplican', mig(mig([], [vieja()]), [vieja()]).length, 1);
+  igual('migrar · dos series de la misma persona el mismo dia siguen siendo dos',
+    mig([], [{ nombre: 'Ana', creada: '2026-09-10', indicadas: 10 }, { nombre: 'Ana', creada: '2026-09-10', indicadas: 6 }]).length, 2);
+
+  const L = [{ id: 'a', clienteId: 'c1' }, { id: 'b', clienteId: 'c2' }, { id: 'c', clienteId: '' }, null];
+  igual('ficha · solo las suyas', M.seriesDeCliente_(L, 'c1').length, 1);
+  igual('ficha · sin cliente no devuelve las sueltas', M.seriesDeCliente_(L, '').length, 0);
+  igual('ficha · con basura no revienta', M.seriesDeCliente_(null, 'c1').length, 0);
+
+  const P = (evas) => ({ ejercicios: [{ series: evas.map(e => ({ eva: e })) }] });
+  igual('molestia · la mas alta', M.u19MolestiaMax_(P([2, 5, 3])), 5);
+  igual('molestia · un cero es un valor', M.u19MolestiaMax_(P([0, null])), 0);
+  igual('molestia · sin anotar, null', M.u19MolestiaMax_(P([null, null])), null);
+  igual('molestia · entre ejercicios', M.u19MolestiaMax_({ ejercicios: [{ series: [{ eva: 1 }] }, { series: [{ eva: 7 }] }] }), 7);
+  igual('molestia · con basura no revienta', M.u19MolestiaMax_(null), null);
+  aviso('estado y ficha · dieciseis casos');
+
+  /* La forma: que todo este enchufado. La paridad de sync, respaldo y
+     borrado total la vigila pruebas.js; aqui, lo propio de las series. */
+  comprobar('estado · state nace con series', /var state = \{[^}]*series: \[\]/.test(src), 'state no declara series');
+  const leer = tramo('function seriesLeer(', '\n}\n', 'seriesLeer');
+  comprobar('estado · seriesLeer lee el estado, no localStorage', leer.indexOf('state.series') > 0 && leer.indexOf('localStorage') < 0,
+    'vuelve la clave suelta: no viaja con nada');
+  const mg = src.slice(src.indexOf('var _sv = localStorage.getItem(SERIES_KEY);'), src.indexOf('} catch(eSer){}'));
+  comprobar('estado · la migracion usa seriesMigrar_', mg.indexOf('seriesMigrar_(state.series') > 0, 'la migracion no deduplica');
+  comprobar('estado · y borra la clave vieja DESPUES de guardar, con copia',
+    mg.indexOf('saveState()') > 0 && mg.indexOf('saveState()') < mg.indexOf('removeItem(SERIES_KEY)') && mg.indexOf('_migradas') > 0,
+    'si el guardado fallara se perderian las series');
+  comprobar('estado · bajar de la nube e importar un respaldo traen las series',
+    (src.match(/if \(Array\.isArray\(data\.series\)\) state\.series = data\.series;/g) || []).length >= 2, 'falta en alguno de los dos');
+  comprobar('ficha · eliminar a la persona y borrar sus datos se llevan sus series',
+    (src.match(/state\.series = state\.series\.filter\(function\(s\)\{ return !s \|\| s\.clienteId !== /g) || []).length >= 2,
+    'quedan datos de salud de alguien que pidio borrarlos');
+  comprobar('ficha · exportar sus datos incluye sus series', src.indexOf('series: seriesDeCliente_(u19Arr(state.series), c.id),') > 0,
+    'la «copia integra» deja fuera las series');
+  comprobar('ficha · la pestaña clinica muestra sus series', tramo('function fichaClinico(', '\n}\n', 'fichaClinico').indexOf('seriesDeCliente_(u19Arr(state.series), c.id)') > 0,
+    'la ficha no ve la readaptacion en curso');
+  comprobar('ficha · una serie nueva guarda a quien pertenece', tramo('function seriesNueva(', '\n}\n', 'seriesNueva').indexOf('clienteId: c ? c.id : ""') > 0,
+    'vuelve a ser solo un nombre escrito');
+  comprobar('molestia · lo que anota la persona entra al registro de dolor',
+    src.indexOf('var _mol = u19MolestiaMax_(nueva);') > 0 && src.indexOf('if (_mol !== null && _enRead){') > 0 && src.indexOf('origen: "enlace"') > 0,
+    'la molestia del enlace vuelve a quedarse solo en la progresion');
 }
 
 /* --- salida ---------------------------------------------------------- */

@@ -451,6 +451,11 @@ function extraerFuncion(nombre) {
     libFav:     { sync: true,  respaldo: true,  borrado: true },
     libRec:     { sync: true,  respaldo: true,  borrado: true },
     circuitos:  { sync: true,  respaldo: true,  borrado: true },
+    /* Las series de sesiones, en el estado desde el 11-sep-2026. Antes vivian
+       en una clave suelta de localStorage y no viajaban ni con la
+       sincronizacion ni con el respaldo: una serie creada en el PC no existia
+       en el telefono. */
+    series:     { sync: true,  respaldo: true,  borrado: true },
 
     /* horasExtra NO se sincroniza, a proposito. Un equipo que solo anadio
        horas no mueve las fechas de rutinas ni clientes; meterlo en el payload
