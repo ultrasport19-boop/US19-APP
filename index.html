@@ -4783,7 +4783,7 @@ function _impCampo(x, nombres){
 }
 /* Copia a `c` lo que Notion sepa y la app no. Devuelve cuantos campos
    nuevos aterrizaron, para poder decirlo al terminar. */
-function _impEnriquecer(c, x){
+function _impEnriquecer(c, x, salvo){
   var n = 0;
   var pares = [
     ["notionReservas30", ["reservas_30d", "reservas30", "Reservas 30 días", "reservas"], "num"],
@@ -4797,9 +4797,11 @@ function _impEnriquecer(c, x){
     ["notionCanal",      ["canal_agenda", "Canal agenda"], "txt"],
     ["notionMedioPago",  ["medio_pago", "Medio de pago"], "txt"],
     ["notionComoConocio",["como_conocio", "Cómo nos conoció"], "txt"],
-    ["notionNacimiento", ["fecha_nacimiento", "nacimiento", "Fecha de nacimiento"], "fecha"]
+    ["notionNacimiento", ["fecha_nacimiento", "nacimiento", "Fecha de nacimiento"], "fecha"],
+    ["notionRecomendado", ["recomendado_por", "Recomendado por"], "txt"]
   ];
   pares.forEach(function(par){
+    if (salvo && salvo[par[0]]) return;   /* un cambio sin subir a Notion */
     var v = _impCampo(x, par[1]);
     if (v == null) return;
     var val = par[2] === "num" ? _impNum(v) : (par[2] === "fecha" ? _impFechaISO(v) : String(v).trim());
@@ -4809,7 +4811,7 @@ function _impEnriquecer(c, x){
   /* Objetivo y antecedentes van a los campos que la app ya tenia, sin
      pisar lo que hayas escrito tu aqui. */
   var obj = _impCampo(x, ["objetivo", "Objetivo"]);
-  if (obj && !c.goal){ c.goal = String(obj).trim(); n++; }
+  if (obj && !c.goal && !(salvo && salvo.goal)){ c.goal = String(obj).trim(); n++; }
   var ant = _impCampo(x, ["antecedentes", "antecedentes_morbidos", "Antecedentes mórbidos"]);
   if (ant && !c.notes){ c.notes = String(ant).trim(); n++; }
   return n;
@@ -4871,9 +4873,10 @@ function u19Arr(x){
  * VERDE diciendo «0 reactivados» como si hubiera ido bien.
  *
  * Comprobado el 9-sep-2026: de los cuatro POST que manda la app
- * (cliente_estado, marcar, notion_bio, claude) NINGUNO existe en el bot.
- * Mientras no existan, esto es lo que evita que un botón roto se vea como
- * un botón que funciona.
+ * (cliente_estado, marcar, notion_bio, claude) NINGUNO existia en el bot.
+ * Existen desde la v5.30; la guarda se queda porque un asistente sin
+ * desplegar vuelve a contestar asi, y un botón roto no puede verse como
+ * uno que funciona.
  */
 function u19RespuestaValida(res, campo){
   return !!(res && typeof res === "object" && res[campo] !== undefined);
@@ -5026,17 +5029,29 @@ window.importClientesNotion = async function(silencioso){
     if (!activos.length){ if (!silencioso) toast("No hay clientes con membresía Activa en Notion","warn"); return; }
     var nuevos = 0, actualizados = 0;
     var renovados = 0, precios = 0, dados_baja = 0, cambios = [];
+    /* 11-sep-2026: los ids que trae Notion (para saber que enlace sigue
+       vivo) y cuantas fichas con cambios sin subir se respetaron. */
+    var idsTodos = {}, protegidos = 0;
+    lista.forEach(function(x){ if (x && x.id) idsTodos[x.id] = true; });
+    /* Una lista a medias (una pagina de Notion fallo) no dice quien se fue:
+       con ella no se reenlaza ni se da de baja a nadie, y todo enlace que la
+       app ya tiene cuenta como vivo. El bot anterior al 11-sep no manda
+       «completo»: por eso se mira === false. */
+    var parcial = !!(data && data.completo === false);
+    if (parcial) state.clients.forEach(function(c){ if (c && c.notionId) idsTodos[c.notionId] = true; });
+    var reparados = parcial ? [] : _impReparar(state.clients, lista);
+    if (reparados.length) console.warn("Enlaces con Notion corregidos:", reparados);
     activos.forEach(function(x){
       var nombre = String(x.nombre || x.name || "").trim();
       var tel = String(x.whatsapp || x.phone || "").trim();
       var telKey = tel.replace(/[^0-9]/g,"").slice(-8);
-      var ex = null;
-      for (var i=0;i<state.clients.length;i++){
-        var c = state.clients[i];
-        if (x.id && c.notionId && c.notionId === x.id){ ex = c; break; }
-        if (telKey && c.phone && String(c.phone).replace(/[^0-9]/g,"").slice(-8) === telKey){ ex = c; break; }
-        if (nombre && String(c.name||"").trim().toLowerCase() === nombre.toLowerCase()){ ex = c; break; }
-      }
+      var ex = _impBuscar(state.clients, x, idsTodos);
+      /* Lo que se cambio en la app y aun no llego a Notion no se pisa; el
+         resto (una renovacion, un precio, una baja) si llega. Antes se
+         saltaba la ficha entera y Cobros seguia viendo vencido a quien ya
+         habia pagado (revision del 11-sep-2026). */
+      var pc = _impPendCampos(ex);
+      if (ex && ex.notionPend) protegidos++;
       var fin = _impFechaISO(x.termino_plan);
       var monto = (typeof x.monto === "number") ? x.monto : null;
       if (ex){
@@ -5047,7 +5062,7 @@ window.importClientesNotion = async function(silencioso){
            Antes solo se rellenaba el hueco, asi que una renovacion nunca
            llegaba y Cobros seguia marcando vencido a quien ya habia pagado.
            Si Notion no trae el dato, se respeta lo que haya en la app. */
-        if (fin && fin !== ex.planEndDate){
+        if (fin && fin !== ex.planEndDate && !pc.planEndDate){
           var _antes = ex.planEndDate || "";
           ex.planEndDate = fin;
           if (!_antes || fin > _antes){
@@ -5055,11 +5070,11 @@ window.importClientesNotion = async function(silencioso){
             cambios.push({ n: nombre, de: _antes, a: fin });
           }
         }
-        if (monto !== null && monto !== ex.planPrice){ ex.planPrice = monto; precios++; }
-        if (x.plan) ex.notionPlan = x.plan;
+        if (monto !== null && monto !== ex.planPrice && !pc.planPrice){ ex.planPrice = monto; precios++; }
+        if (x.plan && !pc.notionPlan) ex.notionPlan = x.plan;
         /* Si estaba dado de baja en la app y Notion lo trae activo, vuelve. */
-        if (ex.activo === false) ex.activo = true;
-        _impEnriquecer(ex, x);
+        if (ex.activo === false && !pc.notionEstado) ex.activo = true;
+        _impEnriquecer(ex, x, pc);
         actualizados++;
       } else {
         state.clients.push({
@@ -5095,22 +5110,22 @@ window.importClientesNotion = async function(silencioso){
       var nombre = String(x.nombre || x.name || "").trim();
       var tel = String(x.whatsapp || x.phone || "").trim();
       var telKey = tel.replace(/[^0-9]/g,"").slice(-8);
-      var ex = null;
-      for (var i2=0;i2<state.clients.length;i2++){
-        var c2 = state.clients[i2];
-        if (x.id && c2.notionId && c2.notionId === x.id){ ex = c2; break; }
-        if (telKey && c2.phone && String(c2.phone).replace(/[^0-9]/g,"").slice(-8) === telKey){ ex = c2; break; }
-        if (nombre && String(c2.name||"").trim().toLowerCase() === nombre.toLowerCase()){ ex = c2; break; }
-      }
+      var ex = _impBuscar(state.clients, x, idsTodos);
+      var pc = _impPendCampos(ex);
+      if (ex && ex.notionPend) protegidos++;
       var fin2 = _impFechaISO(x.termino_plan);
       var monto2 = (typeof x.monto === "number") ? x.monto : null;
       if (ex){
         if (x.id) ex.notionId = x.id;
         if (tel && !ex.phone) ex.phone = _impTelFmt(tel);
-        if (fin2 && !ex.planEndDate) ex.planEndDate = fin2;
-        if (x.plan && !ex.notionPlan) ex.notionPlan = x.plan;
-        ex.notionEstado = x.estado || "";
-        if (ex.activo !== false){ ex.activo = false; dados_baja++; }
+        if (fin2 && !ex.planEndDate && !pc.planEndDate) ex.planEndDate = fin2;
+        if (x.plan && !ex.notionPlan && !pc.notionPlan) ex.notionPlan = x.plan;
+        /* El puente manda la membresia como membresia_activa: con x.estado,
+           que no existe, quedaba vacia en cada importacion. */
+        if (!pc.notionEstado){
+          ex.notionEstado = _impCampo(x, ["estado", "membresia_activa", "Membresía Activa"]) || "";
+          if (ex.activo !== false){ ex.activo = false; dados_baja++; }
+        }
       } else {
         state.clients.push({
           id: genId(), name: nombre, rut: "", phone: _impTelFmt(tel), email: x.email || "",
@@ -5129,7 +5144,7 @@ window.importClientesNotion = async function(silencioso){
     var idsActivos = {};
     activos.forEach(function(x){ if (x.id) idsActivos[x.id] = true; });
     state.clients.forEach(function(c){
-      if (!c.notionId || c.activo === false) return;
+      if (parcial || !c.notionId || c.activo === false || _impPendCampos(c).notionEstado) return;
       if (!idsActivos[c.notionId]){ c.activo = false; dados_baja++; }
     });
 
@@ -5143,8 +5158,11 @@ window.importClientesNotion = async function(silencioso){
     if (precios) msg += " · " + precios + " precio" + (precios === 1 ? "" : "s");
     if (dados_baja) msg += " · " + dados_baja + " dado" + (dados_baja === 1 ? "" : "s") + " de baja";
     if (inactNuevos) msg += " · " + inactNuevos + " inactivo" + (inactNuevos === 1 ? "" : "s") + " traído" + (inactNuevos === 1 ? "" : "s") + " al apartado Inactivos";
+    if (protegidos) msg += " · " + protegidos + " con cambios sin subir a Notion (se respetaron)";
+    if (reparados.length) msg += " · " + reparados.length + " enlace" + (reparados.length === 1 ? "" : "s") + " con Notion corregido" + (reparados.length === 1 ? "" : "s");
+    if (parcial) msg += " · Notion devolvió la lista a medias: esta vez no se dio de baja a nadie";
     if (!silencioso) toast(msg, "success");
-    else if (nuevos || renovados || precios || dados_baja || inactNuevos) toast("Actualizado desde Notion · " + msg.replace(/^Notion: /, ""), "success");
+    else if (nuevos || renovados || precios || dados_baja || inactNuevos || reparados.length || parcial) toast("Actualizado desde Notion · " + msg.replace(/^Notion: /, ""), "success");
 
     /* Con renovaciones, se detalla que cambio: es la diferencia entre
        confiar en el numero y poder comprobarlo. */
@@ -5196,6 +5214,374 @@ function u19AutoImportarNotion(){
   } catch (e){}
 }
 /* ===NOTION_ROSTER_END=== */
+
+/* ===FICHA_NOTION===
+   Las fichas de socios, escritas en Notion desde la app (11-sep-2026).
+   Diego pidio dejar de escribir a mano en Notion: se da de alta y se
+   actualiza aqui, y Notion sigue siendo la fuente de verdad. La app no
+   escribe en Notion por su cuenta -su repositorio es publico y no puede
+   llevar ninguna llave-: lo hace el asistente (tipo=ficha_cliente), que
+   tiene la lista blanca de columnas, busca duplicados y aplica las reglas.
+
+   Siempre en dos pasos: primero SIMULAR (el asistente dice exactamente que
+   escribiria, que fichas se parecen y que avisos hay, sin tocar nada) y
+   solo despues, si Diego confirma, escribir. Lo que no se pudo subir queda
+   marcado como pendiente (notionPend) y la importacion no lo pisa. */
+var FICHA_MEMBRESIAS = ["Potencial ingreso", "Prueba", "Activo", "Inactivo"];
+var FICHA_PLANES = ["Plan 2x/semana", "Plan 3x/semana", "Plan 4x/semana"];
+var FICHA_CANALES = ["Calendly", "Grupo fijo", "Sin agenda"];
+var FICHA_MEDIOS = ["Transferencia", "Efectivo en el gym"];
+var FICHA_CONOCIO = ["Instagram", "Facebook", "Recomendación", "Pasó por el gym", "Google / Web", "Otro"];
+/* dato que entiende el asistente -> campo del cliente en la app. El banco
+   de pruebas del asistente comprueba que sepa escribir todos. */
+var FICHA_CAMPOS = [["nombre", "name"], ["whatsapp", "phone"], ["email", "email"], ["plan", "notionPlan"], ["monto", "planPrice"], ["termino", "planEndDate"], ["membresia", "notionEstado"], ["canal", "notionCanal"], ["medioPago", "notionMedioPago"], ["comoConocio", "notionComoConocio"], ["recomendadoPor", "notionRecomendado"], ["nacimiento", "notionNacimiento"], ["objetivo", "goal"]];
+
+/* Lo que se manda. En una ficha NUEVA, todo lo que tenga valor. En una que
+   ya existe, SOLO lo que cambio en esta edicion: mandarlo todo pisaria en
+   Notion lo que el asistente escribio despues de la ultima importacion (la
+   fecha de termino que alarga un pago, por ejemplo). Lo vacio no se manda:
+   desde la app no se borra nada en Notion. */
+function fichaPayload_(antes, despues, nueva){
+  var txt = function(v){ return (v === undefined || v === null) ? "" : String(v).trim(); };
+  var d = {};
+  FICHA_CAMPOS.forEach(function(par){
+    var v = txt(despues ? despues[par[1]] : "");
+    if (v === "") return;
+    if (nueva || v !== txt(antes ? antes[par[1]] : "")) d[par[0]] = v;
+  });
+  return d;
+}
+/* Dos ediciones seguidas sin subir no se pisan: se suman, y la mas nueva
+   gana campo a campo. */
+function fichaPendMezclar_(pend, datos, ts){
+  var previos = (pend && typeof pend === "object" && pend.datos && typeof pend.datos === "object") ? pend.datos : {};
+  return { datos: Object.assign({}, previos, datos || {}), ts: ts || Date.now() };
+}
+/* El cuerpo para el asistente: crear si la ficha aun no esta enlazada a
+   Notion; actualizar, por su id, si ya lo esta. */
+function fichaCuerpo_(c, extra){
+  c = c || {};
+  var b = { op: c.notionId ? "actualizar" : "crear",
+            datos: Object.assign({}, (c.notionPend && c.notionPend.datos) || {}) };
+  if (c.notionId) b.id = c.notionId;
+  if (extra && extra.forzar === true) b.forzar = true;
+  return b;
+}
+/* ¿Contesto el asistente de verdad? Uno viejo, sin fichas, cae en «webhook
+   desconocido» y responde {status:"ok"}: eso NO es un exito. */
+function fichaLeerRespuesta_(texto){
+  var j;
+  try { j = JSON.parse(texto); } catch (e) { throw new Error("el asistente no contestó con datos (¿sin desplegar?)"); }
+  if (!j || typeof j !== "object") throw new Error("respuesta vacía del asistente");
+  if (j.error === "clave_invalida") throw new Error("la clave de la app no coincide con la del asistente");
+  /* Si el asistente fallo por dentro, se dice su error: no es «falta desplegarlo». */
+  if (typeof j.ok !== "boolean" && typeof j.error === "string" && j.error) throw new Error("el asistente falló: " + j.error);
+  if (typeof j.ok !== "boolean") throw new Error("el asistente contestó, pero no sabe de fichas: falta desplegarlo");
+  return j;
+}
+function fichaPedir_(cuerpo){
+  var url = u19DashUrl("ficha_cliente");
+  if (!url) return Promise.reject(new Error("falta la dirección del puente (Ajustes → Conexión con Notion)"));
+  /* text/plain a proposito: con application/json el navegador manda un
+     preflight que Apps Script no contesta. */
+  return fetch(url, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify(cuerpo) })
+    .then(function(r){ return r.text(); })
+    .then(fichaLeerRespuesta_);
+}
+
+/* La parte del formulario que va a Notion. */
+function fichaSeccionHtml_(c, isEdit){
+  c = c || {};
+  var hayPuente = !!u19DashUrl("ficha_cliente");
+  /* Con algo pendiente, la casilla sale marcada: si no, «Corregir» abria
+     el formulario con ella desmarcada y lo corregido no llegaba nunca. */
+  var marcar = hayPuente && ((c.notionId || c.notionPend) ? true : (!isEdit && getClientType(c) !== "rehab"));
+  var sel = function(id, lista, val, vacio){
+    return '<select id="' + id + '">' + (vacio ? '<option value="">—</option>' : '')
+      + lista.map(function(v){ return '<option value="' + escapeAttr(v) + '"' + (v === val ? ' selected' : '') + '>' + escapeHtml(v) + '</option>'; }).join("")
+      + '</select>';
+  };
+  return '<details class="u-acc cf-notion"' + (marcar ? ' open' : '') + '><summary>Ficha en Notion'
+    + (c.notionId ? ' · enlazada' : ' · todavía sin ficha') + (c.notionPend ? ' · ⏳ cambios sin subir' : '') + '</summary>'
+    + (hayPuente ? '' : '<p class="text-xs text-muted">Falta la dirección del puente (Ajustes → Conexión con Notion).</p>')
+    + '<label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;">'
+    + '<input type="checkbox" id="cf-notion" style="width:auto;margin:0;" onchange="this.dataset.tocado=\'1\'"'
+    + ((c.notionId || c.notionPend) ? ' data-enlazada="1"' : '') + (marcar ? ' checked' : '') + (hayPuente ? '' : ' disabled') + '> '
+    + (c.notionId ? 'Actualizar también su ficha en Notion' : 'Crear su ficha en Notion (Clientes)') + '</label>'
+    + '<div class="form-grid cols-2">'
+    + formField("Membresía", sel("cf-n-mem", FICHA_MEMBRESIAS, c.notionEstado || (isEdit ? "" : "Potencial ingreso"), isEdit))
+    + formField("Plan", sel("cf-n-plan", FICHA_PLANES, c.notionPlan || "", true))
+    + '</div><div class="form-grid cols-2">'
+    + formField("Cómo agenda", sel("cf-n-canal", FICHA_CANALES, c.notionCanal || "", true))
+    + formField("Medio de pago", sel("cf-n-medio", FICHA_MEDIOS, c.notionMedioPago || "", true))
+    + '</div><div class="form-grid cols-2">'
+    + formField("Cómo nos conoció", sel("cf-n-conocio", FICHA_CONOCIO, c.notionComoConocio || "", true))
+    + formField("Recomendado por", '<input type="text" id="cf-n-recom" maxlength="80" value="' + escapeAttr(c.notionRecomendado || "") + '" placeholder="opcional">')
+    + '</div><div class="form-grid cols-2">'
+    + formField("Fecha de nacimiento", '<input type="date" id="cf-n-nac" value="' + escapeAttr(c.notionNacimiento || "") + '">')
+    + formField("Nota para Notion (se añade al final de «Notas»)", '<input type="text" id="cf-n-nota" maxlength="500" placeholder="opcional">')
+    + '</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.5;">Antes de escribir verás exactamente qué cambia en Notion. Una ficha nueva nace en «Potencial ingreso»: así pasa por la bienvenida y la ficha de ingreso del asistente. Desde aquí no se borra nada en Notion: un campo vacío no se manda.</p>'
+    + '</details>';
+}
+/* Una persona NUEVA que pasa a «Rehabilitación» no recibe ficha de
+   gimnasio sin querer: entraria en la lista de ingresos por aprobar. */
+function fichaTipoCambia_(tipo){
+  var k = document.getElementById("cf-notion");
+  if (k && tipo === "rehab" && !k.dataset.tocado && !k.dataset.enlazada) k.checked = false;
+}
+/* Lo que el formulario dice de los campos de Notion. En una ficha que ya
+   existe, un desplegable en «—» no borra lo que habia. */
+function fichaLeerFormulario_(isEdit){
+  var v = function(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  var nf = { notionEstado: v("cf-n-mem"), notionPlan: v("cf-n-plan"), notionCanal: v("cf-n-canal"),
+    notionMedioPago: v("cf-n-medio"), notionComoConocio: v("cf-n-conocio"),
+    notionRecomendado: v("cf-n-recom"), notionNacimiento: v("cf-n-nac") };
+  var campos = {};
+  Object.keys(nf).forEach(function(k){ if (nf[k] || !isEdit) campos[k] = nf[k]; });
+  var k = document.getElementById("cf-notion");
+  return { campos: campos, nota: v("cf-n-nota"), subir: !!(k && k.checked && !k.disabled) };
+}
+/* Despues de guardar en la app: lo que va a Notion y la vista previa. */
+function fichaTrasGuardar_(c, antes, form){
+  if (!c || !form || !form.subir) return;
+  var datos = fichaPayload_(antes, c, !c.notionId);
+  if (form.nota) datos.nota = form.nota;
+  if (!Object.keys(datos).length && !c.notionPend){ toast("En Notion no cambia nada"); return; }
+  if (Object.keys(datos).length) c.notionPend = fichaPendMezclar_(c.notionPend, datos);
+  saveState();
+  /* La tarjeta se pinto antes de marcarlo: sin repintar, el aviso de
+     «Notion pendiente» no aparecia hasta la siguiente vuelta. */
+  renderClients();
+  fichaNotionSubir(c.id);
+}
+
+/* Sube lo pendiente de una ficha: primero simula, enseña lo que cambiaría
+   y solo escribe si Diego confirma. */
+function fichaNotionSubir(id, extra){
+  var c = getClient(id);
+  if (!c || !c.notionPend || !c.notionPend.datos){ toast("Esta ficha no tiene nada pendiente para Notion"); return; }
+  var cuerpo = fichaCuerpo_(c, extra);
+  var ts = c.notionPend.ts;
+  toast("Preguntando a Notion qué cambiaría…");
+  fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){
+    fichaVistaPrevia_(id, cuerpo, ts, r);
+  }).catch(function(e){
+    toast("No pude hablar con el asistente: " + ((e && e.message) || e) + ". Queda pendiente.", "warn");
+  });
+}
+var _fichaDups = null;
+function fichaVistaPrevia_(id, cuerpo, ts, r){
+  var c = getClient(id);
+  if (!c || !r) return;
+  var e = escapeHtml;
+  var cambios = u19Lista(r.cambios).filter(function(x){ return x && x.columna; });
+  var dups = u19Lista(r.duplicados).filter(function(x){ return x && x.id; });
+  var avisos = u19Lista(r.avisos).map(String);
+  var errores = u19Lista(r.errores).map(String);
+  var nombre = c.name || "esta ficha";
+  if (!errores.length && !dups.length && r.ok === false && r.error) errores = [String(r.error)];
+  if (!errores.length && r.nada){
+    if (c.notionPend && c.notionPend.ts === ts){ delete c.notionPend; saveState(); renderClients(); }
+    toast("En Notion ya está todo así: nada que escribir", "success");
+    return;
+  }
+  var tabla = cambios.length ? '<div class="u19-scrollx"><table class="rc-cmp fin-tbl" style="margin-top:.5rem;"><tr><th>Columna</th><th>Ahora en Notion</th><th>Quedará</th></tr>'
+    + cambios.map(function(x){ return '<tr><td>' + e(x.columna) + '</td><td class="text-xs text-muted">' + e(x.antes || "—") + '</td><td style="font-weight:700;">' + e(x.ahora || "—") + '</td></tr>'; }).join("")
+    + '</table></div>' : '';
+  var lista = function(arr, color){ return '<ul class="text-sm" style="line-height:1.6;padding-left:1.2rem;margin:.3rem 0;color:' + color + ';">' + arr.map(function(t){ return '<li>' + e(t) + '</li>'; }).join("") + '</ul>'; };
+  var descartar = { label: "Descartar lo pendiente", cls: "btn-ghost", onClick: function(){
+    if (!window.confirm("¿Descartar los cambios sin subir? En la app se quedan, pero Notion no se entera y la próxima importación los reemplaza.")) return;
+    var c2 = getClient(id);
+    if (c2){ delete c2.notionPend; saveState(); renderClients(); }
+    closeModal();
+  } };
+  var html = '', botones;
+  if (errores.length){
+    html = '<p class="text-sm">Notion no aceptaría esto, así que no se escribe nada:</p>' + lista(errores, "var(--danger)") + tabla;
+    botones = [descartar, { label: "Corregir", cls: "btn-primary", onClick: function(){ closeModal(); openClientForm(id); } }];
+  } else if (cuerpo.op === "crear" && dups.length && !cuerpo.forzar){
+    _fichaDups = { id: id, dups: dups };
+    html = '<p class="text-sm">Antes de crear a <b>' + e(nombre) + '</b>: en Notion ya hay ' + dups.length + ' ficha(s) que podrían ser esta persona. Una ficha duplicada hace que el asistente cobre dos veces.</p>'
+      + '<div class="u19-scrollx"><table class="rc-cmp fin-tbl"><tr><th>Ficha en Notion</th><th>Membresía</th><th>Coincide por</th><th></th></tr>'
+      + dups.map(function(d, i){
+          return '<tr><td>' + e(d.nombre || "—")
+            + (d.portero ? ' <span class="badge warn" title="La creó el asistente cuando escribió por WhatsApp: se completa, no se duplica">borrador</span>' : '')
+            + (d.archivado ? ' <span class="badge muted">archivada</span>' : '') + '</td>'
+            + '<td class="text-xs">' + e(d.membresia || "—") + '</td><td class="text-xs">' + e(d.por || "") + '</td>'
+            + '<td><button class="btn btn-sm btn-primary" onclick="fichaEnlazar_(\'' + escapeAttr(id) + '\',' + i + ')">Es esta: completarla</button></td></tr>';
+        }).join("")
+      + '</table></div>'
+      + '<p class="text-xs text-muted" style="margin-top:.4rem;">Si es otra persona (en las familias se comparte el teléfono), créala igual.</p>'
+      + (avisos.length ? lista(avisos, "var(--warn)") : '') + tabla;
+    botones = [{ label: "Ahora no", cls: "btn-ghost" }, { label: "Es otra persona: crearla", cls: "btn-secondary", onClick: function(){ closeModal(); fichaNotionSubir(id, { forzar: true }); } }];
+  } else {
+    /* A QUE ficha de Notion se escribe (revision del 11-sep-2026): un enlace
+       cruzado escribia en la ficha de un familiar y la vista previa solo
+       ensenaba el nombre de la app. Si no es la misma persona, se dice y se
+       pide confirmacion nombrando a las dos. */
+    var enNotion = String(r.nombreNotion || "");
+    var otraPersona = cuerpo.op === "actualizar" && enNotion && _impNom(enNotion) !== _impNom(nombre);
+    html = '<p class="text-sm">' + (cuerpo.op === "crear" ? 'Se creará la ficha de <b>' + e(nombre) + '</b> en Notion con esto:' : 'En la ficha de <b>' + e(nombre) + '</b> cambiará esto:') + '</p>'
+      + (cuerpo.op === "actualizar" && enNotion ? '<p class="text-xs" style="' + (otraPersona ? 'color:var(--danger);font-weight:700;' : 'color:var(--muted);') + '">Ficha de Notion: ' + e(enNotion)
+        + (otraPersona ? ' — no se llama como en la app: comprueba que sea la misma persona antes de escribir' : '') + '</p>' : '')
+      + tabla + (avisos.length ? '<p class="text-sm" style="margin-top:.6rem;">Ojo:</p>' + lista(avisos, "var(--warn)") : '');
+    botones = [descartar, { label: "Ahora no", cls: "btn-ghost" },
+      { label: avisos.length ? "Entendido: escribir en Notion" : "Escribir en Notion", cls: "btn-primary", onClick: function(){
+        if (otraPersona && !window.confirm("En la app es «" + nombre + "» y en Notion la ficha es de «" + enNotion + "».\n\n¿Es la misma persona? Si no, cancela: se escribiría en la ficha de otra.")) return;
+        fichaEscribir_(id, cuerpo, ts);
+      } }];
+  }
+  openModal({ title: "Notion · " + nombre, bodyHtml: html, footer: botones });
+}
+/* «Es esta: completarla»: la ficha de la app se enlaza a la que ya estaba
+   en Notion y lo pendiente se sube como actualizacion (con su vista previa).
+   La membresia NO viaja: en una ficha nueva era la de por defecto, y
+   aplicada a una que ya existe podria sacar de Activo a alguien que paga. */
+function fichaEnlazar_(id, i){
+  var c = getClient(id);
+  var d = (_fichaDups && _fichaDups.id === id) ? _fichaDups.dups[i] : null;
+  if (!c || !d) return;
+  /* Si otra ficha de la app ya esta enlazada a esa de Notion, quedarian dos
+     sobre una: la importacion solo refresca la primera y la otra sigue
+     escribiendo (revision del 11-sep-2026). Se desenlaza la otra, diciendolo. */
+  var otra = u19Arr(state.clients).filter(function(x){ return x && x !== c && x.notionId === d.id; })[0];
+  if (!window.confirm("¿«" + (c.name || "") + "» es la ficha «" + (d.nombre || "") + "» de Notion?\n\nSe enlazan y se completa la de Notion con lo de aquí. Antes verás qué cambia."
+    + (otra ? "\n\nOjo: esa ficha de Notion ya está en la app como «" + (otra.name || "") + "». Aquella quedará sin enlace (no se borra)." : ""))) return;
+  if (otra){ otra.notionId = ""; otra.updatedAt = Date.now(); }
+  c.notionId = d.id;
+  if (c.notionPend && c.notionPend.datos) delete c.notionPend.datos.membresia;
+  c.updatedAt = Date.now();
+  saveState();
+  closeModal();
+  fichaNotionSubir(id);
+}
+function fichaEscribir_(id, cuerpo, ts){
+  closeModal();
+  toast("Escribiendo en Notion…");
+  fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: true })).then(function(r){
+    if (!r.ok){ toast("Notion no cambió: " + (r.error || "sin respuesta") + ". Queda pendiente.", "error"); return; }
+    var c = getClient(id);
+    if (!c) return;
+    if (r.id && !c.notionId) c.notionId = r.id;
+    var mem = cuerpo.datos && cuerpo.datos.membresia;
+    if (mem){ c.notionEstado = mem; c.activo = (mem === "Activo"); }
+    /* Si mientras tanto se edito otra vez, lo nuevo sigue pendiente. */
+    if (c.notionPend && c.notionPend.ts === ts) delete c.notionPend;
+    c.updatedAt = Date.now();
+    saveState();
+    renderClients();
+    /* Una alta nueva no es Activo: esta en «Potencial ingreso», que la app
+       cuenta fuera de Finanzas (en Inactivos) hasta que se active. Se dice,
+       para que no parezca que se perdio. */
+    toast(cuerpo.op !== "crear" ? "Ficha actualizada en Notion"
+      : (mem && mem !== "Activo" ? "Ficha creada en Notion en «" + mem + "»: sale en «Esperando tu visto bueno» y aquí en Inactivos hasta que se active"
+        : "Ficha creada en Notion"), "success");
+  }).catch(function(e){
+    toast("No pude escribir en Notion: " + ((e && e.message) || e) + ". Queda pendiente.", "error");
+  });
+}
+
+/* Nombre y telefono comparables: sin tildes, sin el 📱 del borrador del
+   asistente, en minusculas; el telefono, sus ultimos 8 digitos. */
+function _impNom(s){
+  return String(s || "").replace(/^\s*📱\s*/, "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+function _impPrimer(s){ return _impNom(s).split(" ")[0] || ""; }
+function _impTel8(s){ return String(s || "").replace(/[^0-9]/g, "").slice(-8); }
+
+/* Busca en la app al cliente de una fila de Notion. Primero por su id de
+   Notion, en TODAS las fichas. Solo si ninguna lo tiene, por telefono y
+   luego por nombre, y entonces solo entre las que no estan enlazadas a
+   OTRA ficha de Notion que siga existiendo.
+   Revision del 11-sep-2026: por telefono hace falta ademas el mismo primer
+   nombre -las familias comparten numero-, y si hay varias, gana la del
+   nombre entero. Por nombre, no si las dos tienen telefono y es distinto:
+   son dos personas que se llaman igual. Desde que la app ESCRIBE en Notion
+   por este enlace, enlazar mal es escribir en la ficha de otra persona. */
+function _impBuscar(lista, x, idsNotion){
+  lista = u19Arr(lista);
+  var ids = idsNotion || {};
+  var xn = (x && (x.nombre || x.name)) || "";
+  var nombre = _impNom(xn);
+  var telKey = _impTel8(x && (x.whatsapp || x.phone));
+  var i, c;
+  if (x && x.id) for (i = 0; i < lista.length; i++){ c = lista[i]; if (c && c.notionId && c.notionId === x.id) return c; }
+  var libre = function(c){ return !!c && (!c.notionId || c.notionId === (x && x.id) || !ids[c.notionId]); };
+  if (telKey.length === 8){
+    var mejor = null;
+    for (i = 0; i < lista.length; i++){
+      c = lista[i];
+      if (!libre(c) || !c.phone || _impTel8(c.phone) !== telKey) continue;
+      if (nombre && _impNom(c.name) === nombre) return c;
+      if (!mejor && _impPrimer(c.name) && _impPrimer(c.name) === _impPrimer(xn)) mejor = c;
+    }
+    if (mejor) return mejor;
+  }
+  if (nombre) for (i = 0; i < lista.length; i++){
+    c = lista[i];
+    if (!libre(c) || _impNom(c.name) !== nombre) continue;
+    var t = _impTel8(c.phone);
+    if (telKey.length === 8 && t.length === 8 && t !== telKey) continue;
+    return c;
+  }
+  return null;
+}
+
+/* Los enlaces cruzados que dejo el importador viejo (revision del
+   11-sep-2026). Buscaba «id O telefono O nombre» y se quedaba con el
+   primero: en una familia que comparte telefono, la ficha de la madre podia
+   terminar con el id de Notion del hijo, y el enlace nuevo lo congelaba.
+   Se deshacen solo los casos INEQUIVOCOS: la ficha de la app se llama
+   distinto que la fila a la que apunta, y hay UNA sola fila, con ese mismo
+   telefono, que se llama exactamente como ella y que ninguna otra ficha de
+   la app tiene. Devuelve lo que se movio, para decirlo. */
+function _impReparar(clientes, lista){
+  clientes = u19Arr(clientes);
+  lista = u19Lista(lista);
+  var porId = {}, tomados = {}, movidos = [];
+  lista.forEach(function(x){ if (x && x.id) porId[x.id] = x; });
+  clientes.forEach(function(c){ if (c && c.notionId) tomados[c.notionId] = (tomados[c.notionId] || 0) + 1; });
+  clientes.forEach(function(c){
+    if (!c || !c.notionId || !porId[c.notionId]) return;
+    var fila = porId[c.notionId];
+    var nc = _impNom(c.name);
+    if (!nc || _impNom(fila.nombre || fila.name) === nc) return;
+    var tels = [_impTel8(fila.whatsapp || fila.phone), _impTel8(c.phone)].filter(function(t){ return t.length === 8; });
+    if (!tels.length) return;
+    var suyas = lista.filter(function(y){
+      return y && y.id && y.id !== c.notionId && tels.indexOf(_impTel8(y.whatsapp || y.phone)) >= 0 && _impNom(y.nombre || y.name) === nc;
+    });
+    if (suyas.length !== 1 || tomados[suyas[0].id]) return;
+    movidos.push({ nombre: c.name || "", de: fila.nombre || fila.name || "", a: suyas[0].nombre || suyas[0].name || "" });
+    tomados[c.notionId]--;
+    tomados[suyas[0].id] = 1;
+    c.notionId = suyas[0].id;
+  });
+  return movidos;
+}
+
+/* Los campos de la app que tienen un cambio sin subir a Notion: esos, y
+   solo esos, no los pisa la importacion. */
+function _impPendCampos(c){
+  var out = {};
+  var d = (c && c.notionPend && c.notionPend.datos && typeof c.notionPend.datos === "object") ? c.notionPend.datos : null;
+  if (d) FICHA_CAMPOS.forEach(function(par){ if (Object.prototype.hasOwnProperty.call(d, par[0])) out[par[1]] = true; });
+  return out;
+}
+
+/* Aplica lo que el formulario cambio, y SOLO eso: lo que la importacion
+   trajo mientras estaba abierto (una renovacion, por ejemplo) no se pisa
+   con el valor viejo que el formulario mostraba. */
+function fichaAplicar_(c, data, antes){
+  var t = function(v){ return (v === undefined || v === null) ? "" : String(v).trim(); };
+  Object.keys(data || {}).forEach(function(k){
+    if (!antes || t(data[k]) !== t(antes[k])) c[k] = data[k];
+  });
+  return c;
+}
+/* ===FICHA_NOTION_END=== */
 
 function clientCardHtml(c){
   var type = getClientType(c);
@@ -5249,6 +5635,8 @@ function clientCardHtml(c){
       + '<div class="card-sub" style="flex-wrap:wrap;gap:.5rem;">'
         + clientTypeBadge(type)
         + (c.notionId ? '<span class="badge teal">🟢 Notion</span>' : '')
+        + (c.notionPend ? '<button type="button" class="badge warn" style="cursor:pointer;" onclick="fichaNotionSubir(\''+c.id+'\')" title="Hay cambios de esta ficha sin subir a Notion: pulsa para verlos y subirlos">⏳ Notion pendiente</button>' : '')
+        + (c.activo === false && c.notionEstado && c.notionEstado !== "Inactivo" ? '<span class="badge warn" title="Así está su membresía en Notion">'+escapeHtml(c.notionEstado)+'</span>' : '')
         + (c.notionPlan ? '<span class="badge muted">'+escapeHtml(c.notionPlan)+(c.planPrice?' · $'+Number(c.planPrice).toLocaleString("es-CL"):'')+'</span>' : '')
         + (c.phone ? '<span>📱 '+escapeHtml(c.phone)+'</span>' : '')
         + (c.goal ? '<span class="badge green">'+escapeHtml(c.goal)+'</span>' : '')
@@ -5285,10 +5673,14 @@ window.crearRutinaParaCliente = function(clientId){
 function openClientForm(id){
   var client = id ? getClient(id) : null;
   var isEdit = !!client;
+  /* Lo de antes se copia AL ABRIR (revision del 11-sep-2026): copiado al
+     guardar, lo que la importacion trajo con el formulario abierto viajaba
+     a Notion como si Diego lo hubiera cambiado. */
+  var _fichaAntes = isEdit ? Object.assign({}, client) : {};
   var c = client || { name:"", rut:"", phone:"", email:"", goal:"", notes:"", type:"gym", reevalDate:"", planEndDate:"", targetWeight:"", targetDate:"", planPrice:"" };
   var curType = getClientType(c);
 
-  var typeHtml = '<select id="cf-type">'
+  var typeHtml = '<select id="cf-type" onchange="fichaTipoCambia_(this.value)">'
     + '<option value="gym"'+(curType==="gym"?" selected":"")+'>🏋️ Gimnasio (rutinas)</option>'
     + '<option value="rehab"'+(curType==="rehab"?" selected":"")+'>🩹 Rehabilitación (protocolos)</option>'
     + '</select>';
@@ -5315,7 +5707,8 @@ function openClientForm(id){
       + '</div>'
       + formField("Precio del plan (mensual, CLP)", '<input type="number" step="1000" id="cf-plan-price" value="'+escapeAttr(c.planPrice||"")+'" placeholder="opcional">')
       + formField("Objetivo", '<input type="text" id="cf-goal" value="'+escapeAttr(c.goal)+'" placeholder="Hipertrofia, Pérdida de grasa, Rehabilitar hombro...">')
-      + formField("Notas", '<textarea id="cf-notes" placeholder="Lesiones, restricciones, etc.">'+escapeHtml(c.notes||"")+'</textarea>'),
+      + formField("Notas", '<textarea id="cf-notes" placeholder="Lesiones, restricciones, etc.">'+escapeHtml(c.notes||"")+'</textarea>')
+      + fichaSeccionHtml_(c, isEdit),
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
       { label: isEdit ? "Guardar" : "Crear", cls:"btn-primary", onClick: function(){
@@ -5340,8 +5733,13 @@ function openClientForm(id){
           targetDate: document.getElementById("cf-target-date").value,
           planPrice: parseFloat(document.getElementById("cf-plan-price").value)||null
         };
+        /* 11-sep-2026: la ficha en Notion. */
+        var _fichaForm = fichaLeerFormulario_(isEdit);
+        Object.assign(data, _fichaForm.campos);
         if (isEdit){
-          Object.assign(client, data);
+          /* Solo lo que el formulario cambio: lo que la importacion trajo
+             con el formulario abierto no se pisa con el valor viejo. */
+          fichaAplicar_(client, data, _fichaAntes);
           /* Sin esto, editar un socio no movia NINGUNA fecha del estado, y era
              la unica via de edicion. La sincronizacion decidia quien gana por
              fechas, asi que una edicion sin subir se dejaba pisar por la copia
@@ -5357,6 +5755,7 @@ function openClientForm(id){
         closeModal();
         renderClients();
         toast(isEdit ? "Cliente actualizado" : "Cliente creado", "success");
+        fichaTrasGuardar_(isEdit ? client : data, _fichaAntes, _fichaForm);
       }}
     ]
   });
@@ -5423,7 +5822,9 @@ function deleteClient(id){
         if (c.rehabProtocolId){
           state.protocols = state.protocols.filter(function(p){ return p.id !== c.rehabProtocolId; });
         }
-        /* Sus series tambien: son datos de salud de esa persona. */
+        /* Sus series tambien: son datos de salud de esa persona. Y las
+           fotos de orden que esperaban en este equipo. */
+        seriesOrdenOlvidar_(seriesDeCliente_(u19Arr(state.series), id));
         if (Array.isArray(state.series)) state.series = state.series.filter(function(s){ return !s || s.clienteId !== id; });
         state.clients = state.clients.filter(function(x){ return x.id !== id; });
         saveState();
@@ -9522,6 +9923,7 @@ function wipeAll(){
   state.trash = []; state.horasExtra = [];
   state.exercises = u19Arr(SEED_DATA.exercises).slice();
   saveState();
+  if (typeof seriesOrdenBarrer_ === "function") seriesOrdenBarrer_();   /* y las fotos de orden de este equipo */
   closeModal();
   showView("dashboard");
   toast("Datos borrados. Catálogo de ejercicios restaurado.","success");
@@ -11444,12 +11846,18 @@ var SERIES_VIAS = ["Bono libre eleccion", "Particular por sesion", "Pack particu
 var SERIES_ESTADOS = ["Abierta", "Terminada", "Abandonada", "Anulada"];
 var SERIES_AUSENCIAS = ["No aviso", "Aviso y reagendo", "Cancelo el prestador"];
 var SERIES_COBROS = ["Bono", "Particular", "Incluido en el pack", "Pendiente", "Sin costo"];
+/* Como llego la persona: los nombres exactos de la base de personas. */
+var SERIES_LLEGADAS = ["Derivacion medica", "Socio del gimnasio", "Recomendacion", "Redes", "Paso por fuera"];
+/* Tope de la foto de la orden: bajo los 5 MiB de Notion, con margen. */
+var SERIES_ORDEN_MAX = 4500000;
 var SERIES_ETIQ = {
   "Bono libre eleccion": "Bono (libre elección)", "Particular por sesion": "Particular, por sesión",
   "Pack particular": "Pack particular (prepagado)", "Convenio socio": "Convenio socio", "Sin definir": "Sin definir",
   "No aviso": "No vino y no avisó", "Aviso y reagendo": "Avisó y se reagendó", "Cancelo el prestador": "La cancelé yo",
   "Incluido en el pack": "Incluida en el pack", "Pendiente": "Pendiente de cobro", "Sin costo": "Sin costo",
-  "Bono": "Bono", "Particular": "Particular"
+  "Bono": "Bono", "Particular": "Particular",
+  "Derivacion medica": "Derivación médica", "Socio del gimnasio": "Socio del gimnasio", "Recomendacion": "Recomendación",
+  "Redes": "Redes sociales", "Paso por fuera": "Pasó por fuera"
 };
 /* Una serie esta abierta mientras no se cierre a mano: completar las
    sesiones no la cierra, la cierra el alta. Las de antes no tienen estado. */
@@ -11499,7 +11907,8 @@ function seriesPayloadSerie_(s){
   return { nombre: s.nombre || "", indicadas: s.indicadas, inicio: s.creada || "",
     fechaOrden: o.fecha || "", medico: s.medico || "", motivo: s.motivo || "", obs: s.obs || "",
     via: SERIES_VIAS.indexOf(s.via) >= 0 ? s.via : "", valor: Number(s.valor) > 0 ? Number(s.valor) : 0,
-    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : "Abierta", alta: s.alta || "" };
+    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : "Abierta", alta: s.alta || "",
+    personaId: s.personaId || "" };
 }
 function seriesPayloadSesion_(s, x, numero){
   x = x || {};
@@ -11521,6 +11930,127 @@ function seriesTocar_(s){
 function seriesSeSube_(x){
   return !!x && !x.notionId && !x.soloNota;
 }
+/* La persona de la serie, para la base de personas de Notion (11-sep-2026).
+   Sale de su ficha si la tiene; si no, del nombre escrito en la serie. Si
+   es socia del gimnasio va enlazada a su ficha, y entonces «Socio del
+   gimnasio» es como llego, salvo que se haya dicho otra cosa. */
+function seriesPayloadPersona_(s, c){
+  s = s || {};
+  var llega = SERIES_LLEGADAS.indexOf(s.comoLlego) >= 0 ? s.comoLlego : ((c && c.notionId) ? "Socio del gimnasio" : "");
+  return { nombre: String((c && c.name) || s.nombre || "").trim(), whatsapp: (c && c.phone) || "", rut: (c && c.rut) || "",
+    nacimiento: (c && c.notionNacimiento) || "", primera: s.creada || "", comoLlego: llega,
+    socioId: (c && c.notionId) || "" };
+}
+/* La foto de la orden, como la espera el asistente. */
+function seriesPayloadOrden_(serieId, f){
+  f = f || {};
+  return { serieId: serieId || "", nombre: f.nombre || "", tipo: f.tipo || "", datos: f.datos || "" };
+}
+/* Donde espera la foto en ESTE equipo hasta subirse. Nunca en el estado:
+   el estado viaja en la sincronizacion y vive en localStorage. */
+function seriesOrdenClave_(s){ return "orden_" + String((s && s.id) || ""); }
+/* El nombre del archivo en Notion: fijo por serie, fecha de la orden y
+   numero de foto. Una respuesta perdida no la sube dos veces (el asistente
+   la reconoce por el nombre) y una foto nueva no se confunde con la vieja. */
+function seriesOrdenNombre_(s, tipo, n){
+  var ext = tipo === "application/pdf" ? "pdf" : (tipo === "image/png" ? "png" : "jpg");
+  var id = String((s && s.id) || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 40) || "serie";
+  var f = String((s && s.orden && s.orden.fecha) || "").replace(/[^0-9-]/g, "");
+  return "orden-" + id + (f ? "-" + f : "") + "-" + (Number(n) > 0 ? Math.floor(Number(n)) : 1) + "." + ext;
+}
+/* A que tamaño se achica la foto: el lado largo a `max` px, sin agrandar. */
+function seriesOrdenEscala_(w, h, max){
+  w = Number(w) || 0; h = Number(h) || 0; max = Number(max) || 1600;
+  if (w <= 0 || h <= 0) return { w: 0, h: 0 };
+  var k = Math.min(1, max / Math.max(w, h));
+  return { w: Math.max(1, Math.round(w * k)), h: Math.max(1, Math.round(h * k)) };
+}
+/* Cuanto falta por subir: la serie sin subir o cambiada, la que aun no
+   tiene su persona, sus sesiones y la foto de la orden. */
+function seriesPendientes_(lista){
+  var n = 0;
+  u19Arr(lista).forEach(function(s){
+    if (!s || typeof s !== "object") return;
+    if (!s.notionId || s.notionSucio || !s.personaId) n++;
+    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) n++; });
+    if (s.orden && s.orden.foto && s.orden.foto.pendiente) n++;
+  });
+  return n;
+}
+/* Las fotos de orden de series que se van se borran tambien de este equipo. */
+/* Las fotos de orden que ya no tienen serie (se borro todo, se bajo otra
+   copia de la nube o se importo un respaldo): fuera de este equipo. Solo
+   las claves orden_*: en ese almacen viven tambien el catalogo y la llave
+   de cifrado del equipo. */
+function seriesOrdenBarrer_(){
+  if (typeof u19IdbClaves !== "function") return Promise.resolve(0);
+  var vivas = {};
+  u19Arr(state.series).forEach(function(s){ if (s && s.id) vivas[seriesOrdenClave_(s)] = true; });
+  return u19IdbClaves().then(function(claves){
+    var fuera = u19Arr(claves).filter(function(k){ return /^orden_/.test(String(k)) && !vivas[k]; });
+    fuera.forEach(function(k){ u19IdbBorrar(k).catch(function(){}); });
+    return fuera.length;
+  }).catch(function(){ return 0; });
+}
+function seriesOrdenOlvidar_(lista){
+  u19Arr(lista).forEach(function(s){
+    if (s && s.id && typeof u19IdbBorrar === "function") u19IdbBorrar(seriesOrdenClave_(s)).catch(function(){});
+  });
+}
+/* Prepara la foto: una imagen se achica a 1600 px y JPEG al 80 % (la de un
+   telefono pasa de 4 MB a unos 300 KB y se lee igual); un PDF va tal cual
+   si cabe. Devuelve {tipo, datos (base64), bytes}. */
+function seriesOrdenPreparar_(archivo){
+  return new Promise(function(ok, mal){
+    if (!archivo) return mal(new Error("no hay archivo"));
+    var lector = new FileReader();
+    lector.onerror = function(){ mal(new Error("no pude leer el archivo")); };
+    if (archivo.type === "application/pdf"){
+      if (archivo.size > SERIES_ORDEN_MAX) return mal(new Error("el PDF pesa " + (archivo.size / 1048576).toFixed(1) + " MB y Notion admite hasta 5"));
+      lector.onload = function(){ var d = String(lector.result || ""); ok({ tipo: "application/pdf", datos: d.slice(d.indexOf(",") + 1), bytes: archivo.size }); };
+      lector.readAsDataURL(archivo);
+      return;
+    }
+    if (!/^image\//.test(archivo.type || "")) return mal(new Error("tiene que ser una foto o un PDF"));
+    lector.onload = function(){
+      var img = new Image();
+      img.onload = function(){
+        var t = seriesOrdenEscala_(img.naturalWidth, img.naturalHeight, 1600);
+        if (!t.w) return mal(new Error("la foto no se pudo leer"));
+        var cv = document.createElement("canvas");
+        cv.width = t.w; cv.height = t.h;
+        cv.getContext("2d").drawImage(img, 0, 0, t.w, t.h);
+        var d = cv.toDataURL("image/jpeg", 0.8);
+        var b64 = d.slice(d.indexOf(",") + 1);
+        var bytes = Math.floor(b64.length * 3 / 4);
+        if (bytes > SERIES_ORDEN_MAX) return mal(new Error("la foto sigue pesando demasiado"));
+        ok({ tipo: "image/jpeg", datos: b64, bytes: bytes });
+      };
+      img.onerror = function(){ mal(new Error("no pude abrir la foto")); };
+      img.src = String(lector.result || "");
+    };
+    lector.readAsDataURL(archivo);
+  });
+}
+/* La foto elegida, achicada y guardada en este equipo hasta que se suba.
+   En el estado solo queda la nota de que existe: nombre, tipo y tamaño. */
+function seriesOrdenGuardarFoto_(s, archivo){
+  toast("Preparando la foto…");
+  seriesOrdenPreparar_(archivo).then(function(p){
+    var prev = (s.orden && s.orden.foto) || {};
+    /* Siempre un numero nuevo: reusar el de una foto pendiente que quiza
+       ya llego a Notion haria que el asistente la diera por subida. */
+    var n = (Number(prev.n) || 0) + 1;
+    var nombre = seriesOrdenNombre_(s, p.tipo, n);
+    return u19IdbGuardar(seriesOrdenClave_(s), { nombre: nombre, tipo: p.tipo, datos: p.datos, bytes: p.bytes }).then(function(){
+      s.orden = Object.assign({}, s.orden || {}, { adjunta: true });
+      s.orden.foto = { nombre: nombre, tipo: p.tipo, bytes: p.bytes, n: n, pendiente: true, fecha: seriesHoyISO() };
+      seriesGuardar(seriesLeer());
+      renderSeries();
+      toast("Foto guardada (" + Math.round(p.bytes / 1024) + " KB). Se sube con «Subir a Notion».", "success");
+    });
+  }).catch(function(e){ toast("La foto no se guardó: " + ((e && e.message) || e), "error"); });
+}
 
 function seriesHoyISO(){
   var d = new Date();
@@ -11538,11 +12068,7 @@ function renderSeries(){
   if (!cont) return;
   var lista = seriesLeer();
   var hoy = seriesHoyISO();
-  var pend = 0;
-  lista.forEach(function(s){
-    if (!s.notionId || s.notionSucio) pend++;
-    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pend++; });
-  });
+  var pend = seriesPendientes_(lista);
   var mes = seriesResumenMes_(lista, hoy.slice(0, 7));
   var h = ['<div class="section-head"><h2>Series</h2><div style="display:flex;gap:.4rem">'
     + (lista.length ? '<button class="btn" onclick="seriesSincronizar()">Subir a Notion'
@@ -11583,6 +12109,7 @@ function renderSeries(){
       + (c.avisadas ? '<span>reagendó <b>' + c.avisadas + '</b></span>' : "")
       + (c.canceladas ? '<span>cancelé <b>' + c.canceladas + '</b></span>' : "")
       + (p.via ? '<span>' + seriesEsc_(SERIES_ETIQ[p.via] || p.via) + '</span>' : "")
+      + (p.orden && p.orden.foto && p.orden.foto.pendiente ? '<span title="La foto de la orden está en este equipo, sin subir a Notion">📎 foto sin subir</span>' : "")
       + (!abierta ? '<span><b>' + seriesEsc_(p.estado) + (p.alta ? ' · alta ' + seriesEsc_(p.alta) : '') + '</b></span>' : "") + '</div>');
 
     h.push('<div class="sr-diez">');
@@ -11628,7 +12155,11 @@ function renderSeries(){
    Se sube SOLO lo que todavía no tiene id de Notion, y el id vuelve y se
    guarda: así pulsar dos veces no duplica nada. Y si algo falla, la serie
    NO se marca como subida — se reintenta a la siguiente. */
+/* Una subida a la vez: con dos cadenas en paralelo, las dos ven la serie
+   sin id mientras la otra espera, y las dos crean (revision del 11-sep-2026). */
+var _seriesSubiendo = false;
 function seriesSincronizar(){
+  if (_seriesSubiendo){ toast("Ya se está subiendo: espera a que termine"); return; }
   var url = u19DashUrl("series");
   if (!url){
     window.alert("Falta la dirección del puente.\n\nAjustes → Conexión con Notion.");
@@ -11637,65 +12168,112 @@ function seriesSincronizar(){
   var lista = seriesLeer();
   if (!lista.length){ window.alert("No hay ninguna serie que subir."); return; }
 
-  var pendientes = 0;
-  lista.forEach(function(s){
-    if (!s.notionId || s.notionSucio) pendientes++;
-    u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pendientes++; });
-  });
+  var pendientes = seriesPendientes_(lista);
   if (!pendientes){ window.alert("Todo está ya en Notion. Nada que subir."); return; }
   if (!window.confirm("Se van a subir " + pendientes + " cosa(s) a Notion. ¿Seguimos?")) return;
+  _seriesSubiendo = true;
+  toast("Subiendo a Notion…");
 
-  var subidas = 0, fallos = [];
+  var subidas = 0, fallos = [], notas = [];
+  var hoy = seriesHoyISO();
   var pide = function(cuerpo){
-    try {
-      var r = fetch(url, { method:"POST", body: JSON.stringify(cuerpo) });
-      return r;
-    } catch(e){ return null; }
+    return fetch(url, { method:"POST", body: JSON.stringify(cuerpo) }).then(function(r){ return r.json(); });
   };
+  /* Se trabaja sobre el OBJETO de cada serie, no sobre su posicion: si se
+     borra una serie mientras sube, la posicion de las demas cambia y se
+     cruzarian ids y fotos entre personas. Una serie borrada se salta. */
+  var sigue = function(s){ return seriesLeer().indexOf(s) >= 0; };
 
-  /* Se hace en serie y no en paralelo: la sesión necesita el id de su serie,
-     y lanzarlas todas a la vez crearía sesiones huérfanas. */
+  /* Se hace en serie y no en paralelo: la serie necesita el id de su
+     persona y la sesión el de su serie. Lanzarlas todas a la vez crearía
+     series y sesiones huérfanas. */
   var cadena = Promise.resolve();
-  lista.forEach(function(s, i){
+  lista.slice().forEach(function(s){
+    if (!s || typeof s !== "object") return;
+    var cli = s.clienteId ? getClient(s.clienteId) : null;
+    /* 1 · la persona (11-sep-2026). Si su ficha ya la tiene, se reusa; si
+       no, el asistente la busca antes de crearla: no se duplica. */
     cadena = cadena.then(function(){
-      /* Ya subida y cambiada despues: se actualiza (estado, alta, datos). */
+      if (!sigue(s) || s.personaId) return null;
+      if (cli && cli.personaNotionId){
+        s.personaId = cli.personaNotionId;
+        if (s.notionId) s.notionSucio = true;
+        return null;
+      }
+      return pide(Object.assign({ op:"crear_persona" }, seriesPayloadPersona_(s, cli)))
+        .then(function(j){
+          if (j && j.ok && j.id){
+            s.personaId = j.id;
+            if (cli) cli.personaNotionId = j.id;
+            /* Una serie que ya estaba en Notion se enlaza a su persona al actualizarla. */
+            if (s.notionId) s.notionSucio = true;
+            subidas++;
+            if (j.existia) notas.push("«" + s.nombre + "» quedó con la persona que ya estaba en Notion: " + (j.nombre || "sin nombre"));
+            if (u19Lista(j.parecidas).length) notas.push("Para «" + s.nombre + "» se creó una persona nueva; en Notion hay otra parecida (" + u19Lista(j.parecidas).map(function(p){ return p.nombre; }).join(", ") + "). Si es la misma, se fusionan en Notion.");
+          } else fallos.push(s.nombre + " (persona): " + ((j && j.error) || "sin respuesta"));
+        })
+        .catch(function(e){ fallos.push(s.nombre + " (persona): " + e.message); });
+    });
+    /* 2 · la serie */
+    cadena = cadena.then(function(){
+      if (!sigue(s)) return null;
+      /* Ya subida y cambiada despues: se actualiza (estado, alta, datos, persona). */
       if (s.notionId){
         if (!s.notionSucio) return null;
         return pide(Object.assign({ op:"actualizar_serie", serieId: s.notionId }, seriesPayloadSerie_(s)))
-          .then(function(r){ return r.json(); })
           .then(function(j){
-            if (j && j.ok){ lista[i].notionSucio = false; subidas++; }
+            if (j && j.ok){ s.notionSucio = false; subidas++; }
             else fallos.push(s.nombre + " (actualizar): " + ((j && j.error) || "sin respuesta"));
           })
           .catch(function(e){ fallos.push(s.nombre + " (actualizar): " + e.message); });
       }
+      /* Sin su persona no se crea: quedaría huérfana en Notion. */
+      if (!s.personaId) return null;
       return pide(Object.assign({ op:"crear_serie" }, seriesPayloadSerie_(s)))
-        .then(function(r){ return r.json(); })
         .then(function(j){
-          if (j && j.ok && j.id){ lista[i].notionId = j.id; lista[i].notionSucio = false; subidas++; }
+          if (j && j.ok && j.id){ s.notionId = j.id; s.notionSucio = false; subidas++; }
           else fallos.push(s.nombre + ": " + ((j && j.error) || "sin respuesta"));
         })
         .catch(function(e){ fallos.push(s.nombre + ": " + e.message); });
     });
+    /* 3 · las sesiones */
     u19Arr(s.sesiones).forEach(function(x, k){
       cadena = cadena.then(function(){
-        if (!seriesSeSube_(x) || !lista[i].notionId) return null;
+        if (!sigue(s) || !seriesSeSube_(x) || !s.notionId) return null;
         var c = seriesContar_(s.sesiones.slice(0, k + 1), s.indicadas);
-        return pide(Object.assign({ op:"crear_sesion", serieId: lista[i].notionId }, seriesPayloadSesion_(s, x, c.hechas)))
-          .then(function(r){ return r.json(); })
+        return pide(Object.assign({ op:"crear_sesion", serieId: s.notionId }, seriesPayloadSesion_(s, x, c.hechas)))
           .then(function(j){
-            if (j && j.ok && j.id){ lista[i].sesiones[k].notionId = j.id; subidas++; }
+            if (j && j.ok && j.id){ x.notionId = j.id; subidas++; }
             else fallos.push(s.nombre + " (sesión): " + ((j && j.error) || "sin respuesta"));
           })
           .catch(function(e){ fallos.push(s.nombre + " (sesión): " + e.message); });
       });
     });
+    /* 4 · la foto de la orden, que espera en este equipo. Solo se borra de
+       aqui cuando Notion dijo que la tiene. */
+    cadena = cadena.then(function(){
+      var f = s.orden && s.orden.foto;
+      if (!sigue(s) || !f || !f.pendiente || !s.notionId) return null;
+      return u19IdbLeer(seriesOrdenClave_(s)).then(function(g){
+        if (!g || !g.datos){ fallos.push(s.nombre + " (orden): la foto quedó en el otro equipo; súbela desde allí o vuelve a elegirla aquí"); return null; }
+        return pide(Object.assign({ op:"subir_orden" }, seriesPayloadOrden_(s.notionId, g)))
+          .then(function(j){
+            if (j && j.ok){
+              f.pendiente = false; f.subida = hoy; subidas++;
+              return u19IdbBorrar(seriesOrdenClave_(s)).catch(function(){});
+            }
+            fallos.push(s.nombre + " (orden): " + ((j && j.error) || "sin respuesta"));
+          });
+      }).catch(function(e){ fallos.push(s.nombre + " (orden): " + ((e && e.message) || e)); });
+    });
   });
 
-  cadena.then(function(){
-    seriesGuardar(lista);
+  cadena.catch(function(e){ fallos.push(String((e && e.message) || e)); }).then(function(){
+    _seriesSubiendo = false;
+    seriesGuardar(seriesLeer());
     renderSeries();
     var msg = subidas + " subida(s) a Notion.";
+    if (notas.length) msg += "\n\n" + notas.slice(0, 3).join("\n");
     if (fallos.length) msg += "\n\nNo pude con " + fallos.length + ":\n" + fallos.slice(0,3).join("\n");
     window.alert(msg);
   });
@@ -11719,7 +12297,8 @@ function seriesNueva(){
     title: "Nueva serie",
     bodyHtml: '<div class="form-row"><label class="form-label">¿De quién es?</label><select id="sr-n-cli">' + seriesElegirFicha_("") + '</select></div>'
       + '<div class="form-row"><label class="form-label">Nombre y apellido (solo si no tiene ficha)</label><input type="text" id="sr-n-nom" placeholder="Nombre y apellido"></div>'
-      + '<div class="form-row"><label class="form-label">Sesiones indicadas</label><input type="number" min="1" id="sr-n-ind" value="10"></div>',
+      + '<div class="form-row"><label class="form-label">Sesiones indicadas</label><input type="number" min="1" id="sr-n-ind" value="10"></div>'
+      + '<div class="form-row"><label class="form-label">¿Cómo llegó? (opcional)</label><select id="sr-n-llega"><option value="">—</option>' + seriesOpciones_(SERIES_LLEGADAS, "") + '</select></div>',
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
       { label:"Crear serie", cls:"btn-primary", onClick: function(){
@@ -11730,8 +12309,10 @@ function seriesNueva(){
         if (!nombre){ toast("Elige una ficha o escribe el nombre", "error"); return; }
         if (!(total > 0)){ toast("Las sesiones indicadas tienen que ser más de cero", "error"); return; }
         var lista = seriesLeer();
+        var llega = (document.getElementById("sr-n-llega") || {}).value || "";
         lista.push({ id: genId(), clienteId: c ? c.id : "", nombre: nombre, indicadas: Math.floor(total),
-                     sesiones: [], orden: null, creada: seriesHoyISO() });
+                     sesiones: [], orden: null, creada: seriesHoyISO(),
+                     comoLlego: SERIES_LLEGADAS.indexOf(llega) >= 0 ? llega : "" });
         seriesGuardar(lista); closeModal(); renderSeries();
       }}
     ]
@@ -11772,6 +12353,10 @@ function seriesOrdenPedir(idx){
   var s = lista[idx];
   if (!s) return;
   var o = s.orden || {};
+  var f = o.foto || null;
+  var estadoFoto = !f ? "" : (f.pendiente
+    ? '<p class="text-xs" style="color:var(--warn);">📎 Hay una foto guardada en este equipo, pendiente de subir con «Subir a Notion».</p>'
+    : (f.subida ? '<p class="text-xs text-muted">📎 Foto subida a Notion el ' + seriesEsc_(f.subida) + '.</p>' : ''));
   openModal({
     title: "Orden médica · " + (s.nombre || ""),
     bodyHtml: '<div class="form-grid cols-2">'
@@ -11780,12 +12365,17 @@ function seriesOrdenPedir(idx){
       + '</div><div class="form-grid cols-2">'
       + '<div class="form-row"><label class="form-label">Médico que deriva</label><input type="text" id="sr-o-medico" value="' + seriesEsc_(s.medico || "") + '"></div>'
       + '<div class="form-row"><label class="form-label">Sesiones que indica</label><input type="number" min="1" id="sr-o-ses" value="' + seriesEsc_(s.indicadas || "") + '"></div>'
-      + '</div><label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;"><input type="checkbox" id="sr-o-vista" style="width:auto;margin:0;"' + (o.adjunta ? " checked" : "") + '> La tengo a la vista (la foto va en Notion, en «Orden médica»)</label>',
+      + '</div>'
+      + '<div class="form-row"><label class="form-label">Foto de la orden (va a Notion, a «Orden médica»)</label><input type="file" id="sr-o-foto" accept="image/*,application/pdf"></div>'
+      + estadoFoto
+      + '<label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;"><input type="checkbox" id="sr-o-vista" style="width:auto;margin:0;"' + (o.adjunta ? " checked" : "") + '> La tengo a la vista</label>',
     footer: [
       { label:"Cancelar", cls:"btn-ghost" },
       { label:"Guardar orden", cls:"btn-primary", onClick: function(){
         var el = document.getElementById("sr-o-vista");
-        if (!el || !el.checked){ toast("Sin la orden a la vista no se registra: la serie sigue bloqueada", "error"); return; }
+        var fe = document.getElementById("sr-o-foto");
+        var archivo = (fe && fe.files && fe.files[0]) || null;
+        if ((!el || !el.checked) && !archivo){ toast("Sin la orden a la vista (o su foto) no se registra: la serie sigue bloqueada", "error"); return; }
         var fecha = seriesVal_("sr-o-fecha"), vence = seriesVal_("sr-o-vence");
         if (!seriesFechaOk_(fecha) || !seriesFechaOk_(vence)){ toast("Las fechas van como AAAA-MM-DD", "error"); return; }
         var n = Math.floor(Number(seriesVal_("sr-o-ses")));
@@ -11794,10 +12384,15 @@ function seriesOrdenPedir(idx){
           if (n < hechas){ toast("La orden indica " + n + " y ya van " + hechas + " hechas: revisa el número", "error"); return; }
           s.indicadas = n;
         }
-        s.orden = { adjunta: true, fecha: fecha, vence: vence };
+        /* Se conserva lo que ya habia (la nota de la foto, sobre todo). */
+        /* Adjunta la da la casilla (o una orden que ya lo estaba). Una foto
+           sola la da por adjunta cuando queda guardada: si falla, la serie
+           sigue bloqueada (revision del 11-sep-2026). */
+        s.orden = Object.assign({}, s.orden || {}, { adjunta: !!(el && el.checked) || !!(s.orden && s.orden.adjunta), fecha: fecha, vence: vence });
         s.medico = seriesVal_("sr-o-medico");
         seriesTocar_(s);
         seriesGuardar(lista); closeModal(); renderSeries();
+        if (archivo) seriesOrdenGuardarFoto_(s, archivo);
       }}
     ]
   });
@@ -11938,6 +12533,7 @@ function seriesEliminar(idx){
   var lista = seriesLeer();
   if (!lista[idx]) return;
   if (!window.confirm("¿Eliminar la serie de " + lista[idx].nombre + "? No se puede deshacer.")) return;
+  seriesOrdenOlvidar_([lista[idx]]);
   lista.splice(idx, 1);
   seriesGuardar(lista);
   renderSeries();
@@ -21767,9 +22363,14 @@ function u19ReactResultadoHTML(res){
     h += '<div class="ml-t">Cambiado en Notion</div><div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
       + '<tr><th>Cliente</th><th>Antes</th><th>Ahora</th></tr>';
     u19Lista(res.hechos).forEach(function(x){
-      h += '<tr><td>' + escapeHtml(x.nombre || '—') + '</td>'
-        + '<td class="text-xs" style="color:var(--muted);">' + escapeHtml((x.antes.activa || '—') + ' · ' + (x.antes.termino || 'sin fecha')) + '</td>'
-        + '<td class="text-xs" style="color:var(--success);">' + escapeHtml((x.ahora.activa || '—') + ' · ' + (x.ahora.termino || '—')) + '</td></tr>';
+      /* Un asistente anterior al 11-sep-2026 devolvia ids sueltos: leer
+         x.antes.activa reventaba y pintaba «No se pudo» sobre un cambio
+         que SI se habia hecho. */
+      if (!x || typeof x !== 'object') x = { nombre: String(x || '') };
+      var an = x.antes || {}, ah = x.ahora || {};
+      h += '<tr><td>' + escapeHtml(x.nombre || x.id || '—') + '</td>'
+        + '<td class="text-xs" style="color:var(--muted);">' + escapeHtml((an.activa || '—') + ' · ' + (an.termino || 'sin fecha')) + '</td>'
+        + '<td class="text-xs" style="color:var(--success);">' + escapeHtml((ah.activa || '—') + ' · ' + (ah.termino || '—')) + '</td></tr>';
     });
     h += '</table></div>';
   }
@@ -21777,6 +22378,7 @@ function u19ReactResultadoHTML(res){
     h += '<div class="ml-t">No se pudo con</div><div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
       + '<tr><th>Cliente</th><th>Por qué</th></tr>';
     u19Lista(res.errores).forEach(function(x){
+      if (!x || typeof x !== 'object') x = { por: String(x || '') };
       h += '<tr><td>' + escapeHtml(x.nombre || x.id || '—') + '</td>'
         + '<td class="text-xs" style="color:var(--danger);">' + escapeHtml(x.por || '') + '</td></tr>';
     });
@@ -21986,7 +22588,7 @@ window.u19AccAprobar = function(tipo, tarifa){
     if (mal && res.errores && msg){
       msg.innerHTML += '<br>' + u19Lista(res.errores).map(function(x){
         return '<span class="text-xs" style="color:var(--danger);">'
-          + escapeHtml((x.nombre || x.id || '?') + ': ' + (x.por || '')) + '</span>'; }).join('<br>');
+          + escapeHtml((x && typeof x === 'object') ? ((x.nombre || x.id || '?') + ': ' + (x.por || '')) : String(x || '')) + '</span>'; }).join('<br>');
     }
   }).catch(function(e){
     di("No se pudo: " + (e && e.message ? e.message : e), "var(--danger)");
@@ -22733,6 +23335,29 @@ function u19IdbGuardar(clave, valor){
       tx.objectStore(IDB_ALMACEN).put(valor, clave);
       tx.oncomplete = function(){ ok(true); };
       tx.onerror = function(){ err(tx.error); };
+    });
+  });
+}
+/* Borra una clave del almacen (11-sep-2026: la foto de la orden, una vez
+   que Notion la tiene). */
+function u19IdbBorrar(clave){
+  return u19Idb().then(function(db){
+    return new Promise(function(ok, err){
+      var tx = db.transaction(IDB_ALMACEN, "readwrite");
+      tx.objectStore(IDB_ALMACEN).delete(clave);
+      tx.oncomplete = function(){ ok(true); };
+      tx.onerror = function(){ err(tx.error); };
+    });
+  });
+}
+/* Las claves del almacen (para barrer las fotos de orden huerfanas). */
+function u19IdbClaves(){
+  return u19Idb().then(function(db){
+    return new Promise(function(ok, err){
+      var tx = db.transaction(IDB_ALMACEN, "readonly");
+      var r = tx.objectStore(IDB_ALMACEN).getAllKeys();
+      r.onsuccess = function(){ ok(u19Arr(r.result)); };
+      r.onerror = function(){ err(r.error); };
     });
   });
 }
@@ -26784,6 +27409,8 @@ function u19Arrancar(){
     if (_arrancado) return;
     _arrancado = true;
     init(); observarAppTop(); if (typeof u19AutoImportarNotion === "function") u19AutoImportarNotion();
+    /* Fotos de orden huerfanas (una copia de la nube o un respaldo reemplazo las series). */
+    if (typeof seriesOrdenBarrer_ === "function") setTimeout(seriesOrdenBarrer_, 8000);
   };
   if (typeof u19RecuperarCatalogo === "function"){
     var t = setTimeout(seguir, 8000);   /* si IndexedDB no responde, se arranca igual */
@@ -29352,6 +29979,7 @@ window.u19BorrarDatosCliente = function(clientId){
           if (c.rehabProtocolId){
             state.protocols = state.protocols.filter(function(p){ return p.id !== c.rehabProtocolId; });
           }
+          seriesOrdenOlvidar_(seriesDeCliente_(u19Arr(state.series), c.id));
           if (Array.isArray(state.series)) state.series = state.series.filter(function(s){ return !s || s.clienteId !== c.id; });
           state.clients = state.clients.filter(function(x){ return x.id !== c.id; });
           saveState(); closeModal(); renderClients();

@@ -71,5 +71,11 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   node "$RAIZ/tools/socio.js" "$RAIZ/index.html" \
     || { echo ""; echo "algo de la readaptacion llega a lo que ve el socio: commit cancelado."; exit 1; }
 
+  # 11. fichas.js - las fichas de socios que la app escribe en Notion: que
+  #     en una edicion solo viaje lo que cambio, que cada fila de Notion se
+  #     enlace con su persona y que la importacion no pise lo pendiente.
+  node "$RAIZ/tools/fichas.js" "$RAIZ/index.html" \
+    || { echo ""; echo "las fichas que van a Notion no pasan la prueba: commit cancelado."; exit 1; }
+
 fi
 exit 0

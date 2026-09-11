@@ -105,8 +105,8 @@
     },
     {
       "nombre": "la subida deja de preguntar y sube las notas",
-      "de": "        if (!seriesSeSube_(x) || !lista[i].notionId) return null;",
-      "a": "        if (x.notionId || !lista[i].notionId) return null;"
+      "de": "        if (!sigue(s) || !seriesSeSube_(x) || !s.notionId) return null;",
+      "a": "        if (!sigue(s) || x.notionId || !s.notionId) return null;"
     },
     {
       "nombre": "el dolor vuelve a leerse de campos que nadie escribe",
@@ -185,8 +185,8 @@
     },
     {
       "nombre": "un estado que Notion no tiene se manda igual",
-      "de": "    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : \"Abierta\", alta: s.alta || \"\" };",
-      "a": "    estado: s.estado || \"Abierta\", alta: s.alta || \"\" };"
+      "de": "    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : \"Abierta\", alta: s.alta || \"\",\n    personaId:",
+      "a": "    estado: s.estado || \"Abierta\", alta: s.alta || \"\",\n    personaId:"
     },
     {
       "nombre": "un dolor de 11 se manda",
@@ -252,6 +252,121 @@
       "nombre": "la proyección deja de contar las sesiones sin monto",
       "de": "&& x.cobro !== \"Sin costo\") r.proyeccion += (m || v);",
       "a": "&& x.cobro !== \"Sin costo\") r.proyeccion += m;"
+    },
+    {
+      "nombre": "la persona socia del gimnasio deja de enlazarse a su ficha",
+      "de": "    socioId: (c && c.notionId) || \"\" };",
+      "a": "    socioId: \"\" };"
+    },
+    {
+      "nombre": "la socia deja de llegar como «Socio del gimnasio»",
+      "de": "((c && c.notionId) ? \"Socio del gimnasio\" : \"\")",
+      "a": "\"\""
+    },
+    {
+      "nombre": "cómo llegó viaja sin validar y crearía una opción nueva",
+      "de": "  var llega = SERIES_LLEGADAS.indexOf(s.comoLlego) >= 0 ? s.comoLlego :",
+      "a": "  var llega = s.comoLlego ? s.comoLlego :"
+    },
+    {
+      "nombre": "la serie deja de llevar el id de su persona",
+      "de": "    personaId: s.personaId || \"\" };",
+      "a": "    personaX: s.personaId || \"\" };"
+    },
+    {
+      "nombre": "la segunda foto se llama igual que la primera y el asistente la da por subida",
+      "de": "+ \"-\" + (Number(n) > 0 ? Math.floor(Number(n)) : 1) + \".\" + ext;",
+      "a": "+ \"-1.\" + ext;"
+    },
+    {
+      "nombre": "una foto chica se agranda",
+      "de": "  var k = Math.min(1, max / Math.max(w, h));",
+      "a": "  var k = max / Math.max(w, h);"
+    },
+    {
+      "nombre": "la foto viaja sin sus datos",
+      "de": "tipo: f.tipo || \"\", datos: f.datos || \"\" };",
+      "a": "tipo: f.tipo || \"\", datos: \"\" };"
+    },
+    {
+      "nombre": "la serie sin su persona deja de contar como pendiente",
+      "de": "    if (!s.notionId || s.notionSucio || !s.personaId) n++;",
+      "a": "    if (!s.notionId || s.notionSucio) n++;"
+    },
+    {
+      "nombre": "la foto sin subir deja de contar como pendiente",
+      "de": "    if (s.orden && s.orden.foto && s.orden.foto.pendiente) n++;\n",
+      "a": ""
+    },
+    {
+      "nombre": "la serie se crea sin su persona",
+      "de": "      if (!s.personaId) return null;\n      return pide(Object.assign({ op:\"crear_serie\" }",
+      "a": "      return pide(Object.assign({ op:\"crear_serie\" }"
+    },
+    {
+      "nombre": "la foto se da por subida aunque Notion no la tenga",
+      "de": "            if (j && j.ok){\n              f.pendiente = false;",
+      "a": "            if (true){\n              f.pendiente = false;"
+    },
+    {
+      "nombre": "la foto se guarda en el estado y viaja en la sincronización",
+      "de": "s.orden.foto = { nombre: nombre, tipo: p.tipo, bytes: p.bytes, n: n, pendiente: true, fecha: seriesHoyISO() };",
+      "a": "s.orden.foto = { nombre: nombre, tipo: p.tipo, bytes: p.bytes, n: n, pendiente: true, fecha: seriesHoyISO(), datos: p.datos };"
+    },
+    {
+      "nombre": "registrar la orden otra vez pierde la nota de la foto",
+      "de": "        s.orden = Object.assign({}, s.orden || {}, { adjunta: !!(el && el.checked) || !!(s.orden && s.orden.adjunta), fecha: fecha, vence: vence });",
+      "a": "        s.orden = { adjunta: !!(el && el.checked), fecha: fecha, vence: vence };"
+    },
+    {
+      "nombre": "borrar una serie deja su foto guardada en el equipo",
+      "de": "  seriesOrdenOlvidar_([lista[idx]]);\n",
+      "a": ""
+    },
+    {
+      "nombre": "la persona nueva no queda en su ficha y se pide otra vez por cada serie",
+      "de": "            if (cli) cli.personaNotionId = j.id;\n",
+      "a": ""
+    },
+    {
+      "nombre": "una serie ya subida no se enlaza a su persona",
+      "de": "            /* Una serie que ya estaba en Notion se enlaza a su persona al actualizarla. */\n            if (s.notionId) s.notionSucio = true;\n",
+      "a": ""
+    },
+    {
+      "nombre": "dos clics lanzan dos subidas en paralelo",
+      "de": "  if (_seriesSubiendo){ toast(",
+      "a": "  if (false){ toast("
+    },
+    {
+      "nombre": "la subida vuelve a escribir por posición y cruza series borradas",
+      "de": "      if (!sigue(s) || s.personaId) return null;",
+      "a": "      if (s.personaId) return null;"
+    },
+    {
+      "nombre": "una foto nueva reusa el número de la pendiente",
+      "de": "    var n = (Number(prev.n) || 0) + 1;",
+      "a": "    var n = (Number(prev.n) || 0) + (prev.pendiente ? 0 : 1);"
+    },
+    {
+      "nombre": "una foto que falla deja la orden desbloqueada",
+      "de": "{ adjunta: !!(el && el.checked) || !!(s.orden && s.orden.adjunta), fecha: fecha, vence: vence }",
+      "a": "{ adjunta: true, fecha: fecha, vence: vence }"
+    },
+    {
+      "nombre": "la limpieza borra todo el almacén (catálogo y llave del equipo)",
+      "de": "    var fuera = u19Arr(claves).filter(function(k){ return /^orden_/.test(String(k)) && !vivas[k]; });",
+      "a": "    var fuera = u19Arr(claves).filter(function(k){ return !vivas[k]; });"
+    },
+    {
+      "nombre": "borrar todo deja las fotos de orden en el equipo",
+      "de": "  if (typeof seriesOrdenBarrer_ === \"function\") seriesOrdenBarrer_();   /* y las fotos de orden de este equipo */\n",
+      "a": ""
+    },
+    {
+      "nombre": "la subida deja de decir con qué persona quedó la serie",
+      "de": "            if (j.existia) notas.push(",
+      "a": "            if (false) notas.push("
     }
   ]
 }

@@ -1,0 +1,200 @@
+{
+  "suite": "tools/fichas.js",
+  "mutantes": [
+    {
+      "nombre": "en una edición viaja todo, y la fecha de término vieja pisa la del pago",
+      "de": "    if (nueva || v !== txt(antes ? antes[par[1]] : \"\")) d[par[0]] = v;",
+      "a": "    d[par[0]] = v;"
+    },
+    {
+      "nombre": "lo vacío viaja y borraría en Notion",
+      "de": "    if (v === \"\") return;\n    if (nueva || v !==",
+      "a": "    if (nueva || v !=="
+    },
+    {
+      "nombre": "la segunda edición sin subir pisa a la primera",
+      "de": "  return { datos: Object.assign({}, previos, datos || {}), ts: ts || Date.now() };",
+      "a": "  return { datos: Object.assign({}, datos || {}), ts: ts || Date.now() };"
+    },
+    {
+      "nombre": "una ficha ya enlazada se vuelve a crear en vez de actualizarse",
+      "de": "  var b = { op: c.notionId ? \"actualizar\" : \"crear\",",
+      "a": "  var b = { op: \"crear\","
+    },
+    {
+      "nombre": "se crea aunque se parezca a otra, sin que nadie lo diga",
+      "de": "  if (extra && extra.forzar === true) b.forzar = true;",
+      "a": "  b.forzar = true;"
+    },
+    {
+      "nombre": "el cuerpo lleva lo pendiente por referencia",
+      "de": "            datos: Object.assign({}, (c.notionPend && c.notionPend.datos) || {}) };",
+      "a": "            datos: (c.notionPend && c.notionPend.datos) || {} };"
+    },
+    {
+      "nombre": "un asistente viejo que contesta {status:ok} se lee como éxito",
+      "de": "  if (typeof j.ok !== \"boolean\") throw new Error(",
+      "a": "  if (false) throw new Error("
+    },
+    {
+      "nombre": "la importación deja de buscar primero por el id de Notion",
+      "de": "  if (x && x.id) for (i = 0; i < lista.length; i++){ c = lista[i]; if (c && c.notionId && c.notionId === x.id) return c; }\n",
+      "a": ""
+    },
+    {
+      "nombre": "una fila nueva de la familia se queda con la ficha de otro por el teléfono",
+      "de": "  var libre = function(c){ return !!c && (!c.notionId || c.notionId === (x && x.id) || !ids[c.notionId]); };",
+      "a": "  var libre = function(c){ return !!c; };"
+    },
+    {
+      "nombre": "una ficha cuyo enlace murió ya no se puede volver a enlazar",
+      "de": "  var libre = function(c){ return !!c && (!c.notionId || c.notionId === (x && x.id) || !ids[c.notionId]); };",
+      "a": "  var libre = function(c){ return !!c && (!c.notionId || c.notionId === (x && x.id)); };"
+    },
+    {
+      "nombre": "la importación pisa lo pendiente de los activos",
+      "de": "        if (fin && fin !== ex.planEndDate && !pc.planEndDate){\n",
+      "a": "        if (fin && fin !== ex.planEndDate){\n"
+    },
+    {
+      "nombre": "la importación pisa lo pendiente de los inactivos",
+      "de": "        if (!pc.notionEstado){\n          ex.notionEstado = _impCampo(",
+      "a": "        if (true){\n          ex.notionEstado = _impCampo("
+    },
+    {
+      "nombre": "el barrido da de baja una ficha nueva que aún no subió",
+      "de": "      if (parcial || !c.notionId || c.activo === false || _impPendCampos(c).notionEstado) return;",
+      "a": "      if (parcial || !c.notionId || c.activo === false) return;"
+    },
+    {
+      "nombre": "la membresía de los inactivos vuelve a leerse de x.estado, que no existe",
+      "de": "        ex.notionEstado = _impCampo(x, [\"estado\", \"membresia_activa\", \"Membresía Activa\"]) || \"\";",
+      "a": "        ex.notionEstado = x.estado || \"\";"
+    },
+    {
+      "nombre": "lo de antes se guarda por referencia y la edición no manda nada",
+      "de": "  var _fichaAntes = isEdit ? Object.assign({}, client) : {};",
+      "a": "  var _fichaAntes = isEdit ? client : {};"
+    },
+    {
+      "nombre": "se escribe en Notion sin simular antes",
+      "de": "  fichaPedir_(Object.assign({}, cuerpo, { simular: true })).then(function(r){",
+      "a": "  fichaPedir_(Object.assign({}, cuerpo, { aceptoAvisos: true })).then(function(r){"
+    },
+    {
+      "nombre": "lo pendiente se borra aunque se haya vuelto a editar durante la escritura",
+      "de": "    if (c.notionPend && c.notionPend.ts === ts) delete c.notionPend;",
+      "a": "    delete c.notionPend;"
+    },
+    {
+      "nombre": "al completar una ficha existente viaja la membresía por defecto",
+      "de": "  if (c.notionPend && c.notionPend.datos) delete c.notionPend.datos.membresia;\n",
+      "a": ""
+    },
+    {
+      "nombre": "reactivar vuelve a reventar con un id suelto",
+      "de": "      if (!x || typeof x !== 'object') x = { nombre: String(x || '') };\n      var an = x.antes || {}, ah = x.ahora || {};",
+      "a": "      var an = x.antes, ah = x.ahora;"
+    },
+    {
+      "nombre": "la vista previa mete lo que llega del asistente sin escapar",
+      "de": "'<tr><td>' + e(x.columna) + '</td>",
+      "a": "'<tr><td>' + x.columna + '</td>"
+    },
+    {
+      "nombre": "una persona nueva de readaptación recibe ficha de gimnasio por defecto",
+      "de": "(!isEdit && getClientType(c) !== \"rehab\")",
+      "a": "(!isEdit)"
+    },
+    {
+      "nombre": "un estado de membresía mal escrito en la app",
+      "de": "var FICHA_MEMBRESIAS = [\"Potencial ingreso\", \"Prueba\", \"Activo\", \"Inactivo\"];",
+      "a": "var FICHA_MEMBRESIAS = [\"Potencial ingreso\", \"Prueba\", \"activo\", \"Inactivo\"];"
+    },
+    {
+      "nombre": "entra lenguaje clínico en el bloque de fichas",
+      "de": "/* ===FICHA_NOTION===\n   Las fichas de socios,",
+      "a": "/* ===FICHA_NOTION===\n   Las fichas de pacientes,"
+    },
+    {
+      "nombre": "con un cambio pendiente se vuelve a saltar la ficha entera y la renovación no llega",
+      "de": "      if (ex && ex.notionPend) protegidos++;\n      var fin2",
+      "a": "      if (ex && ex.notionPend){ protegidos++; return; }\n      var fin2"
+    },
+    {
+      "nombre": "la renovación de un pendiente deja de llegar (se salta la ficha entera en activos)",
+      "de": "      var pc = _impPendCampos(ex);\n      if (ex && ex.notionPend) protegidos++;\n      var fin = ",
+      "a": "      var pc = _impPendCampos(ex);\n      if (ex && ex.notionPend){ protegidos++; return; }\n      var fin = "
+    },
+    {
+      "nombre": "la membresía pendiente la revierte la importación",
+      "de": "        if (ex.activo === false && !pc.notionEstado) ex.activo = true;",
+      "a": "        if (ex.activo === false) ex.activo = true;"
+    },
+    {
+      "nombre": "por teléfono se vuelve a enlazar sin mirar el nombre (la familiar se queda con la ficha)",
+      "de": "      if (!mejor && _impPrimer(c.name) && _impPrimer(c.name) === _impPrimer(xn)) mejor = c;",
+      "a": "      if (!mejor) mejor = c;"
+    },
+    {
+      "nombre": "entre dos del mismo teléfono ya no gana la del nombre entero",
+      "de": "      if (nombre && _impNom(c.name) === nombre) return c;\n      if (!mejor",
+      "a": "      if (!mejor"
+    },
+    {
+      "nombre": "dos que se llaman igual con teléfonos distintos se vuelven a enlazar",
+      "de": "    if (telKey.length === 8 && t.length === 8 && t !== telKey) continue;\n",
+      "a": ""
+    },
+    {
+      "nombre": "los enlaces cruzados heredados no se reparan",
+      "de": "    var reparados = parcial ? [] : _impReparar(state.clients, lista);",
+      "a": "    var reparados = [];"
+    },
+    {
+      "nombre": "la reparación mueve el enlace aunque la fila ya la tenga otra ficha",
+      "de": "    if (suyas.length !== 1 || tomados[suyas[0].id]) return;",
+      "a": "    if (suyas.length !== 1) return;"
+    },
+    {
+      "nombre": "con la lista a medias se vuelve a dar de baja",
+      "de": "      if (parcial || !c.notionId || c.activo === false || _impPendCampos(c).notionEstado) return;",
+      "a": "      if (!c.notionId || c.activo === false || _impPendCampos(c).notionEstado) return;"
+    },
+    {
+      "nombre": "con la lista a medias los enlaces que faltan quedan libres para otro",
+      "de": "    if (parcial) state.clients.forEach(function(c){ if (c && c.notionId) idsTodos[c.notionId] = true; });\n",
+      "a": ""
+    },
+    {
+      "nombre": "el formulario vuelve a copiar encima todo, también lo que trajo la importación",
+      "de": "          fichaAplicar_(client, data, _fichaAntes);\n",
+      "a": "          Object.assign(client, data);\n"
+    },
+    {
+      "nombre": "una ficha con algo pendiente vuelve a abrir con la casilla desmarcada",
+      "de": "  var marcar = hayPuente && ((c.notionId || c.notionPend) ? true :",
+      "a": "  var marcar = hayPuente && (c.notionId ? true :"
+    },
+    {
+      "nombre": "el error del asistente vuelve a leerse como «falta desplegarlo»",
+      "de": "  if (typeof j.ok !== \"boolean\" && typeof j.error === \"string\" && j.error) throw new Error(\"el asistente falló: \" + j.error);\n",
+      "a": ""
+    },
+    {
+      "nombre": "se escribe en la ficha de otra persona sin preguntar",
+      "de": "        if (otraPersona && !window.confirm(",
+      "a": "        if (false && !window.confirm("
+    },
+    {
+      "nombre": "la vista previa deja de decir a qué ficha de Notion se escribe",
+      "de": "    var otraPersona = cuerpo.op === \"actualizar\" && enNotion && _impNom(enNotion) !== _impNom(nombre);",
+      "a": "    var otraPersona = false; enNotion = \"\";"
+    },
+    {
+      "nombre": "«completarla» deja dos fichas de la app sobre una de Notion",
+      "de": "  if (otra){ otra.notionId = \"\"; otra.updatedAt = Date.now(); }\n",
+      "a": ""
+    }
+  ]
+}

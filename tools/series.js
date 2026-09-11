@@ -28,10 +28,11 @@ const NOMBRES = ['seriesDias_', 'seriesContar_', 'seriesSemaforo_', 'seriesOrden
   'seriesCasillas_', 'seriesEvolucion_', 'seriesUltima_', 'seriesEsc_',
   'seriesConNota_', 'seriesSeSube_', 'u19DolorDe',
   'seriesMigrar_', 'seriesDeCliente_', 'u19MolestiaMax_',
-  'seriesAbierta_', 'seriesCobroDefecto_', 'seriesResumenMes_', 'seriesPayloadSerie_', 'seriesPayloadSesion_', 'seriesTocar_'];
+  'seriesAbierta_', 'seriesCobroDefecto_', 'seriesResumenMes_', 'seriesPayloadSerie_', 'seriesPayloadSesion_', 'seriesTocar_',
+  'seriesPayloadPersona_', 'seriesPayloadOrden_', 'seriesOrdenClave_', 'seriesOrdenNombre_', 'seriesOrdenEscala_', 'seriesPendientes_'];
 /* Las cuatro listas de opciones, que son los nombres exactos de Notion. */
 function lineaVar(n) { const i = src.indexOf('\nvar ' + n + ' = '); if (i < 0) { console.error('series: no encuentro ' + n); process.exit(1); } return src.slice(i + 1, src.indexOf('\n', i + 1)) + '\n'; }
-const LISTAS = ['SERIES_VIAS', 'SERIES_ESTADOS', 'SERIES_AUSENCIAS', 'SERIES_COBROS'].map(lineaVar).join('');
+const LISTAS = ['SERIES_VIAS', 'SERIES_ESTADOS', 'SERIES_AUSENCIAS', 'SERIES_COBROS', 'SERIES_LLEGADAS', 'SERIES_ORDEN_MAX'].map(lineaVar).join('');
 
 let M;
 try {
@@ -53,6 +54,8 @@ const igual = (n, a, b) => {
   else falla(n, 'esperaba ' + JSON.stringify(b) + ', obtuvo ' + JSON.stringify(a));
 };
 const aviso = (t) => avisos.push(t);
+
+(async () => {
 
 /* --- 1 · El contador ------------------------------------------------- */
 {
@@ -224,8 +227,12 @@ const aviso = (t) => avisos.push(t);
   igual('subida · nada no se sube', M.seriesSeSube_(null), false);
 
   const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
+  /* Desde el 11-sep-2026 la cuenta la hace seriesPendientes_, que la
+     pantalla y el sincronizador comparten: basta con que ELLA pregunte. */
   comprobar('subida · el sincronizador pregunta a seriesSeSube_ al contar y al subir',
-    (sync.match(/seriesSeSube_\(/g) || []).length >= 2, 'vuelve a subir todo lo que no tiene id, notas sueltas incluidas');
+    (sync.match(/seriesSeSube_\(/g) || []).length >= 1 && sync.indexOf('seriesPendientes_(lista)') > 0 &&
+    tramo('function seriesPendientes_(', '\n}\n', 'seriesPendientes_').indexOf('seriesSeSube_(x)') > 0,
+    'vuelve a subir todo lo que no tiene id, notas sueltas incluidas');
   comprobar('nota · el boton de evolucion usa seriesConNota_',
     tramo('function seriesNota(', '\n}\n', 'seriesNota').indexOf('seriesConNota_(') >= 0, 'vuelve a empujar la nota como una sesion');
   aviso('nota · dieciseis casos');
@@ -401,7 +408,7 @@ const aviso = (t) => avisos.push(t);
     sync.indexOf('seriesPayloadSerie_(s)') > 0 && sync.indexOf('seriesPayloadSesion_(s, x, c.hechas)') > 0, 'vuelve a armar el cuerpo a mano');
   comprobar('forma · y ya no manda el vencimiento', sync.indexOf('vence:') < 0, 'vuelve vence: el puente lo escribiría como fecha de la orden');
   comprobar('forma · una serie cambiada se actualiza en Notion',
-    sync.indexOf('op:"actualizar_serie"') > 0 && sync.indexOf('if (!s.notionSucio) return null;') > 0 && sync.indexOf('lista[i].notionSucio = false') > 0,
+    sync.indexOf('op:"actualizar_serie"') > 0 && sync.indexOf('if (!s.notionSucio) return null;') > 0 && sync.indexOf('s.notionSucio = false') > 0,
     'el alta y el estado se quedarían solo en la app');
   const ses = tramo('function seriesSesion(', '\n}\n', 'seriesSesion');
   comprobar('forma · registrar una sesión también respeta la orden médica', ses.indexOf('seriesOrden_(s.orden, seriesHoyISO()).bloquea') > 0,
@@ -410,8 +417,145 @@ const aviso = (t) => avisos.push(t);
   comprobar('forma · no queda el marcado de un clic', src.indexOf('function seriesMarcar(') < 0, 'vuelve seriesMarcar');
 }
 
+/* --- 12 · La persona y la foto de la orden (11-sep-2026) --------------
+   Diego pidio que la app cree en Notion a la persona de la serie y suba la
+   foto de la orden, que hasta ese dia iban a mano. */
+{
+  const P = M.seriesPayloadPersona_;
+  const socia = { id: 'c1', name: 'Ana Soto', phone: '+56 9 1234 5678', rut: '12.345.678-5', notionNacimiento: '1990-02-03', notionId: 'd4ef74ae300e4a41934e63ec70cf2cce' };
+  const p1 = P({ nombre: 'Ana', creada: '2026-09-11' }, socia);
+  igual('persona · el nombre sale de su ficha', p1.nombre, 'Ana Soto');
+  igual('persona · con su teléfono y su RUT', p1.whatsapp + '|' + p1.rut, '+56 9 1234 5678|12.345.678-5');
+  igual('persona · la primera consulta es el día que empezó la serie', p1.primera, '2026-09-11');
+  igual('persona · y su fecha de nacimiento', p1.nacimiento, '1990-02-03');
+  igual('persona · socia del gimnasio: va enlazada a su ficha', p1.socioId, 'd4ef74ae300e4a41934e63ec70cf2cce');
+  igual('persona · y llegó como socia, si no se dijo otra cosa', p1.comoLlego, 'Socio del gimnasio');
+  igual('persona · lo que se dijo manda', P({ nombre: 'Ana', comoLlego: 'Derivacion medica' }, socia).comoLlego, 'Derivacion medica');
+  const p2 = P({ nombre: ' Luis Rojas ', comoLlego: 'Instagram' }, null);
+  igual('persona · sin ficha, el nombre de la serie', p2.nombre, 'Luis Rojas');
+  igual('persona · sin ficha no se inventa el enlace', p2.socioId, '');
+  igual('persona · una llegada que Notion no tiene no viaja', p2.comoLlego, '');
+  igual('persona · con una ficha que no está en Notion, no se da por socia', P({ nombre: 'X' }, { name: 'X' }).comoLlego, '');
+  igual('serie · lleva el id de su persona', M.seriesPayloadSerie_({ nombre: 'Ana', personaId: 'abc' }).personaId, 'abc');
+
+  const N = M.seriesOrdenNombre_;
+  igual('orden · el nombre del archivo es fijo: serie, fecha y número', N({ id: 'k1x', orden: { fecha: '2026-09-01' } }, 'image/jpeg', 1), 'orden-k1x-2026-09-01-1.jpg');
+  igual('orden · la segunda foto no se confunde con la primera', N({ id: 'k1x', orden: { fecha: '2026-09-01' } }, 'image/jpeg', 2), 'orden-k1x-2026-09-01-2.jpg');
+  igual('orden · un PDF lleva .pdf', N({ id: 'k1x' }, 'application/pdf', 1), 'orden-k1x-1.pdf');
+  igual('orden · sin caracteres raros, que el asistente quitaría', N({ id: 'a/b c', orden: { fecha: '2026/09/01' } }, 'image/jpeg', 1), 'orden-abc-20260901-1.jpg');
+
+  const E = M.seriesOrdenEscala_;
+  const e1 = E(4000, 3000, 1600);
+  igual('orden · una foto de 4000×3000 queda en 1600×1200', e1.w + 'x' + e1.h, '1600x1200');
+  const e2 = E(800, 600, 1600);
+  igual('orden · una chica no se agranda', e2.w + 'x' + e2.h, '800x600');
+  igual('orden · vertical, el lado largo manda', E(3000, 4000, 1600).h, 1600);
+  igual('orden · sin medidas, cero', E(0, 0, 1600).w, 0);
+  const po = M.seriesPayloadOrden_('SID', { nombre: 'o.jpg', tipo: 'image/jpeg', datos: 'aG9sYQ==', bytes: 4 });
+  igual('orden · viaja lo que el asistente lee', [po.serieId, po.nombre, po.tipo, po.datos].join('|'), 'SID|o.jpg|image/jpeg|aG9sYQ==');
+  comprobar('orden · y nada más: el tamaño no viaja', !('bytes' in po));
+  igual('orden · la foto espera en este equipo con una clave por serie', M.seriesOrdenClave_({ id: 'k1x' }), 'orden_k1x');
+
+  const Pe = M.seriesPendientes_;
+  igual('pendientes · una serie nueva: la serie cuenta', Pe([{ id: 'a', sesiones: [] }]), 1);
+  igual('pendientes · subida pero sin su persona: cuenta', Pe([{ id: 'a', notionId: 'n', sesiones: [] }]), 1);
+  igual('pendientes · subida, con persona y limpia: nada', Pe([{ id: 'a', notionId: 'n', personaId: 'p', sesiones: [] }]), 0);
+  igual('pendientes · la foto sin subir cuenta', Pe([{ id: 'a', notionId: 'n', personaId: 'p', sesiones: [], orden: { foto: { pendiente: true } } }]), 1);
+  igual('pendientes · y cada sesión sin subir, pero no la nota suelta', Pe([{ id: 'a', notionId: 'n', personaId: 'p', sesiones: [{ asistio: true }, { asistio: false }, { soloNota: true }] }]), 2);
+  igual('pendientes · con basura no revienta', Pe([null, 'x', 5]), 0);
+  aviso('persona y orden · veintinueve casos');
+
+  /* La forma: el orden de la subida y dónde vive la foto. */
+  const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
+  const iPer = sync.indexOf('op:"crear_persona"'), iSer = sync.indexOf('op:"crear_serie"'), iOrd = sync.indexOf('op:"subir_orden"');
+  comprobar('subida · primero la persona, después la serie, al final la foto', iPer > 0 && iSer > iPer && iOrd > iSer,
+    'la serie necesita el id de su persona, y la foto el de su serie');
+  comprobar('subida · sin su persona la serie no se crea', sync.indexOf('if (!s.personaId) return null;') > 0,
+    'quedaría huérfana en Notion');
+  comprobar('subida · la persona que ya tiene su ficha se reusa, y la nueva queda en su ficha',
+    sync.indexOf('if (cli && cli.personaNotionId){') > 0 && sync.indexOf('if (cli) cli.personaNotionId = j.id;') > 0,
+    'se pediría otra vez por cada serie de la misma persona');
+  comprobar('subida · una serie ya subida se enlaza a su persona al actualizarla', (sync.match(/if \(s\.notionId\) s\.notionSucio = true;/g) || []).length === 2,
+    'las series de antes quedarían sin su persona en Notion');
+  comprobar('subida · la foto se borra de este equipo SOLO cuando Notion la tiene',
+    /if \(j && j\.ok\)\{\s*f\.pendiente = false; f\.subida = hoy; subidas\+\+;\s*return u19IdbBorrar\(/.test(sync),
+    'borrarla antes perdería la única copia si la subida falla');
+  const guarda = tramo('function seriesOrdenGuardarFoto_(', '\n}\n', 'seriesOrdenGuardarFoto_');
+  comprobar('orden · la foto va a IndexedDB, y en el estado solo su nota',
+    guarda.indexOf('u19IdbGuardar(seriesOrdenClave_(s)') > 0 &&
+    /s\.orden\.foto = \{ nombre: nombre, tipo: p\.tipo, bytes: p\.bytes, n: n, pendiente: true/.test(guarda) &&
+    !/s\.orden\.foto = \{[^}]*datos/.test(guarda),
+    'la foto en el estado viajaría en la sincronización y reventaría localStorage');
+  const ped = tramo('function seriesOrdenPedir(', '\n}\n', 'seriesOrdenPedir');
+  comprobar('orden · registrar la orden otra vez no pierde la nota de la foto',
+    ped.indexOf('s.orden = Object.assign({}, s.orden || {}, { adjunta: !!(el && el.checked) || !!(s.orden && s.orden.adjunta), fecha: fecha, vence: vence });') > 0,
+    'se perdería el aviso de la foto pendiente y nunca se subiría');
+  comprobar('orden · se elige foto o PDF', ped.indexOf('accept="image/*,application/pdf"') > 0);
+  comprobar('orden · borrar una serie o a la persona borra también su foto de este equipo',
+    tramo('function seriesEliminar(', '\n}\n', 'seriesEliminar').indexOf('seriesOrdenOlvidar_(') > 0 &&
+    (src.match(/seriesOrdenOlvidar_\(seriesDeCliente_\(u19Arr\(state\.series\)/g) || []).length === 2,
+    'quedaría una orden médica guardada de alguien que pidió borrar sus datos');
+  comprobar('persona · la serie nueva pregunta cómo llegó', tramo('function seriesNueva(', '\n}\n', 'seriesNueva').indexOf('comoLlego:') > 0);
+}
+
+/* --- 13 · Revisión del 11-sep-2026: la foto, el cerrojo y la limpieza,
+   ejecutados con un mundo de mentira (antes solo se miraba el texto). --- */
+{
+  const H = new Function(
+    'var __idb__ = {}, __borradas__ = [], __estado__ = { series: [] }, __t__ = [];' +
+    'var state = __estado__;' +
+    'function u19Arr(x){ return Array.isArray(x) ? x : []; }' +
+    'function toast(t){ __t__.push(String(t)); }' +
+    'var __n__ = 0; function seriesOrdenPreparar_(a){ __n__++; return a === "malo" ? Promise.reject(new Error("no pude abrir la foto")) : Promise.resolve({ tipo: "image/jpeg", datos: "Rk9UT0RFUFJVRUJB" + __n__, bytes: 12 }); }' +
+    'function u19IdbGuardar(k, v){ __idb__[k] = v; return Promise.resolve(true); }' +
+    'function u19IdbClaves(){ return Promise.resolve(Object.keys(__idb__).concat(["exercises", "us19_llave_dispositivo"])); }' +
+    'function u19IdbBorrar(k){ __borradas__.push(k); delete __idb__[k]; return Promise.resolve(true); }' +
+    'function seriesLeer(){ return __estado__.series; }' +
+    'function seriesGuardar(l){ __estado__.series = l; state = __estado__; }' +
+    'function renderSeries(){}' +
+    'function seriesHoyISO(){ return "2026-09-11"; }' +
+    fn('seriesOrdenClave_') + fn('seriesOrdenNombre_') + fn('seriesOrdenGuardarFoto_') + fn('seriesOrdenBarrer_') +
+    'return { guardar: seriesOrdenGuardarFoto_, barrer: seriesOrdenBarrer_, idb: __idb__, borradas: __borradas__, estado: __estado__, toasts: __t__ };')();
+  const tic = () => new Promise(r => setTimeout(r, 0));
+  const s = { id: 'k1x', nombre: 'Ana', orden: { adjunta: false, fecha: '2026-09-01' }, sesiones: [] };
+  H.estado.series.push(s);
+  H.guardar(s, {}); for (let i = 0; i < 6; i++) await tic();
+  const f1 = s.orden.foto || {};
+  const b1 = (H.idb['orden_k1x'] || {}).datos || '';
+  comprobar('foto · queda en IndexedDB y en el estado solo su nota', !!b1 && JSON.stringify(H.estado.series).indexOf(b1) < 0 && f1.pendiente === true,
+    'la foto en el estado viajaría en la sincronización y reventaría localStorage');
+  comprobar('foto · con la foto guardada, la orden queda adjunta', s.orden.adjunta === true);
+  H.guardar(s, {}); for (let i = 0; i < 6; i++) await tic();
+  const f2 = s.orden.foto || {};
+  comprobar('foto · una foto nueva lleva un número nuevo aunque la anterior siguiera pendiente', f2.n === f1.n + 1 && f2.nombre !== f1.nombre,
+    'con el mismo nombre, el asistente la daría por subida si la primera llegó y la respuesta se perdió');
+  const s2 = { id: 'k2y', nombre: 'Luis', orden: { adjunta: false }, sesiones: [] };
+  H.estado.series.push(s2);
+  H.guardar(s2, 'malo'); for (let i = 0; i < 6; i++) await tic();
+  comprobar('foto · si la foto falla, la orden NO queda adjunta: la serie sigue bloqueada', s2.orden.adjunta === false && !s2.orden.foto);
+
+  H.idb['orden_huerfana'] = { datos: 'x' };
+  H.estado.series.splice(1, 1);
+  const n = await H.barrer();
+  comprobar('limpieza · se borran las fotos de series que ya no existen', n === 1 && H.borradas.indexOf('orden_huerfana') >= 0 && H.borradas.indexOf('orden_k1x') < 0);
+  comprobar('limpieza · y NADA más de ese almacén (catálogo, llave del equipo)', H.borradas.every(k => /^orden_/.test(k)));
+
+  const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
+  comprobar('subida · una a la vez: un segundo clic no lanza otra cadena', sync.indexOf('if (_seriesSubiendo){') > 0 && /_seriesSubiendo = false;/.test(sync),
+    'dos cadenas en paralelo ven la serie sin id y las dos crean');
+  comprobar('subida · trabaja sobre el objeto de cada serie, no sobre su posición', sync.indexOf('lista[i]') < 0 && (sync.match(/sigue\(s\)/g) || []).length >= 4,
+    'borrar una serie mientras sube cruzaría ids y fotos entre personas');
+  comprobar('subida · dice con qué persona quedó cada serie y cuál se parecía', sync.indexOf('j.existia') > 0 && sync.indexOf('j.parecidas') > 0);
+  comprobar('borrar todo · se lleva también las fotos de este equipo', tramo('function wipeAll(', '\n}\n', 'wipeAll').indexOf('seriesOrdenBarrer_') > 0);
+  aviso('foto, cerrojo y limpieza · diez casos, ejecutados');
+}
+
+
 /* --- salida ---------------------------------------------------------- */
 
+})().catch(e => { falla('las pruebas asíncronas reventaron', String(e && e.stack || e).slice(0, 300)); }).then(imprimir);
+
+function imprimir() {
 console.log('\nUS19-APP · apartado Series');
 console.log('archivo: ' + ruta + '\n');
 avisos.forEach(a => console.log('  · ' + a));
@@ -424,3 +568,4 @@ if (fallos.length) {
 }
 console.log('comprobaciones OK: ' + ok + '  ·  sin fallos');
 process.exit(0);
+}
