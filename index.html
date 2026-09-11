@@ -242,6 +242,9 @@ img{max-width:100%;display:block;}
 .sr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:.75rem;margin-top:.8rem}
 .sr-card{background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:.9rem 1rem;display:flex;flex-direction:column;gap:.55rem}
 .sr-card.sr-bloqueada{border-color:rgba(229,72,77,.45)}
+.sr-card.sr-cerrada{opacity:.62}
+.sr-mes{font-size:.8rem;color:var(--muted);margin-top:.35rem}
+.sr-mes b{color:var(--text)}
 .sr-nom{font-weight:700;font-size:.95rem;display:flex;justify-content:space-between;gap:.5rem;align-items:center}
 .sr-meta{font-size:.72rem;color:var(--muted);display:flex;gap:.6rem;flex-wrap:wrap}
 .sr-meta b{color:var(--text);font-weight:600}
@@ -11330,15 +11333,22 @@ function seriesDias_(desdeISO, hastaISO){
 
 function seriesContar_(sesiones, indicadas){
   var total = Number(indicadas) > 0 ? Math.floor(Number(indicadas)) : 0;
-  var hechas = 0, faltas = 0;
+  var hechas = 0, faltas = 0, avisadas = 0, canceladas = 0;
   (sesiones || []).forEach(function(s){
     if (s && s.asistio === true) hechas++;
     /* Solo es falta lo anotado como falta. Una nota de evolucion lleva
-       asistio:null y hasta el 11-sep-2026 contaba aqui como «no asistio». */
-    else if (s && s.asistio === false) faltas++;
+       asistio:null y hasta el 11-sep-2026 contaba aqui como «no asistio».
+       Y no todas las inasistencias son abandono: la base de Notion separa
+       «Aviso y reagendo» y «Cancelo el prestador» de «No aviso», que es la
+       unica que mide adherencia. Sin motivo anotado (lo de antes) es falta. */
+    else if (s && s.asistio === false){
+      if (s.ausencia === "Aviso y reagendo") avisadas++;
+      else if (s.ausencia === "Cancelo el prestador") canceladas++;
+      else faltas++;
+    }
   });
   if (hechas > total) hechas = total;
-  return { indicadas: total, hechas: hechas, faltas: faltas,
+  return { indicadas: total, hechas: hechas, faltas: faltas, avisadas: avisadas, canceladas: canceladas,
            /* Sin Math.max: `hechas` ya viene topado justo arriba, así que
               esto no puede salir negativo. Una defensa inalcanzable no
               protege de nada y hace creer que el tope se puede quitar. */
@@ -11427,6 +11437,80 @@ function seriesDeCliente_(lista, clienteId){
   if (!clienteId) return [];
   return (Array.isArray(lista) ? lista : []).filter(function(s){ return !!s && s.clienteId === clienteId; });
 }
+/* Lo que las dos bases de Notion ya tenian preparado y la app no guardaba
+   (medido el 11-sep-2026). Los VALORES son los nombres exactos de las
+   opciones en Notion: si no coinciden, el puente los descarta. */
+var SERIES_VIAS = ["Bono libre eleccion", "Particular por sesion", "Pack particular", "Convenio socio", "Sin definir"];
+var SERIES_ESTADOS = ["Abierta", "Terminada", "Abandonada", "Anulada"];
+var SERIES_AUSENCIAS = ["No aviso", "Aviso y reagendo", "Cancelo el prestador"];
+var SERIES_COBROS = ["Bono", "Particular", "Incluido en el pack", "Pendiente", "Sin costo"];
+var SERIES_ETIQ = {
+  "Bono libre eleccion": "Bono (libre elección)", "Particular por sesion": "Particular, por sesión",
+  "Pack particular": "Pack particular (prepagado)", "Convenio socio": "Convenio socio", "Sin definir": "Sin definir",
+  "No aviso": "No vino y no avisó", "Aviso y reagendo": "Avisó y se reagendó", "Cancelo el prestador": "La cancelé yo",
+  "Incluido en el pack": "Incluida en el pack", "Pendiente": "Pendiente de cobro", "Sin costo": "Sin costo",
+  "Bono": "Bono", "Particular": "Particular"
+};
+/* Una serie esta abierta mientras no se cierre a mano: completar las
+   sesiones no la cierra, la cierra el alta. Las de antes no tienen estado. */
+function seriesAbierta_(s){
+  return !!s && (!s.estado || s.estado === "Abierta");
+}
+/* Como se cobra una sesion segun la via de la serie. Convenio y sin definir
+   quedan Pendiente: mejor una lista de cobro de mas que un cobro olvidado. */
+function seriesCobroDefecto_(via){
+  if (via === "Bono libre eleccion") return "Bono";
+  if (via === "Particular por sesion") return "Particular";
+  if (via === "Pack particular") return "Incluido en el pack";
+  return "Pendiente";
+}
+/* El mes de una seccion de Series: lo hecho, lo recibido y lo que falta
+   cobrar. NO se suma al dinero del gimnasio en ningun sitio. Un pack se
+   cuenta el mes en que se pago, no sesion a sesion. */
+function seriesResumenMes_(lista, mes){
+  var r = { asistidas: 0, recibido: 0, pendientes: 0, porCobrar: 0 };
+  (Array.isArray(lista) ? lista : []).forEach(function(s){
+    if (!s || s.estado === "Anulada") return;
+    if (s.pack && String(s.pack.fecha || "").slice(0, 7) === mes && Number(s.pack.monto) > 0) r.recibido += Number(s.pack.monto);
+    u19Arr(s.sesiones).forEach(function(x){
+      if (!x || x.asistio !== true || String(x.fecha || "").slice(0, 7) !== mes) return;
+      r.asistidas++;
+      var m = Number(x.monto) > 0 ? Number(x.monto) : 0;
+      if (x.cobro === "Pendiente"){ r.pendientes++; r.porCobrar += (m || (Number(s.valor) > 0 ? Number(s.valor) : 0)); }
+      else r.recibido += m;
+    });
+  });
+  return r;
+}
+/* Lo que se manda al puente. Puras y aparte: son el contrato con el bot,
+   y tools/pruebas.js del bot comprueba que lo que lee aparezca aqui.
+   OJO: el VENCIMIENTO de la orden no se manda. Hasta el 11-sep-2026 viajaba
+   como «vence» y el puente lo escribia en «Fecha de la orden», que en
+   Notion es la fecha en que se EMITIO. */
+function seriesPayloadSerie_(s){
+  s = s || {};
+  var o = s.orden || {};
+  return { nombre: s.nombre || "", indicadas: s.indicadas, inicio: s.creada || "",
+    fechaOrden: o.fecha || "", medico: s.medico || "", motivo: s.motivo || "", obs: s.obs || "",
+    via: SERIES_VIAS.indexOf(s.via) >= 0 ? s.via : "", valor: Number(s.valor) > 0 ? Number(s.valor) : 0,
+    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : "Abierta", alta: s.alta || "" };
+}
+function seriesPayloadSesion_(s, x, numero){
+  x = x || {};
+  var d = function(v){ var n = Number(v); return (v === "" || v === null || v === undefined || isNaN(n) || n < 0 || n > 10) ? null : n; };
+  return { titulo: String((s && s.nombre) || "") + " · sesión " + numero + " · " + (x.fecha || ""),
+    asistio: x.asistio === true,
+    ausencia: x.asistio === false ? (SERIES_AUSENCIAS.indexOf(x.ausencia) >= 0 ? x.ausencia : "No aviso") : "",
+    numero: numero, fecha: x.fecha || "", nota: x.nota || "", aplicado: x.aplicado || "",
+    dolorAntes: d(x.dolorAntes), dolorDespues: d(x.dolorDespues),
+    cobro: SERIES_COBROS.indexOf(x.cobro) >= 0 ? x.cobro : "", bono: x.bono || "",
+    monto: Number(x.monto) > 0 ? Number(x.monto) : 0 };
+}
+/* Una serie ya subida que cambia (orden, datos, estado, alta) queda marcada
+   para actualizarse en Notion la proxima vez. */
+function seriesTocar_(s){
+  if (s && s.notionId) s.notionSucio = true;
+}
 /* Lo que sube a Notion como sesion: lo que no tiene id y no es nota suelta. */
 function seriesSeSube_(x){
   return !!x && !x.notionId && !x.soloNota;
@@ -11450,13 +11534,19 @@ function renderSeries(){
   var hoy = seriesHoyISO();
   var pend = 0;
   lista.forEach(function(s){
-    if (!s.notionId) pend++;
+    if (!s.notionId || s.notionSucio) pend++;
     u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pend++; });
   });
+  var mes = seriesResumenMes_(lista, hoy.slice(0, 7));
   var h = ['<div class="section-head"><h2>Series</h2><div style="display:flex;gap:.4rem">'
     + (lista.length ? '<button class="btn" onclick="seriesSincronizar()">Subir a Notion'
         + (pend ? ' (' + pend + ')' : '') + '</button>' : '')
     + '<button class="btn btn-primary" onclick="seriesNueva()">Nueva serie</button></div></div>'];
+  if (lista.length){
+    h.push('<div class="sr-mes">Este mes: <b>' + mes.asistidas + '</b> sesión(es) · recibido <b>$' + mes.recibido.toLocaleString("es-CL") + '</b>'
+      + (mes.pendientes ? ' · <b>' + mes.pendientes + '</b> por cobrar ($' + mes.porCobrar.toLocaleString("es-CL") + ')' : '')
+      + ' <span title="No se suma al dinero del gimnasio en ningún sitio">· aparte de la caja del gimnasio</span></div>');
+  }
 
   if (!lista.length){
     h.push('<div class="sr-vacio">Todavía no hay ninguna serie.<br>'
@@ -11474,18 +11564,25 @@ function renderSeries(){
     var sem = seriesSemaforo_(seriesUltima_(p.sesiones), hoy, c.completa);
     var evo = seriesEvolucion_(p.sesiones);
 
-    h.push('<article class="sr-card' + (o.bloquea ? " sr-bloqueada" : "") + '">');
+    var abierta = seriesAbierta_(p);
+    h.push('<article class="sr-card' + (o.bloquea ? " sr-bloqueada" : "") + (abierta ? "" : " sr-cerrada") + '">');
     h.push('<div class="sr-nom"><span>' + seriesEsc_(p.nombre) + '</span>'
       + (p.clienteId && getClient(p.clienteId) ? '<button class="btn btn-ghost btn-sm" title="Abrir su ficha" onclick="abrirFicha(\'' + seriesEsc_(p.clienteId) + '\',\'clinico\')">ficha →</button>' : '')
+      + '<button class="btn btn-ghost btn-sm" title="Datos de la serie: motivo, médico, cobro, estado" onclick="seriesDatos(' + idx + ')">✎</button>'
       + '<button class="btn btn-ghost btn-sm" title="Eliminar esta serie" onclick="seriesEliminar(' + idx + ')">✕</button></div>');
     h.push('<div class="sr-meta"><span>sesión <b>' + c.hechas + " de " + c.indicadas + '</b></span>'
       + '<span>quedan <b>' + c.quedan + '</b></span>'
-      + (c.faltas ? '<span>no asistió <b>' + c.faltas + '</b></span>' : "") + '</div>');
+      + (c.faltas ? '<span>no asistió <b>' + c.faltas + '</b></span>' : "")
+      + (c.avisadas ? '<span>reagendó <b>' + c.avisadas + '</b></span>' : "")
+      + (c.canceladas ? '<span>cancelé <b>' + c.canceladas + '</b></span>' : "")
+      + (p.via ? '<span>' + seriesEsc_(SERIES_ETIQ[p.via] || p.via) + '</span>' : "")
+      + (!abierta ? '<span><b>' + seriesEsc_(p.estado) + (p.alta ? ' · alta ' + seriesEsc_(p.alta) : '') + '</b></span>' : "") + '</div>');
 
     h.push('<div class="sr-diez">');
     seriesCasillas_(p.sesiones, p.indicadas).forEach(function(k){
       var puede = !o.bloquea && k.estado === "hoy";
-      h.push('<button class="' + k.estado + '"' + (puede ? ' onclick="seriesMarcar(' + idx + ',true)"' : " disabled")
+      if (!abierta) puede = false;
+      h.push('<button class="' + k.estado + '"' + (puede ? ' onclick="seriesSesion(' + idx + ')"' : " disabled")
         + ' title="' + (puede ? "Marcar esta sesión como hecha" : "") + '">' + k.n + "</button>");
     });
     h.push("</div>");
@@ -11494,11 +11591,13 @@ function renderSeries(){
     h.push('<div class="sr-aviso ' + o.clase + '">' + o.texto + "</div>");
 
     h.push('<div class="sr-acc">');
-    if (!o.bloquea && !c.completa){
-      h.push('<button class="btn btn-sm" onclick="seriesMarcar(' + idx + ',false)">No vino hoy</button>');
+    if (abierta && !o.bloquea && !c.completa){
+      h.push('<button class="btn btn-sm" onclick="seriesAusencia(' + idx + ')">No vino hoy</button>');
       h.push('<button class="btn btn-sm" onclick="seriesNota(' + idx + ')">Anotar evolución</button>');
     }
+    if (abierta && c.completa) h.push('<button class="btn btn-sm btn-primary" onclick="seriesAlta(' + idx + ')">Dar de alta</button>');
     if (o.bloquea) h.push('<button class="btn btn-sm" onclick="seriesOrdenPedir(' + idx + ')">Registrar orden médica</button>');
+    else if (abierta) h.push('<button class="btn btn-sm btn-ghost" onclick="seriesOrdenPedir(' + idx + ')">Orden</button>');
     if (!p.clienteId || !getClient(p.clienteId)) h.push('<button class="btn btn-sm btn-ghost" onclick="seriesEnlazar(' + idx + ')">Enlazar a una ficha</button>');
     h.push("</div>");
 
@@ -11533,7 +11632,7 @@ function seriesSincronizar(){
 
   var pendientes = 0;
   lista.forEach(function(s){
-    if (!s.notionId) pendientes++;
+    if (!s.notionId || s.notionSucio) pendientes++;
     u19Arr(s.sesiones).forEach(function(x){ if (seriesSeSube_(x)) pendientes++; });
   });
   if (!pendientes){ window.alert("Todo está ya en Notion. Nada que subir."); return; }
@@ -11552,12 +11651,21 @@ function seriesSincronizar(){
   var cadena = Promise.resolve();
   lista.forEach(function(s, i){
     cadena = cadena.then(function(){
-      if (s.notionId) return null;
-      return pide({ op:"crear_serie", nombre:s.nombre, indicadas:s.indicadas,
-                    inicio:s.creada, vence:(s.orden && s.orden.vence) || "" })
+      /* Ya subida y cambiada despues: se actualiza (estado, alta, datos). */
+      if (s.notionId){
+        if (!s.notionSucio) return null;
+        return pide(Object.assign({ op:"actualizar_serie", serieId: s.notionId }, seriesPayloadSerie_(s)))
+          .then(function(r){ return r.json(); })
+          .then(function(j){
+            if (j && j.ok){ lista[i].notionSucio = false; subidas++; }
+            else fallos.push(s.nombre + " (actualizar): " + ((j && j.error) || "sin respuesta"));
+          })
+          .catch(function(e){ fallos.push(s.nombre + " (actualizar): " + e.message); });
+      }
+      return pide(Object.assign({ op:"crear_serie" }, seriesPayloadSerie_(s)))
         .then(function(r){ return r.json(); })
         .then(function(j){
-          if (j && j.ok && j.id){ lista[i].notionId = j.id; subidas++; }
+          if (j && j.ok && j.id){ lista[i].notionId = j.id; lista[i].notionSucio = false; subidas++; }
           else fallos.push(s.nombre + ": " + ((j && j.error) || "sin respuesta"));
         })
         .catch(function(e){ fallos.push(s.nombre + ": " + e.message); });
@@ -11566,10 +11674,7 @@ function seriesSincronizar(){
       cadena = cadena.then(function(){
         if (!seriesSeSube_(x) || !lista[i].notionId) return null;
         var c = seriesContar_(s.sesiones.slice(0, k + 1), s.indicadas);
-        return pide({ op:"crear_sesion", serieId:lista[i].notionId,
-                      titulo: s.nombre + " · sesión " + c.hechas + " · " + x.fecha,
-                      asistio: x.asistio === true, numero: c.hechas,
-                      fecha: x.fecha, nota: x.nota || "" })
+        return pide(Object.assign({ op:"crear_sesion", serieId: lista[i].notionId }, seriesPayloadSesion_(s, x, c.hechas)))
           .then(function(r){ return r.json(); })
           .then(function(j){
             if (j && j.ok && j.id){ lista[i].sesiones[k].notionId = j.id; subidas++; }
@@ -11643,23 +11748,171 @@ function seriesEnlazar(idx){
   });
 }
 
+/* Las opciones de un <select> con su etiqueta legible. */
+function seriesOpciones_(lista, elegida){
+  return lista.map(function(v){
+    return '<option value="' + seriesEsc_(v) + '"' + (v === elegida ? ' selected' : '') + '>' + seriesEsc_(SERIES_ETIQ[v] || v) + '</option>';
+  }).join("");
+}
+function seriesVal_(id){ var el = document.getElementById(id); return el ? String(el.value || "").trim() : ""; }
+function seriesFechaOk_(v){ return !v || /^\d{4}-\d{2}-\d{2}$/.test(v); }
+
+/* La orden medica. La orden dice cuantas sesiones son: si no cuadra con la
+   serie, se ajusta la serie (nunca por debajo de lo ya hecho). La foto de la
+   orden va en Notion, en la columna «Orden medica» de la serie. */
 function seriesOrdenPedir(idx){
   var lista = seriesLeer();
-  if (!lista[idx]) return;
-  if (!window.confirm("¿Tienes la orden médica de " + lista[idx].nombre + " a la vista?")) return;
-  var v = window.prompt("¿Hasta cuándo vale? (AAAA-MM-DD, o vacío si no vence)", "");
-  lista[idx].orden = { adjunta:true, vence: (v || "").trim() };
-  seriesGuardar(lista);
-  renderSeries();
+  var s = lista[idx];
+  if (!s) return;
+  var o = s.orden || {};
+  openModal({
+    title: "Orden médica · " + (s.nombre || ""),
+    bodyHtml: '<div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Fecha de emisión</label><input type="date" id="sr-o-fecha" value="' + seriesEsc_(o.fecha || "") + '"></div>'
+      + '<div class="form-row"><label class="form-label">Vence (vacío si no vence)</label><input type="date" id="sr-o-vence" value="' + seriesEsc_(o.vence || "") + '"></div>'
+      + '</div><div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Médico que deriva</label><input type="text" id="sr-o-medico" value="' + seriesEsc_(s.medico || "") + '"></div>'
+      + '<div class="form-row"><label class="form-label">Sesiones que indica</label><input type="number" min="1" id="sr-o-ses" value="' + seriesEsc_(s.indicadas || "") + '"></div>'
+      + '</div><label class="form-label" style="display:flex;gap:.4rem;align-items:center;text-transform:none;letter-spacing:0;font-size:.85rem;"><input type="checkbox" id="sr-o-vista" style="width:auto;margin:0;"' + (o.adjunta ? " checked" : "") + '> La tengo a la vista (la foto va en Notion, en «Orden médica»)</label>',
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar orden", cls:"btn-primary", onClick: function(){
+        var el = document.getElementById("sr-o-vista");
+        if (!el || !el.checked){ toast("Sin la orden a la vista no se registra: la serie sigue bloqueada", "error"); return; }
+        var fecha = seriesVal_("sr-o-fecha"), vence = seriesVal_("sr-o-vence");
+        if (!seriesFechaOk_(fecha) || !seriesFechaOk_(vence)){ toast("Las fechas van como AAAA-MM-DD", "error"); return; }
+        var n = Math.floor(Number(seriesVal_("sr-o-ses")));
+        var hechas = seriesContar_(s.sesiones, s.indicadas).hechas;
+        if (n > 0 && n !== Number(s.indicadas)){
+          if (n < hechas){ toast("La orden indica " + n + " y ya van " + hechas + " hechas: revisa el número", "error"); return; }
+          s.indicadas = n;
+        }
+        s.orden = { adjunta: true, fecha: fecha, vence: vence };
+        s.medico = seriesVal_("sr-o-medico");
+        seriesTocar_(s);
+        seriesGuardar(lista); closeModal(); renderSeries();
+      }}
+    ]
+  });
 }
 
-function seriesMarcar(idx, asistio){
+/* Registrar la sesion de hoy. La orden bloquea tambien aqui, no solo en la
+   casilla: la regla no puede depender de que un boton este deshabilitado. */
+function seriesSesion(idx){
   var lista = seriesLeer();
-  if (!lista[idx]) return;
-  lista[idx].sesiones = lista[idx].sesiones || [];
-  lista[idx].sesiones.push({ fecha: seriesHoyISO(), asistio: !!asistio, nota: "" });
-  seriesGuardar(lista);
-  renderSeries();
+  var s = lista[idx];
+  if (!s) return;
+  if (seriesOrden_(s.orden, seriesHoyISO()).bloquea){ toast("La orden médica bloquea la serie: regístrala primero", "error"); return; }
+  if (!seriesAbierta_(s)){ toast("La serie está " + (s.estado || "cerrada") + ": no admite sesiones", "error"); return; }
+  var c = seriesContar_(s.sesiones, s.indicadas);
+  if (c.completa){ toast("La serie ya tiene sus " + c.indicadas + " sesiones", "warn"); return; }
+  var cobro = seriesCobroDefecto_(s.via);
+  var monto = (cobro === "Incluido en el pack" || cobro === "Sin costo") ? "" : (Number(s.valor) > 0 ? String(s.valor) : "");
+  openModal({
+    title: "Sesión " + (c.hechas + 1) + " de " + c.indicadas + " · " + (s.nombre || ""),
+    bodyHtml: '<div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Dolor al llegar (0-10)</label><input type="number" min="0" max="10" id="sr-s-d1" placeholder="opcional"></div>'
+      + '<div class="form-row"><label class="form-label">Dolor al salir (0-10)</label><input type="number" min="0" max="10" id="sr-s-d2" placeholder="opcional"></div>'
+      + '</div>'
+      + '<div class="form-row"><label class="form-label">Lo aplicado (en concreto)</label><input type="text" id="sr-s-apl" placeholder="Ej. 3 series de puente, movilidad de cadera"></div>'
+      + '<div class="form-row"><label class="form-label">Cómo respondió</label><input type="text" id="sr-s-resp" placeholder="opcional"></div>'
+      + '<div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Cómo se cobró</label><select id="sr-s-cobro">' + seriesOpciones_(SERIES_COBROS, cobro) + '</select></div>'
+      + '<div class="form-row"><label class="form-label">Monto recibido</label><input type="number" min="0" id="sr-s-monto" value="' + seriesEsc_(monto) + '"></div>'
+      + '</div>'
+      + '<div class="form-row"><label class="form-label">N.º de bono (si fue con bono)</label><input type="text" id="sr-s-bono" placeholder="evita cobrar dos veces la misma atención"></div>',
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar sesión", cls:"btn-primary", onClick: function(){
+        var d = function(id){ var v = seriesVal_(id); if (v === "") return null; var n = Number(v); return (isNaN(n) || n < 0 || n > 10) ? NaN : n; };
+        var d1 = d("sr-s-d1"), d2 = d("sr-s-d2");
+        if ((d1 !== null && isNaN(d1)) || (d2 !== null && isNaN(d2))){ toast("El dolor va de 0 a 10", "error"); return; }
+        var cb = seriesVal_("sr-s-cobro"), bono = seriesVal_("sr-s-bono");
+        if (cb === "Bono" && bono && u19Arr(s.sesiones).some(function(x){ return x && x.bono === bono; })){
+          toast("Ese número de bono ya está anotado en otra sesión de esta serie", "error"); return;
+        }
+        s.sesiones = u19Arr(s.sesiones);
+        s.sesiones.push({ fecha: seriesHoyISO(), asistio: true, nota: seriesVal_("sr-s-resp"), aplicado: seriesVal_("sr-s-apl"),
+          dolorAntes: d1, dolorDespues: d2, cobro: SERIES_COBROS.indexOf(cb) >= 0 ? cb : "Pendiente", bono: bono,
+          monto: Number(seriesVal_("sr-s-monto")) > 0 ? Number(seriesVal_("sr-s-monto")) : 0 });
+        seriesGuardar(lista); closeModal(); renderSeries();
+      }}
+    ]
+  });
+}
+
+/* No vino: tres casos, y solo uno es abandono. */
+function seriesAusencia(idx){
+  var lista = seriesLeer();
+  var s = lista[idx];
+  if (!s) return;
+  openModal({
+    title: "No vino hoy · " + (s.nombre || ""),
+    bodyHtml: '<div class="form-row"><label class="form-label">¿Qué pasó?</label><select id="sr-a-mot">' + seriesOpciones_(SERIES_AUSENCIAS, "No aviso") + '</select></div>'
+      + '<p class="text-xs text-muted">Solo «no vino y no avisó» cuenta como falta. Ninguna de las tres gasta sesión.</p>',
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Anotar", cls:"btn-primary", onClick: function(){
+        var m = seriesVal_("sr-a-mot");
+        s.sesiones = u19Arr(s.sesiones);
+        s.sesiones.push({ fecha: seriesHoyISO(), asistio: false, ausencia: SERIES_AUSENCIAS.indexOf(m) >= 0 ? m : "No aviso", nota: "" });
+        seriesGuardar(lista); closeModal(); renderSeries();
+      }}
+    ]
+  });
+}
+
+/* Los datos de la serie: lo que la base de Notion ya pedia. */
+function seriesDatos(idx){
+  var lista = seriesLeer();
+  var s = lista[idx];
+  if (!s) return;
+  var pk = s.pack || {};
+  openModal({
+    title: "Datos de la serie · " + (s.nombre || ""),
+    bodyHtml: '<div class="form-row"><label class="form-label">Motivo de consulta</label><input type="text" id="sr-d-mot" value="' + seriesEsc_(s.motivo || "") + '"></div>'
+      + '<div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Vía de cobro</label><select id="sr-d-via">' + seriesOpciones_(SERIES_VIAS, s.via || "Sin definir") + '</select></div>'
+      + '<div class="form-row"><label class="form-label">Valor por sesión (total recibido)</label><input type="number" min="0" id="sr-d-valor" value="' + seriesEsc_(s.valor || "") + '"></div>'
+      + '</div><div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Pack: monto pagado</label><input type="number" min="0" id="sr-d-pk" value="' + seriesEsc_(pk.monto || "") + '" placeholder="solo si es pack"></div>'
+      + '<div class="form-row"><label class="form-label">Pack: fecha de pago</label><input type="date" id="sr-d-pkf" value="' + seriesEsc_(pk.fecha || "") + '"></div>'
+      + '</div><div class="form-grid cols-2">'
+      + '<div class="form-row"><label class="form-label">Estado</label><select id="sr-d-est">' + seriesOpciones_(SERIES_ESTADOS, s.estado || "Abierta") + '</select></div>'
+      + '<div class="form-row"><label class="form-label">Alta</label><input type="date" id="sr-d-alta" value="' + seriesEsc_(s.alta || "") + '"></div>'
+      + '</div>'
+      + '<div class="form-row"><label class="form-label">Observaciones</label><input type="text" id="sr-d-obs" value="' + seriesEsc_(s.obs || "") + '"></div>'
+      + '<p class="text-xs text-muted">«Terminada» y «Abandonada» no son lo mismo: la diferencia es el indicador de adherencia.</p>',
+    footer: [
+      { label:"Cancelar", cls:"btn-ghost" },
+      { label:"Guardar", cls:"btn-primary", onClick: function(){
+        var alta = seriesVal_("sr-d-alta"), pkf = seriesVal_("sr-d-pkf");
+        if (!seriesFechaOk_(alta) || !seriesFechaOk_(pkf)){ toast("Las fechas van como AAAA-MM-DD", "error"); return; }
+        var via = seriesVal_("sr-d-via"), est = seriesVal_("sr-d-est");
+        s.motivo = seriesVal_("sr-d-mot");
+        s.via = SERIES_VIAS.indexOf(via) >= 0 ? via : "Sin definir";
+        s.valor = Number(seriesVal_("sr-d-valor")) > 0 ? Number(seriesVal_("sr-d-valor")) : 0;
+        s.pack = Number(seriesVal_("sr-d-pk")) > 0 ? { monto: Number(seriesVal_("sr-d-pk")), fecha: pkf } : null;
+        s.estado = SERIES_ESTADOS.indexOf(est) >= 0 ? est : "Abierta";
+        /* Cerrarla como Terminada sin fecha de alta pone la de hoy. */
+        s.alta = alta || (s.estado === "Terminada" ? seriesHoyISO() : "");
+        s.obs = seriesVal_("sr-d-obs");
+        seriesTocar_(s);
+        seriesGuardar(lista); closeModal(); renderSeries();
+      }}
+    ]
+  });
+}
+
+/* Dar de alta al completar la serie: Terminada, con la fecha de hoy. */
+function seriesAlta(idx){
+  var lista = seriesLeer();
+  var s = lista[idx];
+  if (!s) return;
+  if (!window.confirm("¿Dar de alta a " + (s.nombre || "") + "? La serie queda Terminada con fecha de hoy.")) return;
+  s.estado = "Terminada"; s.alta = seriesHoyISO();
+  seriesTocar_(s);
+  seriesGuardar(lista); renderSeries();
 }
 
 function seriesNota(idx){
@@ -28207,9 +28460,7 @@ window.u19GuardarProgresionRecibida = function(){
      11-sep-2026 se guardaba en la progresion y la capa de readaptacion no la
      veia. Con la progresion duplicada no se llega aqui, asi que no se duplica. */
   var _mol = u19MolestiaMax_(nueva);
-  var _enRead = getClientType(c) === "rehab" || seriesDeCliente_(u19Arr(state.series), c.id).some(function(s){
-    return !seriesContar_(s.sesiones, s.indicadas).completa;
-  });
+  var _enRead = getClientType(c) === "rehab" || seriesDeCliente_(u19Arr(state.series), c.id).some(seriesAbierta_);
   if (_mol !== null && _enRead){
     if (!Array.isArray(c.painLog)) c.painLog = [];
     c.painLog.push({ id: genId(), fecha: nueva.fecha, durante: _mol, despues: null,
@@ -32760,7 +33011,8 @@ function fichaClinico(c){
     var k = seriesContar_(s.sesiones, s.indicadas), o = seriesOrden_(s.orden, hoyS),
         sem = seriesSemaforo_(seriesUltima_(u19Arr(s.sesiones)), hoyS, k.completa);
     lin.push('<div class="u-kv2"><span>Serie · ' + escapeHtml(s.nombre || '') + '</span><b>sesión ' + k.hechas + ' de ' + k.indicadas
-      + (k.faltas ? ' · ' + k.faltas + ' sin asistir' : '') + ' · ' + escapeHtml(sem.texto)
+      + (k.faltas ? ' · ' + k.faltas + ' sin asistir' : '')
+      + ' · ' + escapeHtml(seriesAbierta_(s) ? sem.texto : (s.estado + (s.alta ? ' (alta ' + s.alta + ')' : '')))
       + (o.clase !== 'ok' ? ' · ' + escapeHtml(o.texto) : '') + '</b></div>');
   });
   var prot = (c.rehabProtocolId && typeof getProtocol === 'function') ? getProtocol(c.rehabProtocolId) : null;

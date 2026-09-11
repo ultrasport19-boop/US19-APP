@@ -85,8 +85,8 @@
     },
     {
       "nombre": "la nota de evolucion vuelve a contar como falta",
-      "de": "    else if (s && s.asistio === false) faltas++;",
-      "a": "    else if (s) faltas++;"
+      "de": "    else if (s && s.asistio === false){",
+      "a": "    else if (s){"
     },
     {
       "nombre": "la nota pisa la que ya tenia la sesion",
@@ -167,6 +167,81 @@
       "nombre": "la molestia del enlace deja de ir al registro de dolor",
       "de": "  if (_mol !== null && _enRead){",
       "a": "  if (false){"
+    },
+    {
+      "nombre": "«avisó y reagendó» vuelve a contar como falta",
+      "de": "      if (s.ausencia === \"Aviso y reagendo\") avisadas++;",
+      "a": "      if (false) avisadas++;"
+    },
+    {
+      "nombre": "«la cancelé yo» vuelve a contar como falta",
+      "de": "      else if (s.ausencia === \"Cancelo el prestador\") canceladas++;",
+      "a": "      else if (false) canceladas++;"
+    },
+    {
+      "nombre": "el vencimiento vuelve a ir como fecha de la orden",
+      "de": "    fechaOrden: o.fecha || \"\", medico:",
+      "a": "    fechaOrden: o.vence || \"\", medico:"
+    },
+    {
+      "nombre": "un estado que Notion no tiene se manda igual",
+      "de": "    estado: SERIES_ESTADOS.indexOf(s.estado) >= 0 ? s.estado : \"Abierta\", alta: s.alta || \"\" };",
+      "a": "    estado: s.estado || \"Abierta\", alta: s.alta || \"\" };"
+    },
+    {
+      "nombre": "un dolor de 11 se manda",
+      "de": "isNaN(n) || n < 0 || n > 10) ? null : n; };",
+      "a": "isNaN(n)) ? null : n; };"
+    },
+    {
+      "nombre": "un dolor 0 se tira como vacío",
+      "de": "return (v === \"\" || v === null || v === undefined || isNaN(n)",
+      "a": "return (!v || isNaN(n)"
+    },
+    {
+      "nombre": "el resumen mezcla meses",
+      "de": "      if (!x || x.asistio !== true || String(x.fecha || \"\").slice(0, 7) !== mes) return;",
+      "a": "      if (!x || x.asistio !== true) return;"
+    },
+    {
+      "nombre": "una serie anulada suma",
+      "de": "    if (!s || s.estado === \"Anulada\") return;",
+      "a": "    if (!s) return;"
+    },
+    {
+      "nombre": "lo pendiente se cuenta como recibido",
+      "de": "      if (x.cobro === \"Pendiente\"){",
+      "a": "      if (false){"
+    },
+    {
+      "nombre": "el pack pagado no suma",
+      "de": "    if (s.pack && String(s.pack.fecha || \"\").slice(0, 7) === mes",
+      "a": "    if (false && s.pack && String(s.pack.fecha || \"\").slice(0, 7) === mes"
+    },
+    {
+      "nombre": "una serie terminada sigue abierta",
+      "de": "  return !!s && (!s.estado || s.estado === \"Abierta\");",
+      "a": "  return !!s;"
+    },
+    {
+      "nombre": "el pack se cobra otra vez en cada sesión",
+      "de": "  if (via === \"Pack particular\") return \"Incluido en el pack\";",
+      "a": "  if (via === \"Pack particular\") return \"Particular\";"
+    },
+    {
+      "nombre": "cambiar una serie ya subida no la marca para actualizar",
+      "de": "  if (s && s.notionId) s.notionSucio = true;",
+      "a": "  if (false) s.notionSucio = true;"
+    },
+    {
+      "nombre": "registrar la sesión se salta la orden médica",
+      "de": "  if (seriesOrden_(s.orden, seriesHoyISO()).bloquea){ toast(",
+      "a": "  if (false){ toast("
+    },
+    {
+      "nombre": "la serie cambiada nunca se actualiza",
+      "de": "        if (!s.notionSucio) return null;",
+      "a": "        return null;"
     }
   ]
 }

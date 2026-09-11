@@ -27,12 +27,16 @@ function fn(nombre) { return tramo('function ' + nombre + '(', '\n}\n', nombre) 
 const NOMBRES = ['seriesDias_', 'seriesContar_', 'seriesSemaforo_', 'seriesOrden_',
   'seriesCasillas_', 'seriesEvolucion_', 'seriesUltima_', 'seriesEsc_',
   'seriesConNota_', 'seriesSeSube_', 'u19DolorDe',
-  'seriesMigrar_', 'seriesDeCliente_', 'u19MolestiaMax_'];
+  'seriesMigrar_', 'seriesDeCliente_', 'u19MolestiaMax_',
+  'seriesAbierta_', 'seriesCobroDefecto_', 'seriesResumenMes_', 'seriesPayloadSerie_', 'seriesPayloadSesion_', 'seriesTocar_'];
+/* Las cuatro listas de opciones, que son los nombres exactos de Notion. */
+function lineaVar(n) { const i = src.indexOf('\nvar ' + n + ' = '); if (i < 0) { console.error('series: no encuentro ' + n); process.exit(1); } return src.slice(i + 1, src.indexOf('\n', i + 1)) + '\n'; }
+const LISTAS = ['SERIES_VIAS', 'SERIES_ESTADOS', 'SERIES_AUSENCIAS', 'SERIES_COBROS'].map(lineaVar).join('');
 
 let M;
 try {
   /* u19Arr es de una linea: se da hecha, igual que en la app. */
-  M = new Function('function u19Arr(x){ return Array.isArray(x) ? x : []; }\n' + NOMBRES.map(fn).join('\n')
+  M = new Function('function u19Arr(x){ return Array.isArray(x) ? x : []; }\n' + LISTAS + NOMBRES.map(fn).join('\n')
     + '\nreturn {' + NOMBRES.map(n => n + ':' + n).join(',') + '};')();
 } catch (e) {
   console.error('series: el código no evalúa aislado: ' + e.message);
@@ -310,6 +314,94 @@ const aviso = (t) => avisos.push(t);
   comprobar('molestia · lo que anota la persona entra al registro de dolor',
     src.indexOf('var _mol = u19MolestiaMax_(nueva);') > 0 && src.indexOf('if (_mol !== null && _enRead){') > 0 && src.indexOf('origen: "enlace"') > 0,
     'la molestia del enlace vuelve a quedarse solo en la progresion');
+}
+
+/* --- 11 · Series v2: lo que Notion ya pedia (11-sep-2026) -------------
+   Las dos bases de Notion tenian columnas que la app no guardaba: tres
+   tipos de inasistencia, como se cobro, el valor, el estado y el alta. Y
+   el puente escribia el VENCIMIENTO en «Fecha de la orden». */
+{
+  const c = M.seriesContar_;
+  const aus = (a) => c([{ fecha: '2026-09-10', asistio: false, ausencia: a }], 10);
+  igual('inasistencia · «avisó y reagendó» no es falta', aus('Aviso y reagendo').faltas, 0);
+  igual('inasistencia · pero se cuenta aparte', aus('Aviso y reagendo').avisadas, 1);
+  igual('inasistencia · «la cancelé yo» no es falta', aus('Cancelo el prestador').faltas, 0);
+  igual('inasistencia · y se cuenta aparte', aus('Cancelo el prestador').canceladas, 1);
+  igual('inasistencia · «no avisó» sí es falta', aus('No aviso').faltas, 1);
+  igual('inasistencia · ninguna gasta sesión', aus('Aviso y reagendo').quedan, 10);
+
+  const cd = M.seriesCobroDefecto_;
+  igual('cobro · con bono, Bono', cd('Bono libre eleccion'), 'Bono');
+  igual('cobro · particular por sesión, Particular', cd('Particular por sesion'), 'Particular');
+  igual('cobro · pack, incluida en el pack', cd('Pack particular'), 'Incluido en el pack');
+  igual('cobro · convenio queda pendiente', cd('Convenio socio'), 'Pendiente');
+  igual('cobro · sin vía, pendiente', cd(undefined), 'Pendiente');
+
+  const ab = M.seriesAbierta_;
+  igual('estado · sin estado (las de antes) está abierta', ab({}), true);
+  igual('estado · Abierta está abierta', ab({ estado: 'Abierta' }), true);
+  igual('estado · Terminada no', ab({ estado: 'Terminada' }), false);
+  igual('estado · Abandonada no', ab({ estado: 'Abandonada' }), false);
+  igual('estado · nada no', ab(null), false);
+
+  const lista = [
+    { valor: 11390, sesiones: [
+      { fecha: '2026-09-02', asistio: true, cobro: 'Bono', monto: 11390 },
+      { fecha: '2026-09-05', asistio: true, cobro: 'Pendiente', monto: 0 },
+      { fecha: '2026-08-30', asistio: true, cobro: 'Particular', monto: 5000 },
+      { fecha: '2026-09-06', asistio: false, ausencia: 'No aviso' } ] },
+    { estado: 'Anulada', sesiones: [{ fecha: '2026-09-03', asistio: true, cobro: 'Particular', monto: 9999 }] },
+    { pack: { monto: 100000, fecha: '2026-09-01' }, sesiones: [{ fecha: '2026-09-04', asistio: true, cobro: 'Incluido en el pack', monto: 0 }] },
+    { pack: { monto: 70000, fecha: '2026-08-20' }, sesiones: [] }
+  ];
+  const r = M.seriesResumenMes_(lista, '2026-09');
+  igual('mes · cuenta las sesiones hechas del mes', r.asistidas, 3);
+  igual('mes · lo recibido: la sesión con bono y el pack pagado este mes', r.recibido, 111390);
+  igual('mes · una pendiente de cobro', r.pendientes, 1);
+  igual('mes · y lo que falta cobrar sale del valor de la serie', r.porCobrar, 11390);
+  igual('mes · con basura no revienta', M.seriesResumenMes_(null, '2026-09').asistidas, 0);
+
+  const ps = M.seriesPayloadSerie_({ nombre: 'Ana', indicadas: 10, creada: '2026-09-10', orden: { adjunta: true, fecha: '2026-09-01', vence: '2026-12-01' },
+    medico: 'Dra. Soto', motivo: 'rodilla', via: 'Bono libre eleccion', valor: 11390 });
+  igual('puente · la fecha de la orden es la de EMISIÓN', ps.fechaOrden, '2026-09-01');
+  comprobar('puente · el vencimiento NO viaja (el puente lo escribía en «Fecha de la orden»)', !('vence' in ps), 'vuelve a viajar vence');
+  igual('puente · nace Abierta', ps.estado, 'Abierta');
+  igual('puente · el médico viaja', ps.medico, 'Dra. Soto');
+  igual('puente · la vía viaja con su nombre de Notion', ps.via, 'Bono libre eleccion');
+  igual('puente · una vía que Notion no tiene no viaja', M.seriesPayloadSerie_({ via: 'Fonasa' }).via, '');
+  igual('puente · un estado raro vuelve a Abierta', M.seriesPayloadSerie_({ estado: 'cerrada' }).estado, 'Abierta');
+  igual('puente · el valor es un número', ps.valor, 11390);
+
+  const pv = M.seriesPayloadSesion_({ nombre: 'Ana' }, { fecha: '2026-09-10', asistio: true, dolorAntes: 0, dolorDespues: 11, cobro: 'Bono', bono: 'F-1', monto: 11390, aplicado: 'puente' }, 3);
+  igual('sesión · la que vino no lleva motivo de ausencia', pv.ausencia, '');
+  igual('sesión · un dolor 0 es un valor', pv.dolorAntes, 0);
+  igual('sesión · un dolor 11 no se manda', pv.dolorDespues, null);
+  igual('sesión · el bono viaja', pv.bono, 'F-1');
+  igual('sesión · lo aplicado viaja', pv.aplicado, 'puente');
+  igual('sesión · el título lleva el número', pv.titulo, 'Ana · sesión 3 · 2026-09-10');
+  const pn = M.seriesPayloadSesion_({ nombre: 'Ana' }, { fecha: '2026-09-10', asistio: false }, 3);
+  igual('sesión · sin motivo, la inasistencia va como «No aviso»', pn.ausencia, 'No aviso');
+  igual('sesión · un cobro que Notion no tiene no viaja', M.seriesPayloadSesion_({}, { asistio: true, cobro: 'Transferencia' }, 1).cobro, '');
+  igual('sesión · un monto negativo es cero', M.seriesPayloadSesion_({}, { asistio: true, monto: -5 }, 1).monto, 0);
+
+  const sub = { notionId: 'x' }, nueva = {};
+  M.seriesTocar_(sub); M.seriesTocar_(nueva);
+  igual('actualizar · una serie ya subida queda por actualizar', sub.notionSucio, true);
+  igual('actualizar · una sin subir no se marca: se creará entera', nueva.notionSucio, undefined);
+  aviso('series v2 · cuarenta y dos casos');
+
+  const sync = tramo('function seriesSincronizar(', '\n}\n', 'seriesSincronizar');
+  comprobar('forma · la subida manda seriesPayloadSerie_ y seriesPayloadSesion_',
+    sync.indexOf('seriesPayloadSerie_(s)') > 0 && sync.indexOf('seriesPayloadSesion_(s, x, c.hechas)') > 0, 'vuelve a armar el cuerpo a mano');
+  comprobar('forma · y ya no manda el vencimiento', sync.indexOf('vence:') < 0, 'vuelve vence: el puente lo escribiría como fecha de la orden');
+  comprobar('forma · una serie cambiada se actualiza en Notion',
+    sync.indexOf('op:"actualizar_serie"') > 0 && sync.indexOf('if (!s.notionSucio) return null;') > 0 && sync.indexOf('lista[i].notionSucio = false') > 0,
+    'el alta y el estado se quedarían solo en la app');
+  const ses = tramo('function seriesSesion(', '\n}\n', 'seriesSesion');
+  comprobar('forma · registrar una sesión también respeta la orden médica', ses.indexOf('seriesOrden_(s.orden, seriesHoyISO()).bloquea') > 0,
+    'la regla dependería de que un botón esté deshabilitado');
+  comprobar('forma · la casilla abre el registro de la sesión', src.indexOf('onclick="seriesSesion(\' + idx + \')"') > 0, 'la casilla ya no registra la sesión');
+  comprobar('forma · no queda el marcado de un clic', src.indexOf('function seriesMarcar(') < 0, 'vuelve seriesMarcar');
 }
 
 /* --- salida ---------------------------------------------------------- */
