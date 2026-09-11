@@ -1,0 +1,107 @@
+{
+  "suite": "tools/socio.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "la etiqueta terapeutica vuelve a viajar en el enlace",
+      "de": "    /* La etiqueta terapeutica NO viaja: el socio no la ve en ningun sitio, y el",
+      "a": "    if (ex.terap) copy.terap = ex.terap;\n    /* La etiqueta terapeutica NO viaja: el socio no la ve en ningun sitio, y el"
+    },
+    {
+      "nombre": "la categoria «rehabilitacion» vuelve a viajar",
+      "de": "      category: u19EsRehabCat(routine.category) ? \"\" : (routine.category || \"\"),",
+      "a": "      category: routine.category || \"\","
+    },
+    {
+      "nombre": "el enfoque terapeutico vuelve a viajar",
+      "de": "      enfoque: routine.enfoque === \"terap\" ? \"\" : (routine.enfoque || \"\"),",
+      "a": "      enfoque: routine.enfoque || \"\","
+    },
+    {
+      "nombre": "se limpia de mas y una rutina de fuerza pierde su categoria",
+      "de": "function u19EsRehabCat(c){ return c === \"rehab\" || c === \"rehabilitacion\"; }",
+      "a": "function u19EsRehabCat(c){ return true; }"
+    },
+    {
+      "nombre": "la fase compartida vuelve a llevar el nombre de la condicion",
+      "de": "      name: u19NombreParaSocio(protocol) + \" — \" + phaseTitle,",
+      "a": "      name: (protocol.name || \"Protocolo\") + \" — \" + phaseTitle,"
+    },
+    {
+      "nombre": "vuelve el objetivo clinico de la fase",
+      "de": "      notes: \"\",\n      subtitle: phaseTitle",
+      "a": "      notes: phase.objetivo || \"\",\n      subtitle: phaseTitle"
+    },
+    {
+      "nombre": "vuelve el foco «Aguda · Proteccion» al titulo",
+      "de": "  var phaseTitle = \"Etapa \" + (phaseIdx+1);",
+      "a": "  var phaseTitle = \"Etapa \" + (phaseIdx+1) + (phase.focus ? \" · \" + phase.focus : \"\");"
+    },
+    {
+      "nombre": "el nombre neutro deja de neutralizar",
+      "de": "  if (!choca) return n;",
+      "a": "  return n;"
+    },
+    {
+      "nombre": "la lista del catalogo deja de mirarse y la condicion escrita de otra forma pasa",
+      "de": "      if (pn && low.indexOf(pn) >= 0){ choca = true; break; }",
+      "a": "      if (false){ choca = true; break; }"
+    },
+    {
+      "nombre": "con zona «Otro» se inventa «programa de otro»",
+      "de": "  return (reg && reg !== \"Otro\") ? \"Programa de \" + reg.toLowerCase() : \"Programa de ejercicios\";",
+      "a": "  return reg ? \"Programa de \" + reg.toLowerCase() : \"Programa de ejercicios\";"
+    },
+    {
+      "nombre": "el WhatsApp vuelve a decir «fase de rehabilitacion»",
+      "de": "  return \"Hola! Te comparto tus ejercicios:\\n\\n\"",
+      "a": "  return \"Hola! Te comparto los ejercicios de tu fase de rehabilitacion:\\n\\n\""
+    },
+    {
+      "nombre": "el WhatsApp vuelve a pedir la escala EVA",
+      "de": "    + \"Anota cuanta molestia sientes de 0 a 10 (0 = nada, 10 = mucha).\\n\"",
+      "a": "    + \"Registra tus molestias en la escala EVA (0 = sin dolor, 10 = dolor maximo).\\n\""
+    },
+    {
+      "nombre": "el modal vuelve a armar su propio WhatsApp",
+      "de": "      function buildWaMessage(){ return u19MensajeFaseSocio(nombreSocio, phaseIdx + 1, currentUrl); }",
+      "a": "      function buildWaMessage(){ return \"Hola! \" + (protocol.name||\"\") + \"\\n\" + currentUrl; }"
+    },
+    {
+      "nombre": "el QR impreso vuelve a llevar el nombre del protocolo",
+      "de": "        printQr(currentUrl, nombreSocio + \" - Etapa \" + (phaseIdx+1), \"\");",
+      "a": "        printQr(currentUrl, (protocol.name||\"Protocolo\") + \" - Etapa \" + (phaseIdx+1), \"\");"
+    },
+    {
+      "nombre": "vuelve la insignia «Rutina terapeutica»",
+      "de": "  return '<div style=\"margin-top:.45rem;\"><span class=\"badge terap\">Zona a proteger: ' + escapeHtml(z) + '</span></div>';",
+      "a": "  return '<div style=\"margin-top:.45rem;\"><span class=\"badge terap\">🩺 Rutina terapéutica · zona a proteger: ' + escapeHtml(z) + '</span></div>';"
+    },
+    {
+      "nombre": "la zona entra sin escapar",
+      "de": "Zona a proteger: ' + escapeHtml(z) + '</span></div>';",
+      "a": "Zona a proteger: ' + z + '</span></div>';"
+    },
+    {
+      "nombre": "la columna vuelve a llamarse EVA en la rutina del socio",
+      "de": "  html += '<th class=\"actual-col\" title=\"Molestia de 0 a 10\">Molestia</th>';",
+      "a": "  html += '<th class=\"actual-col\">EVA</th>';"
+    },
+    {
+      "nombre": "la columna vuelve a llamarse EVA en la sesion en vivo",
+      "de": "<th>RPE</th><th>Molestia</th><th>✓</th>",
+      "a": "<th>RPE</th><th>EVA</th><th>✓</th>"
+    },
+    {
+      "nombre": "el informe impreso vuelve a decir «Paciente en rehabilitacion»",
+      "de": "\"Readaptación\" : \"Atleta\";",
+      "a": "\"Paciente en rehabilitación\" : \"Atleta\";"
+    },
+    {
+      "nombre": "vuelve «Diagnostico kinesico» a la ficha, en un repositorio publico",
+      "de": "fld(\"Hipótesis de trabajo\",\"rcf-dx\"",
+      "a": "fld(\"Diagnóstico kinésico / hipótesis\",\"rcf-dx\""
+    }
+  ]
+}

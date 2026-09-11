@@ -7810,6 +7810,55 @@ function deleteExercise(id){
   });
 }
 
+/* ============================================================
+   LO QUE VE EL SOCIO DE LA READAPTACION (11-sep-2026)
+   Regla de Diego: la app es suya y ahi se puede trabajar la readaptacion,
+   pero nada de eso se le menciona a un socio ni sale a lo publico. Hasta este
+   dia salian seis cosas: «🩺 Rutina terapeutica» en la cabecera, el nombre
+   de la condicion en las fases compartidas («Reconstruccion de LCA»), el
+   objetivo clinico de la fase, «tu fase de rehabilitacion» en el WhatsApp,
+   la columna «EVA» y «Paciente en rehabilitacion» en el informe impreso.
+   Estas cuatro funciones deciden lo que sale; tools/socio.js las vigila.
+   ============================================================ */
+var U19_SOCIO_VETADAS = /rehabilit|patolog|diagn[oó]stic|tratamiento|terap|paciente|kin[eé]si|cl[ií]nic|fisioter|lesi[oó]n|tendin|manguito|menisc|\blca\b|ligament|esguince|luxaci|capsulit|epicond|carpiano|fascitis|pubalgia|trocant|hernia|ci[aá]tica|lumbago|cervicalg|dorsalg|condromalac|femoropatel|operatori|quir[uú]rg|cirug|reconstrucci|reparaci|fractur|s[ií]ndrome|dolor|edema|inflamaci/i;
+function u19EsRehabCat(c){ return c === "rehab" || c === "rehabilitacion"; }
+/* El nombre de un programa del apartado Protocolos tal como lo vera el socio.
+   Si lleva una condicion —las cinco plantillas base se llaman asi: «Tendinopatia
+   de Manguito Rotador»— sale como «Programa de hombro». Si es neutro, tal cual. */
+function u19NombreParaSocio(protocol){
+  var n = String((protocol && protocol.name) || "").trim();
+  var low = n.toLowerCase();
+  var choca = !n || U19_SOCIO_VETADAS.test(n);
+  if (!choca && typeof RC_PATOLOGIAS !== "undefined"){
+    for (var i = 0; i < RC_PATOLOGIAS.length; i++){
+      var pn = String(RC_PATOLOGIAS[i].nombre || "").toLowerCase();
+      if (pn && low.indexOf(pn) >= 0){ choca = true; break; }
+    }
+  }
+  if (!choca) return n;
+  var reg = String((protocol && protocol.region) || "").trim();
+  return (reg && reg !== "Otro") ? "Programa de " + reg.toLowerCase() : "Programa de ejercicios";
+}
+/* Lo unico de la readaptacion que ve el socio en su rutina: la zona a
+   proteger, en vocabulario de sala. Sin zona no se pinta nada. */
+function u19BadgeSocio(r){
+  var z = String((r && r.zonaTerap) || "").trim();
+  if (!z) return "";
+  return '<div style="margin-top:.45rem;"><span class="badge terap">Zona a proteger: ' + escapeHtml(z) + '</span></div>';
+}
+/* El WhatsApp de una etapa. Es lo primero que se lee —en la notificacion, sin
+   desbloquear el telefono—, asi que habla como se habla en la sala. */
+function u19MensajeFaseSocio(nombre, etapa, url){
+  return "Hola! Te comparto tus ejercicios:\n\n"
+    + "*" + (nombre || "Programa de ejercicios") + "*\n"
+    + "Etapa " + etapa + "\n\n"
+    + "Accede a tus ejercicios aqui:\n" + url + "\n\n"
+    + "Abrela desde tu celular, mira los videos y marca cada ejercicio que completes.\n"
+    + "Anota cuanta molestia sientes de 0 a 10 (0 = nada, 10 = mucha).\n"
+    + "Si algo molesta mas de lo indicado, detente y avisame.\n\n"
+    + "-- *Ultra-Sport 19* | Pencahue";
+}
+
 function buildShareData(routine){
   var client = getClient(routine.clientId);
   var usedExIds = {};
@@ -7842,7 +7891,8 @@ function buildShareData(routine){
     if (ex.cat) copy.cat = ex.cat;
     if (ex.pat) copy.pat = ex.pat;
     if (ex.niv) copy.niv = ex.niv;
-    if (ex.terap) copy.terap = ex.terap;
+    /* La etiqueta terapeutica NO viaja: el socio no la ve en ningun sitio, y el
+       enlace #r/ se guarda en la rama publica del repositorio. */
     if (copy.gif && copy.gif.indexOf("data:") === 0){
       copy.gif = "";
       skippedHeavy++;
@@ -7862,8 +7912,10 @@ function buildShareData(routine){
       /* La progresión por semana se muestra en la vista del socio (línea _wkNotes),
          pero nunca viajaba en el enlace: se quedaba en el navegador de Diego. */
       weekNotes: routine.weekNotes || [],
-      category: routine.category || "",
-      enfoque: routine.enfoque || "",
+      /* Una rutina de readaptacion viaja sin su categoria ni su enfoque: los dos
+         dicen «rehabilitacion» o «terapeutica». Solo va la zona a proteger. */
+      category: u19EsRehabCat(routine.category) ? "" : (routine.category || ""),
+      enfoque: routine.enfoque === "terap" ? "" : (routine.enfoque || ""),
       zonaTerap: routine.zonaTerap || "",
       days: routine.days || []
     },
@@ -8354,10 +8406,8 @@ function showClientView(shareData){
   html += '<div class="hero-sub">PLANIFICACIÓN PERSONAL · Ultra-Sport 19</div>';
   html += '<h1>'+escapeHtml(r.name||"Rutina")+'</h1>';
   if (clientName) html += '<div class="hero-meta">Para: '+escapeHtml(clientName)+'</div>';
-  /* Rutina terapéutica: el socio ve la zona a proteger. Vocabulario de sala. */
-  if (typeof libPerfilEquilibrio === "function" && libPerfilEquilibrio(r).terap){
-    html += '<div style="margin-top:.45rem;"><span class="badge terap">🩺 Rutina terapéutica' + (r.zonaTerap ? ' · zona a proteger: ' + escapeHtml(r.zonaTerap) : '') + '</span></div>';
-  }
+  /* La zona a proteger y nada mas: ver u19BadgeSocio. */
+  html += u19BadgeSocio(r);
   if (r.subtitle){
     html += '<div class="text-sm text-muted" style="margin-top:.4rem;">'+escapeHtml(r.subtitle)+'</div>';
   } else {
@@ -8485,7 +8535,7 @@ function buildExerciseBlock(shareData, r, di, ei, progress){
   html += '<th class="actual-col">Reps reales</th>';
   html += '<th class="actual-col">Peso real</th>';
   html += '<th class="actual-col">RPE</th>';
-  html += '<th class="actual-col">EVA</th>';
+  html += '<th class="actual-col" title="Molestia de 0 a 10">Molestia</th>';
   html += '<th style="width:44px;">✓</th>';
   html += '</tr></thead><tbody>';
   for (var s=0; s<setsCount; s++){
@@ -8946,7 +8996,7 @@ function showProgressReport(data){
      pantalla neutra y le invitaria a seguir tocando. */
   if (u19CandadoOk()) html += '<button class="btn btn-ghost" onclick="returnToTrainer()">← Volver al panel</button>';
   html += '<button class="btn btn-secondary" onclick="window.print()">🖨 Imprimir</button>';
-  html += '<button class="btn btn-primary" id="u19-btn-guardar-prog" onclick="u19GuardarProgresionRecibida()" title="Guarda reps, peso, RPE y EVA de cada serie en el historial del cliente">💾 Guardar en el historial</button>';
+  html += '<button class="btn btn-primary" id="u19-btn-guardar-prog" onclick="u19GuardarProgresionRecibida()" title="Guarda reps, peso, RPE y molestia de cada serie en el historial del cliente">💾 Guardar en el historial</button>';
   html += '</div>';
 
   html += '<div class="progress-summary"><div style="display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;">';
@@ -8971,7 +9021,7 @@ function showProgressReport(data){
       html += '<span class="text-xs text-muted" style="font-family:var(--font-mono);">'+escapeHtml(String(rowEx.reps||"—"))+(rowEx.weight?" · "+escapeHtml(rowEx.weight):"")+'</span></div>';
 
       html += '<table class="ex-sets-table" style="margin-bottom:.4rem;"><thead><tr>';
-      html += '<th>Set</th><th class="plan-col">Plan</th><th class="actual-col">Reps</th><th class="actual-col">Peso</th><th class="actual-col">RPE</th><th class="actual-col">EVA</th><th>Estado</th>';
+      html += '<th>Set</th><th class="plan-col">Plan</th><th class="actual-col">Reps</th><th class="actual-col">Peso</th><th class="actual-col">RPE</th><th class="actual-col">Molestia</th><th>Estado</th>';
       html += '</tr></thead><tbody>';
       for (var s=0; s<setsCount; s++){
         var key = di+":"+ei+":"+s;
@@ -12352,7 +12402,10 @@ function buildPhaseShareData(protocol, phaseIdx){
   var days = [];
   for (var d=0; d<7; d++) days.push({ day:d+1, exercises: d===0 ? dayExercises : [] });
 
-  var phaseTitle = "Fase " + (phaseIdx+1) + (focus ? " · " + focus : "");
+  /* Lo que lee el socio va en vocabulario de sala: «Etapa N», sin el foco
+     («Aguda · Protección»), sin el objetivo clinico de la fase y con el nombre
+     del programa neutralizado (u19NombreParaSocio). */
+  var phaseTitle = "Etapa " + (phaseIdx+1);
   var dayLabels = {}; dayLabels[0] = phaseTitle;
 
   return {
@@ -12360,11 +12413,11 @@ function buildPhaseShareData(protocol, phaseIdx){
     v: 1,
     routine: {
       id: protocol.id + "-f" + (phaseIdx+1),
-      name: (protocol.name || "Protocolo") + " — Fase " + (phaseIdx+1),
+      name: u19NombreParaSocio(protocol) + " — " + phaseTitle,
       clientId: "",
       weeks: "",
       startDate: "",
-      notes: phase.objetivo || "",
+      notes: "",
       subtitle: phaseTitle + " · " + dayExercises.length + " ejercicio" + (dayExercises.length===1?"":"s"),
       dayLabels: dayLabels,
       days: days
@@ -12384,23 +12437,10 @@ function openPhaseShareModal(protocolId, phaseIdx){
     toast("Esta fase no tiene ejercicios para compartir","warn"); return;
   }
 
-  /* El nombre del programa es lo unico del protocolo que sale de aqui, y sale
-     por cuatro sitios: el titulo que abre el socio, el cuerpo del WhatsApp —o
-     sea, la notificacion que se lee sin desbloquear el telefono—, el nombre
-     del PNG y el QR que se imprime y se cuelga en la sala. El formulario ya no
-     lo autocompleta con la condicion, pero los programas creados antes de ese
-     cambio la siguen llevando en el nombre. Se avisa antes de mandarlo, no
-     despues. */
-  if (protocol.patologia){
-    var _pat = (typeof getPatologia === "function") ? getPatologia(protocol.patologia) : null;
-    var _nom = _pat && _pat.nombre ? String(_pat.nombre).toLowerCase() : "";
-    if (_nom && String(protocol.name||"").toLowerCase().indexOf(_nom) >= 0){
-      if (!confirm("El nombre de este programa es «" + (protocol.name||"") + "».\n\n"
-        + "Ese texto va en el mensaje de WhatsApp, en la notificación del teléfono y en el QR impreso. "
-        + "Cámbialo por algo neutro (por ejemplo «Programa de " + String(_pat.region||"entrenamiento").toLowerCase() + "») antes de compartirlo.\n\n"
-        + "¿Compartir de todos modos?")) return;
-    }
-  }
+  /* El nombre que ve el socio lo decide u19NombreParaSocio. Antes esto era un
+     confirm que dependia de protocol.patologia, y las cinco plantillas base no
+     tienen ese campo: el aviso no saltaba justo con ellas (11-sep-2026). */
+  var nombreSocio = u19NombreParaSocio(protocol);
 
   var data = buildPhaseShareData(protocol, phaseIdx);
   var encoded = encodeShareData(data);
@@ -12414,6 +12454,7 @@ function openPhaseShareModal(protocolId, phaseIdx){
     '<div class="card" style="background:var(--surface-2);margin-bottom:.8rem;"><div class="card-main">'
       + '<div style="font-weight:700;">'+escapeHtml(protocol.name||"Protocolo")+'</div>'
       + '<div class="text-sm" style="color:var(--accent);margin-top:.2rem;">'+escapeHtml(phaseLabel)+' · '+phase.exercises.length+' ejercicio'+(phase.exercises.length===1?'':'s')+'</div>'
+      + '<div class="text-xs text-muted" style="margin-top:.3rem;">El socio verá: «'+escapeHtml(data.routine.name)+'»</div>'
     + '</div></div>'
     + (data.skippedHeavy ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ '+data.skippedHeavy+' GIF subido(s) como archivo no se incluirán en el link.</div></div>' : '')
     + '<div id="pshare-status" class="text-sm text-muted" style="margin-bottom:.5rem;text-align:center;">'
@@ -12442,28 +12483,17 @@ function openPhaseShareModal(protocolId, phaseIdx){
       }
       renderQrFor(currentUrl);
 
-      function buildWaMessage(){
-        var msg = "Hola! Te comparto los ejercicios de tu fase de rehabilitacion:\n\n"
-          + "*" + (protocol.name||"Protocolo") + "*\n"
-          + "Fase " + (phaseIdx+1) + (focus ? " - " + focus : "") + "\n";
-        if (phase.objetivo) msg += "\nObjetivo: " + phase.objetivo + "\n";
-        msg += "\nAccede a tus ejercicios aqui:\n" + currentUrl + "\n\n"
-          + "Abrela desde tu celular, mira los videos y marca cada ejercicio que completes.\n"
-          + "Registra tus molestias en la escala EVA (0 = sin dolor, 10 = dolor maximo).\n"
-          + "Si sientes dolor por sobre lo indicado, detente y avisame.\n\n"
-          + "-- *Ultra-Sport 19* | Pencahue";
-        return msg;
-      }
+      function buildWaMessage(){ return u19MensajeFaseSocio(nombreSocio, phaseIdx + 1, currentUrl); }
 
       document.getElementById("pbtn-copy-link").addEventListener("click", function(){ copyToClipboard(currentUrl); });
       document.getElementById("pbtn-wa").addEventListener("click", function(){
         window.open("https://wa.me/?text=" + encodeURIComponent(buildWaMessage()), "_blank", "noopener");
       });
       document.getElementById("pbtn-download-qr").addEventListener("click", function(){
-        downloadQrPng(currentUrl, (protocol.name||"protocolo") + " - Fase " + (phaseIdx+1), 600);
+        downloadQrPng(currentUrl, nombreSocio + " - Etapa " + (phaseIdx+1), 600);
       });
       document.getElementById("pbtn-print-qr").addEventListener("click", function(){
-        printQr(currentUrl, (protocol.name||"Protocolo") + " - Fase " + (phaseIdx+1), "");
+        printQr(currentUrl, nombreSocio + " - Etapa " + (phaseIdx+1), "");
       });
 
       function setStatus(html){ var s=document.getElementById("pshare-status"); if(s) s.innerHTML=html; }
@@ -14760,7 +14790,7 @@ function renderLivePlayer(){
       + ' repetición(es) en reserva</b> · RPE ' + _lpObj.rpeMin
       + (_lpObj.rpeMax !== _lpObj.rpeMin ? '–' + _lpObj.rpeMax : '') + '</div>';
   }
-  html += '<table class="ex-sets-table lp-table"><thead><tr><th>Set</th><th>Reps</th><th>Peso</th><th>RPE</th><th>EVA</th><th>✓</th></tr></thead><tbody>';
+  html += '<table class="ex-sets-table lp-table"><thead><tr><th>Set</th><th>Reps</th><th>Peso</th><th>RPE</th><th>Molestia</th><th>✓</th></tr></thead><tbody>';
   for (var s=0;s<setsCount;s++){
     var key = _lpDay+":"+_lpIdx+":"+s;
     var saved = progress[key]||{};
@@ -17879,7 +17909,7 @@ function openFichaClinica(clientId){
     + fld("Alergias","rcf-alergias",f.alergias,"")
     + '</div>'
     + fld("Imagenología / exámenes","rcf-imagen",f.imagen,"Ej. RM rodilla (05-2026): rotura LCA + asa de balde menisco medial",true)
-    + fld("Diagnóstico kinésico / hipótesis","rcf-dx",f.dx,"Ej. tendinopatía de manguito rotador en etapa reactiva",true)
+    + fld("Hipótesis de trabajo","rcf-dx",f.dx,"Ej. tendinopatía de manguito rotador en etapa reactiva",true)
     + '<div class="form-grid cols-2">'
     + fld("Objetivo corto plazo (2-4 sem)","rcf-obj-c",f.objCorto,"Ej. EVA ≤3, ROM funcional")
     + fld("Objetivo mediano plazo (1-2 m)","rcf-obj-m",f.objMediano,"Ej. fuerza 80% vs lado sano")
@@ -32201,7 +32231,8 @@ window.u19BateriaInforme = function(clientId){
   var folio = (typeof infNextFolio === "function") ? infNextFolio() : "";
   var hoyISO = u19HoyISO();
   c.batInformes = c.batInformes || []; c.batInformes.push({ folio: folio, fecha: hoyISO, n: ps.length }); saveState();
-  var perfil = u19BateriaPerfil(c) === "paciente" ? "Paciente en rehabilitación" : "Atleta";
+  /* Lo imprime y se lo lleva el socio: vocabulario de sala, no clinico. */
+  var perfil = u19BateriaPerfil(c) === "paciente" ? "Readaptación" : "Atleta";
   var lic = (typeof _infOpts !== "undefined" && _infOpts.opts && _infOpts.opts.licencia) ? String(_infOpts.opts.licencia).trim() : "";
   var firma = (typeof _infOpts !== "undefined" && _infOpts.firmas && _infOpts.firmas.evaluador) ? _infOpts.firmas.evaluador : "";
   function chipLSI(d){

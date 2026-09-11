@@ -61,5 +61,15 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   node "$RAIZ/tools/arranque.js" "$RAIZ/index.html" \
     || { echo ""; echo "la app no arranca: commit cancelado."; exit 1; }
 
+  # 9. series.js - el contador de sesiones y el bloqueo de la orden medica.
+  #    Existia desde el 10-sep y no la corria nadie (11-sep-2026).
+  node "$RAIZ/tools/series.js" "$RAIZ/index.html" \
+    || { echo ""; echo "el apartado Series no pasa la prueba: commit cancelado."; exit 1; }
+
+  # 10. socio.js - que nada de la readaptacion llegue a lo que ve un socio:
+  #     enlaces, fases compartidas, WhatsApp, tablas e informes impresos.
+  node "$RAIZ/tools/socio.js" "$RAIZ/index.html" \
+    || { echo ""; echo "algo de la readaptacion llega a lo que ve el socio: commit cancelado."; exit 1; }
+
 fi
 exit 0
