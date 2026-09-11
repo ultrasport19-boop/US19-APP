@@ -81,7 +81,7 @@ const FUNCIONES = ['hcTxt_', 'hcNum010_', 'hcPsfs_', 'hcCuest_', 'historiaFusion
   'personaTrasGuardar_', 'personaEnlazarSeries_', 'personaNotionSubir', 'personaAsegurar_', 'personaFallo_', 'personaCrear_',
   'personaActualizar_', 'personaTarjetaHtml_', 'historiaReintentar', 'u19NotionReintentar_',
   'fichaSoloOk_', 'fichaNotionSubir', 'fichaVistaPrevia_', 'fichaEscribir_', 'fichaCuerpo_', 'fichaPedir_', 'fichaLeerRespuesta_',
-  'fichaTipoCambia_', '_impNom',
+  'fichaTipoCambia_', '_impNom', '_impPrimer',
   'seriesPayloadPersona_', 'seriesDeCliente_', 'seriesAutoSubir_', 'seriesSincronizar', 'seriesPendientes_', 'seriesSeSube_',
   'seriesContar_', 'seriesPayloadSerie_', 'seriesPayloadSesion_', 'seriesPayloadOrden_', 'seriesOrdenClave_', 'seriesConNota_', 'rcNum_'];
 
@@ -448,10 +448,20 @@ const aviso = (t) => avisos.push(t);
   W = mundo(); M = W.fn;
   const e = { id: 'e1', name: 'Rosa Pérez', type: 'rehab' };
   W.state.clients.push(e);
-  W.resps = [{ ok: true, id: 'P9', existia: true, nombre: 'Rosita Perez', parecidas: [{ id: 'x', nombre: 'Rosa P.' }] }];
+  W.resps = [{ ok: true, id: 'P9', existia: true, nombre: 'Rosa Perez Soto', parecidas: [{ id: 'x', nombre: 'Rosa P.' }] }];
   await M.personaNotionSubir('e1', { auto: true });
   comprobar('crear · si ya estaba, se enlaza y avisa si se llama distinto', e.personaNotionId === 'P9' && W.toasts.some(t => /se llama distinto/i.test(t)));
   comprobar('crear · y dice cuál se parece', W.toasts.some(t => /otra parecida \(Rosa P\.\)/.test(t)));
+
+  /* Ficha existente de OTRA persona (enlace cruzado de familia): no se enlaza. */
+  W = mundo(); M = W.fn;
+  const ax = { id: 'ax', name: 'Axel Ejemplo', type: 'rehab' };
+  W.state.clients.push(ax);
+  W.resps = [{ ok: true, id: 'P-OLIVER', existia: true, nombre: 'Oliver Ejemplo' }];
+  await M.personaNotionSubir('ax', { auto: true });
+  comprobar('crear · ficha existente de otra persona: no se enlaza', !ax.personaNotionId, String(ax.personaNotionId));
+  comprobar('crear · y queda pendiente con el motivo', !!(ax.personaPend && /Oliver Ejemplo/.test(ax.personaPend.motivo || '')), JSON.stringify(ax.personaPend));
+  comprobar('crear · y no se escribe nada más', W.pedidos.length === 1, String(W.pedidos.length));
 
   W = mundo(); M = W.fn;
   const du = { id: 'd1', name: 'Rosa', type: 'rehab' };

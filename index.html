@@ -5780,6 +5780,14 @@ function personaCrear_(c, opts){
   var pend = (c.personaPend && c.personaPend.datos) || {};
   return u19SeriesPedir_(personaCrearCuerpo_(c)).then(function(j){
     var c2 = getClient(c.id); if (!c2) return null;
+    /* Si el asistente encontro una ficha que YA existia y es de otra persona
+       (otro primer nombre: un enlace cruzado de familia con telefono
+       compartido), no se enlaza: lo siguiente seria escribir su historia ahi. */
+    if (j.ok && j.id && j.existia && j.nombre && _impPrimer(j.nombre) !== _impPrimer(c2.name)){
+      personaFallo_(c2, ts, "En Notion esa ficha es de «" + j.nombre + "»: no se enlaza. Revisa el nombre o el RUT", false);
+      if (!opts.silencioso) toast("No enlacé a «" + (c2.name || "") + "»: la ficha que ya hay en Notion es de «" + j.nombre + "». Revisa el nombre o el RUT.", "warn");
+      return null;
+    }
     if (j.ok && j.id){
       c2.personaNotionId = j.id;
       c2.updatedAt = Date.now();
@@ -12538,6 +12546,11 @@ function seriesSincronizar(opts){
       }
       return pide(Object.assign({ op:"crear_persona" }, seriesPayloadPersona_(s, cli)))
         .then(function(j){
+          /* La misma guarda que personaCrear_: ficha existente de otra persona, no se enlaza. */
+          if (j && j.ok && j.id && j.existia && j.nombre && _impPrimer(j.nombre) !== _impPrimer((cli && cli.name) || s.nombre)){
+            fallos.push(s.nombre + " (persona): en Notion esa ficha es de «" + j.nombre + "», no se enlaza");
+            return;
+          }
           if (j && j.ok && j.id){
             s.personaId = j.id;
             if (cli) cli.personaNotionId = j.id;
@@ -19181,8 +19194,8 @@ var RC_RED_FLAGS = [
   "Deformidad evidente, bloqueo articular completo o incapacidad total de carga",
   "Signos inflamatorios severos sin causa clara (calor, rubor, edema marcado)",
   "Dolor que no ha cambiado nada tras 4-6 semanas de manejo conservador bien llevado",
-  /* 11-sep-2026: estaba en su plantilla de Notion y faltaba aqui. Va AL
-     FINAL: se guardan indices, y meterla en medio cambiaria lo registrado. */
+  /* 11-sep-2026: va AL FINAL: se guardan indices, y meterla en medio
+     cambiaria lo registrado. */
   "Sospecha de trombosis venosa profunda (pantorrilla dolorosa, hinchada y caliente de un lado)"
 ];
 
@@ -19224,16 +19237,11 @@ window.openRedFlags = openRedFlags;
 
 /* ===HISTORIA===
    La historia de la persona, ordenada por el modelo CIF (11-sep-2026).
-   Diego pidio basarla en el modelo CIF y hacerla mas completa con lo que ya
-   tiene en su Notion: su plantilla «Nueva Historia Clinica» (datos,
-   derivacion, PSFS, PQRST, screening, antecedentes, examen, impresion, CIF,
-   plan) y sus apuntes (un problema principal por nivel, la meta en palabras
-   de la persona, el contexto con facilitadores y barreras por separado,
-   «escala + valor» en cada hallazgo). Lo que la plantilla no pedia y el
-   material si -contexto, participacion concreta, PSFS con puntaje,
-   cuestionarios con fecha- esta aqui. En sus dos historias de mayo quedaron
-   siempre vacios la seguridad y el puntaje del PSFS: por eso cuentan en el
-   nucleo.
+   Secciones: datos, derivacion, PSFS, PQRST, screening, antecedentes,
+   examen, impresion, CIF y plan; un problema principal por nivel, la meta en
+   palabras de la persona, facilitadores y barreras por separado y «escala +
+   valor» en cada hallazgo. La seguridad y el puntaje del PSFS son lo que mas
+   facil queda vacio: por eso cuentan en el nucleo.
 
    Vive en c.ficha, la de siempre: las 13 claves de antes (motivo, inicio,
    mecanismo, tratamientos, antecedentes, cirugias, medicacion, alergias,
@@ -19262,7 +19270,7 @@ var HC_ESCALAS = [
   ["TUG", "segundos · más alto = peor"], ["Marcha 2 min", "metros · más alto = mejor"], ["LSI", "% · 90 % o más para volver al deporte"]
 ];
 var HC_PSFS_FILAS = 5, HC_CUEST_FILAS = 8;
-/* Las secciones, en el orden de su plantilla. «t»: txt, area, sel, fecha,
+/* Las secciones, en su orden. «t»: txt, area, sel, fecha,
    num (0-10) o sino. */
 var HC_SECCIONES = [
   { id:"ident", titulo:"Identificación y vida diaria", campos:[
@@ -19411,7 +19419,7 @@ function historiaSecciones_(c){
       }
     }
     if (filas.length) out.push({ titulo: sec.titulo, filas: filas, id: sec.id });
-    /* La seguridad va despues del problema actual, como en su plantilla. */
+    /* La seguridad va despues del problema actual. */
     if (sec.id === "actual") out.push({ titulo: "Seguridad (banderas rojas)", filas: [{ k: "Tamizaje", v: hcSeguridadTexto_(c) }], id: "seguridad" });
   });
   /* Una historia sin nada escrito no es una historia de «No evaluado». */
@@ -19649,8 +19657,8 @@ function historiaCopiar_(clientId){
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok).catch(function(){ window.prompt("Copia el texto:", t); });
   else window.prompt("Copia el texto:", t);
 }
-/* Para imprimir o guardar en PDF. Documento interno: sin firma de nadie y
-   con el aviso de confidencialidad. */
+/* Para imprimir o guardar en PDF. Registro interno: sin marca comercial,
+   sin firma y sin nada que invite a entregarlo. */
 function historiaImprimir_(clientId){
   var c = getClient(clientId); if (!c) return;
   var secs = historiaSecciones_(c);
@@ -19665,15 +19673,15 @@ function historiaImprimir_(clientId){
     + 'table{width:100%;border-collapse:collapse;font-size:9.5pt;}td{padding:4px 7px;border-top:1px solid #e2e8f0;vertical-align:top;}td.k{width:33%;color:#46544c;font-weight:600;}'
     + '.ft{margin-top:18px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;}.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
     + '@media print{body{padding:0;}@page{size:A4;margin:12mm;}}';
-  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historia · ' + e(c.name || "") + ' · Ultra-Sport 19</title><style>' + css + '</style></head><body>'
-    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><h1>Historia · ' + e(c.name || "") + '</h1></div>'
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Historia · ' + e(c.name || "") + ' · uso interno</title><style>' + css + '</style></head><body>'
+    + '<div class="hd"><div><div class="brand">USO INTERNO</div><h1>Historia · ' + e(c.name || "") + '</h1></div>'
     + '<div class="meta">' + e(seriesHoyISO()) + (c.rut ? '<br>RUT ' + e(c.rut) : '') + '<br>Confidencial</div></div>';
   secs.forEach(function(s){
     html += '<h2>' + e(s.titulo) + '</h2><table>' + s.filas.map(function(r){
       return '<tr><td class="k">' + e(r.k) + '</td><td>' + e(r.v).replace(/\n/g, "<br>") + '</td></tr>';
     }).join("") + '</table>';
   });
-  html += '<div class="ft">Documento de uso interno. Contiene datos de salud: no se entrega a terceros sin el consentimiento de la persona.</div>'
+  html += '<div class="ft">Registro interno con datos de salud. No se entrega.</div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
   w.document.open(); w.document.write(html); w.document.close();
 }

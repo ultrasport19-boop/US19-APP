@@ -562,7 +562,8 @@ const aviso = (t) => avisos.push(t);
   const falta = pasos.filter(p => sync.indexOf(p) < 0);
   comprobar('subida · trabaja sobre el objeto de cada serie, no sobre su posición', sync.indexOf('lista[i]') < 0 && !falta.length,
     'borrar una serie mientras sube cruzaría ids y fotos entre personas' + (falta.length ? ' · falta: ' + falta[0] : ''));
-  comprobar('subida · dice con qué persona quedó cada serie y cuál se parecía', sync.indexOf('j.existia') > 0 && sync.indexOf('j.parecidas') > 0);
+  comprobar('subida · dice con qué persona quedó cada serie y cuál se parecía', sync.indexOf('if (j.existia) notas.push(') > 0 && sync.indexOf('j.parecidas') > 0);
+  comprobar('subida · una ficha existente de otra persona no se enlaza', /j\.existia && j\.nombre && _impPrimer\(j\.nombre\) !== _impPrimer\(/.test(sync) && sync.indexOf('no se enlaza') > 0);
   comprobar('borrar todo · se lleva también las fotos de este equipo', tramo('function wipeAll(', '\n}\n', 'wipeAll').indexOf('seriesOrdenBarrer_') > 0);
   aviso('foto, cerrojo y limpieza · diez casos, ejecutados');
 }
