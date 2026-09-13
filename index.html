@@ -5224,8 +5224,10 @@ function u19PagosPendientesHTML(){
 
 window.u19MarcarPagado = function(notionId){
   notionId = String(notionId || "").trim();
-  var msg = document.getElementById("acc-pago-msg");
-  function di(t, col){ if (msg) msg.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>'; }
+  function di(t, col){
+    var msg = document.getElementById("acc-pago-msg");
+    if (msg) msg.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>';
+  }
   if (!notionId){ di("Falta el id de Notion.", "var(--danger)"); return; }
   if (typeof u19SyncAprobarPago !== "function"){
     di("Falta la capa de sync.", "var(--danger)"); return;
