@@ -5012,6 +5012,231 @@ function u19DashLeer(tipo){
     return d;
   });
 }
+
+
+/* ===SYNC_FASE2A_START===
+   Sincronizacion bidireccional (FASE 2A). Cuelga de Finanzas → Hoy →
+   «Esperando tu visto bueno». Reutiliza u19DashUrl / u19DashLeer / toast.
+   Polling 20 s, pausa si la pestaña no esta visible. Cola localStorage
+   de reintentos (3). Sin pantalla nueva.
+
+   u19SyncAprobarPago (op=aprobar_pago → Presupuesto) queda como API pública
+   sin call-site de UI en FASE 2A a proposito:
+   - u19AccAprobar solo marca casillas del bot (tipo=marcar: ingreso /
+     reactivacion). Los pendientes traen id/nombre/plan/mensaje, NO monto
+     ni concepto de caja; las «tarifas» son costo WhatsApp, no el pago del
+     cliente. Cablear aqui duplicaria o inventaria filas en Presupuesto.
+   - Cartera → Cobros y renovaciones solo tiene «Ver ficha» / actualizar
+     desde Notion: no hay boton «marcar pagado» que hoy omita Presupuesto.
+   - u19ReactAplicar (Reactivar y renovar) escribe Membresía/Término vía
+     cliente_estado; reactivar ≠ «cobro recibido», asi que tampoco se
+     engancha aprobar_pago ahi.
+   Cuando Cartera tenga un «marcar pagado» con concepto+monto claros,
+   llamar u19SyncAprobarPago(id, {concepto, monto, fechaPago, medio,
+   termino, idem}, sello) tras el OK local. Hasta entonces: solo API.
+   === */
+var U19_SYNC_COLA_KEY = "us19_sync_cola_v1";
+var U19_SYNC_SELLO_KEY = "us19_sync_sello_v1";
+var U19_SYNC_MS = 20000;
+var _u19SyncTimer = null;
+var _u19SyncBusy = false;
+
+function u19SyncSelloLeer(){
+  try { return localStorage.getItem(U19_SYNC_SELLO_KEY) || ""; } catch (e){ return ""; }
+}
+function u19SyncSelloGuardar(s){
+  s = String(s || "");
+  if (!s) return;
+  try { localStorage.setItem(U19_SYNC_SELLO_KEY, s); } catch (e){}
+}
+function u19SyncColaLeer(){
+  try {
+    var a = JSON.parse(localStorage.getItem(U19_SYNC_COLA_KEY) || "[]");
+    return Array.isArray(a) ? a : [];
+  } catch (e){ return []; }
+}
+function u19SyncColaGuardar(a){
+  try { localStorage.setItem(U19_SYNC_COLA_KEY, JSON.stringify(a || [])); } catch (e){}
+}
+
+/* POST tipo=guardar: misma forma que marcar (text/plain + clave en cuerpo). */
+function u19SyncPostGuardar(cuerpo){
+  var url = (typeof u19DashUrl === "function") ? u19DashUrl("guardar") : "";
+  if (!url) return Promise.reject(new Error("Falta el puente (URL/clave)"));
+  cuerpo = cuerpo || {};
+  if (!cuerpo.clave) cuerpo.clave = ((typeof settings !== "undefined" && settings.dashClave) || "").trim();
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(cuerpo)
+  }).then(function(r){ return r.json(); });
+}
+
+function u19SyncEncolar(item){
+  var cola = u19SyncColaLeer();
+  item = item || {};
+  item.intentos = Number(item.intentos) || 0;
+  item.ts = Date.now();
+  cola.push(item);
+  u19SyncColaGuardar(cola);
+}
+
+function u19SyncVaciarCola(){
+  var cola = u19SyncColaLeer();
+  if (!cola.length) return Promise.resolve();
+  var resto = [];
+  var cadena = Promise.resolve();
+  cola.forEach(function(item){
+    cadena = cadena.then(function(){
+      return u19SyncPostGuardar(item.cuerpo).then(function(res){
+        if (res && res.ok) return;
+        item.intentos = (Number(item.intentos) || 0) + 1;
+        if (item.intentos >= 3){
+          if (typeof toast === "function")
+            toast("No se pudo sincronizar con Notion tras 3 intentos: " + ((res && res.error) || "error"), "error");
+          return;
+        }
+        resto.push(item);
+      }).catch(function(){
+        item.intentos = (Number(item.intentos) || 0) + 1;
+        if (item.intentos >= 3){
+          if (typeof toast === "function")
+            toast("Sin red: escritura a Notion pendiente agotó 3 intentos", "error");
+        } else resto.push(item);
+      });
+    });
+  });
+  return cadena.then(function(){ u19SyncColaGuardar(resto); });
+}
+
+/* Escritura optimista generica: aplica cambio local, POST, revierte si falla. */
+function u19SyncGuardarOptimista(opts){
+  opts = opts || {};
+  var antes = opts.antes;
+  var aplicar = opts.aplicar;
+  var revertir = opts.revertir;
+  var cuerpo = opts.cuerpo;
+  if (typeof aplicar === "function") aplicar();
+  return u19SyncPostGuardar(cuerpo).then(function(res){
+    if (res && res.ok){
+      if (res.sello) u19SyncSelloGuardar(res.sello);
+      return res;
+    }
+    if (typeof revertir === "function") revertir(antes);
+    if (res && res.error === "conflicto"){
+      if (typeof toast === "function")
+        toast("Esto cambió en Notion, revisa antes de guardar", "warn");
+      if (typeof opts.onConflicto === "function") opts.onConflicto(res.actual);
+      return res;
+    }
+    if (typeof toast === "function")
+      toast((res && res.error) || "Notion no aceptó el cambio", "error");
+    return res;
+  }).catch(function(e){
+    u19SyncEncolar({ cuerpo: cuerpo, intentos: 1 });
+    if (typeof toast === "function")
+      toast("Sin red: el cambio queda en cola local", "warn");
+    return { ok: false, error: String(e && e.message ? e.message : e), encolado: true };
+  });
+}
+
+/* API pública FASE 2A: registra ingreso en Presupuesto (puente tipo=guardar).
+   Sin boton propio todavia — ver cabecera SYNC_FASE2A. Expuesta en window
+   para cobros/Cartera futuros sin rediseñar pantallas ahora. */
+function u19SyncAprobarPago(idCliente, datos, sello){
+  datos = datos || {};
+  return u19SyncGuardarOptimista({
+    cuerpo: {
+      entidad: "presupuesto",
+      id: idCliente || "",
+      sello: sello || u19SyncSelloLeer(),
+      cambios: {
+        op: "aprobar_pago",
+        concepto: datos.concepto,
+        monto: datos.monto,
+        fechaPago: datos.fechaPago,
+        medio: datos.medio,
+        termino: datos.termino,
+        idem: datos.idem
+      }
+    },
+    aplicar: function(){},
+    revertir: function(){}
+  });
+}
+
+function u19SyncAplicarFilas(filas){
+  filas = u19Lista(filas);
+  if (!filas.length) return;
+  var toco = false;
+  filas.forEach(function(f){
+    if (!f || f.entidad !== "cliente" || !f.id) return;
+    var c = null;
+    if (typeof state !== "undefined" && Array.isArray(state.clients)){
+      for (var i = 0; i < state.clients.length; i++){
+        if (state.clients[i] && state.clients[i].notionId === f.id){ c = state.clients[i]; break; }
+      }
+    }
+    if (!c || !f.campos) return;
+    if (f.campos.termino && c.planEndDate !== f.campos.termino){
+      c.planEndDate = f.campos.termino; toco = true;
+    }
+    if (f.campos.membresia && c.notionEstado !== f.campos.membresia){
+      c.notionEstado = f.campos.membresia; toco = true;
+    }
+    if (f.campos.monto != null && Number(c.planPrice) !== Number(f.campos.monto)){
+      c.planPrice = f.campos.monto; toco = true;
+    }
+    if (f.sello) u19SyncSelloGuardar(f.sello);
+  });
+  if (toco){
+    try { if (typeof saveState === "function") saveState(); } catch (e){}
+    if (document.getElementById("acc-cuerpo") && typeof u19AccLeer === "function")
+      u19AccLeer(true);
+    else if (typeof renderFinanzas === "function" && document.getElementById("fin-real"))
+      renderFinanzas();
+  } else if (document.getElementById("acc-cuerpo") && typeof u19AccLeer === "function"){
+    /* Pendientes del bot: refrescar lista aunque el roster local no mueva fichas. */
+    u19AccLeer(true);
+  }
+}
+
+function u19SyncTick(){
+  if (_u19SyncBusy) return;
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+  if (!(typeof settings !== "undefined" && settings.dashApiUrl && settings.dashClave)) return;
+  /* Solo si la pantalla de pendientes esta montada (Finanzas → Hoy). */
+  if (!document.getElementById("acc-cuerpo") && !document.getElementById("acc-msg")) return;
+  _u19SyncBusy = true;
+  var desde = u19SyncSelloLeer() || new Date(Date.now() - 60000).toISOString();
+  var base = (typeof u19DashUrl === "function") ? u19DashUrl("cambios") : "";
+  if (!base){ _u19SyncBusy = false; return; }
+  var url = base + "&desde=" + encodeURIComponent(desde);
+  u19SyncVaciarCola().then(function(){
+    return fetch(url).then(function(r){ return r.json(); });
+  }).then(function(d){
+    if (!d || d.error) return;
+    if (d.sello) u19SyncSelloGuardar(d.sello);
+    if (u19Lista(d.filas).length) u19SyncAplicarFilas(d.filas);
+  }).catch(function(){ /* silencio: el boton Ver pendientes sigue */ })
+  .then(function(){ _u19SyncBusy = false; });
+}
+
+function u19SyncArrancar(){
+  if (_u19SyncTimer) return;
+  if (typeof document !== "undefined"){
+    document.addEventListener("visibilitychange", function(){
+      if (document.visibilityState === "visible") u19SyncTick();
+    });
+  }
+  _u19SyncTimer = setInterval(u19SyncTick, U19_SYNC_MS);
+  setTimeout(u19SyncTick, 800);
+}
+window.u19SyncAprobarPago = u19SyncAprobarPago;
+window.u19SyncArrancar = u19SyncArrancar;
+window.u19SyncTick = u19SyncTick;
+/* ===SYNC_FASE2A_END=== */
+
 /* ===DASH_URL_END=== */
 
 window.importClientesNotion = async function(silencioso){
@@ -23396,6 +23621,9 @@ window.u19AccTotal = function(tipo){
   e.textContent = n ? n + ' seleccionado(s)' : 'ninguno';
 };
 
+/* Aprobar pendientes del bot: SOLO tipo=marcar (casillas Notion). No llama
+   u19SyncAprobarPago: los items no traen monto/concepto de Presupuesto
+   (ver cabecera SYNC_FASE2A). El camino del bot debe seguir intacto. */
 window.u19AccAprobar = function(tipo, tarifa){
   var msg = document.getElementById('acc-msg-' + tipo);
   function di(t, col){ if (msg) msg.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>'; }
@@ -23417,15 +23645,51 @@ window.u19AccAprobar = function(tipo, tarifa){
   if (!url){ di("Falta configurar el puente.", "var(--danger)"); return; }
   di("Marcando en Notion…", "var(--muted)");
 
+  /* Optimistic: quita de la lista local; si falla, se vuelve a pedir. */
+  var _snapAcc = null;
+  try { _snapAcc = localStorage.getItem(ACC_KEY); } catch (e0){ _snapAcc = null; }
+  var _cacheAhora = (typeof u19AccCache === "function") ? u19AccCache() : null;
+  if (_cacheAhora){
+    var _ids = {};
+    sel.forEach(function(c){ _ids[c.id] = true; });
+    var _nuevo = JSON.parse(JSON.stringify(_cacheAhora));
+    if (tipo === "reactivacion") _nuevo.reactivacion = u19Lista(_nuevo.reactivacion).filter(function(x){ return x && !_ids[x.id]; });
+    if (tipo === "ingreso") _nuevo.ingreso = u19Lista(_nuevo.ingreso).filter(function(x){ return x && !_ids[x.id]; });
+    try { localStorage.setItem(ACC_KEY, JSON.stringify({ ts: Date.now(), datos: _nuevo })); } catch (e1){}
+    var _cuerpo = document.getElementById("acc-cuerpo");
+    if (_cuerpo && typeof u19AccCuerpoHTML === "function") _cuerpo.innerHTML = u19AccCuerpoHTML(_nuevo);
+  }
+
   fetch(url, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ k: (settings.dashClave || "").trim(),
+    body: JSON.stringify({ clave: (settings.dashClave || "").trim(),
+                           k: (settings.dashClave || "").trim(),
                            casilla: tipo, valor: true,
                            ids: sel.map(function(c){ return c.id; }) })
   }).then(function(r){ return r.json(); }).then(function(res){
-    if (res.error){ di(res.error, "var(--danger)"); return; }
+    if (res.error){
+      if (_snapAcc != null){ try { localStorage.setItem(ACC_KEY, _snapAcc); } catch (e2){} }
+      if (_snapAcc && typeof u19AccCuerpoHTML === "function"){
+        try {
+          var _old = JSON.parse(_snapAcc);
+          var _cx = document.getElementById("acc-cuerpo");
+          if (_cx && _old && _old.datos) _cx.innerHTML = u19AccCuerpoHTML(_old.datos);
+        } catch (e3){}
+      }
+      di(res.error, "var(--danger)");
+      if (typeof toast === "function") toast("No se pudo aprobar: se revirtió la lista", "error");
+      return;
+    }
     if (!u19RespuestaValida(res, "hechos")){
+      if (_snapAcc != null){ try { localStorage.setItem(ACC_KEY, _snapAcc); } catch (e4){} }
+      if (_snapAcc && typeof u19AccCuerpoHTML === "function"){
+        try {
+          var _old2 = JSON.parse(_snapAcc);
+          var _cx2 = document.getElementById("acc-cuerpo");
+          if (_cx2 && _old2 && _old2.datos) _cx2.innerHTML = u19AccCuerpoHTML(_old2.datos);
+        } catch (e5){}
+      }
       di("El puente contestó, pero NO marcó nada: no reconoce «marcar». "
        + "Nadie quedó aprobado y el bot no va a procesar nada. Hay que marcarlo en Notion.", "var(--danger)");
       if (typeof toast === "function") toast("El puente no sabe marcar: nadie quedó aprobado", "error");
@@ -23442,8 +23706,18 @@ window.u19AccAprobar = function(tipo, tarifa){
         return '<span class="text-xs" style="color:var(--danger);">'
           + escapeHtml((x && typeof x === 'object') ? ((x.nombre || x.id || '?') + ': ' + (x.por || '')) : String(x || '')) + '</span>'; }).join('<br>');
     }
+    if (typeof u19AccLeer === "function") setTimeout(function(){ u19AccLeer(true); }, 400);
   }).catch(function(e){
+    if (_snapAcc != null){ try { localStorage.setItem(ACC_KEY, _snapAcc); } catch (e6){} }
+    if (_snapAcc && typeof u19AccCuerpoHTML === "function"){
+      try {
+        var _old3 = JSON.parse(_snapAcc);
+        var _cx3 = document.getElementById("acc-cuerpo");
+        if (_cx3 && _old3 && _old3.datos) _cx3.innerHTML = u19AccCuerpoHTML(_old3.datos);
+      } catch (e7){}
+    }
     di("No se pudo: " + (e && e.message ? e.message : e), "var(--danger)");
+    if (typeof toast === "function") toast("Sin red: se revirtió la aprobación en pantalla", "error");
   });
 };
 
@@ -23576,6 +23850,7 @@ function u19AccionesHTML(){
   /* Se lee sola al abrir. Antes habia que acordarse de pulsar el boton, y
      mientras tanto la pantalla mostraba una lista vieja como si fuera de hoy. */
   setTimeout(function(){ if (typeof u19AccLeer === "function") u19AccLeer(true); }, 60);
+  if (typeof u19SyncArrancar === "function") setTimeout(u19SyncArrancar, 100);
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
   h += '<div style="display:flex;gap:.6rem;align-items:baseline;flex-wrap:wrap;">'
     + '<div class="card-title" style="margin:0;">\u{2705} Esperando tu visto bueno</div>';
