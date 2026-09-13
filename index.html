@@ -5020,20 +5020,11 @@ function u19DashLeer(tipo){
    Polling 20 s, pausa si la pestaña no esta visible. Cola localStorage
    de reintentos (3). Sin pantalla nueva.
 
-   u19SyncAprobarPago (op=aprobar_pago → Presupuesto) queda como API pública
-   sin call-site de UI en FASE 2A a proposito:
-   - u19AccAprobar solo marca casillas del bot (tipo=marcar: ingreso /
-     reactivacion). Los pendientes traen id/nombre/plan/mensaje, NO monto
-     ni concepto de caja; las «tarifas» son costo WhatsApp, no el pago del
-     cliente. Cablear aqui duplicaria o inventaria filas en Presupuesto.
-   - Cartera → Cobros y renovaciones solo tiene «Ver ficha» / actualizar
-     desde Notion: no hay boton «marcar pagado» que hoy omita Presupuesto.
-   - u19ReactAplicar (Reactivar y renovar) escribe Membresía/Término vía
-     cliente_estado; reactivar ≠ «cobro recibido», asi que tampoco se
-     engancha aprobar_pago ahi.
-   Cuando Cartera tenga un «marcar pagado» con concepto+monto claros,
-   llamar u19SyncAprobarPago(id, {concepto, monto, fechaPago, medio,
-   termino, idem}, sello) tras el OK local. Hasta entonces: solo API.
+   «Marcar pagado» (u19MarcarPagado) vive en esta misma tarjeta: lista
+   vencidos/por vencer del roster local (Monto membresía + Plan de BU).
+   Escribe Presupuesto vía tipo=guardar op=aprobar_pago y renueva
+   Término + Membresía Activa. u19AccAprobar sigue solo en tipo=marcar
+   (casillas del bot; tarifas = costo WSP, no el pago del cliente).
    === */
 var U19_SYNC_COLA_KEY = "us19_sync_cola_v1";
 var U19_SYNC_SELLO_KEY = "us19_sync_sello_v1";
@@ -5140,11 +5131,11 @@ function u19SyncGuardarOptimista(opts){
   });
 }
 
-/* API pública FASE 2A: registra ingreso en Presupuesto (puente tipo=guardar).
-   Sin boton propio todavia — ver cabecera SYNC_FASE2A. Expuesta en window
-   para cobros/Cartera futuros sin rediseñar pantallas ahora. */
-function u19SyncAprobarPago(idCliente, datos, sello){
+/* Registra ingreso en Presupuesto (puente tipo=guardar op=aprobar_pago).
+   opts.aplicar / opts.revertir = UI optimista en u19MarcarPagado. */
+function u19SyncAprobarPago(idCliente, datos, sello, opts){
   datos = datos || {};
+  opts = opts || {};
   return u19SyncGuardarOptimista({
     cuerpo: {
       entidad: "presupuesto",
@@ -5157,13 +5148,170 @@ function u19SyncAprobarPago(idCliente, datos, sello){
         fechaPago: datos.fechaPago,
         medio: datos.medio,
         termino: datos.termino,
+        membresia: datos.membresia,
         idem: datos.idem
       }
     },
-    aplicar: function(){},
-    revertir: function(){}
+    aplicar: typeof opts.aplicar === "function" ? opts.aplicar : function(){},
+    revertir: typeof opts.revertir === "function" ? opts.revertir : function(){},
+    onConflicto: opts.onConflicto
   });
 }
+
+function u19PagoHoyISO(){
+  var d = new Date();
+  var p = function(n){ return (n < 10 ? "0" : "") + n; };
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+
+/* Vencidos + por vencer (15 d) con ficha Notion: candidatos a caja. */
+function u19PagosPendientesLista(){
+  var r = (typeof u19FinRenovaciones === "function")
+    ? u19FinRenovaciones() : { venc: [], pronto: [] };
+  var out = [];
+  function push(it, tipo){
+    var c = it && it.c;
+    if (!c || !c.notionId) return;
+    var monto = Number(it.precio) || Number(c.planPrice) || 0;
+    if (!(monto > 0)) return;
+    out.push({
+      notionId: c.notionId,
+      clientId: c.id,
+      nombre: c.name || "",
+      plan: c.notionPlan || "",
+      monto: monto,
+      medio: c.notionMedioPago || "",
+      terminoActual: c.planEndDate || "",
+      dias: it.dias,
+      tipo: tipo
+    });
+  }
+  u19Lista(r.venc).forEach(function(it){ push(it, "vencido"); });
+  u19Lista(r.pronto).forEach(function(it){ push(it, "pronto"); });
+  return out;
+}
+
+function u19PagosPendientesHTML(){
+  var lista = u19PagosPendientesLista().slice(0, 12);
+  var h = '<div style="border:1px solid var(--rule);border-radius:6px;padding:.7rem;margin-top:.9rem;">';
+  h += '<div class="text-sm" style="font-weight:600;margin-bottom:.35rem;">💵 Marcar pagado → Presupuesto</div>';
+  h += '<p class="text-xs text-muted" style="margin:0 0 .55rem;line-height:1.5;">'
+    + 'Registra el ingreso en Notion (concepto, monto, fecha de hoy). '
+    + 'Renueva Término Plan (+1 mes) y deja Membresía Activa = Activo. '
+    + 'Dos clics al mismo pago no duplican fila.</p>';
+  if (!lista.length){
+    h += '<p class="text-xs text-muted" style="margin:0;">Nadie vencido o por vencer con ficha Notion y monto. '
+      + 'Importa clientes o revisa Cartera → Cobros.</p></div>';
+    return h;
+  }
+  h += '<div style="display:flex;flex-direction:column;gap:.45rem;">';
+  lista.forEach(function(x){
+    var etiqueta = x.tipo === "vencido"
+      ? ("vencido hace " + Math.abs(x.dias) + " d")
+      : ("vence en " + x.dias + " d");
+    var col = x.tipo === "vencido" ? "var(--danger)" : "var(--warn)";
+    h += '<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.35rem 0;border-top:1px solid var(--rule);">'
+      + '<span style="flex:1;min-width:140px;"><b>' + escapeHtml(x.nombre || "—") + '</b>'
+      + (x.plan ? ' <span class="text-muted">· ' + escapeHtml(x.plan) + '</span>' : '')
+      + '<br><span class="text-xs" style="color:' + col + ';">' + escapeHtml(etiqueta) + '</span>'
+      + ' <span class="text-xs text-muted">' + (typeof _finCLP === "function" ? _finCLP(x.monto) : ("$" + x.monto)) + '</span></span>'
+      + '<button class="btn btn-primary btn-sm" type="button" data-pago-nid="' + escapeAttr(x.notionId) + '"'
+      + ' onclick="u19MarcarPagado(this.getAttribute(\'data-pago-nid\'))">Marcar pagado</button></div>';
+  });
+  h += '</div><div id="acc-pago-msg" style="font-size:.78rem;margin-top:.45rem;"></div></div>';
+  return h;
+}
+
+window.u19MarcarPagado = function(notionId){
+  notionId = String(notionId || "").trim();
+  var msg = document.getElementById("acc-pago-msg");
+  function di(t, col){ if (msg) msg.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>'; }
+  if (!notionId){ di("Falta el id de Notion.", "var(--danger)"); return; }
+  if (typeof u19SyncAprobarPago !== "function"){
+    di("Falta la capa de sync.", "var(--danger)"); return;
+  }
+  var item = null;
+  u19PagosPendientesLista().forEach(function(x){ if (x.notionId === notionId) item = x; });
+  if (!item){
+    /* Fallback: buscar en el roster por si la lista se desfasó. */
+    var c0 = null;
+    u19Arr(typeof state !== "undefined" ? state.clients : []).forEach(function(c){
+      if (c && c.notionId === notionId) c0 = c;
+    });
+    if (!c0){ di("No encuentro a ese cliente en el roster.", "var(--warn)"); return; }
+    item = {
+      notionId: notionId, clientId: c0.id, nombre: c0.name || "",
+      plan: c0.notionPlan || "", monto: Number(c0.planPrice) || 0,
+      medio: c0.notionMedioPago || "", terminoActual: c0.planEndDate || ""
+    };
+  }
+  if (!(item.monto > 0)){ di("Sin Monto membresía: no se puede registrar el pago.", "var(--warn)"); return; }
+
+  var fechaPago = u19PagoHoyISO();
+  var termino = (typeof u19TermMasUnMes === "function") ? u19TermMasUnMes() : fechaPago;
+  var concepto = "Pago " + (item.nombre || "cliente") + " — " + (item.plan || "membresía");
+  var idem = ["pago", notionId, fechaPago, String(item.monto)].join("|");
+  var aviso = "Registrar en Presupuesto:\n\n  · " + item.nombre
+    + "\n  · " + concepto
+    + "\n  · " + (typeof _finCLP === "function" ? _finCLP(item.monto) : ("$" + item.monto))
+    + "\n  · Fecha de pago: " + fechaPago
+    + "\n  · Nuevo Término Plan: " + termino
+    + "\n  · Membresía Activa → Activo"
+    + (item.medio ? ("\n  · Medio (en Notas): " + item.medio) : "")
+    + "\n\n¿Lo registro?";
+  if (!window.confirm(aviso)){ di("Cancelado.", "var(--muted)"); return; }
+
+  var cli = null;
+  u19Arr(typeof state !== "undefined" ? state.clients : []).forEach(function(c){
+    if (c && (c.notionId === notionId || c.id === item.clientId)) cli = c;
+  });
+  var antes = cli ? { planEndDate: cli.planEndDate, notionEstado: cli.notionEstado } : null;
+
+  di("Registrando en Notion…", "var(--muted)");
+  u19SyncAprobarPago(notionId, {
+    concepto: concepto,
+    monto: item.monto,
+    fechaPago: fechaPago,
+    medio: item.medio || "",
+    termino: termino,
+    membresia: "Activo",
+    idem: idem
+  }, u19SyncSelloLeer(), {
+    aplicar: function(){
+      if (!cli) return;
+      cli.planEndDate = termino;
+      cli.notionEstado = "Activo";
+      try { if (typeof saveState === "function") saveState(); } catch (e0){}
+      var cuerpo = document.getElementById("acc-cuerpo");
+      if (cuerpo && typeof u19AccCuerpoHTML === "function"){
+        var cache = (typeof u19AccCache === "function") ? u19AccCache() : null;
+        cuerpo.innerHTML = u19AccCuerpoHTML(cache || { reactivacion: [], ingreso: [] });
+      }
+    },
+    revertir: function(){
+      if (!cli || !antes) return;
+      cli.planEndDate = antes.planEndDate;
+      cli.notionEstado = antes.notionEstado;
+      try { if (typeof saveState === "function") saveState(); } catch (e1){}
+      var cuerpo2 = document.getElementById("acc-cuerpo");
+      if (cuerpo2 && typeof u19AccCuerpoHTML === "function"){
+        var cache2 = (typeof u19AccCache === "function") ? u19AccCache() : null;
+        cuerpo2.innerHTML = u19AccCuerpoHTML(cache2 || { reactivacion: [], ingreso: [] });
+      }
+    }
+  }).then(function(res){
+    if (res && res.ok){
+      di(res.duplicado
+        ? "Ya estaba registrado (idempotencia): no se duplicó la fila."
+        : "Pago en Presupuesto · ficha renovada.",
+        "var(--success)");
+      if (typeof toast === "function")
+        toast(res.duplicado ? "Pago ya estaba en Presupuesto" : "Pago registrado en Presupuesto", "success");
+      return;
+    }
+    di((res && res.error) || "No se pudo registrar el pago", "var(--danger)");
+  });
+};
 
 function u19SyncAplicarFilas(filas){
   filas = u19Lista(filas);
@@ -23722,7 +23870,7 @@ window.u19AccAprobar = function(tipo, tarifa){
 };
 
 function u19AccCuerpoHTML(d){
-  if (!d) return '';
+  d = d || {};
   var h = '';
   h += u19AccListaHTML('reactivacion', 'Propuestas del bot (congeladas hasta que apruebes o descartes)', d.reactivacion,
         (d.tarifas && d.tarifas.marketing) || 78,
@@ -23734,6 +23882,8 @@ function u19AccCuerpoHTML(d){
         (d.tarifas && d.tarifas.utility) || 14,
         'Al aprobar, el bot manda la bienvenida con los datos de pago.');
   if (!h) h = '<p class="text-xs text-muted" style="margin:.4rem 0 0;">Nada esperando tu visto bueno.</p>';
+  /* Caja: misma tarjeta, sin pantalla nueva. Roster local = BU. */
+  if (typeof u19PagosPendientesHTML === "function") h += u19PagosPendientesHTML();
   return h;
 }
 
@@ -23870,7 +24020,7 @@ function u19AccionesHTML(){
      que el bot escriba (7-sep-2026: «lo de arriba con botones de WhatsApp es
      manual, no me interesa»). La lista viva queda debajo, plegada, como
      referencia de a quien propondra el bot manana a las 8:00. */
-  h += '<div id="acc-cuerpo">' + (d ? u19AccCuerpoHTML(d) : '') + '</div>';
+  h += '<div id="acc-cuerpo">' + u19AccCuerpoHTML(d || {}) + '</div>';
   h += '<details style="margin-top:.9rem;"><summary class="text-xs text-muted" style="cursor:pointer;">'
     + '\u23f1 Qui\u00e9n se est\u00e1 yendo esta semana (calculado aqu\u00ed, sin el bot) \u2014 referencia</summary>'
     + u19SemanaVivaHTML() + '</details>';
