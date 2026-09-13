@@ -5214,7 +5214,7 @@ function u19PagosPendientesHTML(){
   h += '<div class="text-sm" style="font-weight:600;margin-bottom:.35rem;">💵 Marcar pagado → Presupuesto</div>';
   h += '<p class="text-xs text-muted" style="margin:0 0 .55rem;line-height:1.5;">'
     + 'Registra el ingreso en Notion (concepto, monto, fecha de hoy). '
-    + 'Renueva Término Plan (+1 mes) y deja Membresía Activa = Activo. '
+    + 'Renueva Término Plan (+30 días sobre el vencimiento si sigue vigente; si ya venció, desde hoy) y deja Membresía Activa = Activo. '
     + 'Dos clics al mismo pago no duplican fila.</p>';
   if (!lista.length){
     h += '<p class="text-xs text-muted" style="margin:0;">Nadie vencido o por vencer con ficha Notion y monto. '
