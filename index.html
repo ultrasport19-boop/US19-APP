@@ -5164,6 +5164,23 @@ function u19PagoHoyISO(){
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
 
+/* Término nuevo al registrar un pago: +30 días desde el vencimiento si el
+   plan sigue vigente, o desde hoy si ya venció. Es la regla del asistente
+   (US19_visionNuevaFechaTermino_ y US19_SYNC_terminoRenovado_): pagar antes
+   no puede restar días. Antes se mandaba hoy + 1 mes y quien pagaba con
+   días por delante los perdía. Fechas AAAA-MM-DD en UTC al mediodía, sin
+   corrimientos por el cambio de hora. */
+function u19TermRenovado(terminoActual, hoyISO){
+  var hoy = String(hoyISO || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(hoy)) hoy = u19PagoHoyISO();
+  var t = String(terminoActual || "").slice(0, 10);
+  var vigente = /^\d{4}-\d{2}-\d{2}$/.test(t) && t > hoy;
+  var desde = vigente ? t : hoy;
+  var p = desde.split("-").map(Number);
+  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 30, 12));
+  return { termino: d.toISOString().slice(0, 10), vigente: vigente, desde: desde };
+}
+
 /* Vencidos + por vencer (15 d) con ficha Notion: candidatos a caja. */
 function u19PagosPendientesLista(){
   var r = (typeof u19FinRenovaciones === "function")
@@ -5250,14 +5267,15 @@ window.u19MarcarPagado = function(notionId){
   if (!(item.monto > 0)){ di("Sin Monto membresía: no se puede registrar el pago.", "var(--warn)"); return; }
 
   var fechaPago = u19PagoHoyISO();
-  var termino = (typeof u19TermMasUnMes === "function") ? u19TermMasUnMes() : fechaPago;
+  var renov = u19TermRenovado(item.terminoActual, fechaPago);
+  var termino = renov.termino;
   var concepto = "Pago " + (item.nombre || "cliente") + " — " + (item.plan || "membresía");
   var idem = ["pago", notionId, fechaPago, String(item.monto)].join("|");
   var aviso = "Registrar en Presupuesto:\n\n  · " + item.nombre
     + "\n  · " + concepto
     + "\n  · " + (typeof _finCLP === "function" ? _finCLP(item.monto) : ("$" + item.monto))
     + "\n  · Fecha de pago: " + fechaPago
-    + "\n  · Nuevo Término Plan: " + termino
+    + "\n  · Nuevo Término Plan: " + termino + (renov.vigente ? " (vencía el " + renov.desde + ": +30 días)" : " (+30 días desde hoy)")
     + "\n  · Membresía Activa → Activo"
     + (item.medio ? ("\n  · Medio (en Notas): " + item.medio) : "")
     + "\n\n¿Lo registro?";

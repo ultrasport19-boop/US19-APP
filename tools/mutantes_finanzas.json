@@ -42,6 +42,21 @@
       "nombre": "a quien no agenda por Calendly se le empieza a medir la ausencia",
       "de": "    if (!u19AgendaPorCalendly(c)) return;",
       "a": "    if (false) return;"
+    },
+    {
+      "nombre": "Marcar pagado vuelve a contar desde hoy y quien paga antes pierde sus días",
+      "de": "  var vigente = /^\\d{4}-\\d{2}-\\d{2}$/.test(t) && t > hoy;",
+      "a": "  var vigente = false;"
+    },
+    {
+      "nombre": "el botón deja de mirar el término actual del socio",
+      "de": "  var renov = u19TermRenovado(item.terminoActual, fechaPago);",
+      "a": "  var renov = u19TermRenovado(\"\", fechaPago);"
+    },
+    {
+      "nombre": "la renovación suma 31 días en vez de 30",
+      "de": "  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 30, 12));",
+      "a": "  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 31, 12));"
     }
   ]
 }

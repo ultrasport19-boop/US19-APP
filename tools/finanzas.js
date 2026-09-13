@@ -55,13 +55,13 @@ const ENTORNO = [
 const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   fn('u19DiasUmbral'), fn('u19FinRiesgo'), fn('u19FinAntiguedad'),
   fn('u19FinConcentracion'), fn('u19FinRenovaciones'),
-  fn('u19SvcProy')].join('\n');
+  fn('u19SvcProy'), fn('u19PagoHoyISO'), fn('u19TermRenovado')].join('\n');
 
 let m;
 try {
   m = new Function(codigo + '\nreturn { poner: function(cl, rt){ state.clients = cl || []; state.routines = rt || []; },'
     + ' mes: u19FinMes, umbral: u19DiasUmbral, riesgo: u19FinRiesgo, antiguedad: u19FinAntiguedad,'
-    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones, svc: u19SvcProy };')();
+    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones, svc: u19SvcProy, term: u19TermRenovado };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -273,6 +273,29 @@ igual(m.svc(7830, 3560, -4, 10, 2).sesMes, 0, 'proyeccion · personas en curso n
 /* Las sesiones por serie son el divisor de las altas: nunca menos de 1. */
 di(isFinite(m.svc(7830, 3560, 10, 0, 2).altasMes),
   'proyeccion · una serie de cero sesiones no rompe la cuenta de altas');
+
+/* --- «Marcar pagado»: pagar antes no puede restar días ---------------
+   El término nuevo es +30 días desde el vencimiento si el plan sigue
+   vigente, o desde hoy si ya venció: la misma regla del asistente. Antes
+   era hoy + 1 mes y quien pagaba con días por delante los perdía. */
+igual(m.term('2026-10-01', '2026-09-13').termino, '2026-10-31', 'pago · vigente: +30 días sobre su vencimiento');
+di(m.term('2026-10-01', '2026-09-13').vigente === true, 'pago · el diálogo sabe que seguía vigente');
+igual(m.term('2026-09-25', '2026-09-14').termino, '2026-10-25', 'pago · quien paga 11 días antes no pierde esos 11 días');
+igual(m.term('2026-09-01', '2026-09-13').termino, '2026-10-13', 'pago · vencido: +30 días desde hoy');
+igual(m.term('2026-09-13', '2026-09-13').termino, '2026-10-13', 'pago · vence hoy: +30 días desde hoy');
+igual(m.term('', '2026-09-13').termino, '2026-10-13', 'pago · sin término: +30 días desde hoy');
+igual(m.term('pronto', '2026-09-13').termino, '2026-10-13', 'pago · término ilegible: +30 días desde hoy');
+igual(m.term('2026-09-05', '2026-09-01').termino, '2026-10-05', 'pago · cruza el cambio de hora sin correrse');
+igual(m.term('2026-12-20', '2026-12-10').termino, '2027-01-19', 'pago · cruza el año');
+di(/^\d{4}-\d{2}-\d{2}$/.test(m.term('2026-10-01', '').termino), 'pago · sin un hoy legible usa la fecha del equipo, no NaN');
+
+/* Y que el botón use esa regla: si vuelve a calcular por su cuenta, las
+   comprobaciones de arriba siguen verdes y el socio pierde días igual. */
+const iMP = src.indexOf('window.u19MarcarPagado = function');
+const cuerpoMP = iMP >= 0 ? src.slice(iMP, src.indexOf('\n};\n', iMP)) : '';
+di(/u19TermRenovado\(item\.terminoActual, fechaPago\)/.test(cuerpoMP) && /var termino = renov\.termino;/.test(cuerpoMP),
+  'pago · «Marcar pagado» calcula el término con u19TermRenovado sobre el término actual');
+avisos.push('pago · «Marcar pagado» suma 30 días al vencimiento vigente, ejecutado en 11 casos');
 
 /* --- salida --- */
 console.log('\nUS19-APP · números de Finanzas');
