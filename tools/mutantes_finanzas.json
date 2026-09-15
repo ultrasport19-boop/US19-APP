@@ -57,6 +57,31 @@
       "nombre": "la renovación suma 31 días en vez de 30",
       "de": "  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 30, 12));",
       "a": "  var d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + 31, 12));"
+    },
+    {
+      "nombre": "deudas: los días se redondean hacia abajo y la fecha de «libre de deuda» se adelanta",
+      "de": "  var dias = Math.ceil(neto / capacidad * 30);",
+      "a": "  var dias = Math.floor(neto / capacidad * 30);"
+    },
+    {
+      "nombre": "deudas: las no urgentes y las «por venir» vuelven a sumar al total",
+      "de": "  var urgentes = u19Arr(m && m.deudas).filter(function(d){ return d && d.incluirEnTotal === true; });",
+      "a": "  var urgentes = u19Arr(m && m.deudas).filter(function(d){ return !!d; });"
+    },
+    {
+      "nombre": "deudas: el neto puede salir negativo cuando los ingresos comprometidos superan la deuda",
+      "de": "  return { n: urgentes.length, total: total, comprometidos: comprometidos, neto: Math.max(0, total - comprometidos) };",
+      "a": "  return { n: urgentes.length, total: total, comprometidos: comprometidos, neto: total - comprometidos };"
+    },
+    {
+      "nombre": "deudas: el saldo en dólares deja de redondearse a peso y el total trae centavos",
+      "de": "  if (d.moneda === \"USD\") return Math.round(saldo * u19FinNum(d.tipoCambio));",
+      "a": "  if (d.moneda === \"USD\") return saldo * u19FinNum(d.tipoCambio);"
+    },
+    {
+      "nombre": "deudas: la barra del cupo solo alarma desde el 90 %",
+      "de": "  return pct != null && pct >= 80;",
+      "a": "  return pct != null && pct >= 90;"
     }
   ]
 }

@@ -55,13 +55,26 @@ const ENTORNO = [
 const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   fn('u19DiasUmbral'), fn('u19FinRiesgo'), fn('u19FinAntiguedad'),
   fn('u19FinConcentracion'), fn('u19FinRenovaciones'),
-  fn('u19SvcProy'), fn('u19PagoHoyISO'), fn('u19TermRenovado')].join('\n');
+  fn('u19SvcProy'), fn('u19PagoHoyISO'), fn('u19TermRenovado'),
+  /* Deudas (15-sep-2026): los valores de partida, las tres constantes y las
+     funciones puras de la tarjeta. Nada de pantalla. */
+  tramo('var U19_DEUDAS_INICIAL = {', '\n};\n', 'U19_DEUDAS_INICIAL') + '\n};\n',
+  tramo('var U19_DEU_TIPOS = [', '\n\n', 'constantes de deudas'),
+  fn('u19DeuNumONull'), fn('u19DeuId'), fn('u19DeuIdLimpio'), fn('u19DeuNormalizarDeuda'), fn('u19DeuNormalizar'),
+  fn('u19DeuSaldoCLP'), fn('u19DeuPctCupo'), fn('u19DeuAlertaCupo'), fn('u19DeuTotales'), fn('u19DeuCapacidad'),
+  fn('u19DeuFechaMas'), fn('u19DeuFechaCorta'), fn('u19DeuLibre'), fn('u19DeuUSD'), fn('u19DeuPesosDec'),
+  fn('u19DeuAbonoCalc'), fn('u19DeuAjusteCalc'), fn('u19DeuDeshacerCalc'), fn('u19DeuHacerUrgente')].join('\n');
 
 let m;
 try {
   m = new Function(codigo + '\nreturn { poner: function(cl, rt){ state.clients = cl || []; state.routines = rt || []; },'
     + ' mes: u19FinMes, umbral: u19DiasUmbral, riesgo: u19FinRiesgo, antiguedad: u19FinAntiguedad,'
-    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones, svc: u19SvcProy, term: u19TermRenovado };')();
+    + ' concentracion: u19FinConcentracion, renovaciones: u19FinRenovaciones, svc: u19SvcProy, term: u19TermRenovado,'
+    + ' deuInicial: U19_DEUDAS_INICIAL, deuNormalizar: u19DeuNormalizar, deuNormalizarDeuda: u19DeuNormalizarDeuda,'
+    + ' deuSaldoCLP: u19DeuSaldoCLP, deuPctCupo: u19DeuPctCupo, deuAlertaCupo: u19DeuAlertaCupo, deuTotales: u19DeuTotales,'
+    + ' deuCapacidad: u19DeuCapacidad, deuLibre: u19DeuLibre, deuUSD: u19DeuUSD, deuPesosDec: u19DeuPesosDec,'
+    + ' deuAbonoCalc: u19DeuAbonoCalc, deuAjusteCalc: u19DeuAjusteCalc, deuDeshacerCalc: u19DeuDeshacerCalc,'
+    + ' deuUrgente: u19DeuHacerUrgente, deuFechaMas: u19DeuFechaMas };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -296,6 +309,109 @@ const cuerpoMP = iMP >= 0 ? src.slice(iMP, src.indexOf('\n};\n', iMP)) : '';
 di(/u19TermRenovado\(item\.terminoActual, fechaPago\)/.test(cuerpoMP) && /var termino = renov\.termino;/.test(cuerpoMP),
   'pago · «Marcar pagado» calcula el término con u19TermRenovado sobre el término actual');
 avisos.push('pago · «Marcar pagado» suma 30 días al vencimiento vigente, ejecutado en 11 casos');
+
+/* --- 5 · DEUDAS: la cuarta tarjeta de Finanzas (15-sep-2026) -------
+   Con los valores de partida de Diego y hoy fijo en 2026-09-15. Se prueba
+   la aritmética, no la pantalla: total, neto, capacidad, fecha, cupo,
+   abonos en las dos monedas, el ajuste desde el portal y deshacer. */
+const HOY_DEU = '2026-09-15';
+const md = m.deuNormalizar(JSON.parse(JSON.stringify(m.deuInicial)));
+const NAC = md.deudas[0], INT = md.deudas[1], TROT = md.deudas[2], DELEX = md.deudas[3];
+igual(NAC.id, 'tc-nacional', 'deudas · los valores de partida traen la nacional primero');
+igual(TROT.tipo, 'no_urgente', 'deudas · la trotadora es «no urgente»');
+igual(DELEX.tipo, 'por_venir', 'deudas · Delex es «por venir»');
+const tot = m.deuTotales(md);
+igual(tot.n, 2, 'deudas · solo las urgentes cuentan: nacional e internacional');
+igual(m.deuSaldoCLP(INT), 575837, 'deudas · USD 612 × 940,91 = $575.837, redondeado a peso');
+igual(tot.total, 993752, 'deudas · total $993.752 = 417.915 + 575.837');
+igual(tot.comprometidos, 300000, 'deudas · ingresos comprometidos: 100.000 + 200.000');
+igual(tot.neto, 693752, 'deudas · neto = total − comprometidos');
+igual(m.deuCapacidad(800000, md), 725000, 'deudas · capacidad = utilidad 800.000 − sistema 75.000');
+const libre = m.deuLibre(tot.neto, 725000, HOY_DEU);
+igual(libre.dias, 29, 'deudas · ceil(693.752 / 725.000 × 30) = 29 días');
+igual(libre.fecha, '2026-10-14', 'deudas · 29 días desde el 15-sep es el 14-oct');
+igual(libre.etiqueta, '~14 oct 2026', 'deudas · «Libre de deuda urgente: ~14 oct 2026»');
+igual(Math.round(m.deuPctCupo(NAC)), 84, 'cupo · la nacional va al 84 %');
+di(m.deuAlertaCupo(m.deuPctCupo(NAC)) === true, 'cupo · y su barra va en rojo (≥ 80 %)');
+igual(Math.round(m.deuPctCupo(INT)), 51, 'cupo · la internacional va al 51 %');
+di(m.deuAlertaCupo(m.deuPctCupo(INT)) === false, 'cupo · al 51 % la barra no alarma');
+di(m.deuAlertaCupo(79.9) === false && m.deuAlertaCupo(80) === true, 'cupo · el umbral es exactamente 80 %');
+igual(m.deuPctCupo(TROT), null, 'cupo · sin cupo no hay porcentaje');
+igual(INT.estado, 'CONFIRMADO', 'deudas · la internacional está CONFIRMADA');
+igual(m.deuUSD(INT.saldo), 'USD 612,00', 'formato · «USD 612,00», con coma decimal');
+igual(m.deuUSD(1200), 'USD 1.200,00', 'formato · miles con punto');
+igual(m.deuPesosDec(INT.tipoCambio), '$940,91', 'formato · el dólar se muestra «$940,91»');
+
+/* Abono de $100.000 a la nacional */
+const ab = m.deuAbonoCalc(NAC, 100000, 'CLP', HOY_DEU, 'prueba');
+igual(ab.saldo, 317915, 'abono · 417.915 − 100.000 = 317.915');
+igual(ab.mov.montoCLP, 100000, 'abono · queda registrado en pesos');
+igual(ab.mov.tipo, 'abono', 'abono · el movimiento es un abono');
+igual(ab.mov.saldoAntes, 417915, 'abono · guarda el saldo anterior para poder deshacerlo');
+NAC.saldo = ab.saldo; NAC.abonos = NAC.abonos.concat([ab.mov]);
+const tot2 = m.deuTotales(md);
+igual(tot2.total, 893752, 'abono · el total baja a $893.752');
+const libre2 = m.deuLibre(tot2.neto, 725000, HOY_DEU);
+igual(libre2.dias, 25, 'abono · 593.752 / 725.000 × 30 → 25 días');
+igual(libre2.etiqueta, '~10 oct 2026', 'abono · «~10 oct 2026»');
+
+/* Deshacer el abono */
+const des = m.deuDeshacerCalc(NAC);
+igual(des.saldo, 417915, 'deshacer · vuelve al saldo anterior');
+igual(des.abonos.length, 0, 'deshacer · y quita el movimiento del historial');
+NAC.saldo = des.saldo; NAC.abonos = des.abonos;
+igual(m.deuDeshacerCalc(NAC), null, 'deshacer · sin historial no hay nada que deshacer');
+
+/* La internacional: abonar en USD o en CLP */
+const abU = m.deuAbonoCalc(INT, 100, 'USD', HOY_DEU, '');
+igual(abU.saldo, 512, 'abono USD · 612 − 100 = 512');
+igual(abU.mov.montoCLP, 94091, 'abono USD · en pesos, con el dólar guardado: $94.091');
+const abC = m.deuAbonoCalc(INT, 94091, 'CLP', HOY_DEU, '');
+igual(abC.mov.montoOriginal, 100, 'abono en CLP a una deuda en USD · $94.091 / 940,91 = USD 100,00');
+igual(abC.saldo, 512, 'abono en CLP a una deuda en USD · el saldo baja en dólares');
+
+/* Abono mayor que el saldo */
+igual(m.deuAbonoCalc(NAC, 999999, 'CLP', HOY_DEU, '').saldo, 0, 'abono · mayor que el saldo deja 0, nunca negativo');
+igual(m.deuAbonoCalc(INT, 5000, 'USD', HOY_DEU, '').saldo, 0, 'abono · lo mismo en dólares');
+
+/* Ajuste desde el portal */
+const ajN = m.deuAjusteCalc(NAC, 82085, HOY_DEU);
+igual(ajN.saldo, 417915, 'portal · nacional: cupo 500.000 − disponible 82.085 = 417.915');
+igual(ajN.mov.tipo, 'ajuste', 'portal · se registra como AJUSTE, no como abono');
+igual(ajN.mov.saldoAntes, 417915, 'portal · guarda el saldo anterior');
+const ajI = m.deuAjusteCalc(INT, 588, HOY_DEU);
+igual(ajI.saldo, 612, 'portal · internacional: cupo 1.200 − disponible 588 = 612');
+igual(m.deuAjusteCalc(TROT, 100, HOY_DEU), null, 'portal · sin cupo no hay ajuste');
+igual(m.deuAjusteCalc(NAC, 999999, HOY_DEU).saldo, 0, 'portal · un disponible mayor que el cupo deja saldo 0');
+/* Deshacer un ajuste */
+const dTmp = JSON.parse(JSON.stringify(NAC)); dTmp.saldo = 300000;
+const ajT = m.deuAjusteCalc(dTmp, 0, HOY_DEU);
+dTmp.saldo = ajT.saldo; dTmp.abonos = dTmp.abonos.concat([ajT.mov]);
+igual(dTmp.saldo, 500000, 'portal · disponible 0 = todo el cupo usado');
+igual(m.deuDeshacerCalc(dTmp).saldo, 300000, 'deshacer · también revierte un ajuste');
+
+/* La trotadora pasa a urgente */
+m.deuUrgente(TROT);
+di(TROT.incluirEnTotal === true && TROT.tipo === 'credito', 'urgente · la trotadora pasa a crédito urgente');
+const tot3 = m.deuTotales(md);
+igual(tot3.total, 2493752, 'urgente · con la trotadora el total es $2.493.752');
+igual(tot3.n, 3, 'urgente · y son 3 urgentes');
+m.deuUrgente(DELEX);
+di(DELEX.estado === 'CONFIRMADO' && DELEX.tipo === 'credito' && DELEX.incluirEnTotal === true, 'urgente · un «por venir» se vuelve deuda real CONFIRMADA');
+
+/* Sin capacidad, neto cero, comprometidos mayores que la deuda */
+igual(m.deuLibre(693752, 0, HOY_DEU), null, 'capacidad · sin capacidad de pago devuelve null (la tarjeta lo dice en rojo)');
+igual(m.deuLibre(693752, -5000, HOY_DEU), null, 'capacidad · negativa también');
+igual(m.deuLibre(0, 725000, HOY_DEU).etiqueta, 'ya', 'capacidad · neto 0 → «ya»');
+igual(m.deuTotales({ deudas: [{ incluirEnTotal: true, moneda: 'CLP', saldo: 100000 }], ingresosComprometidos: [{ monto: 300000 }] }).neto, 0,
+  'neto · nunca negativo aunque los comprometidos superen la deuda');
+igual(m.deuNormalizar({}).deudas.length, 0, 'normalizar · un modelo vacío no revienta');
+igual(m.deuNormalizar({ deudas: { a: 1 } }).deudas.length, 0, 'normalizar · un objeto donde va un array queda vacío, no revienta');
+igual(m.deuNormalizarDeuda({ id: 'a b/c', moneda: 'EUR' }).moneda, 'CLP', 'normalizar · moneda desconocida → CLP');
+igual(m.deuNormalizarDeuda({ id: 'a b/c', saldo: -5 }).saldo, 0, 'normalizar · un saldo negativo queda en 0');
+igual(m.deuNormalizarDeuda({ id: 'a b/c' }).id, 'abc', 'normalizar · el id se limpia para ir dentro de onclick');
+igual(m.deuFechaMas('2026-12-25', 10), '2027-01-04', 'fecha · cruza el año');
+avisos.push('deudas · la cuarta tarjeta: total, fecha, cupo, abonos en CLP y USD, ajuste desde el portal y deshacer, ejecutados con los valores del 15-sep');
 
 /* --- salida --- */
 console.log('\nUS19-APP · números de Finanzas');

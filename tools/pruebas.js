@@ -456,6 +456,11 @@ function extraerFuncion(nombre) {
        sincronizacion ni con el respaldo: una serie creada en el PC no existia
        en el telefono. */
     series:     { sync: true,  respaldo: true,  borrado: true },
+    /* Las deudas (15-sep-2026): un objeto con las deudas, los ingresos
+       comprometidos y el costo del sistema. Viaja cifrado con la
+       sincronizacion y con el respaldo, como los socios; «borrar TODO» lo
+       deja vacio (u19DeuVacio), sin volver a los valores de partida. */
+    deudas:     { sync: true,  respaldo: true,  borrado: true },
 
     /* horasExtra NO se sincroniza, a proposito. Un equipo que solo anadio
        horas no mueve las fechas de rutinas ni clientes; meterlo en el payload
