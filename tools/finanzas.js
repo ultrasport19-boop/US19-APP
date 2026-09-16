@@ -63,7 +63,11 @@ const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   fn('u19DeuNumONull'), fn('u19DeuId'), fn('u19DeuIdLimpio'), fn('u19DeuNormalizarDeuda'), fn('u19DeuNormalizar'),
   fn('u19DeuSaldoCLP'), fn('u19DeuPctCupo'), fn('u19DeuAlertaCupo'), fn('u19DeuTotales'), fn('u19DeuCapacidad'),
   fn('u19DeuFechaMas'), fn('u19DeuFechaCorta'), fn('u19DeuLibre'), fn('u19DeuUSD'), fn('u19DeuPesosDec'),
-  fn('u19DeuAbonoCalc'), fn('u19DeuAjusteCalc'), fn('u19DeuDeshacerCalc'), fn('u19DeuHacerUrgente')].join('\n');
+  fn('u19DeuAbonoCalc'), fn('u19DeuAjusteCalc'), fn('u19DeuDeshacerCalc'), fn('u19DeuHacerUrgente'),
+  /* Asistencia (16-sep-2026): las cuentas y el gráfico de la pestaña. */
+  'function escapeHtml(s){ return String(s); }', 'function escapeAttr(s){ return String(s); }',
+  fn('u19AsisSumarDias'), fn('u19AsisDiaSemana'), fn('u19AsisLunes'), fn('u19AsisNorm'), fn('u19AsisResumen'),
+  fn('u19AsisActivo'), fn('u19AsisFicha'), fn('u19AsisMotivos'), fn('u19AsisBarrasSVG')].join('\n');
 
 let m;
 try {
@@ -74,7 +78,8 @@ try {
     + ' deuSaldoCLP: u19DeuSaldoCLP, deuPctCupo: u19DeuPctCupo, deuAlertaCupo: u19DeuAlertaCupo, deuTotales: u19DeuTotales,'
     + ' deuCapacidad: u19DeuCapacidad, deuLibre: u19DeuLibre, deuUSD: u19DeuUSD, deuPesosDec: u19DeuPesosDec,'
     + ' deuAbonoCalc: u19DeuAbonoCalc, deuAjusteCalc: u19DeuAjusteCalc, deuDeshacerCalc: u19DeuDeshacerCalc,'
-    + ' deuUrgente: u19DeuHacerUrgente, deuFechaMas: u19DeuFechaMas };')();
+    + ' deuUrgente: u19DeuHacerUrgente, deuFechaMas: u19DeuFechaMas,'
+    + ' asisResumen: u19AsisResumen, asisLunes: u19AsisLunes, asisFicha: u19AsisFicha, asisMotivos: u19AsisMotivos, asisBarras: u19AsisBarrasSVG };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -412,6 +417,66 @@ igual(m.deuNormalizarDeuda({ id: 'a b/c', saldo: -5 }).saldo, 0, 'normalizar · 
 igual(m.deuNormalizarDeuda({ id: 'a b/c' }).id, 'abc', 'normalizar · el id se limpia para ir dentro de onclick');
 igual(m.deuFechaMas('2026-12-25', 10), '2027-01-04', 'fecha · cruza el año');
 avisos.push('deudas · la cuarta tarjeta: total, fecha, cupo, abonos en CLP y USD, ajuste desde el portal y deshacer, ejecutados con los valores del 15-sep');
+
+/* --- Asistencia (16-sep-2026): las cuentas de la pestaña ------------------
+   Fechas escritas a mano a propósito: las cuentas reciben «hoy» como
+   argumento, así que no dependen del reloj. El 16-sep-2026 es miércoles. */
+{
+  const HOYA = '2026-09-16';
+  const F = (f, h, n, t, v) => ({ f: f, h: h, n: n, t: t, v: v, m: '…4544' });
+  const filas = [
+    F('2026-09-16', '18:00', 'Ana Pérez', '12345678', 1),
+    F('2026-09-16', '18:00', 'Bruno Soto', '22223333', 0),
+    F('2026-09-15', '19:00', 'Bruno Soto', '22223333', 0),
+    F('2026-09-15', '19:00', 'Carla Díaz', '', 1),
+    F('2026-09-14', '07:00', 'Ana Pérez', '12345678', 1),
+    F('2026-09-12', '10:00', 'Carla Díaz', '', 1),
+    F('2026-08-10', '18:00', 'Diego Mena', '44445555', 0),
+    F('2026-08-17', '18:00', 'Elisa Rojas', '55556666', 0),   // día 31 contando hoy: ya no entra en los 30
+    F('2026-09-17', '18:00', 'Mañana', '99998888', 0),
+    { f: 'basura', h: '18:00', n: 'X', t: '', v: 0 }
+  ];
+  const r = m.asisResumen(filas, HOYA, 12);
+  igual(JSON.stringify([r.vino30, r.falto30, r.pct30, r.dias30]), '[4,2,67,4]',
+    'asistencia · 30 días: vinieron, faltaron, % y días con lista (sin lo de mañana, lo viejo ni la basura)');
+  igual(r.semanas.length, 12, 'asistencia · 12 semanas, también las vacías');
+  igual(r.semanas[11].lunes, '2026-09-14', 'asistencia · la última semana empieza el lunes de hoy');
+  igual(JSON.stringify([r.semanas[11].vino, r.semanas[11].falto, r.semanas[11].pct]), '[3,2,60]', 'asistencia · la semana de hoy');
+  di(r.semanas.some(s => s.lunes === '2026-08-10' && s.falto === 1 && s.pct === 0), 'asistencia · la falta del 10-ago cae en su semana aunque quede fuera de 30 días');
+  di(r.semanas.some(s => s.pct === null), 'asistencia · una semana sin lista tiene % null, no cero');
+  igual(r.horas.map(x => x.h + ':' + x.vino + '/' + x.falto).join(','), '07:1/0,10:1/0,18:1/1,19:1/1', 'asistencia · por hora');
+  igual(r.diasSemana.map(x => x.d).join(','), '1,2,3,4,5,6', 'asistencia · lunes a viernes siempre, y el sábado porque hubo lista');
+  igual(r.top.length, 1, 'asistencia · «quién falta más» trae solo a quien faltó');
+  igual(JSON.stringify([r.top[0].nombre, r.top[0].falto, r.top[0].vino, r.top[0].pct, r.top[0].ultima]), '["Bruno Soto",2,0,0,"2026-09-16"]',
+    'asistencia · con sus faltas, lo que vino, su % y la última falta');
+  igual(m.asisResumen([], HOYA).hayDatos, false, 'asistencia · sin filas no hay datos');
+  igual(m.asisResumen(null, HOYA).pct30, null, 'asistencia · sin filas el % es null, no NaN');
+  igual(m.asisLunes('2026-09-20'), '2026-09-14', 'asistencia · el domingo es de la semana que empezó el lunes');
+  igual(m.asisLunes('2026-09-01'), '2026-08-31', 'asistencia · la semana cruza el mes');
+
+  const cl2 = [
+    { name: 'Ana', notionEstado: 'Activo', notionFichaIngreso: 'Aceptada' },
+    { name: 'Carla', notionEstado: 'Activo' },
+    { name: 'Bruno', notionEstado: 'Activo', notionFichaIngreso: 'Pedida' },
+    { name: 'Diego', notionEstado: 'Inactivo', notionMotivoSalida: 'Horario' },
+    { name: 'Elisa', notionEstado: 'Inactivo', notionMotivoSalida: 'Horario' },
+    { name: 'Fede', notionEstado: 'Inactivo', notionMotivoSalida: 'Precio' },
+    { name: 'Gabi', notionEstado: 'Inactivo' },
+    { name: 'Hugo', activo: false, notionEstado: 'Activo', notionFichaIngreso: '' }
+  ];
+  const fi = m.asisFicha(cl2);
+  igual(JSON.stringify([fi.activos, fi.aceptada, fi.pedida, fi.sin, fi.faltan.join('|')]), '[3,1,1,1,"Bruno|Carla"]',
+    'ficha · activos, aceptada, pedida, sin pedir y a quién le falta, en orden');
+  const mo = m.asisMotivos(cl2);
+  igual(JSON.stringify(mo.lista), '[{"motivo":"Horario","n":2},{"motivo":"Precio","n":1}]', 'motivos · ordenados de más a menos');
+  igual(JSON.stringify([mo.total, mo.sinMotivo]), '[3,2]', 'motivos · los activos no cuentan; marcado inactivo en la app cuenta como sin motivo');
+
+  const svg = m.asisBarras([{ lbl: 'Lu', vino: 3, falto: 1, top: '1' }, { lbl: 'Ma', vino: 0, falto: 0, top: '' }]);
+  di(/<svg/.test(svg) && (svg.match(/<rect/g) || []).length === 2 && /Lu: 3 vinieron/.test(svg) && /Lu: 1 faltaron/.test(svg),
+    'barras · una barra verde y una roja, con su detalle al pasar el dedo');
+  di(!/<svg/.test(m.asisBarras([{ lbl: 'Lu', vino: 0, falto: 0 }])), 'barras · sin datos no dibuja un gráfico vacío');
+  avisos.push('asistencia · la pestaña: 30 días, semanas, horas, días, quién falta más, ficha de ingreso y motivos, ejecutados con listas inventadas');
+}
 
 /* --- salida --- */
 console.log('\nUS19-APP · números de Finanzas');

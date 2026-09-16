@@ -82,6 +82,46 @@
       "nombre": "deudas: la barra del cupo solo alarma desde el 90 %",
       "de": "  return pct != null && pct >= 80;",
       "a": "  return pct != null && pct >= 90;"
+    },
+    {
+      "nombre": "asistencia · lo de mañana cuenta",
+      "de": "    if (!r || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.f || \"\")) || r.f > hoy) return;",
+      "a": "    if (!r || !/^\\d{4}-\\d{2}-\\d{2}$/.test(String(r.f || \"\"))) return;"
+    },
+    {
+      "nombre": "asistencia · los 30 días son 31",
+      "de": "  var c30 = u19AsisSumarDias(hoy, -29);",
+      "a": "  var c30 = u19AsisSumarDias(hoy, -30);"
+    },
+    {
+      "nombre": "asistencia · el domingo abre semana",
+      "de": "  return w === 0 ? 7 : w;",
+      "a": "  return w;"
+    },
+    {
+      "nombre": "asistencia · «quién falta más» trae a quien no faltó",
+      "de": "  }).filter(function(p){ return p.falto > 0; })",
+      "a": "  }).filter(function(p){ return true; })"
+    },
+    {
+      "nombre": "ficha · «Pedida» cuenta como firmada",
+      "de": "    if (f === \"Aceptada\"){ out.aceptada++; return; }",
+      "a": "    if (f === \"Aceptada\" || f === \"Pedida\"){ out.aceptada++; return; }"
+    },
+    {
+      "nombre": "motivos · los activos también cuentan",
+      "de": "    if (!c || u19AsisActivo(c)) return;",
+      "a": "    if (!c) return;"
+    },
+    {
+      "nombre": "activo · la marca de la app no manda",
+      "de": "  if (!c || c.activo === false) return false;\n  var e = String(c.notionEstado || \"\").trim().toLowerCase();",
+      "a": "  if (!c) return false;\n  var e = String(c.notionEstado || \"\").trim().toLowerCase();"
+    },
+    {
+      "nombre": "semana · una semana sin lista sale en 0 %",
+      "de": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });",
+      "a": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : 0 });"
     }
   ]
 }
