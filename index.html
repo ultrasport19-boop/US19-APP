@@ -15812,6 +15812,7 @@ function horasSyncNotion(){
   if (!settings.horasApiUrl){ toast("Falta la URL del Apps Script en ⚙ Ajustes", "error"); return; }
   var payload = {
     accion: "horas",
+    clave: (settings.dashClave || "").trim(),   // 16-sep-2026: el bot exige su clave también aquí
     ciclo: { etiqueta: _horasData.ciclo.etiqueta, inicio: horasISO(_horasData.ciclo.ini), fin: horasISO(_horasData.ciclo.fin), pago: horasISO(_horasData.ciclo.pago) },
     cfg: _horasData.cfg,
     total: _horasData.total,
