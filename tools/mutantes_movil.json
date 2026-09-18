@@ -32,6 +32,16 @@
       "nombre": "en escritorio tambien se esconde la cabecera",
       "de": "  var oculto = (movil && altoTabs) ? Math.max(0, alto - altoTabs) : 0;",
       "a": "  var oculto = altoTabs ? Math.max(0, alto - altoTabs) : 0;"
+    },
+    {
+      "nombre": "Informes vuelve a salirse en un telefono de 320",
+      "de": ".inf-2col > *{min-width:0;}",
+      "a": ".inf-2col > *{min-width:auto;}"
+    },
+    {
+      "nombre": "el boton de instalar vuelve a taparlo todo",
+      "de": "s.bottom = \"14px\"; s.zIndex = \"60\";",
+      "a": "s.bottom = \"14px\"; s.zIndex = \"9999\";"
     }
   ]
 }

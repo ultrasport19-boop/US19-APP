@@ -739,6 +739,13 @@ comprobar('movil - en escritorio no se oculta nada',
   src.indexOf('var oculto = (movil && altoTabs) ? Math.max(0, alto - altoTabs) : 0;') > 0,
   'fuera del telefono el bloque se queda entero, como siempre');
 
+comprobar('movil - Informes cabe en un telefono de 320 px',
+  src.indexOf('.inf-2col > *{min-width:0;}') > 0,
+  'un hijo de rejilla trae min-width:auto y no baja del ancho de su contenido: medía 328 en un padre de 278');
+comprobar('movil - el boton de instalar NO tapa los modales',
+  src.indexOf('s.bottom = "14px"; s.zIndex = "60";') > 0,
+  'a 9999 flotaba por encima de cualquier ventana y se comia el boton de cerrar');
+
 console.log('archivo: ' + ruta);
 console.log('');
 avisos.forEach(function (a) { console.log('  · ' + a); });

@@ -821,6 +821,10 @@ img{max-width:100%;display:block;}
 .inf-2col > * > .card:first-child{margin-top:0 !important;}
 .inf-aside > .card{margin:0;}
 @media (max-width:1000px){.inf-2col{grid-template-columns:1fr;}}
+/* 18-sep-2026 - Un hijo de rejilla trae `min-width:auto` y no baja del
+   ancho minimo de su contenido: en un telefono de 320 px medía 328 y se
+   llevaba por delante toda la vista de Informes. */
+.inf-2col > *{min-width:0;}
 .inf-evs{display:grid;grid-template-columns:1fr 1fr;gap:.7rem;}
 @media (max-width:640px){.inf-evs{grid-template-columns:1fr;}}
 .rnd-2col{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1rem;align-items:start;}
@@ -31846,7 +31850,10 @@ function _cus19Import(){
     btn.textContent = "⬇ Instalar app";
     btn.setAttribute("aria-label", "Instalar Ultra-Sport 19");
     var s = btn.style;
-    s.position = "fixed"; s.right = "14px"; s.bottom = "14px"; s.zIndex = "9999";
+    /* 60, no 9999: por encima del contenido y de la cabecera (50), y por
+       DEBAJO de los modales (100) y de las capas a pantalla completa. A
+       9999 tapaba el boton de cerrar de cualquier ventana en el movil. */
+    s.position = "fixed"; s.right = "14px"; s.bottom = "14px"; s.zIndex = "60";
     s.padding = "10px 14px"; s.border = "0"; s.borderRadius = "999px";
     s.background = "#E21C25"; s.color = "#fff";
     s.font = "600 13px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
