@@ -49,11 +49,6 @@
       "a": "    if (i % 3 === 0) return [base];"
     },
     {
-      "nombre": "sale un estimulo de mas en cada serie",
-      "de": "  var cuantos = Math.max(1, Math.floor(total / iv));",
-      "a": "  var cuantos = Math.max(1, Math.floor(total / iv) + 1);"
-    },
-    {
       "nombre": "puede haber dos Pods base a la vez",
       "de": "  p.pods.forEach(function(pod){ if (pod.base){ if (vistaBase) pod.base = false; else vistaBase = true; } });",
       "a": "  p.pods.forEach(function(pod){ if (pod.base){ vistaBase = true; } });"
@@ -122,6 +117,46 @@
       "nombre": "la simulacion pierde el color del estimulo",
       "de": "      enc[e.pods[k]] = c ? c.hex : \"#ffffff\";",
       "a": "      enc[e.pods[k]] = \"#ffffff\";"
+    },
+    {
+      "nombre": "sale un estimulo de mas en cada serie",
+      "de": "  while (tt < total - 0.000001 && n < 2000){",
+      "a": "  while (tt <= total && n < 2000){"
+    },
+    {
+      "nombre": "el retardo de luz no se aplica",
+      "de": "    tt += iv + blzRetardoSeg(L, rnd);",
+      "a": "    tt += iv;"
+    },
+    {
+      "nombre": "el retardo se lee del logica ya rehecho y se pierde siempre",
+      "de": "  var rt = (L.retardo && typeof L.retardo === \"object\") ? L.retardo : {};",
+      "a": "  var rt = (p.logica.retardo && typeof p.logica.retardo === \"object\") ? p.logica.retardo : {};"
+    },
+    {
+      "nombre": "un maximo de retardo menor que el minimo se queda al reves",
+      "de": "  if (p.logica.retardo.max < p.logica.retardo.min) p.logica.retardo.max = p.logica.retardo.min;",
+      "a": "  if (false) p.logica.retardo.max = p.logica.retardo.min;"
+    },
+    {
+      "nombre": "en home base el color vuelve a decidirlo el azar",
+      "de": "    if (L.modo === \"base\") col.ids = blzColorBase_(p, elegidos, col.ids);",
+      "a": "    if (false) col.ids = blzColorBase_(p, elegidos, col.ids);"
+    },
+    {
+      "nombre": "la accion del segmentado vuelve a pisar al formateador de segundos",
+      "de": "window.blzElegir = function(campo, valor){",
+      "a": "window.blzSeg = function(campo, valor){"
+    },
+    {
+      "nombre": "un color elegido no entra en la paleta y el Pod se encenderia en blanco",
+      "de": "  if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });",
+      "a": "  if (false) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });"
+    },
+    {
+      "nombre": "el editor deja de pintar el paso 2, donde se tocan los colores",
+      "de": "  html += blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p);",
+      "a": "  html += blzPaso1Html(c, p) + blzPaso3Html(p);"
     }
   ]
 }

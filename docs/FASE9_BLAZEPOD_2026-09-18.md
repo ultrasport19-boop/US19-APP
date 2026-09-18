@@ -227,3 +227,77 @@ que cruza las dos listas y un mutante que la reintroduce.
 
 Publicar. El cambio queda en el repositorio, listo para revisión; **no se ha desplegado
 nada**.
+
+---
+
+## 10 · v2 (18-sep-2026, la misma noche): la forma de la app oficial
+
+Diego probó la v1 y dijo lo que había que oír: **«entiendo la modalidad, pero quiero que sea
+más sencillo; yo sobre un Pod o sobre un número le asigno el color»**. Y mandó **diez
+capturas** de su teléfono. Tenía razón: la v1 era una pantalla de ajustes y le obligaba a
+traducir entre lo que ve en cancha y lo que ve aquí.
+
+### Lo que enseñan las capturas
+
+Su app no es una pantalla: es un **asistente de tres pasos**, con el nombre de la actividad
+en la cabecera («Create Focus», «Create Home Base», «Create Sequence»).
+
+| Paso | Cómo se llama allí | Qué tiene |
+|---|---|---|
+| 1 | Defining General Setup | Stations · Pods per station · (Foco) Distracting pods · (Base) Colors per player |
+| 2 | Colors / Pod / Steps and Light Rules | El color se toca. En Secuencia, «Pod #1» con su círculo. En Foco, objetivo y distractores. En Base, dos bloques. Y **Lights Out** y **Light Delay Time** |
+| 3 | Finalize Activity | Duration (Time · Hit count · Time or Hit count; en Secuencia Time · Once · Repetitions), **Cycles**, y en Foco **Strikeout** |
+
+### Lo que se rehízo
+
+- **Tres secciones numeradas** —1 · Montaje, 2 · Colores y reglas de luz, 3 · Cerrar la
+  actividad— en vez de la pantalla única de ajustes.
+- **El color se toca.** `blzCirculoHtml` pinta el círculo; al tocarlo se abre la paleta de
+  ocho colores justo debajo (`blzPaletaHtml`) y al elegir uno se aplica. En Secuencia cada
+  paso es una fila «Paso 1 · Pod #1 ▾ · consigna · ●», igual que el teléfono. En Foco hay
+  círculo de objetivo y de distractor; en Home Base, de base y de esquinas.
+- **Controles segmentados** (`blzSegHtml`) y **contadores ±** (`blzContadorHtml`) en lugar de
+  `<select>` e `<input type=number>`: con el móvil en una mano, un desplegable es un enemigo.
+- **Retardo de luz**, que no existía: Ninguno · Fijo · Aleatorio, y afecta de verdad al
+  ritmo. Con «ninguno» el motor produce **exactamente** la misma serie que antes, así que
+  ninguna planificación guardada cambia.
+- **Estaciones**, **Pods distractores**, **Colores por jugador**, **Strikeout** y las tres
+  formas de **Duración**. «Series» pasa a llamarse **Ciclos** en pantalla.
+- **En Home Base el color lo manda el rol**: la base siempre del suyo y las esquinas del
+  suyo. Antes lo decidía el azar y «vuelve a la base» no se distinguía de nada.
+
+`blzColoresHtml` y `blzSecuenciaHtml` se retiraron; las sustituyen `blzPaso1Html`,
+`blzPaso2Html` y `blzPaso3Html`.
+
+### La segunda colisión de nombres, cazada por su propia prueba
+
+`window.blzSeg` (la acción de los segmentados) pisaba a **`blzSeg(segundos)`**, el
+formateador que escribe «1 min 30 s». Exactamente el mismo fallo que `blzPodBase` en la v1,
+y esta vez **lo cazó la comprobación que se añadió entonces**, antes de tocar el navegador.
+La acción se llama ahora `window.blzElegir`. La prueba se gana el sueldo.
+
+### Un fallo del que conviene acordarse
+
+El bloque nuevo de `blzNormalizar` leía el retardo de `p.logica.retardo`… pero unas líneas
+más arriba **`p.logica` se rehace entero**, así que para cuando llegaba ahí el retardo del
+plan ya no existía y siempre salía «ninguno». Se lee de `L`, que es el original. Tiene su
+mutante.
+
+### Pruebas de la v2
+
+`tools/blazepod.js` pasa de 166 a **218 comprobaciones**; los mutantes, de 24 a **31**. Con
+las demás suites: **1.530 comprobaciones sin fallos** y **79 mutantes, los 79 caen**. Cero
+errores de consola en Chrome.
+
+Comprobado además en el navegador, no solo en el banco: tocar el círculo abre los ocho
+colores, elegir uno lo aplica y lo mete en la paleta, el contador de pasos crea pasos, el de
+Pods añade Pods, cambiar «Pod #1» por «Pod #3» reordena lo que hace el motor, y el retardo
+fijo de 1,5 s deja 9 estímulos donde antes había 13. Sin desplazamiento horizontal a 390 px
+—se corrigió de paso el interruptor «Usar BlazePod», que sacaba 6 px al documento entero—.
+
+### Lo que sigue sin existir
+
+Sigue sin controlar los Pods, y ahora que se parece tanto a la app oficial conviene decirlo
+más alto, no menos: el aviso está en el editor, en la hoja impresa y en el enlace compartido.
+Lo que el teléfono hace y esto no puede hacer es **leer el toque**: por eso «se apaga con
+toque» es una etiqueta de planificación y la simulación usa el intervalo como referencia.

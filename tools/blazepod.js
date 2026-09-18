@@ -294,7 +294,7 @@ dentro('blzVistaHtml', "html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeH
 dentro('blzLienzoHtml', 'escapeHtml(pod.etiqueta)', 'escapado · la etiqueta del Pod');
 dentro('blzLienzoHtml', 'escapeHtml(a.etiqueta)', 'escapado · la etiqueta de un elemento del lienzo');
 dentro('blzSelHtml', 'escapeAttr(pod.etiqueta)', 'escapado · la etiqueta en el campo de edición');
-dentro('blzSecuenciaHtml', 'escapeAttr(paso.consigna)', 'escapado · la instrucción de cada paso');
+dentro('blzPaso2Html', 'escapeAttr(paso.consigna)', 'escapado · la instrucción de cada paso');
 dentro('blzHudHtml', "escapeHtml(e.consigna || \"\")", 'escapado · la consigna que se ve durante la simulación');
 di(fn('blzImprimirHtml').indexOf('escapeHtml(pod.etiqueta.slice(0, 18))') >= 0, 'escapado · la hoja impresa');
 di(fn('blzImprimirHtml').indexOf('escapeHtml(x.v)') >= 0, 'escapado · la tabla de la hoja impresa');
@@ -373,6 +373,96 @@ di(fn('circPlan').indexOf('blz') < 0, 'circuito · el plan del cronómetro tampo
 di(fn('circDuracion').indexOf('blz') < 0, 'circuito · ni la duración');
 di(fn('circTrabajoDe').indexOf('blz') < 0, 'circuito · ni el tiempo por estación');
 di(fn('circNuevo').indexOf('blazePlan') < 0, 'circuito · un circuito nuevo nace sin plan BlazePod, como antes');
+
+/* ================= 10. la v2: la forma de la app oficial ================= */
+/* Diez capturas del teléfono de Diego, 18-sep-2026. Su app es un asistente de
+   tres pasos y el color se toca encima del Pod. Esto vigila que lo que se
+   añadió para parecerse a ella siga funcionando. */
+
+/* --- retardo de luz («Light Delay Time») --- */
+const sinRet = m.blzEstimulos(planDemo(), 1);
+igual('retardo · sin retardo salen los diez de siempre', sinRet.length, 10);
+const retFijo = conLogica({}, planDemo());
+retFijo.logica.retardo = { tipo: 'fijo', seg: 2, min: 0, max: 0 };
+const lFijo = m.blzEstimulos(retFijo, 1);
+di(lFijo.length < sinRet.length, 'retardo fijo · caben menos estímulos en la misma serie (' + lFijo.length + ' < ' + sinRet.length + ')');
+di(lFijo.every((e, i) => i === 0 || Math.abs((e.t - lFijo[i - 1].t) - 5) < 1e-6), 'retardo fijo · 3 s de intervalo + 2 s de hueco = 5 s entre luces');
+const retAzar = conLogica({}, planDemo());
+retAzar.logica.retardo = { tipo: 'aleatorio', seg: 0, min: 0.5, max: 3 };
+const lAzar1 = m.blzEstimulos(retAzar, 1), lAzar2 = m.blzEstimulos(retAzar, 1);
+igual('retardo aleatorio · la misma semilla repite los mismos huecos', JSON.stringify(lAzar1), JSON.stringify(lAzar2));
+const huecos = lAzar1.slice(1).map((e, i) => +(e.t - lAzar1[i].t).toFixed(6));
+di(new Set(huecos).size > 1, 'retardo aleatorio · los huecos NO son todos iguales');
+di(huecos.every(h => h >= 3.5 - 1e-6 && h <= 6 + 1e-6), 'retardo aleatorio · cada hueco cae entre el mínimo y el máximo');
+/* Y en ningún caso se sale de la serie: eso era lo que hacía la cuenta previa. */
+[sinRet, lFijo, lAzar1].forEach((l, k) => {
+  di(l.every(e => e.t < 30), 'retardo · ningún estímulo empieza fuera de la serie (caso ' + (k + 1) + ')');
+});
+
+/* --- base y periferia: el color lo manda el rol, no el azar --- */
+const hb = conLogica({ modo: 'base', duracion: 40, intervalo: 2 }, planDemo());
+hb.pods[0].base = true;
+hb.homebase = { base: 'blanco', esquinas: 'rojo' };
+const lHb = m.blzEstimulos(hb, 1);
+di(lHb.filter((e, i) => i % 2 === 0).every(e => e.colores[0] === 'blanco'), 'home base · la base se enciende SIEMPRE de su color');
+di(lHb.filter((e, i) => i % 2 === 1).every(e => e.colores[0] === 'rojo'), 'home base · las esquinas, del suyo');
+di(lHb.every(e => e.colores.length === e.pods.length), 'home base · un color por Pod encendido');
+
+/* --- los campos nuevos, y que un plan de la v1 siga abriendo --- */
+const v1 = m.blzNormalizar(planDemo());
+igual('v2 · un plan sin montaje recibe una estación', v1.montaje.estaciones, 1);
+igual('v2 · y los Pods por estación son los que hay', v1.montaje.podsPorEstacion, 6);
+igual('v2 · sin retardo declarado, ninguno', v1.logica.retardo.tipo, 'ninguno');
+igual('v2 · la actividad termina por tiempo mientras no se diga otra cosa', v1.fin.por, 'tiempo');
+igual('v2 · strikeout apagado de fábrica', v1.strikeout, false);
+di(!!m.blzColorPorId(v1, v1.homebase.base) && !!m.blzColorPorId(v1, v1.homebase.esquinas),
+   'v2 · los colores de home base salen de la paleta, no inventados');
+di(v1.homebase.base !== v1.homebase.esquinas, 'v2 · y la base no es del mismo color que las esquinas');
+igual('v2 · un plan de la v1 produce EXACTAMENTE la misma serie que antes',
+      JSON.stringify(m.blzEstimulos(planDemo(), 1).map(e => e.pods[0] + ':' + e.colores[0])),
+      JSON.stringify(sinRet.map(e => e.pods[0] + ':' + e.colores[0])));
+const raro = m.blzNormalizar({ montaje: 'no soy objeto', fin: 7, homebase: null, logica: { retardo: 'tampoco' } });
+di(raro.montaje.estaciones === 1 && raro.fin.por === 'tiempo' && raro.logica.retardo.tipo === 'ninguno',
+   'v2 · campos corruptos no tumban nada, caen en su valor por defecto');
+di(m.blzNormalizar({ logica: { retardo: { tipo: 'aleatorio', min: 5, max: 1 } } }).logica.retardo.max >= 5,
+   'v2 · un máximo menor que el mínimo se corrige, no se queda al revés');
+
+/* --- las tres pantallas existen y hacen lo que dicen --- */
+['blzPaso1Html', 'blzPaso2Html', 'blzPaso3Html'].forEach(f => {
+  di(src.indexOf('function ' + f + '(') >= 0, 'pantallas · existe ' + f);
+});
+dentro('blzEditorHtml', 'blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p)', 'pantallas · el editor pinta los tres pasos en orden');
+dentro('blzPaso1Html', 'montaje.podsPorEstacion', 'paso 1 · el contador de Pods es el de la app');
+dentro('blzPaso1Html', 'montaje.estaciones', 'paso 1 · y el de estaciones');
+dentro('blzPaso2Html', 'blzCirculoHtml(destino, paso.color', 'paso 2 · cada paso lleva su círculo de color al lado');
+dentro('blzPaso2Html', "blzCirculoHtml('foco:objetivo'", 'paso 2 · en foco, el círculo del color objetivo');
+dentro('blzPaso2Html', "blzCirculoHtml('base:base'", 'paso 2 · en home base, el círculo de la base');
+dentro('blzPaso2Html', 'logica.retardo.tipo', 'paso 2 · el retardo de luz se elige aquí');
+dentro('blzPaso3Html', 'fin.por', 'paso 3 · la duración tiene sus tres formas');
+dentro('blzPaso3Html', "'Ciclos', 'veces que se repite entera', 'series'", 'paso 3 · los ciclos se llaman ciclos, como en la app');
+di(fn('blzPaso3Html').indexOf('strikeout') >= 0, 'paso 3 · el strikeout de foco está');
+
+/* --- tocar el color: es lo que pidió Diego --- */
+dentro('blzCirculoHtml', "onclick=\"blzPaleta(", 'color · tocar el círculo abre la paleta');
+dentro('blzPaletaHtml', "onclick=\"blzColorPoner(", 'color · y elegir uno lo aplica');
+dentro('blzPaletaHtml', 'if (_blzPaleta !== destino) return', 'color · la paleta solo sale bajo el círculo que tocaste');
+di(src.indexOf('window.blzColorPoner = function(destino, colorId)') >= 0, 'color · la acción existe');
+di(src.indexOf('if (!blzColorPorId(p, ref.id)) p.colores.push(') >= 0,
+   'color · un color elegido entra en la paleta, para que el motor lo encuentre');
+dentro('blzSegHtml', 'onclick="blzElegir(', 'controles · los segmentados escriben con blzElegir');
+di(src.indexOf('window.blzElegir = function(campo, valor)') >= 0, 'controles · y esa acción existe');
+di(src.indexOf('window.blzSeg = function') < 0, 'controles · blzSeg sigue siendo SOLO el formateador de segundos');
+igual('controles · los ocho colores están en la paleta', m.BLZ_COLORES.length, 8);
+
+/* --- escapado y accesibilidad de lo nuevo --- */
+dentro('blzPaso2Html', 'escapeHtml(pod.etiqueta)', 'escapado · la etiqueta del Pod en el selector del paso');
+dentro('blzContadorHtml', 'escapeHtml(titulo)', 'escapado · el título de cada contador');
+dentro('blzSegHtml', 'escapeHtml(o.nombre)', 'escapado · el texto de cada botón del segmentado');
+dentro('blzCirculoHtml', 'aria-label=', 'accesibilidad · el círculo de color se anuncia');
+dentro('blzContadorHtml', 'aria-label="Quitar uno"', 'accesibilidad · los ± tienen nombre');
+dentro('blzSegHtml', 'aria-pressed=', 'accesibilidad · el segmentado dice cuál está elegido');
+di(src.indexOf('.blz-cnt-b{width:40px;height:40px') >= 0, 'móvil · los ± miden 40 px');
+di(src.indexOf('.blz-circ{width:38px;height:38px') >= 0, 'móvil · los círculos de color, 38 px');
 
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');
