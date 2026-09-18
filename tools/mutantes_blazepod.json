@@ -70,8 +70,8 @@
     },
     {
       "nombre": "la secuencia se recorre al reves",
-      "de": "    u19Arr(p.secuencia).forEach(function(paso){",
-      "a": "    u19Arr(p.secuencia).slice().reverse().forEach(function(paso){"
+      "de": "  if (L.modo === \"secuencia\" || L.modo === \"libre\"){\n    var t = 0;\n    u19Arr(p.secuencia).forEach(function(paso){",
+      "a": "  if (L.modo === \"secuencia\" || L.modo === \"libre\"){\n    var t = 0;\n    u19Arr(p.secuencia).slice().reverse().forEach(function(paso){"
     },
     {
       "nombre": "todos a la vez enciende uno solo",
@@ -150,8 +150,8 @@
     },
     {
       "nombre": "un color elegido no entra en la paleta y el Pod se encenderia en blanco",
-      "de": "  if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });",
-      "a": "  if (false) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });"
+      "de": "     encuentra y el Pod se encendería en blanco. */\n  if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });",
+      "a": "     encuentra y el Pod se encendería en blanco. */\n  if (false) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });"
     },
     {
       "nombre": "el editor deja de pintar el paso 2, donde se tocan los colores",
@@ -177,6 +177,21 @@
       "nombre": "el objetivo sale siempre y no hay nada que inhibir",
       "de": "    var hayObjetivo = rnd() < 0.7;",
       "a": "    var hayObjetivo = true;"
+    },
+    {
+      "nombre": "el color fijo de un Pod deja de respetarse",
+      "de": "    if (podQ && podQ.color && blzColorPorId(plan, podQ.color)) out[q] = podQ.color;",
+      "a": "    if (false) out[q] = podQ.color;"
+    },
+    {
+      "nombre": "el color del Pod no sobrevive a normalizar",
+      "de": "             color: blzColorRef(pod && pod.color) ? pod.color : \"\" };",
+      "a": "             color: \"\" };"
+    },
+    {
+      "nombre": "la paleta del color fijo no se dibuja en ningun sitio",
+      "de": "    + blzPaletaHtml('pod:' + pod.n);",
+      "a": "    + \"\";"
     }
   ]
 }

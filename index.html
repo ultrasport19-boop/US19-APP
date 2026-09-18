@@ -18786,7 +18786,8 @@ function blzNormalizar(plan){
   p.pods = u19Arr(p.pods).slice(0, BLZ_MAX_PODS).map(function(pod, i){
     return { id: blzTexto(pod && pod.id, 40) || ("p" + (i + 1)), n: i + 1,
              x: blzNum(pod && pod.x, 0.5, 0.03, 0.97), y: blzNum(pod && pod.y, 0.5, 0.05, 0.95),
-             etiqueta: blzTexto(pod && pod.etiqueta, 24), base: !!(pod && pod.base) };
+             etiqueta: blzTexto(pod && pod.etiqueta, 24), base: !!(pod && pod.base),
+             color: blzColorRef(pod && pod.color) ? pod.color : "" };
   });
   var vistaBase = false;
   p.pods.forEach(function(pod){ if (pod.base){ if (vistaBase) pod.base = false; else vistaBase = true; } });
@@ -18944,7 +18945,10 @@ function blzElegirPods(plan, rnd, prev, i){
   return blzTomar(cand, k2, rnd).sort(function(a, b){ return a - b; });
 }
 /* Un color por Pod encendido. En «foco» marca si ese color es el objetivo. */
-function blzColoresDe(plan, rnd, cuantos){
+/* Recibe los Pods encendidos, no solo cuantos: hace falta para respetar el
+   color propio de cada uno. */
+function blzColoresDe(plan, rnd, pods){
+  var cuantos = u19Arr(pods).length;
   var cols = u19Arr(plan.colores), out = [];
   if (!cols.length) return { ids: [], objetivo: true, consigna: "" };
   if (plan.logica.modo === "todos"){
@@ -18974,6 +18978,15 @@ function blzColoresDe(plan, rnd, cuantos){
     var cj = Math.floor(rnd() * cols.length);
     var c = cols[cj >= cols.length ? cols.length - 1 : cj];
     for (var j = 0; j < cuantos; j++) out.push(c.id);
+  }
+  /* Un Pod con color propio manda sobre lo que decidiera el modo. Se aplica
+     DESPUES de la tirada y sin tocar el generador: una actividad sin colores
+     fijos sale exactamente igual que antes y la semilla sigue valiendo. */
+  var suyos = u19Arr(plan.pods);
+  for (var q = 0; q < out.length; q++){
+    var podQ = null;
+    for (var w = 0; w < suyos.length; w++) if (suyos[w].n === pods[q]) { podQ = suyos[w]; break; }
+    if (podQ && podQ.color && blzColorPorId(plan, podQ.color)) out[q] = podQ.color;
   }
   var obj = u19Arr(plan.objetivo);
   /* «objetivo» quiere decir: en este estimulo HAY algo que tocar. */
@@ -19015,7 +19028,7 @@ function blzEstimulos(plan, serie){
      retardo sale exactamente lo mismo que antes (30 s a 3 s = diez). */
   while (tt < total - 0.000001 && n < 2000){
     var elegidos = blzElegirPods(p, rnd, (L.modo === "base" ? prevPeri : prev), n);
-    var col = blzColoresDe(p, rnd, elegidos.length);
+    var col = blzColoresDe(p, rnd, elegidos);
     /* En base y periferia el color lo manda el ROL, no el azar: la base
        siempre del suyo y las esquinas del suyo, como en la app. */
     if (L.modo === "base") col.ids = blzColorBase_(p, elegidos, col.ids);
@@ -19365,6 +19378,10 @@ function blzSelHtml(p){
     + '<span class="blz-sel-t">P' + pod.n + '</span>'
     + '<input type="text" maxlength="24" placeholder="Etiqueta (opcional)" value="' + escapeAttr(pod.etiqueta) + '" oninput="blzPodEtiqueta(' + pod.n + ',this.value)">'
     + '<label class="blz-mini"><input type="checkbox"' + (pod.base ? ' checked' : '') + ' onchange="blzPodMarcarBase(' + pod.n + ',this.checked)"> Base</label>'
+    + '<span class="blz-mini">Color fijo</span>'
+    + (pod.color ? blzCirculoHtml('pod:' + pod.n, pod.color, 'Pod ' + pod.n)
+                 : '<button type="button" class="blz-circ mas" onclick="blzPaleta(\'pod:' + pod.n + '\')" title="Darle un color fijo a este Pod" aria-label="Color fijo del Pod ' + pod.n + '">+</button>')
+    + (pod.color ? '<button class="btn btn-ghost btn-sm" onclick="blzPodColorQuitar(' + pod.n + ')" title="Que vuelva a tomar el color del modo">Quitar color</button>' : '')
     + '<span class="blz-dpad" role="group" aria-label="Mover el Pod ' + pod.n + '">'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',-1,0)" aria-label="Mover a la izquierda">◀</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',0,-1)" aria-label="Mover arriba">▲</button>'
@@ -19374,7 +19391,10 @@ function blzSelHtml(p){
         ? '<button class="btn btn-secondary btn-sm" onclick="blzPasoDeEstePod(' + pod.n + ')" title="Añadir un paso de la secuencia que encienda este Pod">+ Paso</button>' : '')
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodDup(' + pod.n + ')" title="Duplicar">⎘</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodBorrar(' + pod.n + ')" title="Quitar">×</button>'
-    + '</div>';
+    + '</div>'
+    /* La paleta del color fijo se dibuja AQUI, debajo de la caja: sin esto el
+       boton abria _blzPaleta y no aparecia nada en pantalla. */
+    + blzPaletaHtml('pod:' + pod.n);
 }
 function blzReloj(s){
   s = Math.max(0, Math.round(blzNum(s, 0, 0, 999999)));
@@ -19845,12 +19865,25 @@ function blzPaso2Html(p){
   } else if (L.modo === "focus"){
     /* «Colors and Light Rules» de Foco: el color al que se responde arriba y,
        bajo la línea, los distractores. */
-    html += '<div class="blz-estacion"><div class="blz-est-t">Estación 1</div>'
-      + '<div class="blz-rol"><span>Color objetivo</span>' + blzCirculoHtml('foco:objetivo', u19Arr(p.objetivo)[0] || 'verde', 'Objetivo') + '</div>'
-      + blzPaletaHtml('foco:objetivo')
-      + '<div class="blz-rol-sep">Colores distractores</div>'
-      + '<div class="blz-rol"><span>No se responde a este</span>' + blzCirculoHtml('foco:distractor', blzDistractorId(p), 'Distractor') + '</div>'
-      + blzPaletaHtml('foco:distractor')
+    /* Dos filas de circulos, como los contadores «Colors per player» y
+       «Distracting colors» del telefono: se tocan y se eligen, y con + y -
+       se ponen tantos como haga falta. */
+    var objs = blzFocoLista(p, 'obj'), diss = blzFocoLista(p, 'dis');
+    html += '<div class="blz-estacion"><div class="blz-est-t">Colores a los que SÍ hay que responder</div>'
+      + '<div class="blz-rol-fila">'
+      + objs.map(function(id, i){ return blzCirculoHtml('foco:obj:' + i, id, 'Objetivo ' + (i + 1)); }).join('')
+      + '<button type="button" class="blz-circ mas" onclick="blzFocoAnadir(\'obj\')" title="Añadir otro color objetivo" aria-label="Añadir color objetivo">+</button>'
+      + (objs.length > 1 ? '<button type="button" class="blz-circ menos" onclick="blzFocoQuitar(\'obj\')" title="Quitar el último" aria-label="Quitar color objetivo">−</button>' : '')
+      + '</div>'
+      + objs.map(function(id, i){ return blzPaletaHtml('foco:obj:' + i); }).join('')
+      + '<div class="blz-rol-sep">Colores de trampa: se encienden y NO se tocan</div>'
+      + '<div class="blz-rol-fila">'
+      + diss.map(function(id, i){ return blzCirculoHtml('foco:dis:' + i, id, 'Distractor ' + (i + 1)); }).join('')
+      + '<button type="button" class="blz-circ mas" onclick="blzFocoAnadir(\'dis\')" title="Añadir otro color de trampa" aria-label="Añadir color distractor">+</button>'
+      + (diss.length > 1 ? '<button type="button" class="blz-circ menos" onclick="blzFocoQuitar(\'dis\')" title="Quitar el último" aria-label="Quitar color distractor">−</button>' : '')
+      + '</div>'
+      + diss.map(function(id, i){ return blzPaletaHtml('foco:dis:' + i); }).join('')
+      + (diss.length ? '' : '<p class="blz-alerta">Sin colores de trampa no hay foco que entrenar: añade al menos uno.</p>')
       + '</div>';
 
   } else if (L.modo === "base"){
@@ -19910,11 +19943,22 @@ function blzRetardoCamposHtml(p){
   }
   return '';
 }
-/* El primer color de la paleta que NO es objetivo: el distractor que se ve. */
-function blzDistractorId(p){
-  var obj = u19Arr(p.objetivo), l = u19Arr(p.colores);
-  for (var i = 0; i < l.length; i++) if (obj.indexOf(l[i].id) < 0) return l[i].id;
-  return (l[0] || BLZ_COLORES[0]).id;
+/* Los colores de cada rol en Foco. La paleta es la union de los dos: objetivo
+   es la lista `p.objetivo` y trampa es todo lo demas que haya en la paleta.
+   Asi no hace falta una segunda lista que mantener en sitio. */
+function blzFocoLista(p, rol){
+  var obj = u19Arr(p.objetivo), l = u19Arr(p.colores), out = [];
+  l.forEach(function(c){
+    var esObj = obj.indexOf(c.id) >= 0;
+    if ((rol === "obj") === esObj) out.push(c.id);
+  });
+  if (rol === "obj" && !out.length && l.length) out.push(l[0].id);
+  return out;
+}
+/* Un color libre de la paleta de la casa que no este ya puesto. */
+function blzColorLibre(p){
+  for (var i = 0; i < BLZ_COLORES.length; i++) if (!blzColorPorId(p, BLZ_COLORES[i].id)) return BLZ_COLORES[i];
+  return null;
 }
 
 /* ---------- paso 3 · cerrar la actividad ---------- */
@@ -20017,14 +20061,25 @@ window.blzColorPoner = function(destino, colorId){
     var paso = u19Arr(p.secuencia)[parseInt(cual, 10)];
     if (paso) paso.color = ref.id;
   } else if (que === "foco"){
-    if (cual === "objetivo"){
-      p.objetivo = [ref.id];
-    } else {
-      /* El distractor sale de la paleta, así que basta con que esté y no sea
-         el objetivo. Si eligió el mismo color que el objetivo, no hay foco
-         que valga: se avisa y no se hace. */
-      if (u19Arr(p.objetivo).indexOf(ref.id) >= 0){ toast("Ese ya es el color objetivo: elige otro para el distractor", "warn"); _blzPaleta = ""; blzRepintar(); return; }
+    /* destino = foco:obj:<i> o foco:dis:<i>. Cambiar el color de una casilla
+       es cambiar ESE color de la paleta y recolocarlo en su rol. */
+    var rol = partes[1], idx = parseInt(partes[2], 10);
+    var lista = blzFocoLista(p, rol), viejoId = lista[idx];
+    var otros = blzFocoLista(p, rol === "obj" ? "dis" : "obj");
+    if (otros.indexOf(ref.id) >= 0){
+      toast(rol === "obj" ? "Ese color ya es de trampa: quítalo de ahí primero" : "Ese color ya es objetivo: quítalo de ahí primero", "warn");
+      _blzPaleta = ""; blzRepintar(); return;
     }
+    if (viejoId && viejoId !== ref.id){
+      /* El color viejo sale de la paleta si no lo usa nadie mas. */
+      p.colores = u19Arr(p.colores).filter(function(c){ return c.id !== viejoId; });
+      p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== viejoId; });
+      u19Arr(p.pods).forEach(function(pod){ if (pod.color === viejoId) pod.color = ""; });
+      u19Arr(p.secuencia).forEach(function(paso){ if (paso.color === viejoId) paso.color = ref.id; });
+      if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });
+    }
+    p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== ref.id; });
+    if (rol === "obj") p.objetivo.push(ref.id);
   } else if (que === "base"){
     p.homebase[cual === "base" ? "base" : "esquinas"] = ref.id;
   } else if (que === "lista"){
@@ -20061,6 +20116,37 @@ window.blzColorQuitar = function(){
   _circEdit.blazePlan = blzNormalizar(p);
   blzRepintar();
 };
+/* Un color mas para el rol que sea: se saca de la paleta de la casa. */
+window.blzFocoAnadir = function(rol){
+  var p = blzEdNorm(); if (!p) return;
+  var libre = blzColorLibre(p);
+  if (!libre){ toast("Ya están los ocho colores puestos", "warn"); return; }
+  p.colores.push({ id: libre.id, hex: libre.hex, consigna: libre.consigna });
+  if (rol === "obj") p.objetivo = u19Arr(p.objetivo).concat([libre.id]);
+  _circEdit.blazePlan = blzNormalizar(p);
+  _blzPaleta = "";
+  blzRepintar();
+};
+window.blzFocoQuitar = function(rol){
+  var p = blzEdNorm(); if (!p) return;
+  var lista = blzFocoLista(p, rol);
+  if (lista.length <= 1){ toast(rol === "obj" ? "Deja al menos un color objetivo" : "Deja al menos un color de trampa", "warn"); return; }
+  var fuera = lista[lista.length - 1];
+  p.colores = u19Arr(p.colores).filter(function(c){ return c.id !== fuera; });
+  p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== fuera; });
+  u19Arr(p.pods).forEach(function(pod){ if (pod.color === fuera) pod.color = ""; });
+  u19Arr(p.secuencia).forEach(function(paso){ if (paso.color === fuera) paso.color = (u19Arr(p.colores)[0] || BLZ_COLORES[0]).id; });
+  _circEdit.blazePlan = blzNormalizar(p);
+  blzRepintar();
+};
+/* El Pod vuelve a tomar el color que le toque por el modo. */
+window.blzPodColorQuitar = function(n){
+  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
+  pod.color = "";
+  _circEdit.blazePlan = blzNormalizar(p);
+  blzRepintar();
+};
+
 /* Añade un paso que use justo el Pod que está seleccionado en el lienzo. */
 window.blzPasoDeEstePod = function(n){
   var p = blzEdNorm(); if (!p) return;

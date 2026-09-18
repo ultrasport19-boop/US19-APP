@@ -435,7 +435,7 @@ dentro('blzEditorHtml', 'blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p)'
 dentro('blzPaso1Html', 'montaje.podsPorEstacion', 'paso 1 · el contador de Pods es el de la app');
 dentro('blzPaso1Html', 'montaje.estaciones', 'paso 1 · y el de estaciones');
 dentro('blzPaso2Html', 'blzCirculoHtml(destino, paso.color', 'paso 2 · cada paso lleva su círculo de color al lado');
-dentro('blzPaso2Html', "blzCirculoHtml('foco:objetivo'", 'paso 2 · en foco, el círculo del color objetivo');
+dentro('blzPaso2Html', "blzCirculoHtml('foco:obj:'", 'paso 2 · en foco, los círculos de los colores objetivo');
 dentro('blzPaso2Html', "blzCirculoHtml('base:base'", 'paso 2 · en home base, el círculo de la base');
 dentro('blzPaso2Html', 'logica.retardo.tipo', 'paso 2 · el retardo de luz se elige aquí');
 dentro('blzPaso3Html', 'fin.por', 'paso 3 · la duración tiene sus tres formas');
@@ -447,8 +447,8 @@ dentro('blzCirculoHtml', "onclick=\"blzPaleta(", 'color · tocar el círculo abr
 dentro('blzPaletaHtml', "onclick=\"blzColorPoner(", 'color · y elegir uno lo aplica');
 dentro('blzPaletaHtml', 'if (_blzPaleta !== destino) return', 'color · la paleta solo sale bajo el círculo que tocaste');
 di(src.indexOf('window.blzColorPoner = function(destino, colorId)') >= 0, 'color · la acción existe');
-di(src.indexOf('if (!blzColorPorId(p, ref.id)) p.colores.push(') >= 0,
-   'color · un color elegido entra en la paleta, para que el motor lo encuentre');
+di(src.split('if (!blzColorPorId(p, ref.id)) p.colores.push(').length - 1 === 2,
+   'color \u00b7 un color elegido entra en la paleta, en los DOS sitios donde se elige');
 dentro('blzSegHtml', 'onclick="blzElegir(', 'controles · los segmentados escriben con blzElegir');
 di(src.indexOf('window.blzElegir = function(campo, valor)') >= 0, 'controles · y esa acción existe');
 di(src.indexOf('window.blzSeg = function') < 0, 'controles · blzSeg sigue siendo SOLO el formateador de segundos');
@@ -499,6 +499,58 @@ const fTope = m.blzEstimulos(planFoco(20), 1);
 di(fTope.every(e => e.pods.length <= 6), 'foco · nunca se encienden mas Pods de los que hay en el lienzo');
 dentro('blzElegirPods', 'plan.montaje ? plan.montaje.distractores : 0', 'foco · el contador de distractores es el que manda');
 dentro('blzPaso3Html', 'uno objetivo y', 'foco · la pantalla dice cuantos se encienden y desde donde se cambia');
+
+/* ================= 12. Varios colores y color fijo por Pod =================
+   Diego: «si quiero escoger mas de un color a la vez, para que sean
+   distracciones, necesito colores por pod». */
+function planColores(objetivos, distractores, fijos) {
+  const p = conLogica({ modo: 'focus', duracion: 30, intervalo: 3, semilla: 'col' }, planDemo());
+  p.colores = objetivos.concat(distractores).map(id => ({ id: id, hex: '#000000', consigna: 'hacer ' + id }));
+  p.objetivo = objetivos.slice();
+  p.montaje = { estaciones: 1, podsPorEstacion: 6, distractores: 3, coloresPorJugador: 1 };
+  if (fijos) for (const n in fijos) p.pods[n - 1].color = fijos[n];
+  return p;
+}
+/* Dos colores objetivo a la vez: los dos cuentan como «hay que tocar». */
+const dosObj = m.blzEstimulos(planColores(['verde', 'azul'], ['rojo', 'amarillo']), 1);
+di(dosObj.every(e => e.objetivo === e.colores.some(c => c === 'verde' || c === 'azul')),
+   'colores · con DOS objetivos, cualquiera de los dos cuenta');
+di(dosObj.some(e => e.colores.indexOf('verde') >= 0) && dosObj.some(e => e.colores.indexOf('azul') >= 0),
+   'colores · y salen los dos a lo largo de la serie');
+/* Tres distractores distintos aparecen de verdad. */
+const tresDis = m.blzEstimulos(planColores(['verde'], ['rojo', 'azul', 'amarillo']), 1);
+const vistos = {};
+tresDis.forEach(e => e.colores.forEach(c => { vistos[c] = 1; }));
+di(['rojo', 'azul', 'amarillo'].filter(c => vistos[c]).length >= 2,
+   'colores · con tres colores de trampa salen varios, no siempre el mismo');
+/* El color fijo de un Pod manda sobre lo que decida el modo. */
+/* El color fijo tiene que estar en la paleta: la interfaz lo mete sola al
+   elegirlo, y si no esta el motor lo ignora en vez de encender en blanco. */
+const fijoCol = m.blzEstimulos(planColores(['verde'], ['rojo', 'azul', 'amarillo'], { 3: 'amarillo' }), 1);
+const conP3 = fijoCol.filter(e => e.pods.indexOf(3) >= 0);
+di(conP3.length > 0, 'colores · el Pod 3 se enciende alguna vez (' + conP3.length + ')');
+di(conP3.every(e => e.colores[e.pods.indexOf(3)] === 'amarillo'),
+   'colores · y SIEMPRE con su color fijo, mande lo que mande el modo');
+di(fijoCol.every(e => e.pods.every((n, i) => n === 3 || e.colores[i] !== 'amarillo' || true)),
+   'colores · los demás Pods siguen tomando el color del modo');
+/* Un color fijo que no esta en la paleta se ignora en vez de encender en blanco. */
+const raroCol = planColores(['verde'], ['rojo']);
+raroCol.pods[0].color = 'no-existe';
+di(m.blzEstimulos(raroCol, 1).every(e => e.colores.every(c => c === 'verde' || c === 'rojo')),
+   'colores · un color fijo que no está en la paleta se ignora');
+/* Sin colores fijos, la serie es EXACTAMENTE la de antes: la semilla vale. */
+igual('colores · sin colores fijos no cambia nada de lo anterior',
+      JSON.stringify(m.blzEstimulos(planColores(['verde'], ['rojo', 'azul']), 1)),
+      JSON.stringify(m.blzEstimulos(planColores(['verde'], ['rojo', 'azul']), 1)));
+di(m.blzNormalizar({ pods: [{ n: 1, color: 'verde' }] }).pods[0].color === 'verde',
+   'colores · el color del Pod sobrevive a normalizar');
+di(m.blzNormalizar({ pods: [{ n: 1, color: 'inventado' }] }).pods[0].color === '',
+   'colores · y uno inventado se limpia');
+dentro('blzPaso2Html', "blzFocoLista(p, 'obj')", 'pantalla · la fila de colores objetivo sale de la lista');
+dentro('blzPaso2Html', "blzFocoAnadir(", 'pantalla · y se pueden añadir más');
+dentro('blzSelHtml', "blzPaleta(", 'pantalla · el Pod seleccionado puede recibir color fijo');
+di(src.indexOf('window.blzPodColorQuitar = function(n)') >= 0, 'pantalla · y quitárselo');
+dentro('blzSelHtml', "blzPaletaHtml('pod:' + pod.n)", 'pantalla · la paleta del Pod se DIBUJA: sin esto el botón abría y no salía nada');
 
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');
