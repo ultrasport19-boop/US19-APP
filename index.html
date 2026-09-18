@@ -18929,7 +18929,13 @@ function blzElegirPods(plan, rnd, prev, i){
     var libres = (L.sinRepetir && u19Arr(prev).length) ? peri.filter(function(x){ return prev.indexOf(x) < 0; }) : peri;
     return blzTomar(libres.length ? libres : peri, 1, rnd);
   }
-  var k2 = Math.min(Math.max(1, blzEnt(L.simultaneos, 1, 1, N)), N);
+  /* En Foco mandan los distractores del paso 1: se encienden uno objetivo
+     mas tantos distractores como haya pedido. En los demas modos manda
+     «Pods a la vez». */
+  var pedidos = (L.modo === "focus")
+    ? 1 + blzEnt(plan.montaje ? plan.montaje.distractores : 0, 0, 0, N - 1)
+    : blzEnt(L.simultaneos, 1, 1, N);
+  var k2 = Math.min(Math.max(1, pedidos), N);
   var cand = nums.slice();
   if (L.sinRepetir && u19Arr(prev).length && N > k2){
     var f = cand.filter(function(x){ return prev.indexOf(x) < 0; });
@@ -18946,14 +18952,42 @@ function blzColoresDe(plan, rnd, cuantos){
       var ci = Math.floor(rnd() * cols.length);
       out.push(cols[ci >= cols.length ? cols.length - 1 : ci].id);
     }
+  } else if (plan.logica.modo === "focus"){
+    /* Uno de los encendidos lleva el color objetivo y el resto distractores.
+       Con un solo color para todos no habria foco que entrenar: cuatro Pods
+       iguales no son «uno bueno y tres trampa». */
+    var objIds = u19Arr(plan.objetivo);
+    var buenos = cols.filter(function(c){ return objIds.indexOf(c.id) >= 0; });
+    var malos = cols.filter(function(c){ return objIds.indexOf(c.id) < 0; });
+    if (!buenos.length) buenos = cols;
+    if (!malos.length) malos = buenos;
+    /* Y a veces NO sale el objetivo: entonces no hay que tocar nada. Eso es
+       lo que entrena la inhibicion, y sin ello el ejercicio se responde solo. */
+    var hayObjetivo = rnd() < 0.7;
+    var donde = Math.floor(rnd() * cuantos);
+    for (var f = 0; f < cuantos; f++){
+      var lista = (hayObjetivo && f === donde) ? buenos : malos;
+      var fi = Math.floor(rnd() * lista.length);
+      out.push(lista[fi >= lista.length ? lista.length - 1 : fi].id);
+    }
   } else {
     var cj = Math.floor(rnd() * cols.length);
     var c = cols[cj >= cols.length ? cols.length - 1 : cj];
     for (var j = 0; j < cuantos; j++) out.push(c.id);
   }
   var obj = u19Arr(plan.objetivo);
+  /* «objetivo» quiere decir: en este estimulo HAY algo que tocar. */
   var esObj = (plan.logica.modo !== "focus") ? true : out.some(function(id){ return obj.indexOf(id) >= 0; });
-  var ref = blzColorPorId(plan, out[0]);
+  /* La consigna que se lee es la del color al que hay que responder, no la
+     del primer Pod de la lista, que puede ser un distractor. */
+  var cual = out[0];
+  if (plan.logica.modo === "focus"){
+    /* Sin objetivo en pantalla no hay consigna que dar: ensenar la de un
+       distractor seria decirle que haga justo lo que NO tiene que hacer. */
+    cual = "";
+    for (var g = 0; g < out.length; g++) if (obj.indexOf(out[g]) >= 0){ cual = out[g]; break; }
+  }
+  var ref = blzColorPorId(plan, cual);
   return { ids: out, objetivo: esObj, consigna: ref ? (ref.consigna || "") : "" };
 }
 /* Los estímulos de UNA serie. Con duración 30 e intervalo 3 salen diez. */
@@ -19905,6 +19939,7 @@ function blzPaso3Html(p){
     + (esSec ? '' : '<label class="blz-mini">Cada estímulo dura <input type="number" min="0.2" max="600" step="0.1" data-blz="logica.intervalo" value="' + L.intervalo + '"> s</label>')
     + '<label class="blz-mini">La luz se queda <input type="number" min="0.2" max="600" step="0.1" data-blz="logica.luz" value="' + L.luz + '"> s</label>'
     + (L.modo === "todos" || L.modo === "random" ? '<label class="blz-mini">Pods a la vez <input type="number" min="0" max="' + BLZ_MAX_PODS + '" data-blz="logica.simultaneos" value="' + L.simultaneos + '"></label>' : '')
+    + (L.modo === "focus" ? '<span class="blz-mini">Se encienden ' + (1 + p.montaje.distractores) + ': uno objetivo y ' + p.montaje.distractores + ' de trampa \u00b7 se cambia en el paso 1</span>' : '')
     + '</div></div>'
     + '<div class="blz-regla"><div class="blz-regla-x">'
     + '<label class="blz-mini">Semilla <input type="text" maxlength="40" data-blz="logica.semilla" value="' + escapeAttr(L.semilla) + '" title="Con la misma semilla la simulación repite exactamente la misma serie"></label>'

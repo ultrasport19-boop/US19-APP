@@ -464,6 +464,42 @@ dentro('blzSegHtml', 'aria-pressed=', 'accesibilidad · el segmentado dice cuál
 di(src.indexOf('.blz-cnt-b{width:40px;height:40px') >= 0, 'móvil · los ± miden 40 px');
 di(src.indexOf('.blz-circ{width:38px;height:38px') >= 0, 'móvil · los círculos de color, 38 px');
 
+/* ================= 11. Foco con varios Pods encendidos =================
+   Diego, 18-sep por la noche: «la idea es poder colocar mas distracciones, no
+   que solo 1 pod se prenda; si lo configuro asi que se enciendan 4 pods». El
+   contador de distractores del paso 1 se guardaba y nadie lo leia, y aunque
+   se encendieran varios todos salian del MISMO color, que no es un foco sino
+   cuatro luces iguales. */
+function planFoco(distractores) {
+  const p = conLogica({ modo: 'focus', duracion: 30, intervalo: 3, semilla: 'foco' }, planDemo());
+  p.objetivo = ['verde'];
+  p.montaje = { estaciones: 1, podsPorEstacion: 6, distractores: distractores, coloresPorJugador: 1 };
+  return p;
+}
+const f0 = m.blzEstimulos(planFoco(0), 1);
+di(f0.every(e => e.pods.length === 1), 'foco · sin distractores se enciende UNO, como antes');
+const f3 = m.blzEstimulos(planFoco(3), 1);
+di(f3.every(e => e.pods.length === 4), 'foco · con 3 distractores se encienden CUATRO Pods (' + f3[0].pods.length + ')');
+const f1 = m.blzEstimulos(planFoco(1), 1);
+di(f1.every(e => e.pods.length === 2), 'foco · y con 1 distractor, dos');
+di(f3.every(e => new Set(e.pods).size === e.pods.length), 'foco · sin repetir el mismo Pod dentro del estimulo');
+di(f3.some(e => new Set(e.colores).size > 1), 'foco · los Pods encendidos NO son todos del mismo color');
+di(f3.every(e => e.colores.length === e.pods.length), 'foco · un color por Pod encendido');
+/* Como maximo UNO lleva el color al que hay que responder: si hubiera dos,
+   no habria eleccion que entrenar. */
+di(f3.every(e => e.colores.filter(c => c === 'verde').length <= 1), 'foco · a lo sumo un Pod lleva el color objetivo');
+di(f3.every(e => e.objetivo === e.colores.some(c => c === 'verde')), 'foco · la marca dice si HAY objetivo en pantalla');
+di(f3.some(e => e.objetivo === false), 'foco · a veces no sale el objetivo: entonces no se toca nada');
+di(f3.filter(e => !e.objetivo).every(e => !e.consigna), 'foco · sin objetivo no se da consigna, que seria mandar hacer lo contrario');
+di(f3.filter(e => e.objetivo).every(e => e.consigna === 'Conducción'), 'foco · con objetivo, la consigna es la del color objetivo, no la de un distractor');
+igual('foco · y sigue siendo repetible con la misma semilla',
+      JSON.stringify(m.blzEstimulos(planFoco(3), 1)), JSON.stringify(f3));
+/* El tope: no se pueden encender mas Pods de los que hay. */
+const fTope = m.blzEstimulos(planFoco(20), 1);
+di(fTope.every(e => e.pods.length <= 6), 'foco · nunca se encienden mas Pods de los que hay en el lienzo');
+dentro('blzElegirPods', 'plan.montaje ? plan.montaje.distractores : 0', 'foco · el contador de distractores es el que manda');
+dentro('blzPaso3Html', 'uno objetivo y', 'foco · la pantalla dice cuantos se encienden y desde donde se cambia');
+
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');
 console.log('archivo: ' + ruta);

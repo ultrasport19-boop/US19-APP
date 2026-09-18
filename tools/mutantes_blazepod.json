@@ -157,6 +157,26 @@
       "nombre": "el editor deja de pintar el paso 2, donde se tocan los colores",
       "de": "  html += blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p);",
       "a": "  html += blzPaso1Html(c, p) + blzPaso3Html(p);"
+    },
+    {
+      "nombre": "el contador de distractores vuelve a no hacer nada",
+      "de": "  var pedidos = (L.modo === \"focus\")\n    ? 1 + blzEnt(plan.montaje ? plan.montaje.distractores : 0, 0, 0, N - 1)\n    : blzEnt(L.simultaneos, 1, 1, N);",
+      "a": "  var pedidos = blzEnt(L.simultaneos, 1, 1, N);"
+    },
+    {
+      "nombre": "en foco todos los Pods vuelven a encenderse del mismo color",
+      "de": "      var lista = (hayObjetivo && f === donde) ? buenos : malos;",
+      "a": "      var lista = buenos;"
+    },
+    {
+      "nombre": "sin objetivo se ensena la consigna de un distractor",
+      "de": "    cual = \"\";\n    for (var g = 0; g < out.length; g++) if (obj.indexOf(out[g]) >= 0){ cual = out[g]; break; }",
+      "a": "    for (var g = 0; g < out.length; g++) if (obj.indexOf(out[g]) >= 0){ cual = out[g]; break; }"
+    },
+    {
+      "nombre": "el objetivo sale siempre y no hay nada que inhibir",
+      "de": "    var hayObjetivo = rnd() < 0.7;",
+      "a": "    var hayObjetivo = true;"
     }
   ]
 }
