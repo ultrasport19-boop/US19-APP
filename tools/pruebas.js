@@ -723,7 +723,7 @@ comprobar('movil - los botones de la ficha bajan de linea en vez de cortarse',
   src.indexOf('.exc-acts{flex-wrap:wrap;}') > 0,
   'sin flex-wrap, Sustitutos se corta en todas las fichas de la biblioteca');
 comprobar('movil - y su texto se lee (0,72rem, no 0,62)',
-  src.indexOf('.exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}') > 0,
+  src.indexOf('.exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;white-space:nowrap;}') > 0,
   '9,9 px no se leen con el telefono en la mano');
 
 comprobar('movil - la cabecera sube y deja solo las pestanas',
@@ -745,6 +745,10 @@ comprobar('movil - Informes cabe en un telefono de 320 px',
 comprobar('movil - el boton de instalar NO tapa los modales',
   src.indexOf('s.bottom = "14px"; s.zIndex = "60";') > 0,
   'a 9999 flotaba por encima de cualquier ventana y se comia el boton de cerrar');
+
+comprobar('movil - showTrainerUI remide la cabecera al aparecer',
+  /document\.getElementById\("tab-bar"\)\.style\.display = "";[\s\S]{0,400}?medirAppTop\(\);/.test(src),
+  'con el candado cerrado no hay pestanas y el alto oculto vale 0: si no se remide al entrar, la cabecera se queda pegada entera');
 
 console.log('archivo: ' + ruta);
 console.log('');

@@ -10,7 +10,7 @@
     },
     {
       "nombre": "el texto de esos botones vuelve a 9,9 px",
-      "de": "  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}",
+      "de": "  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;white-space:nowrap;}",
       "a": "  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}"
     },
     {
@@ -42,6 +42,11 @@
       "nombre": "el boton de instalar vuelve a taparlo todo",
       "de": "s.bottom = \"14px\"; s.zIndex = \"60\";",
       "a": "s.bottom = \"14px\"; s.zIndex = \"9999\";"
+    },
+    {
+      "nombre": "la cabecera no se remide al entrar con el PIN",
+      "de": "  try { if (typeof medirAppTop === \"function\") medirAppTop(); } catch (e) {}",
+      "a": "  /* ya no se remide */"
     }
   ]
 }

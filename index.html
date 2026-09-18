@@ -576,7 +576,7 @@ img{max-width:100%;display:block;}
      que sobra: con `nowrap`, «Sustitutos» se cortaba en TODAS las fichas.
      Que bajen de linea. Y 9,9 px no se leen con el telefono en la mano. */
   .exc-acts{flex-wrap:wrap;}
-  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}
+  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;white-space:nowrap;}
   .lib-sticky{position:static;}
 }
 .badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
@@ -4537,6 +4537,10 @@ function showTrainerUI(){
   document.getElementById("trainer-header").style.display = "";
   document.getElementById("tab-bar").style.display = "";
   u19CandadoAviso();
+  /* Con el candado cerrado no hay barra de pestanas y --app-top-oculto vale 0.
+     Aqui es donde aparecen cabecera y pestanas, asi que se remide aqui: el
+     ResizeObserver tambien lo hace, pero es asincrono y puede no existir. */
+  try { if (typeof medirAppTop === "function") medirAppTop(); } catch (e) {}
 }
 /* ===CANDADO_END=== */
 function hideTrainerUI(){
