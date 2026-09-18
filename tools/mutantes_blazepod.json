@@ -175,7 +175,7 @@
     },
     {
       "nombre": "el objetivo sale siempre y no hay nada que inhibir",
-      "de": "    var hayObjetivo = rnd() < 0.7;",
+      "de": "    var hayObjetivo = rnd() < (blzNum(plan.logica.probObjetivo, 70, 0, 100) / 100);",
       "a": "    var hayObjetivo = true;"
     },
     {
@@ -185,13 +185,28 @@
     },
     {
       "nombre": "el color del Pod no sobrevive a normalizar",
-      "de": "             color: blzColorRef(pod && pod.color) ? pod.color : \"\" };",
-      "a": "             color: \"\" };"
+      "de": "             color: blzColorRef(pod && pod.color) ? pod.color : \"\",",
+      "a": "             color: \"\","
     },
     {
       "nombre": "la paleta del color fijo no se dibuja en ningun sitio",
       "de": "    + blzPaletaHtml('pod:' + pod.n);",
       "a": "    + \"\";"
+    },
+    {
+      "nombre": "la probabilidad del objetivo vuelve a estar escrita a fuego",
+      "de": "    var hayObjetivo = rnd() < (blzNum(plan.logica.probObjetivo, 70, 0, 100) / 100);",
+      "a": "    var hayObjetivo = rnd() < 0.7;"
+    },
+    {
+      "nombre": "el peso de los Pods deja de contar",
+      "de": "  return blzTomar(cand, k2, rnd, blzPesosDe(plan, cand)).sort(function(a, b){ return a - b; });",
+      "a": "  return blzTomar(cand, k2, rnd).sort(function(a, b){ return a - b; });"
+    },
+    {
+      "nombre": "el peso no sobrevive a normalizar",
+      "de": "             peso: blzEnt(pod && pod.peso, 1, 1, 5) };",
+      "a": "             peso: 1 };"
     }
   ]
 }

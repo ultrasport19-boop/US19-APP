@@ -552,6 +552,63 @@ dentro('blzSelHtml', "blzPaleta(", 'pantalla · el Pod seleccionado puede recibi
 di(src.indexOf('window.blzPodColorQuitar = function(n)') >= 0, 'pantalla · y quitárselo');
 dentro('blzSelHtml', "blzPaletaHtml('pod:' + pod.n)", 'pantalla · la paleta del Pod se DIBUJA: sin esto el botón abría y no salía nada');
 
+/* ================= 13. Lo que decide Diego, no yo =================
+   «Que sea variable, que todo eso sea configurable». Habia dos constantes
+   mias decidiendo cosas del entrenamiento: cada cuanto sale el objetivo y
+   que todos los Pods salieran igual de a menudo. */
+
+/* --- cada cuanto sale el objetivo --- */
+function planProb(prob) {
+  const p = conLogica({ modo: 'focus', duracion: 300, intervalo: 3, semilla: 'prob' }, planDemo());
+  p.objetivo = ['verde'];
+  p.logica.probObjetivo = prob;
+  p.montaje = { estaciones: 1, podsPorEstacion: 6, distractores: 2, coloresPorJugador: 1 };
+  return p;
+}
+const cien = m.blzEstimulos(planProb(100), 1);
+di(cien.every(e => e.objetivo), 'probabilidad · al 100 % el objetivo sale SIEMPRE');
+const cero = m.blzEstimulos(planProb(0), 1);
+di(cero.every(e => !e.objetivo), 'probabilidad · al 0 % no sale nunca y no hay nada que tocar');
+const mitad = m.blzEstimulos(planProb(50), 1);
+const conObj = mitad.filter(e => e.objetivo).length;
+di(conObj > mitad.length * 0.3 && conObj < mitad.length * 0.7,
+   'probabilidad · al 50 % sale mas o menos la mitad (' + conObj + ' de ' + mitad.length + ')');
+const alto = m.blzEstimulos(planProb(90), 1).filter(e => e.objetivo).length;
+const bajo = m.blzEstimulos(planProb(20), 1).filter(e => e.objetivo).length;
+di(alto > bajo, 'probabilidad · al 90 % sale mas veces que al 20 % (' + alto + ' > ' + bajo + ')');
+igual('probabilidad · sin decir nada, 70 %', m.blzNormalizar({}).logica.probObjetivo, 70);
+di(m.blzNormalizar({ logica: { probObjetivo: 500 } }).logica.probObjetivo <= 100, 'probabilidad · no pasa del 100');
+di(m.blzNormalizar({ logica: { probObjetivo: -5 } }).logica.probObjetivo >= 0, 'probabilidad · ni baja de 0');
+
+/* --- cada cuanto sale cada Pod --- */
+function planPeso(pesos) {
+  const p = conLogica({ modo: 'random', duracion: 600, intervalo: 3, semilla: 'peso', sinRepetir: false }, planDemo());
+  for (const n in pesos) p.pods[n - 1].peso = pesos[n];
+  return p;
+}
+const iguales = m.blzEstimulos(planPeso({}), 1);
+const cuenta = (lista, n) => lista.filter(e => e.pods.indexOf(n) >= 0).length;
+di(Math.abs(cuenta(iguales, 1) - cuenta(iguales, 6)) < iguales.length * 0.15,
+   'pesos · sin tocar nada, todos los Pods salen parecido');
+const pesado = m.blzEstimulos(planPeso({ 2: 5 }), 1);
+di(cuenta(pesado, 2) > cuenta(pesado, 1) * 2,
+   'pesos · el Pod 2 con peso 5 sale mucho mas que el 1 (' + cuenta(pesado, 2) + ' contra ' + cuenta(pesado, 1) + ')');
+di(cuenta(pesado, 3) > 0, 'pesos · y los demas siguen saliendo, no desaparecen');
+igual('pesos · sin decir nada, 1', m.blzNormalizar({ pods: [{ n: 1 }] }).pods[0].peso, 1);
+di(m.blzNormalizar({ pods: [{ n: 1, peso: 99 }] }).pods[0].peso <= 5, 'pesos · el tope es 5');
+di(m.blzNormalizar({ pods: [{ n: 1, peso: 0 }] }).pods[0].peso >= 1, 'pesos · y el minimo 1: un Pod que no sale nunca sobra del lienzo');
+/* Lo que mas importa: con todos los pesos a 1 la serie es EXACTAMENTE la de
+   siempre. El sorteo con pesos degenera en el de antes y la semilla vale. */
+igual('pesos · con todos a 1, la serie es la de siempre',
+      JSON.stringify(m.blzEstimulos(planPeso({}), 1)),
+      JSON.stringify(m.blzEstimulos(conLogica({ modo: 'random', duracion: 600, intervalo: 3, semilla: 'peso', sinRepetir: false }, planDemo()), 1)));
+
+dentro('blzPaso3Html', 'logica.probObjetivo', 'pantalla · la probabilidad se toca en el paso 3');
+dentro('blzSelHtml', 'blzPodPeso(', 'pantalla · y el peso, en el Pod seleccionado');
+di(src.indexOf('window.blzPodPeso = function(n, v)') >= 0, 'pantalla · con su accion');
+dentro('blzMontaje', 'Salen m\u00e1s a menudo', 'montaje · el papel dice que Pods salen mas');
+dentro('blzMontaje', 'siempre ', 'montaje · y cuales llevan color fijo');
+
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');
 console.log('archivo: ' + ruta);

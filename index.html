@@ -18737,16 +18737,35 @@ function blzRnd(semilla){
   };
 }
 /* k elementos distintos de la lista, sin repetir, con el generador dado. */
-function blzTomar(lista, k, rnd){
-  var copia = u19Arr(lista).slice(), out = [];
+function blzTomar(lista, k, rnd, pesos){
+  var copia = u19Arr(lista).slice(), out = [], w = u19Arr(pesos).slice();
   k = Math.min(Math.max(0, Math.round(k)), copia.length);
   for (var i = 0; i < k; i++){
-    var j = Math.floor(rnd() * copia.length);
+    /* Sorteo con pesos. Con todos los pesos a 1 esto es EXACTAMENTE el sorteo
+       de antes: total = n, r = rnd() * n y el indice acaba siendo floor(r).
+       Por eso una actividad que no toque los pesos repite la misma serie. */
+    var total = 0, z;
+    for (z = 0; z < copia.length; z++) total += blzPeso(w[z]);
+    var r = rnd() * total, acc = 0, j = copia.length - 1;
+    for (z = 0; z < copia.length; z++){ acc += blzPeso(w[z]); if (r < acc){ j = z; break; } }
     if (j >= copia.length) j = copia.length - 1;
     if (j < 0) j = 0;
     out.push(copia.splice(j, 1)[0]);
+    w.splice(j, 1);
   }
   return out;
+}
+/* Cuantas veces sale un Pod respecto a los demas. Sin decir nada, 1. */
+function blzPeso(v){
+  var x = blzNum(v, 1, 1, 5);
+  return x > 0 ? x : 1;
+}
+/* Los pesos de una lista de numeros de Pod, en el mismo orden. */
+function blzPesosDe(plan, nums){
+  return u19Arr(nums).map(function(n){
+    var pod = blzPodPorN(plan, n);
+    return blzPeso(pod ? pod.peso : 1);
+  });
 }
 
 /* ---------- el plan ---------- */
@@ -18787,7 +18806,8 @@ function blzNormalizar(plan){
     return { id: blzTexto(pod && pod.id, 40) || ("p" + (i + 1)), n: i + 1,
              x: blzNum(pod && pod.x, 0.5, 0.03, 0.97), y: blzNum(pod && pod.y, 0.5, 0.05, 0.95),
              etiqueta: blzTexto(pod && pod.etiqueta, 24), base: !!(pod && pod.base),
-             color: blzColorRef(pod && pod.color) ? pod.color : "" };
+             color: blzColorRef(pod && pod.color) ? pod.color : "",
+             peso: blzEnt(pod && pod.peso, 1, 1, 5) };
   });
   var vistaBase = false;
   p.pods.forEach(function(pod){ if (pod.base){ if (vistaBase) pod.base = false; else vistaBase = true; } });
@@ -18810,6 +18830,7 @@ function blzNormalizar(plan){
     disparo: blzDisparo(L.disparo) ? L.disparo : "intervalo",
     simultaneos: blzEnt(L.simultaneos, 1, 0, Math.max(1, N)),
     sinRepetir: L.sinRepetir !== false,
+    probObjetivo: blzEnt(L.probObjetivo, 70, 0, 100),
     semilla: blzTexto(L.semilla, 40) || "us19",
     sonido: L.sonido !== false
   };
@@ -18919,7 +18940,7 @@ function blzElegirPods(plan, rnd, prev, i){
   if (L.modo === "todos"){
     var k = blzEnt(L.simultaneos, 0, 0, N);
     if (k <= 0 || k >= N) return nums.slice();
-    return blzTomar(nums, k, rnd).sort(function(a, b){ return a - b; });
+    return blzTomar(nums, k, rnd, blzPesosDe(plan, nums)).sort(function(a, b){ return a - b; });
   }
   if (L.modo === "base"){
     var base = blzPodBase(plan);
@@ -18928,7 +18949,8 @@ function blzElegirPods(plan, rnd, prev, i){
     var peri = nums.filter(function(x){ return x !== base; });
     if (!peri.length) return [base];
     var libres = (L.sinRepetir && u19Arr(prev).length) ? peri.filter(function(x){ return prev.indexOf(x) < 0; }) : peri;
-    return blzTomar(libres.length ? libres : peri, 1, rnd);
+    var cuales = libres.length ? libres : peri;
+    return blzTomar(cuales, 1, rnd, blzPesosDe(plan, cuales));
   }
   /* En Foco mandan los distractores del paso 1: se encienden uno objetivo
      mas tantos distractores como haya pedido. En los demas modos manda
@@ -18942,7 +18964,7 @@ function blzElegirPods(plan, rnd, prev, i){
     var f = cand.filter(function(x){ return prev.indexOf(x) < 0; });
     if (f.length >= k2) cand = f;
   }
-  return blzTomar(cand, k2, rnd).sort(function(a, b){ return a - b; });
+  return blzTomar(cand, k2, rnd, blzPesosDe(plan, cand)).sort(function(a, b){ return a - b; });
 }
 /* Un color por Pod encendido. En «foco» marca si ese color es el objetivo. */
 /* Recibe los Pods encendidos, no solo cuantos: hace falta para respetar el
@@ -18967,7 +18989,7 @@ function blzColoresDe(plan, rnd, pods){
     if (!malos.length) malos = buenos;
     /* Y a veces NO sale el objetivo: entonces no hay que tocar nada. Eso es
        lo que entrena la inhibicion, y sin ello el ejercicio se responde solo. */
-    var hayObjetivo = rnd() < 0.7;
+    var hayObjetivo = rnd() < (blzNum(plan.logica.probObjetivo, 70, 0, 100) / 100);
     var donde = Math.floor(rnd() * cuantos);
     for (var f = 0; f < cuantos; f++){
       var lista = (hayObjetivo && f === donde) ? buenos : malos;
@@ -19130,6 +19152,14 @@ function blzMontaje(plan){
   out.push({ k: "Pods", v: pods.length + (pods.length === 1 ? " Pod" : " Pods") + " sobre " + sup.nombre.toLowerCase() + " de " + blzM(p.superficie.anchoM) + " × " + blzM(p.superficie.altoM) });
   if (pods.length > 1) out.push({ k: "Distancias", v: "entre " + blzM(d.min) + " y " + blzM(d.max) + " entre Pods (media " + blzM(d.media) + ")" });
   out.push({ k: "Pod base", v: base == null ? "sin base: todos son periféricos" : ("P" + base + " es la base; se vuelve a él entre estímulos") });
+  var pesados = pods.filter(function(x){ return blzPeso(x.peso) > 1; });
+  if (pesados.length) out.push({ k: "Salen más a menudo", v: pesados.map(function(x){ return "P" + x.n + " ×" + blzPeso(x.peso); }).join(" · ") });
+  var fijos = pods.filter(function(x){ return x.color && blzColorPorId(p, x.color); });
+  if (fijos.length) out.push({ k: "Color fijo", v: fijos.map(function(x){
+    var r = blzColorRef(x.color);
+    return "P" + x.n + " siempre " + String((r ? r.nombre : x.color)).toLowerCase();
+  }).join(" · ") });
+  if (p.logica.modo === "focus") out.push({ k: "Objetivo", v: "sale el " + p.logica.probObjetivo + " % de las veces; el resto son solo trampas y no se toca nada" });
   out.push({ k: "Colocación", v: pods.map(function(x){
     return "P" + x.n + (x.etiqueta ? " (" + x.etiqueta + ")" : "") + " a " + blzM(x.x * p.superficie.anchoM) + " del lateral izquierdo y " + blzM(x.y * p.superficie.altoM) + " del fondo";
   }).join(" · ") || "sin Pods" });
@@ -19378,6 +19408,7 @@ function blzSelHtml(p){
     + '<span class="blz-sel-t">P' + pod.n + '</span>'
     + '<input type="text" maxlength="24" placeholder="Etiqueta (opcional)" value="' + escapeAttr(pod.etiqueta) + '" oninput="blzPodEtiqueta(' + pod.n + ',this.value)">'
     + '<label class="blz-mini"><input type="checkbox"' + (pod.base ? ' checked' : '') + ' onchange="blzPodMarcarBase(' + pod.n + ',this.checked)"> Base</label>'
+    + '<label class="blz-mini" title="Cuántas veces sale este Pod respecto a los demás: con 3 sale el triple que uno con 1">Sale ×<input type="number" min="1" max="5" style="width:56px;" value="' + blzPeso(pod.peso) + '" oninput="blzPodPeso(' + pod.n + ',this.value)"></label>'
     + '<span class="blz-mini">Color fijo</span>'
     + (pod.color ? blzCirculoHtml('pod:' + pod.n, pod.color, 'Pod ' + pod.n)
                  : '<button type="button" class="blz-circ mas" onclick="blzPaleta(\'pod:' + pod.n + '\')" title="Darle un color fijo a este Pod" aria-label="Color fijo del Pod ' + pod.n + '">+</button>')
@@ -19967,7 +19998,12 @@ function blzPaso3Html(p){
   var html = '<details class="blz-sec" open><summary>3 · Cerrar la actividad</summary><div class="blz-secc">';
   if (L.modo === "focus"){
     html += '<div class="blz-regla"><div class="blz-regla-t">✖ Strikeout <span class="text-xs text-muted">— si tocar un distractor termina la serie</span></div>'
-      + blzSegHtml('strikeout', [{ id: "no", nombre: "No" }, { id: "si", nombre: "Sí" }], p.strikeout ? "si" : "no") + '</div>';
+      + blzSegHtml('strikeout', [{ id: "no", nombre: "No" }, { id: "si", nombre: "Sí" }], p.strikeout ? "si" : "no") + '</div>'
+      + '<div class="blz-regla"><div class="blz-regla-t">🎯 Cada cuánto sale el objetivo</div>'
+      + '<div class="blz-regla-x">'
+      + '<label class="blz-mini"><input type="number" min="0" max="100" step="5" data-blz="logica.probObjetivo" value="' + L.probObjetivo + '"> % de las veces</label>'
+      + '<span class="text-xs text-muted">Al ' + (100 - L.probObjetivo) + ' % restante se encienden solo trampas y NO hay que tocar nada: eso es lo que entrena aguantarse.</span>'
+      + '</div></div>';
   }
   html += '<div class="blz-regla"><div class="blz-regla-t">⏳ Duración</div>'
     + blzSegHtml('fin.por', esSec ? BLZ_FIN_SEC : BLZ_FIN, p.fin.por)
@@ -20138,6 +20174,13 @@ window.blzFocoQuitar = function(rol){
   u19Arr(p.secuencia).forEach(function(paso){ if (paso.color === fuera) paso.color = (u19Arr(p.colores)[0] || BLZ_COLORES[0]).id; });
   _circEdit.blazePlan = blzNormalizar(p);
   blzRepintar();
+};
+/* Cuantas veces sale este Pod respecto a los demas. */
+window.blzPodPeso = function(n, v){
+  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
+  pod.peso = blzEnt(v, 1, 1, 5);
+  _circEdit.blazePlan = blzNormalizar(p);
+  blzTocado();
 };
 /* El Pod vuelve a tomar el color que le toque por el modo. */
 window.blzPodColorQuitar = function(n){
