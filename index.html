@@ -415,6 +415,13 @@ img{max-width:100%;display:block;}
   .modal{max-height:95vh;}
   .client-hero{flex-direction:column;text-align:center;}
 }
+/* 18-sep-2026 - El bloque de arriba ocupaba 275 px en un telefono de 844:
+   un TERCIO de la pantalla, fijo, mientras lees. Se va con el scroll y solo
+   se queda la barra de pestanas, que es lo unico que se toca a cada rato.
+   Son 233 px mas de contenido en cada pantalla. */
+@media (max-width:680px){
+  .app-top{top:calc(-1 * var(--app-top-oculto, 0px));}
+}
 @media (max-width:420px){
   .header-actions .icon-btn{width:36px;height:36px;}
   .day-tab{font-size:.7rem;padding:.5rem .55rem;min-width:50px;}
@@ -562,10 +569,14 @@ img{max-width:100%;display:block;}
   .lib-grid.lista{grid-template-columns:1fr;}
   .exc-body{padding:.5rem .55rem .5rem;gap:.28rem;}
   .exc-title{font-size:.82rem;}
-  .exc-mus{font-size:.7rem;}
+  .exc-mus{font-size:.76rem;}
   .exc-mus span{display:none;}
-  .exc-tags .badge{font-size:.6rem;padding:.15rem .4rem;}
-  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}
+  .exc-tags .badge{font-size:.68rem;padding:.16rem .42rem;}
+  /* 18-sep-2026 - En dos columnas la ficha mide 170 px y `.exc` recorta lo
+     que sobra: con `nowrap`, «Sustitutos» se cortaba en TODAS las fichas.
+     Que bajen de linea. Y 9,9 px no se leen con el telefono en la mano. */
+  .exc-acts{flex-wrap:wrap;}
+  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}
   .lib-sticky{position:static;}
 }
 .badge.mus{background:rgba(168,209,57,.16);color:#c3e46b;border:1px solid rgba(168,209,57,.45);font-weight:600;}
@@ -31367,8 +31378,18 @@ window.progDelete = function(clientId, progId){
 function medirAppTop(){
   var t = document.getElementById("app-top");
   if (!t) return;
-  var h = Math.round(t.getBoundingClientRect().height);
-  document.documentElement.style.setProperty("--app-top-h", h + "px");
+  var tb = t.querySelector(".tab-bar");
+  var alto = Math.round(t.getBoundingClientRect().height);
+  var altoTabs = tb ? Math.round(tb.getBoundingClientRect().height) : 0;
+  /* En el telefono el bloque sube con un `top` negativo: la marca, el buscador
+     y el aviso se van con el scroll y solo se queda la barra de pestanas. Lo
+     que tapa -y lo que las cabeceras de tabla tienen que descontar- son esos
+     42 px, no los 275 del bloque entero. */
+  var movil = false;
+  try { movil = !!(window.matchMedia && window.matchMedia("(max-width:680px)").matches); } catch (e) {}
+  var oculto = (movil && altoTabs) ? Math.max(0, alto - altoTabs) : 0;
+  document.documentElement.style.setProperty("--app-top-oculto", oculto + "px");
+  document.documentElement.style.setProperty("--app-top-h", (oculto ? altoTabs : alto) + "px");
 }
 function observarAppTop(){
   medirAppTop();

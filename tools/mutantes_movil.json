@@ -1,0 +1,37 @@
+{
+  "suite": "tools/pruebas.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "los botones de la ficha vuelven a cortarse en la biblioteca",
+      "de": "  .exc-acts{flex-wrap:wrap;}\n",
+      "a": "  \n"
+    },
+    {
+      "nombre": "el texto de esos botones vuelve a 9,9 px",
+      "de": "  .exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}",
+      "a": "  .exc-acts .btn{padding:.3rem .35rem;font-size:.62rem;}"
+    },
+    {
+      "nombre": "la cabecera vuelve a comerse un tercio de la pantalla",
+      "de": "  .app-top{top:calc(-1 * var(--app-top-oculto, 0px));}",
+      "a": "  .app-top{top:0;}"
+    },
+    {
+      "nombre": "el alto que sube se deja de publicar",
+      "de": "  document.documentElement.style.setProperty(\"--app-top-oculto\", oculto + \"px\");",
+      "a": "  /* ya no se publica */"
+    },
+    {
+      "nombre": "las cabeceras de tabla vuelven a descontar el bloque entero",
+      "de": "  document.documentElement.style.setProperty(\"--app-top-h\", (oculto ? altoTabs : alto) + \"px\");",
+      "a": "  document.documentElement.style.setProperty(\"--app-top-h\", alto + \"px\");"
+    },
+    {
+      "nombre": "en escritorio tambien se esconde la cabecera",
+      "de": "  var oculto = (movil && altoTabs) ? Math.max(0, alto - altoTabs) : 0;",
+      "a": "  var oculto = altoTabs ? Math.max(0, alto - altoTabs) : 0;"
+    }
+  ]
+}

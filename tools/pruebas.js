@@ -706,6 +706,39 @@ comprobar('escritura · el aviso de bioimpedancia dice que NO quedó guardada',
   /La evaluación NO quedó guardada en Notion/.test(src),
   'era la mentira mas cara: decia «ya estaba todo» sobre datos que no se escribieron nunca');
 
+/* --- El telefono ------------------------------------------------------
+   Medido a 390x844 el 18-sep-2026. Dos cosas estaban mal y no se veian
+   desde el escritorio:
+
+   1. En Biblioteca la ficha mide 170 px y `.exc` recorta lo que sobra. Con
+      `.exc-acts` en `nowrap`, el boton «Sustitutos» salia CORTADO en las
+      noventa fichas de la pantalla.
+   2. `.app-top` se quedaba pegado midiendo 275 px: un TERCIO de la pantalla
+      ocupado mientras lees. Ahora sube con un `top` negativo y solo se queda
+      la barra de pestanas, 42 px.
+
+   Las dos son de CSS y de una variable que publica el JS, asi que se vigilan
+   por texto. Si alguien las deshace, esto se pone rojo. ------------------ */
+comprobar('movil - los botones de la ficha bajan de linea en vez de cortarse',
+  src.indexOf('.exc-acts{flex-wrap:wrap;}') > 0,
+  'sin flex-wrap, Sustitutos se corta en todas las fichas de la biblioteca');
+comprobar('movil - y su texto se lee (0,72rem, no 0,62)',
+  src.indexOf('.exc-acts .btn{padding:.3rem .4rem;font-size:.72rem;}') > 0,
+  '9,9 px no se leen con el telefono en la mano');
+
+comprobar('movil - la cabecera sube y deja solo las pestanas',
+  src.indexOf('.app-top{top:calc(-1 * var(--app-top-oculto, 0px));}') > 0,
+  'sin esto vuelven a perderse 233 px de pantalla en cada vista');
+comprobar('movil - el alto que sube lo publica el JS, no una constante',
+  src.indexOf('setProperty("--app-top-oculto", oculto + "px")') > 0,
+  'el aviso del PIN aparece y desaparece y el telefono se gira: adivinarlo es apostar');
+comprobar('movil - y --app-top-h pasa a ser SOLO lo que tapa',
+  src.indexOf('setProperty("--app-top-h", (oculto ? altoTabs : alto) + "px")') > 0,
+  'las cabeceras de tabla se pegan con esa variable; si mide el bloque entero, caen 275 px mas abajo');
+comprobar('movil - en escritorio no se oculta nada',
+  src.indexOf('var oculto = (movil && altoTabs) ? Math.max(0, alto - altoTabs) : 0;') > 0,
+  'fuera del telefono el bloque se queda entero, como siempre');
+
 console.log('archivo: ' + ruta);
 console.log('');
 avisos.forEach(function (a) { console.log('  · ' + a); });
