@@ -2,7 +2,7 @@
 # Hook de pre-commit de US19-APP. Se instala con tools/instalar_hook.sh
 # (los hooks no viajan con el repo, hay que instalarlos en cada clon).
 #
-# Una barrera que corre SIEMPRE, y siete mas cuando el commit toca index.html.
+# Una barrera que corre SIEMPRE, y trece mas cuando el commit toca index.html.
 #
 #   0. secretos.js  - va fuera del `if` a proposito. Las otras siete
 #                     comprueban la app, y solo tiene sentido correrlas si
@@ -83,6 +83,13 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   #     decidir (11-sep-2026).
   node "$RAIZ/tools/historia.js" "$RAIZ/index.html" \
     || { echo ""; echo "la historia o el envio a Notion no pasan la prueba: commit cancelado."; exit 1; }
+
+  # 13. blazepod.js - el planificador BlazePod dentro de Circuitos: que la
+  #     misma semilla repita la misma serie, que nunca se encienda un Pod
+  #     borrado, que el enlace compartido sea de solo lectura y que al salir
+  #     del editor no quede un temporizador vivo (18-sep-2026).
+  node "$RAIZ/tools/blazepod.js" "$RAIZ/index.html" \
+    || { echo ""; echo "el planificador BlazePod no pasa la prueba: commit cancelado."; exit 1; }
 
 fi
 exit 0

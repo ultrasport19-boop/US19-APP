@@ -1,0 +1,127 @@
+{
+  "suite": "tools/blazepod.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "se permite repetir el mismo Pod dos veces seguidas",
+      "de": "  if (L.sinRepetir && u19Arr(prev).length && N > k2){",
+      "a": "  if (false && u19Arr(prev).length && N > k2){"
+    },
+    {
+      "nombre": "la semilla da igual: todas las series arrancan en el mismo sitio",
+      "de": "  var a = blzSemillaNum(semilla) || 1;",
+      "a": "  var a = 1;"
+    },
+    {
+      "nombre": "el respaldo tira la planificacion BlazePod",
+      "de": "    circuitos: state.circuitos || [],\n    series: state.series || [],\n    deudas: state.deudas || null,\n    reports:",
+      "a": "    circuitos: (state.circuitos || []).map(function(c){ var o = JSON.parse(JSON.stringify(c)); delete o.blazePlan; return o; }),\n    series: state.series || [],\n    deudas: state.deudas || null,\n    reports:"
+    },
+    {
+      "nombre": "al cerrar la vista el reloj de la simulacion se queda vivo",
+      "de": "  if (_blzSim.timer){ clearInterval(_blzSim.timer); _blzSim.timer = null; }",
+      "a": "  if (_blzSim.timer){ _blzSim.timer = null; }"
+    },
+    {
+      "nombre": "repintar la vista de circuitos ya no apaga la simulacion",
+      "de": "  blzSimParar();   /* al repintar la vista no puede quedar vivo el reloj de la simulacion */",
+      "a": "  /* al repintar la vista no puede quedar vivo el reloj de la simulacion */"
+    },
+    {
+      "nombre": "se enciende un Pod que ya se habia borrado",
+      "de": "      var nums = u19Arr(paso.pods).filter(function(n){ return blzPodPorN(p, n); });",
+      "a": "      var nums = u19Arr(paso.pods);"
+    },
+    {
+      "nombre": "la instruccion del montaje se pinta sin escapar",
+      "de": "\n    html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>';",
+      "a": "\n    html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + x.v + '</dd>';"
+    },
+    {
+      "nombre": "la vista compartida pinta la instruccion sin escapar",
+      "de": "  blzMontaje(p).forEach(function(x){ html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>'; });",
+      "a": "  blzMontaje(p).forEach(function(x){ html += '<dt>' + x.k + '</dt><dd>' + x.v + '</dd>'; });"
+    },
+    {
+      "nombre": "la base deja de alternar con la periferia",
+      "de": "    if (i % 2 === 0) return [base];",
+      "a": "    if (i % 3 === 0) return [base];"
+    },
+    {
+      "nombre": "sale un estimulo de mas en cada serie",
+      "de": "  var cuantos = Math.max(1, Math.floor(total / iv));",
+      "a": "  var cuantos = Math.max(1, Math.floor(total / iv) + 1);"
+    },
+    {
+      "nombre": "puede haber dos Pods base a la vez",
+      "de": "  p.pods.forEach(function(pod){ if (pod.base){ if (vistaBase) pod.base = false; else vistaBase = true; } });",
+      "a": "  p.pods.forEach(function(pod){ if (pod.base){ vistaBase = true; } });"
+    },
+    {
+      "nombre": "el enlace compartido deja tocar los Pods",
+      "de": "(opts.lectura ? ' tabindex=\"-1\" disabled' : '')",
+      "a": "('')"
+    },
+    {
+      "nombre": "el enlace compartido pierde la planificacion",
+      "de": "  if (blzActivo(c)) d.circuito.blazePlan = blzNormalizar(c.blazePlan);",
+      "a": "  if (false) d.circuito.blazePlan = blzNormalizar(c.blazePlan);"
+    },
+    {
+      "nombre": "en modo foco todo se marca como objetivo",
+      "de": "  var esObj = (plan.logica.modo !== \"focus\") ? true : out.some(function(id){ return obj.indexOf(id) >= 0; });",
+      "a": "  var esObj = true;"
+    },
+    {
+      "nombre": "la secuencia se recorre al reves",
+      "de": "    u19Arr(p.secuencia).forEach(function(paso){",
+      "a": "    u19Arr(p.secuencia).slice().reverse().forEach(function(paso){"
+    },
+    {
+      "nombre": "todos a la vez enciende uno solo",
+      "de": "    if (k <= 0 || k >= N) return nums.slice();",
+      "a": "    if (k <= 0 || k >= N) return [nums[0]];"
+    },
+    {
+      "nombre": "las posiciones se guardan fuera del 0 a 1",
+      "de": "             x: blzNum(pod && pod.x, 0.5, 0.03, 0.97), y: blzNum(pod && pod.y, 0.5, 0.05, 0.95),",
+      "a": "             x: blzNum(pod && pod.x, 0.5), y: blzNum(pod && pod.y, 0.5),"
+    },
+    {
+      "nombre": "normalizar borra los campos que no conoce",
+      "de": "  var p = {};\n  if (plan && typeof plan === \"object\"){ for (var k in plan) if (Object.prototype.hasOwnProperty.call(plan, k)) p[k] = plan[k]; }",
+      "a": "  var p = {};"
+    },
+    {
+      "nombre": "el maximo de doce Pods deja de aplicarse",
+      "de": "  p.pods = u19Arr(p.pods).slice(0, BLZ_MAX_PODS).map(function(pod, i){",
+      "a": "  p.pods = u19Arr(p.pods).map(function(pod, i){"
+    },
+    {
+      "nombre": "la simulacion ignora la preferencia de reducir movimiento",
+      "de": "  var enc = {}, sinAnim = blzReducirMovimiento();",
+      "a": "  var enc = {}, sinAnim = false;"
+    },
+    {
+      "nombre": "se cuela un descanso despues de la ultima serie",
+      "de": "    if (s < series && desc > 0){",
+      "a": "    if (desc > 0){"
+    },
+    {
+      "nombre": "un plan corrupto se recorre letra a letra en vez de quedar vacio",
+      "de": "  p.pods = u19Arr(p.pods).slice(0, BLZ_MAX_PODS)",
+      "a": "  p.pods = (p.pods || []).slice(0, BLZ_MAX_PODS)"
+    },
+    {
+      "nombre": "la accion de la interfaz vuelve a pisar al motor (colision de nombres)",
+      "de": "window.blzPodMarcarBase = function(n, on){",
+      "a": "window.blzPodBase = function(n, on){"
+    },
+    {
+      "nombre": "la simulacion pierde el color del estimulo",
+      "de": "      enc[e.pods[k]] = c ? c.hex : \"#ffffff\";",
+      "a": "      enc[e.pods[k]] = \"#ffffff\";"
+    }
+  ]
+}
