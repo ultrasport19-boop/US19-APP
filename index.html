@@ -17503,10 +17503,23 @@ window.pizarraProtocolo = function(id, fase){
 window.pizarraCircuitoObj = function(c){
   if (!c) return;
   var items = u19Arr(c.estaciones).map(function(s, i){
+    var pods = circPodsTexto(c, s.id);
     return { nombre: "Estación " + (i + 1) + " · " + circEstacionNombre(s), gif: circGifDe(s),
-             detalle: circTrabajoDe(c, i) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio", nota: s.nota || "" };
+             detalle: circTrabajoDe(c, i) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio" + (pods ? " · 🔵 " + pods : ""),
+             nota: s.nota || "" };
   });
   var secciones = [{ nombre: "Estaciones", items: items }];
+  /* Los Pods sueltos y los elementos del espacio son parte del montaje: si no
+     se dicen, en la sala no aparecen. */
+  var extra = [];
+  var sueltosTxt = circPodsTexto(c, null);
+  if (sueltosTxt) extra.push({ nombre: "🔵 Pods sueltos", gif: "", detalle: sueltosTxt, nota: "Se encienden a mano" });
+  var cuentaEl = {};
+  circElementos(c).forEach(function(el){ var r = blzAdorno(el.tipo); if (r) cuentaEl[r.icono + " " + r.nombre] = (cuentaEl[r.icono + " " + r.nombre] || 0) + 1; });
+  Object.keys(cuentaEl).sort().forEach(function(k){
+    extra.push({ nombre: k + (cuentaEl[k] > 1 ? " ×" + cuentaEl[k] : ""), gif: "", detalle: "", nota: "" });
+  });
+  if (extra.length) secciones.push({ nombre: "Montaje", items: extra });
   /* La pizarra ensena medios en movimiento: del plan BlazePod muestra lo que
      se dice en voz alta, una consigna por color, mas la cabecera del montaje. */
   if (blzActivo(c)){
@@ -17830,13 +17843,36 @@ function circDuracion(c){
   for (var i = 0; i < N; i++) t += circTrabajoDe(c, i);
   return R * t + R * (N - 1) * cmb + (R - 1) * dr;
 }
+/* Lo que hay que sacar del armario para esta sesion. Sale de las tres capas:
+   el material de los ejercicios, los Pods y los elementos del espacio. Antes
+   solo miraba los ejercicios, y los conos y los Pods habia que acordarse. */
 function circMaterial(c){
   var m = {};
+  var sumar = function(k, n){ if (k) m[k] = (m[k] || 0) + (n || 1); };
   u19Arr(c.estaciones).forEach(function(s){
     var e = s.exerciseId ? getExercise(s.exerciseId) : null;
-    if (e && e.equipment && !/peso corporal/i.test(e.equipment)) m[e.equipment] = (m[e.equipment] || 0) + 1;
+    if (e && e.equipment && !/peso corporal/i.test(e.equipment)) sumar(e.equipment, 1);
   });
+  var nPods = circPods(c).length;
+  if (nPods) sumar("Pods", nPods);
+  var tipos = {};
+  circElementos(c).forEach(function(el){
+    var ref = blzAdorno(el.tipo);
+    if (ref && el.tipo !== "flecha" && el.tipo !== "pase") tipos[ref.nombre] = (tipos[ref.nombre] || 0) + 1;
+  });
+  Object.keys(tipos).forEach(function(k){ sumar(k, tipos[k]); });
   return Object.keys(m).sort().map(function(k){ return k + (m[k] > 1 ? " ×" + m[k] : ""); }).join(", ");
+}
+/* Los Pods de cada estacion, en texto, para la hoja y la pizarra. */
+function circPodsTexto(c, estacionId){
+  var l = circPodsDe(c, estacionId);
+  if (!l.length) return "";
+  var cfg = circPodsConfigDe(c, estacionId);
+  var modo = blzModo(cfg.modo) || BLZ_MODOS[0];
+  return l.length + " Pod" + (l.length === 1 ? "" : "s")
+    + " · " + modo.nombre.toLowerCase()
+    + " · respuesta " + (cfg.tiempoRespuestaMs / 1000).toFixed(1).replace(".", ",") + " s"
+    + (l.some(function(p){ return p.base; }) ? " · con base" : "");
 }
 function circEstacionNombre(s){
   if (s.nombre) return s.nombre;
@@ -18828,9 +18864,22 @@ window.circAddLibreCon = function(nombre){
   var q = document.getElementById("circ-q"); if (q){ q.value = ""; circBuscar(""); }
 };
 /* El mapa en la hoja impresa, como SVG con las imágenes. */
+/* El plano para la hoja, en SVG puro: las mismas tres capas que en pantalla,
+   porque el papel tiene que ser el montaje que se ve en la app. */
 function circMapaSvgImprimir(c){
-  var ratio = circRatio(c), H = Math.round(1000 / ratio);
-  var svg = '<svg viewBox="0 0 1000 ' + H + '" width="100%" style="border:1px solid #bbb;border-radius:8px;background:#fafafa;color:#555;display:block;">' + circMapaFlechasSvg(c, H, {});
+  var e = circEspacio(c), ratio = e.anchoM / e.largoM, H = Math.round(1000 / ratio);
+  var svg = '<svg viewBox="0 0 1000 ' + H + '" width="100%" style="border:1px solid #bbb;border-radius:8px;background:#fafafa;color:#555;display:block;">'
+    + circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
+    + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, {});
+  /* Los elementos del espacio van debajo de las estaciones, como en pantalla. */
+  circElementos(c).forEach(function(a){
+    var ref = blzAdorno(a.tipo); if (!ref) return;
+    if (a.tipo === "flecha" || a.tipo === "pase") return;   /* ya van en el SVG de lineas */
+    var x = a.x * 1000, y = a.y * H;
+    svg += '<g><text x="' + x.toFixed(0) + '" y="' + (y + 9).toFixed(0) + '" text-anchor="middle" font-size="26" font-family="Arial">' + ref.icono + '</text>'
+      + (a.etiqueta ? '<text x="' + x.toFixed(0) + '" y="' + (y + 26).toFixed(0) + '" text-anchor="middle" font-size="10" font-family="Arial" fill="#444">' + escapeHtml(a.etiqueta.slice(0, 18)) + '</text>' : '')
+      + '</g>';
+  });
   c.estaciones.forEach(function(s, i){
     var p = circPos(c, i), x = p.x * 1000, y = p.y * H, gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
     var img = gif ? (typeof isVideoUrl === "function" && isVideoUrl(gif) && typeof posterUrl === "function" ? posterUrl(gif) : gif) : "";
@@ -18839,8 +18888,26 @@ function circMapaSvgImprimir(c){
       + '<circle cx="' + (x - 65) + '" cy="' + (y - 72) + '" r="16" fill="' + col + '" stroke="#333"/><text x="' + (x - 65) + '" y="' + (y - 66) + '" text-anchor="middle" font-size="17" font-weight="bold" font-family="Arial">' + (i + 1) + '</text>'
       + '<text x="' + x + '" y="' + (y + 36) + '" text-anchor="middle" font-size="13" font-weight="bold" font-family="Arial" fill="#111">' + escapeHtml(circEstacionNombre(s).slice(0, 22)) + '</text>'
       + (s.nota ? '<text x="' + x + '" y="' + (y + 56) + '" text-anchor="middle" font-size="10" font-family="Arial" fill="#444">' + escapeHtml(s.nota.slice(0, 32)) + '</text>' : '')
+      + (circPodsDe(c, s.id).length ? '<circle cx="' + (x + 65) + '" cy="' + (y + 72) + '" r="14" fill="#fff" stroke="' + col + '" stroke-width="3"/>'
+          + '<text x="' + (x + 65) + '" y="' + (y + 77) + '" text-anchor="middle" font-size="13" font-weight="bold" font-family="Arial" fill="#111">' + circPodsDe(c, s.id).length + '</text>' : '')
       + '</g>';
   });
+  /* Y los Pods encima de todo, como en pantalla: numerados, con el aro del
+     color de su estacion si estan atados, y con la B de base. */
+  circPods(c).forEach(function(pod){
+    var j = pod.estacionId ? circEstacionIdx(c, pod.estacionId) : -1;
+    var col = (j >= 0) ? CIRC_COLORES[j % CIRC_COLORES.length] : "#888";
+    var x = pod.x * 1000, y = pod.y * H;
+    svg += '<g><circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="17" fill="#fff" stroke="' + col + '" stroke-width="' + (j >= 0 ? 4 : 2) + '"' + (j >= 0 ? '' : ' stroke-dasharray="4 3"') + '/>'
+      + '<text x="' + x.toFixed(0) + '" y="' + (y + 6).toFixed(0) + '" text-anchor="middle" font-size="15" font-weight="bold" font-family="Arial" fill="#111">' + pod.n + '</text>'
+      + (pod.base ? '<text x="' + (x + 17).toFixed(0) + '" y="' + (y - 11).toFixed(0) + '" font-size="9" font-weight="bold" font-family="Arial" fill="#111">B</text>' : '')
+      + (pod.etiqueta ? '<text x="' + x.toFixed(0) + '" y="' + (y + 30).toFixed(0) + '" text-anchor="middle" font-size="9" font-family="Arial" fill="#444">' + escapeHtml(pod.etiqueta.slice(0, 16)) + '</text>' : '')
+      + '</g>';
+  });
+  if (e.medidas){
+    svg += '<text x="994" y="' + (H - 8) + '" text-anchor="end" font-size="11" font-family="Arial" fill="#555">'
+      + escapeHtml(blzM(e.anchoM) + " × " + blzM(e.largoM)) + '</text>';
+  }
   return svg + '</svg>';
 }
 
@@ -18854,6 +18921,22 @@ function circShareData(c){
   var d = { type: "circuito", v: 1, sharedAt: Date.now(),
     circuito: { nombre: c.nombre || "", grupo: c.grupo || "", notas: c.notas || "", modo: c.modo || "rotacion", grupos: c.grupos, rondas: c.rondas,
       trabajo: c.trabajo, cambio: c.cambio, descansoRonda: c.descansoRonda, ratio: c.ratio || "16:9", nombresGrupos: c.nombresGrupos || "",
+      pv: CIRC_PV, disposicion: c.disposicion || "circulo",
+      espacio: circEspacio(c),
+      /* Los Pods y los elementos viajan con sus posiciones y sus vinculos: al
+         otro lado se ve el mismo montaje, en modo lectura. `estacionId` se
+         manda como INDICE, porque los ids no viajan. */
+      pods: circPods(c).map(function(p){
+        return { n: p.n, x: p.x, y: p.y, est: p.estacionId ? circEstacionIdx(c, p.estacionId) : -1,
+                 color: p.color || "", etiqueta: p.etiqueta || "", base: !!p.base };
+      }),
+      elementos: circElementos(c).map(function(el){
+        var o = { tipo: el.tipo, x: el.x, y: el.y, rotacion: el.rotacion || 0, etiqueta: el.etiqueta || "" };
+        if (el.x2 != null){ o.x2 = el.x2; o.y2 = el.y2; }
+        return o;
+      }),
+      podsConfig: u19Arr(c.estaciones).map(function(st){ return circPodsDe(c, st.id).length ? circPodsConfigDe(c, st.id) : null; }),
+      podsSueltos: circPodsSueltos(c).length ? circPodsConfigDe(c, null) : null,
       estaciones: u19Arr(c.estaciones).map(function(s){
         var g = circGifDe(s), o = { nombre: circEstacionNombre(s), nota: s.nota || "", x: s.x, y: s.y, trabajo: circNum(s.trabajo, 0) };
         if (g && g.indexOf("data:") !== 0) o.gif = g;
@@ -18911,7 +18994,39 @@ function showCircuitoView(data){
   var c = { id: "compartido", nombre: src.nombre || "Circuito", grupo: src.grupo || "", notas: src.notas || "", modo: src.modo || "rotacion", grupos: src.grupos, rondas: src.rondas,
             trabajo: src.trabajo, cambio: src.cambio, descansoRonda: src.descansoRonda, ratio: src.ratio || "16:9", nombresGrupos: src.nombresGrupos || "",
             estaciones: u19Arr(src.estaciones).map(function(s){ return { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" }; }),
+            disposicion: src.disposicion || "circulo",
             blazePlan: (src.blazePlan && typeof src.blazePlan === "object") ? src.blazePlan : null };
+  /* El espacio, los Pods y los elementos del enlace. Un enlace de ANTES no los
+     trae: entonces manda circEspacio con su legado del `ratio` y no hay Pods,
+     que es exactamente lo que ese enlace mostraba. */
+  if (src.espacio && typeof src.espacio === "object"){
+    c.espacio = { plantilla: src.espacio.plantilla, anchoM: src.espacio.anchoM, largoM: src.espacio.largoM,
+                  cuadricula: !!src.espacio.cuadricula, medidas: !!src.espacio.medidas };
+  }
+  c.pods = u19Arr(src.pods).slice(0, CIRC_MAX_PODS).map(function(p, i){
+    /* `est` es el INDICE de la estacion al otro lado: aqui se traduce al id
+       recien generado. -1 o fuera de rango = Pod suelto. */
+    var j = blzEnt(p && p.est, -1, -1, 99);
+    var st = (j >= 0) ? c.estaciones[j] : null;
+    return { id: "pod" + genId(), n: i + 1,
+             x: blzNum(p && p.x, 0.5, 0, 1), y: blzNum(p && p.y, 0.5, 0, 1),
+             estacionId: st ? st.id : null,
+             color: blzColorRef(p && p.color) ? p.color : "",
+             etiqueta: blzTexto(p && p.etiqueta, 24), base: !!(p && p.base), peso: 1 };
+  });
+  c.elementos = u19Arr(src.elementos).slice(0, CIRC_MAX_ELEM).map(function(a){
+    var t = blzAdorno(a && a.tipo) ? a.tipo : "cono";
+    var o = { id: "el" + genId(), tipo: t, x: blzNum(a && a.x, 0.5, 0, 1), y: blzNum(a && a.y, 0.5, 0, 1),
+              rotacion: blzEnt(a && a.rotacion, 0, 0, 359), etiqueta: blzTexto(a && a.etiqueta, 24) };
+    if (t === "flecha" || t === "pase"){ o.x2 = blzNum(a && a.x2, Math.min(0.95, o.x + 0.18), 0, 1); o.y2 = blzNum(a && a.y2, o.y, 0, 1); }
+    return o;
+  });
+  u19Arr(src.podsConfig).forEach(function(cfg, i){
+    if (cfg && c.estaciones[i]) c.estaciones[i].podsConfig = circPodsConfig(cfg);
+  });
+  c.podsSueltos = circPodsConfig(src.podsSueltos);
+  /* Ya viene en el modelo nuevo: no hay que volver a migrarlo desde blazePlan. */
+  c.pv = CIRC_PV;
   _circCompartido = c;
   hideTrainerUI();
   showView("client");
@@ -18926,8 +19041,16 @@ function showCircuitoView(data){
     + '<button class="btn btn-secondary" onclick="pizarraCircuitoObj(_circCompartido)">🎞 Pizarra</button>'
     + '<button class="btn btn-secondary" onclick="circImprimirObj(_circCompartido)">🖨 Hoja</button></div>';
   if (c.notas) html += '<div class="card" style="background:var(--surface-2);margin-bottom:1rem;"><div class="card-main"><div class="card-sub">📝 ' + escapeHtml(c.notas) + '</div></div></div>';
-  html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">🗺 Mapa de la sala</div>' + circMapaHtml(c, {}) + '</div></div>';
-  if (c.blazePlan) html += blzVistaHtml(c.blazePlan);
+  html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">🗺 Planilla de la sesión</div>' + circMapaHtml(c, { lectura: true }) + '</div></div>';
+  if (circPods(c).length){
+    html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">🔵 Pods</div>'
+      + '<div class="text-sm">' + escapeHtml(circPods(c).length + " Pods en el plano · "
+          + circPodsDe(c, null).length + " sueltos") + '</div>'
+      + '<div class="text-xs text-muted" style="margin-top:.3rem;line-height:1.5;">' + escapeHtml(BLZ_AVISO) + '.</div></div></div>';
+  }
+  /* El plan de antes solo se ensena si esta encendida la bandera: la planilla
+     nueva ya muestra lo mismo, y dos veces confunde. */
+  if (CIRC_BLZ_VIEJO && c.blazePlan) html += blzVistaHtml(c.blazePlan);
   html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">📍 Estaciones · ' + circNum(c.trabajo, 40) + ' s de trabajo · ' + circNum(c.cambio, 15) + ' s de cambio</div>';
   c.estaciones.forEach(function(s, i){
     var g = circGifDe(s);
@@ -19402,13 +19525,27 @@ window.circImprimirObj = function(c){
     + (c.modo !== "secuencia" ? '<span>Grupos: ' + G + '</span>' : '')
     + '<span>Vueltas: ' + R + '</span><span>Trabajo: ' + circNum(c.trabajo, 40) + ' s</span><span>Cambio: ' + circNum(c.cambio, 15) + ' s</span>'
     + '<span>Descanso entre vueltas: ' + circNum(c.descansoRonda, 60) + ' s</span><span>Duración: ' + circFmt(circDuracion(c)) + '</span></div>'
-    + '<h2>Mapa de la sala</h2>' + circMapaSvgImprimir(c)
-    + '<h2>Estaciones</h2><table><thead><tr><th style="width:36px">#</th><th>Estación</th><th>Consigna</th><th style="width:22%">Observaciones</th></tr></thead><tbody>';
+    + '<h2>Plano de la sesión</h2>' + circMapaSvgImprimir(c)
+    + '<h2>Estaciones</h2><table><thead><tr><th style="width:36px">#</th><th>Estación</th><th>Pods</th><th>Consigna</th><th style="width:20%">Observaciones</th></tr></thead><tbody>';
   c.estaciones.forEach(function(s, i){
     var tProp = (c.modo === "secuencia" && circNum(s.trabajo, 0) > 0) ? ' <span style="color:#444;font-weight:normal">· ' + circNum(s.trabajo, 0) + ' s</span>' : '';
-    doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b>' + tProp + '</td><td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
+    doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b>' + tProp + '</td>'
+      + '<td>' + escapeHtml(circPodsTexto(c, s.id) || "—") + '</td>'
+      + '<td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
   });
   doc += '</tbody></table>';
+  var sueltos = circPodsSueltos(c);
+  if (sueltos.length){
+    doc += '<p><b>Pods sueltos:</b> ' + escapeHtml(circPodsTexto(c, null))
+      + ' — no pertenecen a ninguna estación y se encienden a mano.</p>';
+  }
+  var els = circElementos(c);
+  if (els.length){
+    var cuenta = {};
+    els.forEach(function(el){ var r = blzAdorno(el.tipo); if (r) cuenta[r.icono + " " + r.nombre] = (cuenta[r.icono + " " + r.nombre] || 0) + 1; });
+    doc += '<p><b>Elementos del espacio:</b> ' + escapeHtml(Object.keys(cuenta).sort().map(function(k){ return k + (cuenta[k] > 1 ? " ×" + cuenta[k] : ""); }).join(" · ")) + '</p>';
+  }
+  if (circPods(c).length) doc += '<p style="color:#444;font-size:11px">' + escapeHtml(BLZ_AVISO) + '.</p>';
   if (c.modo !== "secuencia" && N){
     doc += '<h2>Rotación</h2><table class="rot"><thead><tr><th>Turno</th>';
     for (var s = 0; s < N; s++) doc += '<th>' + (s + 1) + '</th>';

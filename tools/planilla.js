@@ -43,6 +43,7 @@ const codigo = [
   fn('circPodsConfigDeLogica'), fn('circMigrarUno'),
   fn('circPosAuto'), fn('circPos'),
   uno('CIRC_LIM'), fn('circClampXY'), fn('circEstacionCerca'), fn('circMoverEstacion'), fn('circAutoLayout'),
+  fn('circMaterial'), fn('circPodsTexto'),
 ].join('\n');
 
 const exporta = ['circEspacio', 'circEspacioRef', 'circEspacioPorMedida', 'circRatio', 'circMigrarUno',
@@ -50,6 +51,7 @@ const exporta = ['circEspacio', 'circEspacioRef', 'circEspacioPorMedida', 'circR
   'circPodPorId', 'circElementoPorId', 'circEstacionPorId', 'circEstacionPorNombre', 'circEstacionIdx',
   'circPodsConfig', 'circPodsConfigNueva', 'circPodsConfigDe', 'circPodsConfigPoner', 'circPodsConfigDeLogica',
   'circClampXY', 'circEstacionCerca', 'circMoverEstacion', 'circAutoLayout', 'circPos', 'circPosAuto',
+  'circMaterial', 'circPodsTexto',
   'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS', 'CIRC_LIM'];
 
 let m;
@@ -428,6 +430,43 @@ function viejoSinPods(ratio) {
   /* Un circuito sin estaciones no puede romper el reordenado. */
   const d = { estaciones: [], pods: [], elementos: [] };
   es('sin estaciones no rompe', m.circAutoLayout(d, 'circulo'), undefined);
+}
+
+/* --- 15. los implementos salen de las tres capas ------------------------ */
+{
+  /* Antes esta lista solo miraba los ejercicios: los conos y los Pods habia que
+     acordarse de llevarlos. Ahora los cuenta. */
+  const c = m.circMigrarUno(viejoConPods());
+  c.estaciones[0].exerciseId = 'x1';      /* el getExercise de prueba da Mancuernas */
+  c.estaciones[1].exerciseId = 'x2';
+  c.elementos.push({ id: 'e9', tipo: 'cono', x: 0.3, y: 0.3, rotacion: 0, etiqueta: '' });
+  c.elementos.push({ id: 'e10', tipo: 'balon', x: 0.4, y: 0.3, rotacion: 0, etiqueta: '' });
+  const l = m.circMaterial(c);
+  cierto('cuenta los Pods', /Pods ×2/.test(l));
+  cierto('cuenta los conos, y son dos', /Cono ×2/.test(l));
+  cierto('cuenta el balon', /Bal[oó]n/.test(l));
+  cierto('cuenta el material de los ejercicios', /Mancuernas ×2/.test(l));
+  /* Una flecha y una linea de pase se dibujan, pero no se meten en la bolsa. */
+  falso('la linea de pase no es un implemento', /pase|Pase/.test(l));
+
+  const d = m.circMigrarUno(viejoSinPods('16:9'));
+  es('sin nada, la lista esta vacia', m.circMaterial(d), '');
+}
+
+/* --- 16. el texto de los Pods de un grupo ------------------------------- */
+{
+  const c = m.circMigrarUno(viejoConPods());
+  const t = m.circPodsTexto(c, 'e3');
+  cierto('dice cuantos Pods', /^2 Pods/.test(t));
+  cierto('dice el modo', /secuencia/.test(t));
+  cierto('dice el tiempo de respuesta con coma decimal', /respuesta 1,8 s/.test(t));
+  cierto('avisa de que hay base', /con base/.test(t));
+  es('una estacion sin Pods no dice nada', m.circPodsTexto(c, 'e1'), '');
+  es('y sin sueltos, tampoco', m.circPodsTexto(c, null), '');
+
+  /* Sin base, no se inventa la coletilla. */
+  c.pods.forEach(function (p) { p.base = false; });
+  falso('sin base no lo dice', /con base/.test(m.circPodsTexto(c, 'e3')));
 }
 
 /* --- salida -------------------------------------------------------------- */
