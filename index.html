@@ -17728,8 +17728,16 @@ var _circEditNuevo = false;
 var _live = null;            // sesión en vivo
 var _circAudio = null, _circWake = null;
 
+/* Todo el mundo pide la lista por aqui, asi que aqui se migra: sin bandera de
+   una sola vez, porque el respaldo y la sincronizacion REEMPLAZAN el array
+   entero y una bandera se quedaria en true sobre circuitos sin migrar. El
+   coste es una comparacion de propiedad por circuito y por pintada. */
 function circLista(){
   if (!Array.isArray(state.circuitos)) state.circuitos = [];
+  for (var i = 0; i < state.circuitos.length; i++){
+    var c = state.circuitos[i];
+    if (c && c.pv !== CIRC_PV) circMigrarUno(c);
+  }
   return state.circuitos;
 }
 function circGet(id){
@@ -17738,8 +17746,12 @@ function circGet(id){
   return null;
 }
 function circNuevo(){
+  var e = circEspacioRef("sala169");
   return { id: genId(), nombre: "", grupo: "", notas: "", modo: "rotacion", grupos: 4, rondas: 1, ratio: "16:9",
-           trabajo: 40, cambio: 15, descansoRonda: 60, estaciones: [], createdAt: Date.now(), updatedAt: Date.now() };
+           trabajo: 40, cambio: 15, descansoRonda: 60, estaciones: [], createdAt: Date.now(), updatedAt: Date.now(),
+           pv: CIRC_PV, disposicion: "circulo",
+           espacio: { plantilla: e.id, anchoM: e.ancho, largoM: e.largo, cuadricula: false, medidas: e.medidas },
+           pods: [], elementos: [], podsSueltos: circPodsConfigNueva() };
 }
 function circNum(v, def){ var x = parseInt(v, 10); return (isNaN(x) || x < 0) ? def : x; }
 function circFmt(sec){
@@ -17793,6 +17805,271 @@ function circGrupoEn(c, s, t){
   return g < G ? g : -1;
 }
 
+/* ---------- la planilla unica: espacio, Pods y elementos ---------- */
+/* 19-sep-2026. Antes habia dos lienzos apilados en la misma pantalla: el mapa
+   de estaciones, con un `ratio` y ninguna medida, y el lienzo de BlazePod, con
+   ancho y largo en metros. Eran dos planos distintos de la misma sala y habia
+   que colocar dos veces lo mismo.
+
+   Ahora manda `c.espacio`, en metros, y las tres capas comparten un unico
+   sistema de coordenadas: x e y son SIEMPRE fraccion 0..1 del plano. Por eso
+   cambiar de plantilla conserva las posiciones relativas y solo recalcula la
+   escala: no hay nada que reproyectar.
+
+     c.espacio     = { plantilla, anchoM, largoM, cuadricula, medidas }
+     c.pods        = [ { id, n, x, y, estacionId|null, color, etiqueta, base, peso } ]
+     c.elementos   = [ { id, tipo, x, y, rotacion, etiqueta, x2, y2 } ]
+     c.podsSueltos = configuracion del grupo de Pods sin estacion
+     s.podsConfig  = configuracion del grupo de Pods de esa estacion
+     c.disposicion = "circulo" | "filas" | "libre"
+
+   `estacionId` es el vinculo, y es lo unico que decide: null = Pod suelto. Un
+   Pod pertenece a una sola estacion; una estacion puede tener cero, uno o
+   varios.
+
+   Las dos lineas y las dos flechas (`flecha`, `pase`) llevan ademas x2,y2: una
+   rotacion sola no puede decir ADONDE va un pase, hacen falta dos puntos.
+
+   `c.blazePlan` NO se borra. La migracion lee de el y escribe en los campos
+   nuevos, y el editor de antes sigue accesible detras de CIRC_BLZ_VIEJO hasta
+   que Diego valide esta planilla. Un circuito que no se pueda migrar se marca
+   `_ro` y se abre en solo lectura avisando en pantalla, en vez de descartarse. */
+var CIRC_PV = 2;              /* version de la planilla: pv < 2 es de antes */
+var CIRC_BLZ_VIEJO = false;   /* true reabre el editor BlazePod de antes */
+var CIRC_MAX_PODS = 12;       /* el mismo tope que BLZ_MAX_PODS */
+var CIRC_MAX_ELEM = 40;
+var CIRC_RADIO_POD = 0.085;   /* fraccion del ancho: cerca de una estacion */
+
+/* `medidas` arranca en la plantilla pero se guarda, no se deriva: en cuanto
+   alguien escribe un ancho o un largo a mano, esos metros son reales y la
+   barra de escala tiene que aparecer aunque la plantilla no la trajera. */
+var CIRC_ESPACIOS = [
+  { id: "sala169", nombre: "Sala 16:9 genérica",    ancho: 16,  largo: 9,   medidas: false },
+  { id: "gym",     nombre: "Gym US19 10 × 4,5 m",   ancho: 10,  largo: 4.5, medidas: true  },
+  { id: "cardio",  nombre: "Sala cardio 4,5 × 5 m", ancho: 4.5, largo: 5,   medidas: true  },
+  { id: "cancha",  nombre: "Cancha de fútbol",      ancho: 20,  largo: 15,  medidas: true  },
+  { id: "cancha2", nombre: "Cancha completa",       ancho: 40,  largo: 25,  medidas: true  },
+  { id: "libre",   nombre: "Espacio libre",         ancho: 16,  largo: 9,   medidas: false }
+];
+/* Legado: la forma de la sala era un texto sin metros. Se traduce aqui y no
+   solo en la migracion, porque un circuito compartido por enlace llega como
+   objeto suelto y nunca pasa por state.circuitos ni por circMigrarUno. */
+var CIRC_RATIO_LEGADO = { "16:9": ["sala169", 16, 9], "4:3": ["libre", 4, 3], "2:1": ["libre", 2, 1] };
+
+function circEspacioRef(id){
+  for (var i = 0; i < CIRC_ESPACIOS.length; i++) if (CIRC_ESPACIOS[i].id === id) return CIRC_ESPACIOS[i];
+  return CIRC_ESPACIOS[0];
+}
+/* Una medida, acotada con criterio. blzNum RECORTA al minimo, y por eso un
+   ancho de 0 salia como una sala de 1 m: aqui un cero, un negativo o algo que
+   no es numero significan «no me lo has dicho» y cae el valor de la plantilla,
+   mientras que un numero real pero fuera de rango si se recorta, porque el que
+   escribe 250 quiere lo mas grande que se pueda y no la plantilla. */
+function circMedida(v, def, min, max){
+  var x = parseFloat(v);
+  if (!isFinite(x) || x <= 0) return def;
+  if (typeof min === "number" && x < min) return min;
+  if (typeof max === "number" && x > max) return max;
+  return x;
+}
+/* Que plantilla corresponde a unas medidas, para que una superficie heredada de
+   BlazePod no aparezca siempre como «Espacio libre». Tolerancia de 25 cm. */
+function circEspacioPorMedida(a, l){
+  for (var i = 0; i < CIRC_ESPACIOS.length; i++){
+    var r = CIRC_ESPACIOS[i];
+    if (r.medidas && Math.abs(r.ancho - a) < 0.26 && Math.abs(r.largo - l) < 0.26) return r.id;
+  }
+  return "libre";
+}
+/* El espacio de un circuito, ya normalizado y con las medidas acotadas. Nunca
+   devuelve null y nunca lanza: lo llaman el editor, la vista en vivo, la hoja
+   impresa y el enlace compartido, y ninguno puede quedarse sin plano. */
+function circEspacio(c){
+  var e = (c && c.espacio && typeof c.espacio === "object") ? c.espacio : null;
+  if (!e && c){
+    var bp = (c.blazePlan && typeof c.blazePlan === "object") ? c.blazePlan : null;
+    var sup = (bp && bp.superficie && typeof bp.superficie === "object") ? bp.superficie : null;
+    /* Si el circuito traia Pods, manda la superficie del plan: sus metros son
+       reales y las x,y de los Pods son fracciones de ELLA, no del mapa. */
+    if (sup && u19Arr(bp.pods).length){
+      var a = blzNum(sup.anchoM, 20, 1, 200), l = blzNum(sup.altoM, 15, 1, 200);
+      e = { plantilla: circEspacioPorMedida(a, l), anchoM: a, largoM: l, cuadricula: sup.rejilla !== false, medidas: true };
+    } else {
+      var leg = CIRC_RATIO_LEGADO[String(c.ratio || "16:9")] || CIRC_RATIO_LEGADO["16:9"];
+      e = { plantilla: leg[0], anchoM: leg[1], largoM: leg[2], cuadricula: false, medidas: false };
+    }
+  }
+  if (!e) e = { plantilla: "sala169", anchoM: 16, largoM: 9, cuadricula: false, medidas: false };
+  var ref = circEspacioRef(e.plantilla);
+  return { plantilla: ref.id,
+           anchoM: circMedida(e.anchoM, ref.ancho, 1, 200),
+           largoM: circMedida(e.largoM, ref.largo, 1, 200),
+           cuadricula: !!e.cuadricula,
+           medidas: (e.medidas == null) ? ref.medidas : !!e.medidas };
+}
+
+/* ---------- los Pods como piezas libres ---------- */
+function circPods(c){ if (!c) return []; if (!Array.isArray(c.pods)) c.pods = []; return c.pods; }
+function circElementos(c){ if (!c) return []; if (!Array.isArray(c.elementos)) c.elementos = []; return c.elementos; }
+function circPodPorId(c, id){
+  var l = circPods(c);
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+function circElementoPorId(c, id){
+  var l = circElementos(c);
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+function circEstacionPorId(c, id){
+  var l = u19Arr(c && c.estaciones);
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
+  return null;
+}
+function circEstacionIdx(c, id){
+  var l = u19Arr(c && c.estaciones);
+  for (var i = 0; i < l.length; i++) if (l[i].id === id) return i;
+  return -1;
+}
+function circEstacionPorNombre(c, nombre){
+  var q = circNorm(nombre), l = u19Arr(c && c.estaciones);
+  if (!q) return null;
+  for (var i = 0; i < l.length; i++) if (circNorm(circEstacionNombre(l[i])) === q) return l[i];
+  return null;
+}
+/* Los Pods de un grupo: los de una estacion, o los sueltos si no se da id. */
+function circPodsDe(c, estacionId){
+  return circPods(c).filter(function(p){ return estacionId ? (p.estacionId === estacionId) : !p.estacionId; });
+}
+function circPodsSueltos(c){ return circPodsDe(c, null); }
+/* Un Pod que apunta a una estacion que ya no existe no se pierde: se suelta. */
+function circHuerfanos(c){
+  var n = 0;
+  circPods(c).forEach(function(p){
+    if (p.estacionId && !circEstacionPorId(c, p.estacionId)){ p.estacionId = null; n++; }
+  });
+  return n;
+}
+/* Renumera 1..N para que el numero que se ve en el Pod sea estable y sin huecos
+   despues de borrar o duplicar. El id NO cambia: es lo que guarda el vinculo. */
+function circPodsRenumerar(c){
+  circPods(c).forEach(function(p, i){ p.n = i + 1; });
+  return c;
+}
+
+/* ---------- la configuracion de luz, por grupo ---------- */
+/* Antes era una sola para todo el circuito (`blazePlan.logica`). Ahora cada
+   grupo tiene la suya: la estacion en `s.podsConfig`, los sueltos en
+   `c.podsSueltos`. Los cuatro primeros campos son los del modelo acordado; los
+   demas viajan para no perder nada de lo que ya estaba configurado. */
+function circPodsConfigNueva(){
+  return { modo: "random", tiempoRespuestaMs: 3000, aleatorio: true,
+           colores: BLZ_COLORES.slice(0, 4).map(function(x){ return x.id; }),
+           intervalo: 3, luz: 3, disparo: "intervalo", simultaneos: 1, semilla: "us19", sonido: true };
+}
+function circPodsConfig(o){
+  var d = circPodsConfigNueva(), q = (o && typeof o === "object") ? o : {};
+  var cols = u19Arr(q.colores).filter(function(id){ return !!blzColorRef(id); });
+  var iv = circMedida(q.intervalo, d.intervalo, 0.2, 600);
+  return { modo: blzModo(q.modo) ? q.modo : d.modo,
+           tiempoRespuestaMs: Math.round(circMedida(q.tiempoRespuestaMs, d.tiempoRespuestaMs, 200, 600000)),
+           aleatorio: q.aleatorio !== false,
+           colores: cols.length ? cols.slice(0, BLZ_COLORES.length) : d.colores.slice(),
+           intervalo: iv,
+           luz: circMedida(q.luz, iv, 0.2, 600),
+           disparo: blzDisparo(q.disparo) ? q.disparo : d.disparo,
+           simultaneos: blzEnt(q.simultaneos, 1, 1, CIRC_MAX_PODS),
+           semilla: blzTexto(q.semilla, 40) || d.semilla,
+           sonido: q.sonido !== false };
+}
+/* La configuracion de un grupo, siempre normalizada y sin escribir en el
+   circuito: quien quiera guardarla usa circPodsConfigPoner. */
+function circPodsConfigDe(c, estacionId){
+  if (estacionId){
+    var s = circEstacionPorId(c, estacionId);
+    return circPodsConfig(s && s.podsConfig);
+  }
+  return circPodsConfig(c && c.podsSueltos);
+}
+function circPodsConfigPoner(c, estacionId, cfg){
+  var n = circPodsConfig(cfg);
+  if (estacionId){ var s = circEstacionPorId(c, estacionId); if (s) s.podsConfig = n; }
+  else c.podsSueltos = n;
+  return n;
+}
+/* De la logica vieja del plan a la configuracion de un grupo. `respuesta` iba
+   en segundos y el modelo nuevo la quiere en milisegundos. */
+function circPodsConfigDeLogica(bp){
+  var L = (bp && bp.logica && typeof bp.logica === "object") ? bp.logica : {};
+  var cols = u19Arr(bp && bp.colores).map(function(x){ return x && x.id; }).filter(function(id){ return !!blzColorRef(id); });
+  return circPodsConfig({ modo: L.modo,
+                          tiempoRespuestaMs: Math.round(blzNum(L.respuesta, 3, 0.2, 600) * 1000),
+                          aleatorio: (L.modo !== "secuencia" && L.modo !== "libre"),
+                          colores: cols, intervalo: L.intervalo, luz: L.luz, disparo: L.disparo,
+                          simultaneos: L.simultaneos, semilla: L.semilla, sonido: L.sonido });
+}
+
+/* ---------- migracion: de los dos lienzos a uno ---------- */
+/* Lee `blazePlan` y escribe `espacio`, `pods` y `elementos`. NO borra
+   `blazePlan`: mientras CIRC_BLZ_VIEJO exista, el editor de antes tiene que
+   seguir abriendo lo mismo que abria. Es idempotente y solo rellena lo que
+   falta, asi que un circuito que ya venia con Pods nuevos no se pisa. */
+function circMigrarUno(c){
+  if (!c || typeof c !== "object") return c;
+  if (c.pv === CIRC_PV) return c;
+  try {
+    var e = circEspacio(c);
+    c.espacio = { plantilla: e.plantilla, anchoM: e.anchoM, largoM: e.largoM, cuadricula: e.cuadricula, medidas: e.medidas };
+    var bp = (c.blazePlan && typeof c.blazePlan === "object") ? c.blazePlan : null;
+    u19Arr(c.estaciones).forEach(function(s){ if (s && !s.id) s.id = genId(); });
+    if (!Array.isArray(c.pods)){
+      c.pods = [];
+      if (bp){
+        /* alcance "estacion": todos los Pods del plan eran de esa estacion y
+           asi siguen. Se busca por nombre porque era lo unico que guardaba. */
+        var destino = (bp.alcance === "estacion" && bp.estacion) ? circEstacionPorNombre(c, bp.estacion) : null;
+        u19Arr(bp.pods).slice(0, CIRC_MAX_PODS).forEach(function(pod, i){
+          c.pods.push({ id: blzTexto(pod && pod.id, 40) || ("pod" + genId()), n: i + 1,
+                        x: blzNum(pod && pod.x, 0.5, 0, 1), y: blzNum(pod && pod.y, 0.5, 0, 1),
+                        estacionId: destino ? destino.id : null,
+                        color: blzColorRef(pod && pod.color) ? pod.color : "",
+                        etiqueta: blzTexto(pod && pod.etiqueta, 24), base: !!(pod && pod.base),
+                        peso: blzEnt(pod && pod.peso, 1, 1, 5) });
+        });
+      }
+    }
+    if (!Array.isArray(c.elementos)){
+      c.elementos = [];
+      if (bp) u19Arr(bp.adornos).slice(0, CIRC_MAX_ELEM).forEach(function(a){
+        var t = blzAdorno(a && a.tipo) ? a.tipo : "cono";
+        var o = { id: blzTexto(a && a.id, 40) || ("el" + genId()), tipo: t,
+                  x: blzNum(a && a.x, 0.5, 0, 1), y: blzNum(a && a.y, 0.5, 0, 1),
+                  rotacion: blzEnt(a && a.rotacion, 0, 0, 359), etiqueta: blzTexto(a && a.etiqueta, 24) };
+        if (t === "flecha" || t === "pase"){
+          o.x2 = blzNum(a && a.x2, Math.min(0.95, o.x + 0.18), 0, 1);
+          o.y2 = blzNum(a && a.y2, o.y, 0, 1);
+        }
+        c.elementos.push(o);
+      });
+    }
+    var cfg = bp ? circPodsConfigDeLogica(bp) : circPodsConfigNueva();
+    u19Arr(c.estaciones).forEach(function(s){
+      if (!s.podsConfig && circPodsDe(c, s.id).length) s.podsConfig = JSON.parse(JSON.stringify(cfg));
+    });
+    if (!c.podsSueltos) c.podsSueltos = JSON.parse(JSON.stringify(cfg));
+    if (c.disposicion !== "filas" && c.disposicion !== "libre") c.disposicion = "circulo";
+    circHuerfanos(c);
+    circPodsRenumerar(c);
+    c.pv = CIRC_PV;
+    if (c._ro) delete c._ro;
+  } catch(err){
+    /* Nunca se descarta: se marca y se abre en solo lectura. */
+    c._ro = true;
+    try { console.warn("US19: circuito que no se pudo migrar, se abre en solo lectura:", c && c.id, err); } catch(e2){}
+  }
+  return c;
+}
+
 /* ---------- mapa de estaciones ---------- */
 /* Cada estación tiene una posición (x, y) como fracción del plano de la sala.
    Si no la tiene, se coloca sola en un círculo (estación 1 arriba, sentido
@@ -17800,9 +18077,12 @@ function circGrupoEn(c, s, t){
    que rotan los grupos. El mismo mapa se dibuja en el editor (arrastrable),
    en vivo (con el grupo de cada estación) y en la hoja impresa (SVG). */
 var CIRC_COLORES = ["#a8d139", "#5cc8e8", "#f59e0b", "#ef4444", "#a78bfa", "#f472b6", "#34d399", "#fb923c"];
+/* La proporcion sale ya del espacio en metros, no del `ratio` de texto. Los
+   circuitos de antes pasan por CIRC_RATIO_LEGADO dentro de circEspacio, asi que
+   un 16:9 sigue siendo 16:9 y no se mueve nada de sitio. */
 function circRatio(c){
-  var r = { "16:9": 16 / 9, "4:3": 4 / 3, "2:1": 2 }[c && c.ratio] || 16 / 9;
-  return r;
+  var e = circEspacio(c);
+  return e.anchoM / e.largoM;
 }
 function circPosAuto(i, N, forma){
   if (forma === "filas"){
