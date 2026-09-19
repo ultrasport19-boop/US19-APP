@@ -91,5 +91,12 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   node "$RAIZ/tools/blazepod.js" "$RAIZ/index.html" \
     || { echo ""; echo "el planificador BlazePod no pasa la prueba: commit cancelado."; exit 1; }
 
+  # 14. planilla.js - la planilla unica: que un circuito de antes se migre sin
+  #     mover un Pod de sitio, que el vinculo Pod <-> estacion se respete, que
+  #     un Pod huerfano se suelte en vez de perderse y que cambiar de plantilla
+  #     no reproyecte nada (19-sep-2026).
+  node "$RAIZ/tools/planilla.js" "$RAIZ/index.html" \
+    || { echo ""; echo "la planilla unica no pasa la prueba: commit cancelado."; exit 1; }
+
 fi
 exit 0

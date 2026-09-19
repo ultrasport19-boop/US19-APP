@@ -1405,6 +1405,46 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .cm-grupo{margin-top:.25rem;font-family:var(--font-display);font-size:1rem;color:var(--accent);letter-spacing:.04em;}
 .cm-grupo.libre{color:var(--muted);font-family:var(--font-body);font-size:.7rem;}
 .cm-vacio-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:.9rem;padding:1rem;text-align:center;}
+/* --- la planilla unica: las tres capas del plano (19-sep-2026) ---
+   El orden de z es el orden de pintado y tambien el del closest() al
+   arrastrar: elementos (el suelo) < estaciones < Pods. Asi un Pod se coge
+   aunque quede encima de una tarjeta de estacion. */
+.circ-mapa .cm-capa-el{position:absolute;inset:0;z-index:2;}
+.circ-mapa .cm-est{z-index:3;}
+.circ-mapa .cm-capa-pod{position:absolute;inset:0;z-index:4;}
+.cm-el{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;cursor:grab;touch-action:none;font-size:1.3rem;line-height:1;}
+.cm-el.drag{cursor:grabbing;z-index:5;}
+.cm-el.sel{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px;}
+.cm-el.punta{font-size:.9rem;color:var(--muted);}
+.cm-el-e{font-size:.6rem;color:var(--muted);white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
+.circ-mapa.lectura .cm-el,.circ-mapa.lectura .cm-pod{cursor:default;}
+.cm-pod{position:absolute;width:40px;height:40px;transform:translate(-50%,-50%);border-radius:50%;border:3px solid var(--muted);background:var(--surface-1);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:grab;touch-action:none;box-shadow:var(--shadow);}
+.cm-pod.drag{cursor:grabbing;z-index:6;box-shadow:var(--shadow-lg);}
+.cm-pod.sel{outline:3px solid var(--accent);outline-offset:3px;}
+.cm-pod.base{border-style:double;border-width:6px;}
+.cm-pod.on{color:#0b1014;}
+/* El vinculo se ve sin tener que seleccionar nada: aro exterior del color de
+   la estacion a la que pertenece el Pod. Un Pod suelto no lleva aro. */
+.cm-pod.atado{box-shadow:0 0 0 3px var(--cm-est-col,var(--accent)),var(--shadow);}
+.cm-pod-n{font-family:var(--font-display);font-size:.95rem;line-height:1;}
+.cm-pod-b{font-size:.46rem;letter-spacing:.06em;text-transform:uppercase;opacity:.85;}
+.cm-pod-e{position:absolute;transform:translate(-50%,24px);font-size:.6rem;color:var(--muted);white-space:nowrap;pointer-events:none;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
+.cm-pods-n{position:absolute;bottom:-9px;right:-9px;min-width:20px;height:20px;padding:0 .2rem;border-radius:10px;background:var(--surface-1);border:2px solid var(--accent);color:var(--accent);font-family:var(--font-display);font-size:.7rem;display:flex;align-items:center;justify-content:center;}
+.cm-escala{position:absolute;right:.5rem;bottom:.4rem;z-index:5;display:flex;align-items:center;gap:.35rem;font-size:.6rem;color:var(--muted);background:rgba(0,0,0,.35);border-radius:6px;padding:.15rem .4rem;pointer-events:none;}
+.cm-escala-b{display:block;width:25%;min-width:38px;height:0;border-top:2px solid currentColor;}
+.circ-selp{margin-top:.5rem;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:.45rem .55rem;}
+.circ-selp-t{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-family:var(--font-display);font-size:1.05rem;color:var(--accent);}
+.circ-selp-f{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap;margin-top:.4rem;}
+.circ-selp-f input[type=text]{flex:1 1 150px;min-width:110px;}
+.circ-flechas{display:inline-flex;gap:.15rem;}
+.circ-col{width:24px;height:24px;min-width:24px;border-radius:50%;border:2px solid var(--border);background:var(--surface-2);color:var(--muted);padding:0;cursor:pointer;font-size:.7rem;line-height:1;}
+.circ-col.on{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
+.cm-ro{background:rgba(234,179,8,.10);border:1px solid rgba(234,179,8,.35);border-radius:10px;padding:.5rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:var(--warn);line-height:1.45;}
+@media (max-width:560px){
+  /* Con el dedo, 44 px es el minimo con el que se acierta un Pod. */
+  .cm-pod{width:44px;height:44px;}
+  .cm-el{font-size:1.5rem;}
+}
 .circ-mapa-tools{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin-bottom:.6rem;}
 .circ-buscar{display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;}
 .circ-buscar input{flex:1 1 220px;}
@@ -18097,8 +18137,19 @@ function circPos(c, i){
   if (s && typeof s.x === "number" && typeof s.y === "number") return { x: s.x, y: s.y };
   return circPosAuto(i, c.estaciones.length, "circulo");
 }
+/* Reordenar mueve las estaciones y arrastra con ellas los Pods que tienen
+   atados, manteniendo el desfase relativo de cada uno. Los Pods sueltos y los
+   elementos del espacio NO se mueven: un cono esta donde esta. */
 function circAutoLayout(c, forma){
-  c.estaciones.forEach(function(s, i){ var p = circPosAuto(i, c.estaciones.length, forma); s.x = p.x; s.y = p.y; });
+  u19Arr(c.estaciones).forEach(function(s, i){
+    var antes = circPos(c, i), p = circPosAuto(i, u19Arr(c.estaciones).length, forma);
+    var dx = p.x - antes.x, dy = p.y - antes.y;
+    s.x = p.x; s.y = p.y;
+    circPodsDe(c, s.id).forEach(function(pod){
+      var q = circClampXY("pod", pod.x + dx, pod.y + dy);
+      pod.x = q.x; pod.y = q.y;
+    });
+  });
 }
 function circColocarNueva(c){
   var i = c.estaciones.length - 1; if (i < 0) return;
@@ -18109,6 +18160,108 @@ function circNorm(s){
   s = String(s || "").toLowerCase();
   try { s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, ""); } catch(e){}
   return s;
+}
+/* Las marcas del espacio: cuatro lineas, ni un escudo ni una imagen remota.
+   Solo los espacios medidos las llevan; una sala generica es un rectangulo. */
+function circEspacioSvg(c, H){
+  var e = circEspacio(c), t = e.plantilla, W = 1000, s = '';
+  if (t === "cancha" || t === "cancha2"){
+    s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>'
+      + '<line x1="' + (W / 2) + '" y1="8" x2="' + (W / 2) + '" y2="' + (H - 8) + '" stroke="currentColor" stroke-width="3" opacity=".5"/>'
+      + '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="' + (H * 0.17).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>'
+      + '<rect x="8" y="' + (H * 0.28).toFixed(0) + '" width="' + (W * 0.11).toFixed(0) + '" height="' + (H * 0.44).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>'
+      + '<rect x="' + (W - 8 - W * 0.11).toFixed(0) + '" y="' + (H * 0.28).toFixed(0) + '" width="' + (W * 0.11).toFixed(0) + '" height="' + (H * 0.44).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
+  } else if (t === "gym" || t === "cardio"){
+    s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" rx="18" fill="none" stroke="currentColor" stroke-width="3" opacity=".4"/>';
+  }
+  return s;
+}
+/* La cuadricula, en metros de verdad: un paso por metro en una sala, cada 2 m
+   si pasa de 12 y cada 5 en una cancha. Una rejilla en porcentajes fijos no
+   dice nada; esta se puede contar con los pies. */
+function circCuadriculaSvg(c, H){
+  var e = circEspacio(c);
+  if (!e.cuadricula) return '';
+  var paso = e.anchoM > 25 ? 5 : (e.anchoM > 12 ? 2 : 1), s = '', x, y;
+  for (x = paso; x < e.anchoM - 0.001; x += paso)
+    s += '<line x1="' + (x / e.anchoM * 1000).toFixed(1) + '" y1="0" x2="' + (x / e.anchoM * 1000).toFixed(1) + '" y2="' + H + '" stroke="currentColor" stroke-width="1" opacity=".18"/>';
+  for (y = paso; y < e.largoM - 0.001; y += paso)
+    s += '<line x1="0" y1="' + (y / e.largoM * H).toFixed(1) + '" x2="1000" y2="' + (y / e.largoM * H).toFixed(1) + '" stroke="currentColor" stroke-width="1" opacity=".18"/>';
+  return s;
+}
+/* Las flechas y las lineas de pase: dos puntos, no una rotacion. Una rotacion
+   sola no puede decir ADONDE va un pase. */
+function circElementosSvg(c, H){
+  var s = '<defs><marker id="cm-earr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>';
+  circElementos(c).forEach(function(a){
+    if (a.tipo !== "flecha" && a.tipo !== "pase") return;
+    s += '<line x1="' + (a.x * 1000).toFixed(1) + '" y1="' + (a.y * H).toFixed(1)
+      + '" x2="' + (blzNum(a.x2, a.x, 0, 1) * 1000).toFixed(1) + '" y2="' + (blzNum(a.y2, a.y, 0, 1) * H).toFixed(1)
+      + '" stroke="currentColor" stroke-width="4"' + (a.tipo === "pase" ? ' stroke-dasharray="12 9"' : '') + ' marker-end="url(#cm-earr)" opacity=".8"/>';
+  });
+  return s;
+}
+/* El vinculo dibujado: un hilo corto del Pod a su estacion, del color de la
+   estacion. Es lo que hace que «este Pod es de la 3» se vea de un vistazo. */
+function circVinculosSvg(c, H){
+  var s = '';
+  circPods(c).forEach(function(pod){
+    if (!pod.estacionId) return;
+    var i = circEstacionIdx(c, pod.estacionId);
+    if (i < 0) return;
+    var a = circPos(c, i), col = CIRC_COLORES[i % CIRC_COLORES.length];
+    s += '<line x1="' + (pod.x * 1000).toFixed(1) + '" y1="' + (pod.y * H).toFixed(1)
+      + '" x2="' + (a.x * 1000).toFixed(1) + '" y2="' + (a.y * H).toFixed(1)
+      + '" stroke="' + col + '" stroke-width="2" stroke-dasharray="5 5" opacity=".55"/>';
+  });
+  return s;
+}
+/* La capa de los elementos del espacio. En lectura no se dibuja la punta de la
+   flecha: no hay nada que arrastrar. */
+function circElementosHtml(c, opts){
+  opts = opts || {};
+  var html = '<div class="cm-capa-el">';
+  circElementos(c).forEach(function(a){
+    var ref = blzAdorno(a.tipo); if (!ref) return;
+    var esLinea = (a.tipo === "flecha" || a.tipo === "pase");
+    var giro = (!esLinea && a.rotacion) ? 'transform:translate(-50%,-50%) rotate(' + blzEnt(a.rotacion, 0, 0, 359) + 'deg);' : '';
+    html += '<div class="cm-el' + (esLinea ? ' linea' : '') + (opts.selEl === a.id ? ' sel' : '') + '" data-el="' + escapeAttr(a.id) + '" data-punta="1"'
+      + ' style="left:' + (a.x * 100).toFixed(2) + '%;top:' + (a.y * 100).toFixed(2) + '%;' + giro + '" title="' + escapeAttr(ref.nombre) + '">'
+      + '<span class="cm-el-i">' + ref.icono + '</span>'
+      + (a.etiqueta ? '<span class="cm-el-e">' + escapeHtml(a.etiqueta) + '</span>' : '') + '</div>';
+    if (esLinea && !opts.lectura){
+      html += '<div class="cm-el punta" data-el="' + escapeAttr(a.id) + '" data-punta="2" style="left:' + (blzNum(a.x2, a.x, 0, 1) * 100).toFixed(2) + '%;top:' + (blzNum(a.y2, a.y, 0, 1) * 100).toFixed(2) + '%;" title="Punta"><span class="cm-el-i">•</span></div>';
+    }
+  });
+  return html + '</div>';
+}
+/* La capa de los Pods. `podsOn` y `podsColor` son lo que enciende el
+   subcronometro en vivo; en el editor llegan vacios. */
+function circPodsHtml(c, opts){
+  opts = opts || {};
+  var activos = u19Arr(opts.podsOn), colores = opts.podsColor || {};
+  var html = '<div class="cm-capa-pod">';
+  circPods(c).forEach(function(pod){
+    var i = pod.estacionId ? circEstacionIdx(c, pod.estacionId) : -1;
+    var colEst = (i >= 0) ? CIRC_COLORES[i % CIRC_COLORES.length] : "";
+    var fijo = pod.color ? blzColorRef(pod.color) : null;
+    var on = activos.indexOf(pod.n) >= 0, hex = colores[pod.n] || "";
+    var estilo = 'left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;';
+    if (colEst) estilo += '--cm-est-col:' + colEst + ';';
+    if (on && hex) estilo += 'background:' + escapeAttr(hex) + ';border-color:' + escapeAttr(hex) + ';';
+    else if (fijo) estilo += 'border-color:' + escapeAttr(fijo.hex) + ';';
+    html += '<button type="button" class="cm-pod' + (on ? ' on' : '') + (pod.base ? ' base' : '') + (colEst ? ' atado' : '') + (opts.selPod === pod.id ? ' sel' : '') + '"'
+      + ' data-pod="' + escapeAttr(pod.id) + '"' + (opts.lectura ? ' tabindex="-1" disabled' : '')
+      + ' style="' + estilo + '"'
+      + ' aria-label="Pod ' + pod.n + (pod.base ? ', base' : '')
+        + (i >= 0 ? ', de la estación ' + (i + 1) : ', suelto')
+        + (pod.etiqueta ? ', ' + escapeAttr(pod.etiqueta) : '') + '">'
+      + '<span class="cm-pod-n">' + pod.n + '</span>'
+      + (pod.base ? '<span class="cm-pod-b">base</span>' : '')
+      + '</button>'
+      + (pod.etiqueta ? '<span class="cm-pod-e" data-pod="' + escapeAttr(pod.id) + '" style="left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;">' + escapeHtml(pod.etiqueta) + '</span>' : '');
+  });
+  return html + '</div>';
 }
 function circMapaFlechasSvg(c, H, opts){
   var N = c.estaciones.length; if (N < 2) return "";
@@ -18123,60 +18276,482 @@ function circMapaFlechasSvg(c, H, opts){
   }
   return svg;
 }
+/* El plano entero: una sola planilla. De abajo arriba — marcas del espacio,
+   cuadricula, hilos de vinculo y flechas de rotacion (todo en el SVG), luego
+   los elementos del espacio, luego las estaciones, luego los Pods, y la escala
+   encima de todo. Los mismos metros los usan el editor, la vista en vivo, la
+   pizarra y la hoja impresa: un solo plano, no cuatro parecidos. */
 function circMapaHtml(c, opts){
   opts = opts || {};
-  var N = c.estaciones.length, ratio = circRatio(c), H = Math.round(1000 / ratio);
-  var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';">'
-    + '<svg class="cm-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">' + circMapaFlechasSvg(c, H, opts) + '</svg>';
+  var N = c.estaciones.length, e = circEspacio(c), ratio = e.anchoM / e.largoM, H = Math.round(1000 / ratio);
+  var nPods = circPods(c).length, nEl = circElementos(c).length;
+  var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + (opts.lectura ? ' lectura' : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';">'
+    + '<svg class="cm-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">'
+      + circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
+      + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, opts)
+    + '</svg>';
+  if (nEl) html += circElementosHtml(c, opts);
   c.estaciones.forEach(function(s, i){
     var pos = circPos(c, i), gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
     var g = (opts.turno != null) ? circGrupoEn(c, i, opts.turno) : null;
+    var misPods = circPodsDe(c, s.id).length;
     html += '<div class="cm-est' + (opts.activa === i ? ' on' : '') + (g != null && g < 0 ? ' libre' : '') + '" data-i="' + i + '" style="left:' + (pos.x * 100).toFixed(2) + '%;top:' + (pos.y * 100).toFixed(2) + '%;border-color:' + col + ';">'
       + '<span class="cm-num" style="background:' + col + ';">' + (i + 1) + '</span>'
       + (gif ? mediaThumb(gif, 'class="cm-img" loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
       + '<div class="cm-nom">' + escapeHtml(circEstacionNombre(s)) + '</div>'
       + (s.nota && !opts.compacto ? '<div class="cm-nota">' + escapeHtml(s.nota) + '</div>' : '')
       + (g != null ? '<div class="cm-grupo' + (g < 0 ? ' libre' : '') + '">' + (g >= 0 ? escapeHtml(circNombreGrupo(c, g)) : 'libre') + '</div>' : '')
+      + (misPods ? '<span class="cm-pods-n" title="' + misPods + ' Pod' + (misPods === 1 ? '' : 's') + ' en esta estación">🔵' + misPods + '</span>' : '')
       + '</div>';
   });
-  if (!N) html += '<div class="cm-vacio-msg">Busca un ejercicio abajo o añade una estación libre: irán apareciendo aquí, en el mapa de la sala, y las puedes arrastrar hasta donde van de verdad.</div>';
+  if (nPods) html += circPodsHtml(c, opts);
+  if (!N && !nPods && !nEl) html += '<div class="cm-vacio-msg">Busca un ejercicio abajo o añade una estación libre: irán apareciendo aquí, en el plano, y las puedes arrastrar hasta donde van de verdad. Los Pods y los conos se añaden con los botones de arriba y viven en el mismo plano.</div>';
+  if (e.medidas) html += '<div class="cm-escala"><span class="cm-escala-b"></span>' + blzM(e.anchoM / 4) + '</div>';
   return html + '</div>';
 }
-/* Arrastre de estaciones en el editor (ratón y dedo). */
+/* Los limites de cada capa, en fracciones del plano. Una tarjeta de estacion
+   es grande y no puede pegarse al borde; un Pod es un circulo de 40 px y si
+   puede. Antes cada lienzo tenia los suyos y no coincidian. */
+var CIRC_LIM = {
+  est: { x1: 0.06, x2: 0.94, y1: 0.10, y2: 0.90 },
+  pod: { x1: 0.02, x2: 0.98, y1: 0.03, y2: 0.97 },
+  el:  { x1: 0.02, x2: 0.98, y1: 0.02, y2: 0.98 }
+};
+function circClampXY(tipo, x, y){
+  var L = CIRC_LIM[tipo] || CIRC_LIM.pod;
+  return { x: Math.min(L.x2, Math.max(L.x1, x)), y: Math.min(L.y2, Math.max(L.y1, y)) };
+}
+/* La estacion mas cercana a un punto, si esta dentro del radio. El radio se
+   mide EN PANTALLA, no en fracciones crudas: x es fraccion del ancho e y del
+   largo, asi que comparandolas tal cual el radio sale ovalado y en una cancha
+   de 20 x 15 un Pod se engancha por arriba y no por el lado. Multiplicar ry por
+   la proporcion lo devuelve a un circulo de verdad. */
+function circEstacionCerca(c, x, y){
+  var e = circEspacio(c), ratio = e.anchoM / e.largoM;
+  var rx = CIRC_RADIO_POD, ry = CIRC_RADIO_POD * ratio;
+  var mejor = null, mejorD = Infinity;
+  u19Arr(c && c.estaciones).forEach(function(st, i){
+    var p = circPos(c, i);
+    var dx = (x - p.x) / rx, dy = (y - p.y) / ry, d = dx * dx + dy * dy;
+    if (d <= 1 && d < mejorD){ mejorD = d; mejor = st; }
+  });
+  return mejor;
+}
+/* Mover una estacion arrastra sus Pods con el mismo desfase. Si no lo hiciera,
+   el hilo del vinculo se estiraria por toda la sala y el montaje que se ve en
+   pantalla dejaria de ser el que hay en el suelo. */
+function circMoverEstacion(c, i, x, y){
+  var st = u19Arr(c.estaciones)[i]; if (!st) return;
+  var antes = circPos(c, i), q = circClampXY("est", x, y);
+  var dx = q.x - antes.x, dy = q.y - antes.y;
+  st.x = q.x; st.y = q.y;
+  circPodsDe(c, st.id).forEach(function(pod){
+    var p = circClampXY("pod", pod.x + dx, pod.y + dy);
+    pod.x = p.x; pod.y = p.y;
+  });
+}
+
+/* Arrastre de las tres capas en el editor (ratón y dedo). Un solo juego de
+   oyentes sobre el contenedor, que NO se vuelve a montar al repintar: el
+   innerHTML cambia por debajo y la delegacion sigue funcionando. Montarlos otra
+   vez en cada pintada los acumularia. */
 function circMapaMontar(box){
   if (!box || box._montado) return;
   box._montado = true;
   var arr = null;
+  /* Mientras se arrastra se redibuja SOLO el SVG: flechas, hilos, cuadricula y
+     marcas. Repintar el plano entero en cada pointermove tira al suelo el
+     puntero capturado y en el telefono el arrastre se corta a la primera. */
+  var svgVivo = function(){
+    if (!arr || !arr.mapa) return;
+    var svg = arr.mapa.querySelector("svg.cm-svg"); if (!svg) return;
+    var c = _circEdit, e = circEspacio(c), H = Math.round(1000 / (e.anchoM / e.largoM));
+    svg.innerHTML = circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
+      + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, {});
+  };
   box.addEventListener("pointerdown", function(ev){
-    var card = ev.target.closest ? ev.target.closest(".cm-est") : null;
-    if (!card || !_circEdit) return;
-    var mapa = card.parentNode, r = mapa.getBoundingClientRect();
-    arr = { i: parseInt(card.getAttribute("data-i"), 10), r: r, card: card, mapa: mapa, movio: false };
-    try { card.setPointerCapture(ev.pointerId); } catch(e){}
-    card.classList.add("drag");
+    if (!_circEdit || _circEdit._ro) return;
+    if (!ev.target || !ev.target.closest) return;
+    /* Los Pods primero: son la capa de arriba y tienen que ganar aunque caigan
+       encima de una tarjeta de estacion. */
+    var pod = ev.target.closest(".cm-pod");
+    var el  = pod ? null : ev.target.closest(".cm-el");
+    var card = (pod || el) ? null : ev.target.closest(".cm-est");
+    var pieza = pod || el || card;
+    if (!pieza) return;
+    var mapa = pieza.closest(".circ-mapa"); if (!mapa) return;
+    arr = { pieza: pieza, mapa: mapa, r: mapa.getBoundingClientRect(), movio: false,
+            pod: pod ? pod.getAttribute("data-pod") : "",
+            el: el ? el.getAttribute("data-el") : "",
+            punta: el ? (el.getAttribute("data-punta") === "2") : false,
+            i: card ? parseInt(card.getAttribute("data-i"), 10) : -1 };
+    try { pieza.setPointerCapture(ev.pointerId); } catch(e){}
+    pieza.classList.add("drag");
     ev.preventDefault();
   });
   box.addEventListener("pointermove", function(ev){
     if (!arr || !_circEdit) return;
-    var s = _circEdit.estaciones[arr.i]; if (!s) return;
-    var x = (ev.clientX - arr.r.left) / arr.r.width, y = (ev.clientY - arr.r.top) / arr.r.height;
-    s.x = Math.min(0.94, Math.max(0.06, x)); s.y = Math.min(0.9, Math.max(0.1, y));
-    arr.card.style.left = (s.x * 100).toFixed(2) + "%"; arr.card.style.top = (s.y * 100).toFixed(2) + "%";
+    var c = _circEdit;
+    var fx = (ev.clientX - arr.r.left) / arr.r.width, fy = (ev.clientY - arr.r.top) / arr.r.height;
+    if (arr.pod){
+      var pod = circPodPorId(c, arr.pod); if (!pod) return;
+      var q = circClampXY("pod", fx, fy);
+      pod.x = q.x; pod.y = q.y;
+      arr.pieza.style.left = (q.x * 100).toFixed(2) + "%";
+      arr.pieza.style.top = (q.y * 100).toFixed(2) + "%";
+      var et = arr.mapa.querySelector('.cm-pod-e[data-pod="' + arr.pod + '"]');
+      if (et){ et.style.left = arr.pieza.style.left; et.style.top = arr.pieza.style.top; }
+    } else if (arr.el){
+      var a = circElementoPorId(c, arr.el); if (!a) return;
+      var p = circClampXY("el", fx, fy);
+      if (arr.punta){ a.x2 = p.x; a.y2 = p.y; }
+      else {
+        /* La linea entera se mueve: la punta acompana al origen. */
+        if (a.x2 != null){
+          var t = circClampXY("el", a.x2 + (p.x - a.x), a.y2 + (p.y - a.y));
+          a.x2 = t.x; a.y2 = t.y;
+        }
+        a.x = p.x; a.y = p.y;
+      }
+      arr.pieza.style.left = (p.x * 100).toFixed(2) + "%";
+      arr.pieza.style.top = (p.y * 100).toFixed(2) + "%";
+    } else if (arr.i >= 0){
+      circMoverEstacion(c, arr.i, fx, fy);
+      var st = c.estaciones[arr.i];
+      arr.pieza.style.left = (st.x * 100).toFixed(2) + "%";
+      arr.pieza.style.top = (st.y * 100).toFixed(2) + "%";
+      /* Los Pods atados siguen a la estacion, y se ven seguirla. */
+      circPodsDe(c, st.id).forEach(function(pd){
+        var b = arr.mapa.querySelector('.cm-pod[data-pod="' + pd.id + '"]');
+        var be = arr.mapa.querySelector('.cm-pod-e[data-pod="' + pd.id + '"]');
+        if (b){ b.style.left = (pd.x * 100).toFixed(2) + "%"; b.style.top = (pd.y * 100).toFixed(2) + "%"; }
+        if (be){ be.style.left = (pd.x * 100).toFixed(2) + "%"; be.style.top = (pd.y * 100).toFixed(2) + "%"; }
+      });
+    } else return;
     arr.movio = true;
-    var svg = arr.mapa.querySelector("svg.cm-svg");
-    if (svg) svg.innerHTML = circMapaFlechasSvg(_circEdit, Math.round(1000 / circRatio(_circEdit)), {});
+    svgVivo();
   });
-  var fin = function(){ if (!arr) return; arr.card.classList.remove("drag"); arr = null; };
+  var fin = function(){
+    if (!arr) return;
+    arr.pieza.classList.remove("drag");
+    var movio = arr.movio, idPod = arr.pod, idEl = arr.el, punta = arr.punta, i = arr.i;
+    arr = null;
+    if (!movio){
+      /* Un toque sin arrastre selecciona o deselecciona. */
+      if (idPod){ _circSelPod = (_circSelPod === idPod) ? "" : idPod; _circSelEl = ""; }
+      else if (idEl && !punta){ _circSelEl = (_circSelEl === idEl) ? "" : idEl; _circSelPod = ""; }
+      else return;
+      circPintarMapa();
+      return;
+    }
+    if (idPod){
+      /* Aqui se decide el vinculo, y es lo UNICO que lo decide: encima o dentro
+         del radio de una estacion queda atado; fuera, se libera. */
+      var c = _circEdit, pod = circPodPorId(c, idPod);
+      if (pod){
+        var st = circEstacionCerca(c, pod.x, pod.y);
+        var antes = pod.estacionId || "";
+        pod.estacionId = st ? st.id : null;
+        if (antes !== (pod.estacionId || "")){
+          if (pod.estacionId){
+            /* Un grupo nuevo necesita su configuracion de luz: se le da la de
+               los sueltos, que es de donde viene el Pod. */
+            var e2 = circEstacionPorId(c, pod.estacionId);
+            if (e2 && !e2.podsConfig) e2.podsConfig = JSON.parse(JSON.stringify(circPodsConfigDe(c, null)));
+            toast("Pod " + pod.n + " → estación " + (circEstacionIdx(c, pod.estacionId) + 1), "success");
+          } else {
+            toast("Pod " + pod.n + " suelto", "success");
+          }
+        }
+      }
+      _circSelPod = idPod; _circSelEl = "";
+    }
+    /* Al soltar, un repintado completo: los hilos, el aro del vinculo y el
+       contador de la tarjeta tienen que quedar de acuerdo con el modelo. */
+    circPintarMapa();
+    if (i >= 0) circPintarResumen();
+  };
   box.addEventListener("pointerup", fin);
   box.addEventListener("pointercancel", fin);
 }
+var _circSelPod = "", _circSelEl = "";
+/* Repinta el plano SIN volver a montar los oyentes: viven en el contenedor, que
+   no se sustituye. */
 function circPintarMapa(){
   var box = document.getElementById("circ-mapa-box");
-  if (box && _circEdit) box.innerHTML = circMapaHtml(_circEdit, {});
+  if (!box || !_circEdit) return;
+  if (_circSelPod && !circPodPorId(_circEdit, _circSelPod)) _circSelPod = "";
+  if (_circSelEl && !circElementoPorId(_circEdit, _circSelEl)) _circSelEl = "";
+  box.innerHTML = circMapaHtml(_circEdit, { selPod: _circSelPod, selEl: _circSelEl, lectura: !!_circEdit._ro });
+  var sel = document.getElementById("circ-sel-box");
+  if (sel) sel.innerHTML = circSelHtml(_circEdit);
 }
+function circPintarTools(){
+  var box = document.getElementById("circ-mapa-tools");
+  if (box && _circEdit) box.innerHTML = circMapaToolsHtml(_circEdit);
+}
+
+/* ---------- la barra del plano ---------- */
+function circMapaToolsHtml(c){
+  var e = circEspacio(c), nP = circPods(c).length, nE = circElementos(c).length;
+  return '<span class="text-xs text-muted">Arrastra cada pieza hasta donde va. Un Pod soltado sobre una estación queda atado a ella; fuera, queda suelto.</span>'
+    + '<span style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
+    + '<select id="circ-espacio" onchange="circEspacioCambiar(this.value)" title="El espacio real donde se hace la sesión">'
+    + CIRC_ESPACIOS.map(function(x){
+        return '<option value="' + escapeAttr(x.id) + '"' + (e.plantilla === x.id ? ' selected' : '') + '>' + escapeHtml(x.nombre) + '</option>';
+      }).join("") + '</select>'
+    + '<label class="blz-mini">Ancho <input type="number" min="1" max="200" step="0.5" value="' + e.anchoM + '" onchange="circEspacioMedida(\'anchoM\', this.value)"> m</label>'
+    + '<label class="blz-mini">Largo <input type="number" min="1" max="200" step="0.5" value="' + e.largoM + '" onchange="circEspacioMedida(\'largoM\', this.value)"> m</label>'
+    + '<label class="blz-mini"><input type="checkbox"' + (e.cuadricula ? ' checked' : '') + ' onchange="circCuadricula(this.checked)"> Cuadrícula</label>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circAddPod()" title="Añade un Pod al plano. Después lo arrastras: suelto, o encima de una estación">🔵 + Pod' + (nP ? ' (' + nP + ')' : '') + '</button>'
+    + '<select onchange="circAddElemento(this.value);this.selectedIndex=0;" title="Añade un elemento del espacio"><option value="">+ Elemento…' + (nE ? ' (' + nE + ')' : '') + '</option>'
+    + BLZ_ADORNOS.map(function(a){ return '<option value="' + escapeAttr(a.id) + '">' + a.icono + ' ' + escapeHtml(a.nombre) + '</option>'; }).join("") + '</select>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'circulo\')" title="Reordena las estaciones en círculo. Los Pods atados las siguen; los sueltos y los elementos no se mueven">◯ En círculo</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'filas\')" title="Reordena las estaciones en filas. Los Pods atados las siguen; los sueltos y los elementos no se mueven">▦ En filas</button>'
+    + '</span>';
+}
+
+/* ---------- el panel de la pieza seleccionada ---------- */
+function circSelHtml(c){
+  if (!c) return "";
+  if (_circSelPod){
+    var pod = circPodPorId(c, _circSelPod);
+    if (pod) return circSelPodHtml(c, pod);
+  }
+  if (_circSelEl){
+    var el = circElementoPorId(c, _circSelEl);
+    if (el) return circSelElHtml(c, el);
+  }
+  var nP = circPods(c).length;
+  if (!nP) return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Sin Pods en el plano. Añade el primero con «+ Pod»: aparece abajo y lo arrastras hasta donde va.</p>';
+  var sueltos = circPodsSueltos(c).length;
+  return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">' + nP + ' Pod' + (nP === 1 ? '' : 's') + ' en el plano, '
+    + (sueltos ? sueltos + ' suelto' + (sueltos === 1 ? '' : 's') : 'todos atados a una estación')
+    + '. Toca una pieza del plano para moverla con las flechas, etiquetarla o borrarla.</p>';
+}
+function circSelPodHtml(c, pod){
+  var i = pod.estacionId ? circEstacionIdx(c, pod.estacionId) : -1;
+  var donde = (i >= 0) ? ('estación ' + (i + 1) + ' · ' + escapeHtml(circEstacionNombre(c.estaciones[i]))) : 'suelto';
+  var id = escapeAttr(pod.id);
+  return '<div class="circ-selp">'
+    + '<div class="circ-selp-t">🔵 Pod ' + pod.n + ' <span class="text-xs text-muted">' + donde + '</span>'
+    + '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="circSelLimpiar()" title="Quitar la selección">✕</button></div>'
+    + '<div class="circ-selp-f">'
+    + '<span class="circ-flechas">'
+      + '<button class="btn btn-ghost btn-sm" onclick="circPodMover(\'' + id + '\',-1,0)" title="Izquierda">←</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circPodMover(\'' + id + '\',0,-1)" title="Arriba">↑</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circPodMover(\'' + id + '\',0,1)" title="Abajo">↓</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circPodMover(\'' + id + '\',1,0)" title="Derecha">→</button>'
+    + '</span>'
+    + '<label class="blz-mini">Etiqueta <input type="text" maxlength="24" value="' + escapeAttr(pod.etiqueta || "") + '" onchange="circPodEtiqueta(\'' + id + '\', this.value)" placeholder="lo que dices en clase"></label>'
+    + '<label class="blz-mini"><input type="checkbox"' + (pod.base ? ' checked' : '') + ' onchange="circPodBase(\'' + id + '\', this.checked)"> Base</label>'
+    + '</div>'
+    + '<div class="circ-selp-f">'
+    + '<span class="text-xs text-muted">Color fijo:</span>'
+    + '<button type="button" class="circ-col' + (pod.color ? '' : ' on') + '" onclick="circPodColor(\'' + id + '\',\'\')" title="Sin color fijo: lo decide la lógica del grupo">—</button>'
+    + BLZ_COLORES.map(function(col){
+        return '<button type="button" class="circ-col' + (pod.color === col.id ? ' on' : '') + '" style="background:' + col.hex + ';" onclick="circPodColor(\'' + id + '\',\'' + escapeAttr(col.id) + '\')" title="' + escapeAttr(col.nombre) + '"></button>';
+      }).join("")
+    + '</div>'
+    + '<div class="circ-selp-f">'
+    + (i >= 0 ? '<button class="btn btn-ghost btn-sm" onclick="circPodSoltar(\'' + id + '\')" title="Dejarlo suelto sin arrastrarlo">Soltar de la estación</button>' : '')
+    + '<button class="btn btn-ghost btn-sm" onclick="circPodDup(\'' + id + '\')">Duplicar</button>'
+    + '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circPodBorrar(\'' + id + '\')">Borrar</button>'
+    + '</div></div>';
+}
+function circSelElHtml(c, el){
+  var ref = blzAdorno(el.tipo) || BLZ_ADORNOS[0];
+  var esLinea = (el.tipo === "flecha" || el.tipo === "pase"), id = escapeAttr(el.id);
+  return '<div class="circ-selp">'
+    + '<div class="circ-selp-t">' + ref.icono + ' ' + escapeHtml(ref.nombre)
+    + '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="circSelLimpiar()" title="Quitar la selección">✕</button></div>'
+    + '<div class="circ-selp-f">'
+    + '<span class="circ-flechas">'
+      + '<button class="btn btn-ghost btn-sm" onclick="circElMover(\'' + id + '\',-1,0)" title="Izquierda">←</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circElMover(\'' + id + '\',0,-1)" title="Arriba">↑</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circElMover(\'' + id + '\',0,1)" title="Abajo">↓</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circElMover(\'' + id + '\',1,0)" title="Derecha">→</button>'
+    + '</span>'
+    + '<label class="blz-mini">Etiqueta <input type="text" maxlength="24" value="' + escapeAttr(el.etiqueta || "") + '" onchange="circElEtiqueta(\'' + id + '\', this.value)"></label>'
+    + (esLinea ? '<span class="text-xs text-muted">Arrastra el punto «•» para mover la punta.</span>'
+               : '<label class="blz-mini">Giro <input type="number" min="0" max="359" step="15" value="' + blzEnt(el.rotacion, 0, 0, 359) + '" onchange="circElGirar(\'' + id + '\', this.value)"> °</label>')
+    + '</div>'
+    + '<div class="circ-selp-f">'
+    + '<button class="btn btn-ghost btn-sm" onclick="circElDup(\'' + id + '\')">Duplicar</button>'
+    + '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circElBorrar(\'' + id + '\')">Borrar</button>'
+    + '</div></div>';
+}
+
+/* ---------- lo que hacen los botones ---------- */
+window.circSelLimpiar = function(){ _circSelPod = ""; _circSelEl = ""; circPintarMapa(); };
+window.circEspacioCambiar = function(id){
+  if (!_circEdit) return;
+  var ref = circEspacioRef(id), ant = circEspacio(_circEdit);
+  /* Solo cambian los metros. Las x,y son fracciones del plano, asi que las
+     posiciones relativas de estaciones, Pods y elementos se conservan solas y
+     lo unico que se recalcula es la escala: no hay nada que reproyectar. */
+  _circEdit.espacio = { plantilla: ref.id, anchoM: ref.ancho, largoM: ref.largo,
+                        cuadricula: ant.cuadricula, medidas: ref.medidas };
+  circPintarTools();
+  circPintarMapa();
+};
+window.circEspacioMedida = function(campo, valor){
+  if (!_circEdit) return;
+  var e = circEspacio(_circEdit);
+  e[campo] = circMedida(valor, e[campo], 1, 200);
+  /* Escribir un metro a mano hace que las medidas sean reales: la escala
+     aparece aunque la plantilla no la trajera. */
+  _circEdit.espacio = { plantilla: e.plantilla, anchoM: e.anchoM, largoM: e.largoM, cuadricula: e.cuadricula, medidas: true };
+  circPintarMapa();
+};
+window.circCuadricula = function(on){
+  if (!_circEdit) return;
+  var e = circEspacio(_circEdit);
+  _circEdit.espacio = { plantilla: e.plantilla, anchoM: e.anchoM, largoM: e.largoM, cuadricula: !!on, medidas: e.medidas };
+  circPintarMapa();
+};
+window.circAddPod = function(){
+  if (!_circEdit) return;
+  var c = _circEdit, l = circPods(c);
+  if (l.length >= CIRC_MAX_PODS){ toast("El tope son " + CIRC_MAX_PODS + " Pods", "warn"); return; }
+  /* Aparecen en fila abajo y sueltos: el profesor los arrastra desde ahi. */
+  var k = l.length, q = circClampXY("pod", 0.10 + (k % 8) * 0.105, 0.88 - Math.floor(k / 8) * 0.10);
+  var pod = { id: "pod" + genId(), n: l.length + 1, x: q.x, y: q.y, estacionId: null,
+              color: "", etiqueta: "", base: false, peso: 1 };
+  l.push(pod);
+  circPodsRenumerar(c);
+  _circSelPod = pod.id; _circSelEl = "";
+  circPintarTools(); circPintarMapa();
+};
+window.circAddElemento = function(tipo){
+  if (!_circEdit || !tipo) return;
+  var c = _circEdit, l = circElementos(c);
+  if (l.length >= CIRC_MAX_ELEM){ toast("El tope son " + CIRC_MAX_ELEM + " elementos", "warn"); return; }
+  var ref = blzAdorno(tipo); if (!ref) return;
+  var k = l.length, q = circClampXY("el", 0.10 + (k % 8) * 0.10, 0.12 + Math.floor(k / 8) * 0.09);
+  var el = { id: "el" + genId(), tipo: ref.id, x: q.x, y: q.y, rotacion: 0, etiqueta: "" };
+  if (ref.id === "flecha" || ref.id === "pase"){
+    var t = circClampXY("el", q.x + 0.18, q.y);
+    el.x2 = t.x; el.y2 = t.y;
+  }
+  l.push(el);
+  _circSelEl = el.id; _circSelPod = "";
+  circPintarTools(); circPintarMapa();
+};
+window.circPodMover = function(id, dx, dy){
+  if (!_circEdit) return;
+  var pod = circPodPorId(_circEdit, id); if (!pod) return;
+  var q = circClampXY("pod", pod.x + dx * 0.01, pod.y + dy * 0.01);
+  pod.x = q.x; pod.y = q.y;
+  /* Las flechas tambien atan y desatan: la regla es la posicion, no como se
+     haya llegado a ella. */
+  var st = circEstacionCerca(_circEdit, pod.x, pod.y);
+  pod.estacionId = st ? st.id : null;
+  if (pod.estacionId){
+    var e2 = circEstacionPorId(_circEdit, pod.estacionId);
+    if (e2 && !e2.podsConfig) e2.podsConfig = JSON.parse(JSON.stringify(circPodsConfigDe(_circEdit, null)));
+  }
+  circPintarMapa();
+};
+window.circPodEtiqueta = function(id, v){
+  if (!_circEdit) return;
+  var pod = circPodPorId(_circEdit, id); if (!pod) return;
+  pod.etiqueta = blzTexto(v, 24);
+  circPintarMapa();
+};
+window.circPodBase = function(id, on){
+  if (!_circEdit) return;
+  var pod = circPodPorId(_circEdit, id); if (!pod) return;
+  /* Una sola base por grupo: la que se acaba de marcar. */
+  if (on) circPodsDe(_circEdit, pod.estacionId).forEach(function(p){ p.base = false; });
+  pod.base = !!on;
+  circPintarMapa();
+};
+window.circPodColor = function(id, colorId){
+  if (!_circEdit) return;
+  var pod = circPodPorId(_circEdit, id); if (!pod) return;
+  pod.color = blzColorRef(colorId) ? colorId : "";
+  circPintarMapa();
+};
+window.circPodSoltar = function(id){
+  if (!_circEdit) return;
+  var pod = circPodPorId(_circEdit, id); if (!pod) return;
+  pod.estacionId = null;
+  circPintarMapa();
+  toast("Pod " + pod.n + " suelto", "success");
+};
+window.circPodDup = function(id){
+  if (!_circEdit) return;
+  var c = _circEdit, pod = circPodPorId(c, id); if (!pod) return;
+  if (circPods(c).length >= CIRC_MAX_PODS){ toast("El tope son " + CIRC_MAX_PODS + " Pods", "warn"); return; }
+  var copia = JSON.parse(JSON.stringify(pod));
+  copia.id = "pod" + genId();
+  copia.base = false;   /* la base es unica por grupo: la copia no la hereda */
+  var q = circClampXY("pod", pod.x + 0.05, pod.y + 0.05);
+  copia.x = q.x; copia.y = q.y;
+  circPods(c).push(copia);
+  circPodsRenumerar(c);
+  _circSelPod = copia.id;
+  circPintarTools(); circPintarMapa();
+};
+window.circPodBorrar = function(id){
+  if (!_circEdit) return;
+  var c = _circEdit;
+  c.pods = circPods(c).filter(function(p){ return p.id !== id; });
+  circPodsRenumerar(c);
+  if (_circSelPod === id) _circSelPod = "";
+  circPintarTools(); circPintarMapa();
+};
+window.circElMover = function(id, dx, dy){
+  if (!_circEdit) return;
+  var a = circElementoPorId(_circEdit, id); if (!a) return;
+  var q = circClampXY("el", a.x + dx * 0.01, a.y + dy * 0.01);
+  if (a.x2 != null){
+    var t = circClampXY("el", a.x2 + (q.x - a.x), a.y2 + (q.y - a.y));
+    a.x2 = t.x; a.y2 = t.y;
+  }
+  a.x = q.x; a.y = q.y;
+  circPintarMapa();
+};
+window.circElEtiqueta = function(id, v){
+  if (!_circEdit) return;
+  var a = circElementoPorId(_circEdit, id); if (!a) return;
+  a.etiqueta = blzTexto(v, 24);
+  circPintarMapa();
+};
+window.circElGirar = function(id, v){
+  if (!_circEdit) return;
+  var a = circElementoPorId(_circEdit, id); if (!a) return;
+  a.rotacion = blzEnt(v, 0, 0, 359);
+  circPintarMapa();
+};
+window.circElDup = function(id){
+  if (!_circEdit) return;
+  var c = _circEdit, a = circElementoPorId(c, id); if (!a) return;
+  if (circElementos(c).length >= CIRC_MAX_ELEM){ toast("El tope son " + CIRC_MAX_ELEM + " elementos", "warn"); return; }
+  var copia = JSON.parse(JSON.stringify(a));
+  copia.id = "el" + genId();
+  var q = circClampXY("el", a.x + 0.05, a.y + 0.05);
+  if (copia.x2 != null){
+    var t = circClampXY("el", copia.x2 + (q.x - copia.x), copia.y2 + (q.y - copia.y));
+    copia.x2 = t.x; copia.y2 = t.y;
+  }
+  copia.x = q.x; copia.y = q.y;
+  circElementos(c).push(copia);
+  _circSelEl = copia.id;
+  circPintarTools(); circPintarMapa();
+};
+window.circElBorrar = function(id){
+  if (!_circEdit) return;
+  var c = _circEdit;
+  c.elementos = circElementos(c).filter(function(a){ return a.id !== id; });
+  if (_circSelEl === id) _circSelEl = "";
+  circPintarTools(); circPintarMapa();
+};
 window.circOrdenar = function(forma){
   if (!_circEdit) return;
   circAutoLayout(_circEdit, forma);
+  _circEdit.disposicion = (forma === "filas") ? "filas" : "circulo";
   circPintarMapa();
 };
 window.circRatioCambiar = function(v){
@@ -18575,17 +19150,16 @@ function circEditorHtml(){
     + formField("Nombres de los grupos", '<input type="text" data-k="nombresGrupos" value="' + escapeAttr(c.nombresGrupos || "") + '" placeholder="Leones, Tigres, Águilas, Pumas (opcional, separados por coma)">')
     + formField("Notas / objetivo", '<input type="text" data-k="notas" value="' + escapeAttr(c.notas || "") + '" placeholder="Objetivo de la clase, materiales, adaptaciones">')
     + '</div>';
+  /* La planilla: un solo plano con las estaciones, los Pods y los elementos del
+     espacio. La barra y el panel de seleccion viven en sus propios
+     contenedores para poder repintarse por separado sin robarle el foco a un
+     campo que se esta escribiendo. */
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
-    + '<div class="card-title">🗺 Mapa de estaciones</div>'
-    + '<div class="circ-mapa-tools"><span class="text-xs text-muted">Arrastra cada estación hasta donde va en la sala. Las flechas marcan el sentido en que rotan los grupos.</span>'
-    + '<span style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
-    + '<select id="circ-ratio" onchange="circRatioCambiar(this.value)" title="Forma de la sala">'
-      + '<option value="16:9"' + ((c.ratio || "16:9") === "16:9" ? ' selected' : '') + '>Sala 16:9</option>'
-      + '<option value="4:3"' + (c.ratio === "4:3" ? ' selected' : '') + '>Sala 4:3</option>'
-      + '<option value="2:1"' + (c.ratio === "2:1" ? ' selected' : '') + '>Sala alargada 2:1</option></select>'
-    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'circulo\')">◯ En círculo</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'filas\')">▦ En filas</button></span></div>'
-    + '<div id="circ-mapa-box">' + circMapaHtml(c, {}) + '</div>'
+    + '<div class="card-title">🗺 Planilla de la sesión</div>'
+    + (c._ro ? '<div class="cm-ro">⚠ Esta sesión viene de una versión anterior y no se ha podido convertir a la planilla nueva, así que se abre <strong>en solo lectura</strong>: puedes verla e imprimirla, pero no mover piezas. No se ha borrado nada. Duplícala para empezar una copia editable.</div>' : '')
+    + '<div class="circ-mapa-tools" id="circ-mapa-tools">' + circMapaToolsHtml(c) + '</div>'
+    + '<div id="circ-mapa-box">' + circMapaHtml(c, { lectura: !!c._ro }) + '</div>'
+    + '<div id="circ-sel-box">' + circSelHtml(c) + '</div>'
     + '</div></div>';
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
     + '<div class="card-title">🔎 Añadir ejercicios</div>'
@@ -18604,7 +19178,11 @@ function circEditorHtml(){
     + '<div id="circ-resumen" class="circ-resumen"></div>'
     + '<div id="circ-rot" class="circ-rot"></div>'
     + '</div></div>';
-  html += '<div id="blz-box">' + blzEditorHtml(c) + '</div>';
+  /* El editor BlazePod de antes sigue entero y accesible, pero apagado: la
+     planilla nueva es la que manda. Se enciende poniendo CIRC_BLZ_VIEJO en
+     true, y ahi se ve lo mismo que veia antes, porque c.blazePlan no se ha
+     tocado. No se borra nada en este cambio. */
+  if (CIRC_BLZ_VIEJO) html += '<div id="blz-box">' + blzEditorHtml(c) + '</div>';
   html += circSesionesHtml(c);
   return html;
 }
@@ -18615,7 +19193,7 @@ function circEditorMontar(){
   circMapaMontar(document.getElementById("circ-mapa-box"));
   circPintarEstaciones();
   circBuscar("");
-  blzEditorMontar();
+  if (CIRC_BLZ_VIEJO) blzEditorMontar();
 }
 function circCampo(ev){
   var el = ev.target, k = el.getAttribute("data-k");
@@ -18755,14 +19333,24 @@ window.circFotoQuitar = function(i){
 window.circQuitar = function(i){
   if (!_circEdit) return;
   _circEdit.estaciones.splice(i, 1);
+  /* Los Pods que eran de esa estacion NO se borran: se quedan en el plano,
+     sueltos. Perderlos seria perder el montaje. */
+  var n = circHuerfanos(_circEdit);
   circPintarEstaciones();
+  if (n) toast(n + " Pod" + (n === 1 ? " queda" : "s quedan") + " sueltos", "warn");
 };
 function circGuardar(silencio){
   var c = _circEdit; if (!c) return null;
+  if (c._ro){ toast("Esta sesión está en solo lectura: duplícala para editarla", "warn"); return null; }
   c.nombre = (c.nombre || "").trim();
   if (!c.nombre){ toast("Ponle nombre al circuito", "error"); return null; }
   c.estaciones = c.estaciones.filter(function(s){ return (s.nombre || "").trim() || s.exerciseId; });
   c.estaciones.forEach(function(s){ if (!s.nombre) s.nombre = circEstacionNombre(s); });
+  /* El filtro de arriba puede haberse llevado una estacion vacia que tenia
+     Pods: se sanea aqui, antes de copiar, para que no se guarde un vinculo que
+     apunta a nada. */
+  circHuerfanos(c);
+  circPodsRenumerar(c);
   c.updatedAt = Date.now();
   var l = circLista(), idx = -1;
   for (var i = 0; i < l.length; i++) if (l[i].id === c.id) idx = i;

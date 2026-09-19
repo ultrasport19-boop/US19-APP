@@ -41,13 +41,16 @@ const codigo = [
   fn('circPodsDe'), fn('circPodsSueltos'), fn('circHuerfanos'), fn('circPodsRenumerar'),
   fn('circPodsConfigNueva'), fn('circPodsConfig'), fn('circPodsConfigDe'), fn('circPodsConfigPoner'),
   fn('circPodsConfigDeLogica'), fn('circMigrarUno'),
+  fn('circPosAuto'), fn('circPos'),
+  uno('CIRC_LIM'), fn('circClampXY'), fn('circEstacionCerca'), fn('circMoverEstacion'), fn('circAutoLayout'),
 ].join('\n');
 
 const exporta = ['circEspacio', 'circEspacioRef', 'circEspacioPorMedida', 'circRatio', 'circMigrarUno',
   'circPods', 'circElementos', 'circPodsDe', 'circPodsSueltos', 'circHuerfanos', 'circPodsRenumerar',
   'circPodPorId', 'circElementoPorId', 'circEstacionPorId', 'circEstacionPorNombre', 'circEstacionIdx',
   'circPodsConfig', 'circPodsConfigNueva', 'circPodsConfigDe', 'circPodsConfigPoner', 'circPodsConfigDeLogica',
-  'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS'];
+  'circClampXY', 'circEstacionCerca', 'circMoverEstacion', 'circAutoLayout', 'circPos', 'circPosAuto',
+  'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS', 'CIRC_LIM'];
 
 let m;
 try {
@@ -325,6 +328,106 @@ function viejoSinPods(ratio) {
   es('una que no existe da -1', m.circEstacionIdx(c, 'zzz'), -1);
   es('por nombre, sin tildes ni mayúsculas', m.circEstacionPorNombre(c, 'ESTACION 3').id, 'e3');
   es('un nombre vacío no encuentra nada', m.circEstacionPorNombre(c, ''), null);
+}
+
+/* --- 11. los limites de cada capa --------------------------------------- */
+{
+  /* Una tarjeta de estacion es grande y no puede pegarse al borde; un Pod es un
+     circulo pequeno y si puede. Antes cada lienzo tenia sus limites y no
+     coincidian, asi que la misma posicion valia en uno y no en el otro. */
+  es('una estacion no se pega al borde izquierdo', m.circClampXY('est', -1, 0.5).x, 0.06);
+  es('ni al derecho', m.circClampXY('est', 2, 0.5).x, 0.94);
+  es('ni arriba', m.circClampXY('est', 0.5, -1).y, 0.10);
+  es('ni abajo', m.circClampXY('est', 0.5, 2).y, 0.90);
+  es('un Pod llega mas cerca del borde', m.circClampXY('pod', -1, -1), { x: 0.02, y: 0.03 });
+  es('un elemento tambien', m.circClampXY('el', 2, 2), { x: 0.98, y: 0.98 });
+  es('dentro del rango no se toca nada', m.circClampXY('pod', 0.4, 0.6), { x: 0.4, y: 0.6 });
+  es('una capa que no existe se trata como Pod', m.circClampXY('nada', -1, -1), { x: 0.02, y: 0.03 });
+}
+
+/* --- 12. cercania: el radio es un circulo en pantalla ------------------- */
+{
+  const c = m.circMigrarUno(viejoConPods());
+  /* Las seis estaciones estan en circulo; la 1 arriba en el centro. */
+  c.estaciones.forEach(function (st, i) { const p = m.circPos(c, i); st.x = p.x; st.y = p.y; });
+  const e3 = c.estaciones[2], p3 = m.circPos(c, 2);
+
+  cierto('encima de la estacion 3, atado', m.circEstacionCerca(c, p3.x, p3.y) === e3);
+  cierto('a un pelo de la 3, atado', m.circEstacionCerca(c, p3.x + 0.02, p3.y) === e3);
+  es('en el centro del plano, suelto', m.circEstacionCerca(c, 0.5, 0.5), null);
+
+  /* El radio se mide en pantalla: x es fraccion del ancho e y del largo. Si se
+     comparan crudas, el radio sale ovalado. En una cancha 20 x 15 (proporcion
+     1,33) el radio en y tiene que ser 1,33 veces el de x EN FRACCIONES para
+     que en pantalla sea el mismo. Esto lo comprueba. */
+  const R = 0.085;
+  cierto('justo dentro por el lado', m.circEstacionCerca(c, p3.x + R * 0.95, p3.y) === e3);
+  es('justo fuera por el lado', m.circEstacionCerca(c, p3.x + R * 1.1, p3.y), null);
+  cierto('justo dentro por arriba, con la proporcion aplicada',
+         m.circEstacionCerca(c, p3.x, p3.y + R * (20 / 15) * 0.95) === e3);
+  es('justo fuera por arriba', m.circEstacionCerca(c, p3.x, p3.y + R * (20 / 15) * 1.1), null);
+
+  /* Sin estaciones no se puede atar a nada. */
+  const d = m.circMigrarUno(viejoConPods());
+  d.estaciones = [];
+  es('sin estaciones, todo suelto', m.circEstacionCerca(d, 0.5, 0.5), null);
+}
+
+/* --- 13. mover una estacion arrastra sus Pods -------------------------- */
+{
+  const c = m.circMigrarUno(viejoConPods());
+  c.estaciones.forEach(function (st, i) { const p = m.circPos(c, i); st.x = p.x; st.y = p.y; });
+  /* Los dos Pods son de la estacion 3. Se les pone un desfase conocido. */
+  const p3 = m.circPos(c, 2);
+  const pods = m.circPodsDe(c, 'e3');
+  pods[0].x = p3.x + 0.05; pods[0].y = p3.y + 0.04;
+  pods[1].x = p3.x - 0.03; pods[1].y = p3.y - 0.02;
+  /* Y un Pod suelto, que no debe moverse. */
+  c.pods.push({ id: 'libre', n: 3, x: 0.20, y: 0.20, estacionId: null, color: '', etiqueta: '', base: false, peso: 1 });
+
+  m.circMoverEstacion(c, 2, 0.50, 0.50);
+  es('la estacion va donde se le dice', [c.estaciones[2].x, c.estaciones[2].y], [0.50, 0.50]);
+  casi('el Pod atado conserva su desfase en x', pods[0].x - 0.50, 0.05, 1e-9);
+  casi('y en y', pods[0].y - 0.50, 0.04, 1e-9);
+  casi('el segundo tambien', pods[1].x - 0.50, -0.03, 1e-9);
+  es('el Pod suelto no se mueve', [m.circPodPorId(c, 'libre').x, m.circPodPorId(c, 'libre').y], [0.20, 0.20]);
+
+  /* La estacion se acota, y el Pod tambien, cada uno con su limite. */
+  m.circMoverEstacion(c, 2, 5, 5);
+  es('la estacion se acota', [c.estaciones[2].x, c.estaciones[2].y], [0.94, 0.90]);
+  cierto('el Pod atado se queda dentro del plano',
+         pods[0].x <= 0.98 && pods[0].y <= 0.97 && pods[0].x >= 0.02 && pods[0].y >= 0.03);
+
+  es('una estacion que no existe no rompe', m.circMoverEstacion(c, 99, 0.5, 0.5), undefined);
+}
+
+/* --- 14. disposicion automatica ---------------------------------------- */
+{
+  const c = m.circMigrarUno(viejoConPods());
+  c.estaciones.forEach(function (st, i) { const p = m.circPos(c, i); st.x = p.x; st.y = p.y; });
+  const p3 = m.circPos(c, 2);
+  const pods = m.circPodsDe(c, 'e3');
+  pods[0].x = p3.x + 0.06; pods[0].y = p3.y + 0.03;
+  c.pods.push({ id: 'libre', n: 3, x: 0.20, y: 0.20, estacionId: null, color: '', etiqueta: '', base: false, peso: 1 });
+  const elAntes = m.circElementos(c).map(function (x) { return [x.x, x.y]; });
+
+  m.circAutoLayout(c, 'filas');
+  const nuevo3 = m.circPosAuto(2, 6, 'filas');
+  es('la estacion 3 va a su sitio en filas', [c.estaciones[2].x, c.estaciones[2].y], [nuevo3.x, nuevo3.y]);
+  casi('su Pod la sigue conservando el desfase en x', pods[0].x - nuevo3.x, 0.06, 1e-9);
+  casi('y en y', pods[0].y - nuevo3.y, 0.03, 1e-9);
+  es('el Pod suelto se queda quieto', [m.circPodPorId(c, 'libre').x, m.circPodPorId(c, 'libre').y], [0.20, 0.20]);
+  es('los elementos del espacio se quedan quietos', m.circElementos(c).map(function (x) { return [x.x, x.y]; }), elAntes);
+
+  /* Y en circulo, lo mismo. */
+  m.circAutoLayout(c, 'circulo');
+  const circ3 = m.circPosAuto(2, 6, 'circulo');
+  es('en circulo tambien', [c.estaciones[2].x, c.estaciones[2].y], [circ3.x, circ3.y]);
+  casi('y el Pod sigue pegado', pods[0].x - circ3.x, 0.06, 1e-9);
+
+  /* Un circuito sin estaciones no puede romper el reordenado. */
+  const d = { estaciones: [], pods: [], elementos: [] };
+  es('sin estaciones no rompe', m.circAutoLayout(d, 'circulo'), undefined);
 }
 
 /* --- salida -------------------------------------------------------------- */
