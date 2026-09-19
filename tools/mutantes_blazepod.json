@@ -189,11 +189,6 @@
       "a": "             color: \"\","
     },
     {
-      "nombre": "la paleta del color fijo no se dibuja en ningun sitio",
-      "de": "    + blzPaletaHtml('pod:' + pod.n);",
-      "a": "    + \"\";"
-    },
-    {
       "nombre": "la probabilidad del objetivo vuelve a estar escrita a fuego",
       "de": "    var hayObjetivo = rnd() < (blzNum(plan.logica.probObjetivo, 70, 0, 100) / 100);",
       "a": "    var hayObjetivo = rnd() < 0.7;"
@@ -207,6 +202,21 @@
       "nombre": "el peso no sobrevive a normalizar",
       "de": "             peso: blzEnt(pod && pod.peso, 1, 1, 5) };",
       "a": "             peso: 1 };"
+    },
+    {
+      "nombre": "al seleccionar un Pod ya no salen los colores",
+      "de": "    + blzPodColorHtml(p, pod);",
+      "a": "    + \"\";"
+    },
+    {
+      "nombre": "tocar un color no se lo pone al Pod",
+      "de": "          + ' onclick=\"blzColorPoner(\\'pod:' + pod.n + '\\',\\'' + escapeAttr(col.id) + '\\')\"'",
+      "a": "          + ''"
+    },
+    {
+      "nombre": "el lienzo deja de ensenar el color fijo del Pod",
+      "de": "    var fijo = pod.color ? blzColorPorId(p, pod.color) : null;",
+      "a": "    var fijo = null;"
     }
   ]
 }

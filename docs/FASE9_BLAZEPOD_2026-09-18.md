@@ -301,3 +301,50 @@ Sigue sin controlar los Pods, y ahora que se parece tanto a la app oficial convi
 más alto, no menos: el aviso está en el editor, en la hoja impresa y en el enlace compartido.
 Lo que el teléfono hace y esto no puede hacer es **leer el toque**: por eso «se apaga con
 toque» es una etiqueta de planificación y la simulación usa el intervalo como referencia.
+
+---
+
+## v3 · El color se elige tocando el Pod
+
+> «A lo que me refiero es que cuando selecciones el puntero poder escoger el color que se
+> encenderá.»
+
+El color fijo por Pod ya existía desde la v2, pero vivía **detrás de un «+» pequeño** dentro
+de la caja de selección, entre la etiqueta, la casilla de base y el «Sale ×». Había que saber
+que estaba ahí. Eso no es una función: es una función escondida.
+
+Ahora, al tocar un Pod en el lienzo, debajo de la caja salen **los ocho colores a la vista**
+y se toca uno. El primer botón, **«El que toque»**, lo devuelve a lo de siempre —que el color
+lo decida el modo—, y viene marcado de fábrica. Debajo, una línea dice en cristiano qué va a
+pasar:
+
+| Situación | Lo que dice el pie |
+|---|---|
+| Sin color fijo | «Ahora mismo lo decide el modo: cada vez se enciende con el color que toque» |
+| Con color fijo, modo normal | «Siempre amarillo — rematar» |
+| Con color fijo, modo **Foco**, color objetivo | «Siempre verde: en Foco este Pod es SIEMPRE el bueno, hay que tocarlo» |
+| Con color fijo, modo **Foco**, color de trampa | «Siempre rojo: en Foco este Pod es SIEMPRE trampa, no se toca» |
+
+Ese aviso de Foco importa: amarrar un Pod a un color objetivo lo vuelve predecible, y eso
+puede ser justo lo que se busca (un Pod «bueno» fijo para un jugador que empieza) o justo lo
+que arruina la actividad. Lo dice la pantalla, lo decide Diego.
+
+El lienzo también cambió: un Pod con color fijo lleva **el aro de ese color aunque esté
+apagado**, así se ve de un vistazo cuál está amarrado sin ir seleccionándolos uno a uno. El
+lector de pantalla lo dice igual («Pod 1, siempre amarillo»), porque el color solo no informa.
+
+El botón «+» y el «Quitar color» desaparecen: ya no hacen falta. La prueba comprueba además
+que **no quede ningún botón escondido** en la caja de selección (`blz-circ` fuera de
+`blzSelHtml`), para que esto no vuelva a colarse.
+
+### Pruebas de la v3
+
+`tools/blazepod.js`: **277 comprobaciones**, sin fallos. Mutantes: **43, los 43 caen** —entra
+uno por cada cosa nueva (que la fila no se dibuje, que tocar un color no lo aplique, que el
+lienzo deje de enseñar el aro) y sale el del botón que ya no existe.
+
+Comprobado en el navegador a 412 px (Galaxy A55): tocar el Pod 1 y luego el amarillo deja
+`pods[0].color = "amarillo"`, mete el amarillo en la paleta del plan, marca la muestra, pinta
+el aro del Pod y escribe «Siempre amarillo — rematar». «El que toque» lo deja en blanco otra
+vez. Sin desplazamiento horizontal.
+

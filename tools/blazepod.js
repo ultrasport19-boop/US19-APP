@@ -548,9 +548,9 @@ di(m.blzNormalizar({ pods: [{ n: 1, color: 'inventado' }] }).pods[0].color === '
    'colores · y uno inventado se limpia');
 dentro('blzPaso2Html', "blzFocoLista(p, 'obj')", 'pantalla · la fila de colores objetivo sale de la lista');
 dentro('blzPaso2Html', "blzFocoAnadir(", 'pantalla · y se pueden añadir más');
-dentro('blzSelHtml', "blzPaleta(", 'pantalla · el Pod seleccionado puede recibir color fijo');
+dentro('blzSelHtml', "blzPodColorHtml(p, pod)", 'pantalla \u00b7 el Pod seleccionado ensena sus colores');
 di(src.indexOf('window.blzPodColorQuitar = function(n)') >= 0, 'pantalla · y quitárselo');
-dentro('blzSelHtml', "blzPaletaHtml('pod:' + pod.n)", 'pantalla · la paleta del Pod se DIBUJA: sin esto el botón abría y no salía nada');
+dentro('blzPodColorHtml', "blzColorPoner(\\'pod:", 'pantalla \u00b7 y tocar uno se lo pone, sin abrir nada antes');
 
 /* ================= 13. Lo que decide Diego, no yo =================
    «Que sea variable, que todo eso sea configurable». Habia dos constantes
@@ -608,6 +608,28 @@ dentro('blzSelHtml', 'blzPodPeso(', 'pantalla · y el peso, en el Pod selecciona
 di(src.indexOf('window.blzPodPeso = function(n, v)') >= 0, 'pantalla · con su accion');
 dentro('blzMontaje', 'Salen m\u00e1s a menudo', 'montaje · el papel dice que Pods salen mas');
 dentro('blzMontaje', 'siempre ', 'montaje · y cuales llevan color fijo');
+
+/* ================= 14. El color se elige tocando el Pod =================
+   Diego: «cuando selecciones el puntero poder escojer el color que se
+   encendera». El color fijo existia desde el 18-sep pero vivia detras de un
+   «+» dentro de la caja de seleccion y habia que saber que estaba ahi. */
+const cuerpoPodCol = (function () {
+  const i = src.indexOf('function blzPodColorHtml(');
+  const j = src.indexOf('\n}\n', i);
+  return (i >= 0 && j > i) ? src.slice(i, j) : '';
+})();
+di(cuerpoPodCol.length > 0, 'pod \u00b7 la fila de colores del Pod existe');
+di(cuerpoPodCol.indexOf('BLZ_COLORES.map(') >= 0, 'pod \u00b7 salen los OCHO colores, no una muestra');
+di(cuerpoPodCol.indexOf('blzPodColorQuitar(') >= 0, 'pod \u00b7 y «El que toque» lo devuelve a lo que mande el modo');
+di(cuerpoPodCol.indexOf("class=\"blz-sw' + (puesto ? ' on' : '')") >= 0, 'pod \u00b7 el color puesto se ve marcado');
+di(cuerpoPodCol.indexOf('aria-pressed=') >= 0, 'pod \u00b7 y un lector de pantalla sabe cual esta elegido');
+di(cuerpoPodCol.indexOf('escapeHtml(pie)') >= 0, 'pod \u00b7 el pie explica en cristiano que va a pasar');
+di(cuerpoPodCol.indexOf('esFoco') >= 0 && cuerpoPodCol.indexOf('SIEMPRE trampa') >= 0,
+   'pod \u00b7 en Foco avisa de que ese Pod queda fijo de bueno o de trampa');
+di(fn('blzSelHtml').indexOf('blz-circ') < 0,
+   'pod \u00b7 ya no hay ningun bot\u00f3n escondido que haya que descubrir');
+dentro('blzLienzoHtml', 'blzColorPorId(p, pod.color)', 'lienzo \u00b7 el Pod con color fijo lleva su aro de ese color');
+dentro('blzLienzoHtml', "', siempre '", 'lienzo \u00b7 y lo dice en voz alta para quien no ve el color');
 
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');

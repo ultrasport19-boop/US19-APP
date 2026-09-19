@@ -1515,6 +1515,12 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .blz-paleta{display:flex;gap:.45rem;flex-wrap:wrap;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:.5rem;margin:.35rem 0 .5rem;}
 .blz-sw{width:38px;height:38px;min-width:38px;border-radius:50%;border:3px solid var(--surface-1);box-shadow:0 0 0 1px var(--border);cursor:pointer;padding:0;}
 .blz-sw:hover,.blz-sw:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.blz-sw.on{outline:3px solid var(--accent);outline-offset:3px;}
+.blz-podcol{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:.5rem;margin:.35rem 0 .5rem;}
+.blz-podcol-t{font-size:.78rem;font-weight:700;color:var(--text);white-space:nowrap;flex:0 0 auto;}
+.blz-podcol-q{flex:1 1 100%;font-size:.72rem;color:var(--muted);}
+.blz-auto{border:1px solid var(--border);background:var(--surface-3);color:var(--text);border-radius:999px;padding:.35rem .7rem;font-size:.74rem;font-weight:700;cursor:pointer;min-height:38px;flex:0 0 auto;}
+.blz-auto.on{outline:3px solid var(--accent);outline-offset:2px;}
 
 .blz-modos{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.5rem;}
 .blz-modo{border:1px solid var(--border);background:var(--surface-3);color:var(--muted);border-radius:999px;padding:.42rem .8rem;font-size:.78rem;font-weight:700;cursor:pointer;min-height:34px;}
@@ -19331,10 +19337,15 @@ function blzLienzoHtml(plan, opts){
   });
   u19Arr(p.pods).forEach(function(pod){
     var on = activos.indexOf(pod.n) >= 0, hex = colores[pod.n] || "";
+    /* Un Pod con color fijo lleva su aro de ese color tambien apagado: asi se
+       ve cual esta amarrado sin tener que seleccionarlo uno por uno. */
+    var fijo = pod.color ? blzColorPorId(p, pod.color) : null;
     html += '<button type="button" class="blz-pod' + (on ? ' on' : '') + (pod.base ? ' base' : '') + (opts.sel === pod.n ? ' sel' : '') + '"'
       + ' id="' + (opts.idPrefijo || "blz-pod-") + pod.n + '" data-n="' + pod.n + '"' + (opts.lectura ? ' tabindex="-1" disabled' : '')
-      + ' style="left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;' + (on && hex ? 'background:' + escapeAttr(hex) + ';border-color:' + escapeAttr(hex) + ';' : '') + '"'
-      + ' aria-label="Pod ' + pod.n + (pod.base ? ', base' : '') + (pod.etiqueta ? ', ' + escapeAttr(pod.etiqueta) : '') + '">'
+      + ' style="left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;'
+        + (on && hex ? 'background:' + escapeAttr(hex) + ';border-color:' + escapeAttr(hex) + ';'
+                     : (fijo ? 'border-color:' + escapeAttr(fijo.hex) + ';' : '')) + '"'
+      + ' aria-label="Pod ' + pod.n + (pod.base ? ', base' : '') + (fijo ? ', siempre ' + escapeAttr(String(blzColorRef(fijo.id) ? blzColorRef(fijo.id).nombre : fijo.id).toLowerCase()) : '') + (pod.etiqueta ? ', ' + escapeAttr(pod.etiqueta) : '') + '">'
       + '<span class="blz-pod-n">' + pod.n + '</span>'
       + (pod.base ? '<span class="blz-pod-b">base</span>' : '')
       + '</button>'
@@ -19409,10 +19420,6 @@ function blzSelHtml(p){
     + '<input type="text" maxlength="24" placeholder="Etiqueta (opcional)" value="' + escapeAttr(pod.etiqueta) + '" oninput="blzPodEtiqueta(' + pod.n + ',this.value)">'
     + '<label class="blz-mini"><input type="checkbox"' + (pod.base ? ' checked' : '') + ' onchange="blzPodMarcarBase(' + pod.n + ',this.checked)"> Base</label>'
     + '<label class="blz-mini" title="Cuántas veces sale este Pod respecto a los demás: con 3 sale el triple que uno con 1">Sale ×<input type="number" min="1" max="5" style="width:56px;" value="' + blzPeso(pod.peso) + '" oninput="blzPodPeso(' + pod.n + ',this.value)"></label>'
-    + '<span class="blz-mini">Color fijo</span>'
-    + (pod.color ? blzCirculoHtml('pod:' + pod.n, pod.color, 'Pod ' + pod.n)
-                 : '<button type="button" class="blz-circ mas" onclick="blzPaleta(\'pod:' + pod.n + '\')" title="Darle un color fijo a este Pod" aria-label="Color fijo del Pod ' + pod.n + '">+</button>')
-    + (pod.color ? '<button class="btn btn-ghost btn-sm" onclick="blzPodColorQuitar(' + pod.n + ')" title="Que vuelva a tomar el color del modo">Quitar color</button>' : '')
     + '<span class="blz-dpad" role="group" aria-label="Mover el Pod ' + pod.n + '">'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',-1,0)" aria-label="Mover a la izquierda">◀</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',0,-1)" aria-label="Mover arriba">▲</button>'
@@ -19423,9 +19430,33 @@ function blzSelHtml(p){
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodDup(' + pod.n + ')" title="Duplicar">⎘</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="blzPodBorrar(' + pod.n + ')" title="Quitar">×</button>'
     + '</div>'
-    /* La paleta del color fijo se dibuja AQUI, debajo de la caja: sin esto el
-       boton abria _blzPaleta y no aparecia nada en pantalla. */
-    + blzPaletaHtml('pod:' + pod.n);
+    /* Los colores van AQUI, debajo de la caja y siempre a la vista: tocas el
+       Pod y eliges con que se enciende, sin abrir nada antes. */
+    + blzPodColorHtml(p, pod);
+}
+/* Con que color se enciende ESTE Pod. Los ocho a la vista y a un toque; «El
+   que toque» lo devuelve a lo que mande el modo, que es como viene de fabrica. */
+function blzPodColorHtml(p, pod){
+  var fijo = pod.color ? blzColorRef(pod.color) : null;
+  var esFoco = (p.logica.modo === "focus");
+  var esObj = fijo && u19Arr(p.objetivo).indexOf(fijo.id) >= 0;
+  var pie = !fijo
+    ? "Ahora mismo lo decide el modo: cada vez se enciende con el color que toque."
+    : (esFoco
+        ? ("Siempre " + fijo.nombre.toLowerCase() + ": en Foco este Pod es " + (esObj ? "SIEMPRE el bueno, hay que tocarlo" : "SIEMPRE trampa, no se toca") + ".")
+        : ("Siempre " + fijo.nombre.toLowerCase() + " — " + fijo.consigna.toLowerCase() + "."));
+  return '<div class="blz-podcol"><span class="blz-podcol-t">P' + pod.n + ' se enciende en</span>'
+    + '<button type="button" class="blz-auto' + (fijo ? '' : ' on') + '" onclick="blzPodColorQuitar(' + pod.n + ')"'
+    + ' title="Que tome el color que le toque por el modo" aria-pressed="' + (fijo ? 'false' : 'true') + '">El que toque</button>'
+    + BLZ_COLORES.map(function(col){
+        var puesto = (fijo && fijo.id === col.id);
+        return '<button type="button" class="blz-sw' + (puesto ? ' on' : '') + '" style="background:' + col.hex + ';"'
+          + ' onclick="blzColorPoner(\'pod:' + pod.n + '\',\'' + escapeAttr(col.id) + '\')"'
+          + ' title="' + escapeAttr(col.nombre + " \u2014 " + col.consigna) + '"'
+          + ' aria-pressed="' + (puesto ? 'true' : 'false') + '"'
+          + ' aria-label="' + escapeAttr("Pod " + pod.n + " siempre " + col.nombre) + '"></button>';
+      }).join("")
+    + '<span class="blz-podcol-q">' + escapeHtml(pie) + '</span></div>';
 }
 function blzReloj(s){
   s = Math.max(0, Math.round(blzNum(s, 0, 0, 999999)));
