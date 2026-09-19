@@ -1418,11 +1418,16 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .cm-el.punta{font-size:.9rem;color:var(--muted);}
 .cm-el-e{font-size:.6rem;color:var(--muted);white-space:nowrap;max-width:110px;overflow:hidden;text-overflow:ellipsis;}
 .circ-mapa.lectura .cm-el,.circ-mapa.lectura .cm-pod{cursor:default;}
-.cm-pod{position:absolute;width:40px;height:40px;transform:translate(-50%,-50%);border-radius:50%;border:3px solid var(--muted);background:var(--surface-1);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:grab;touch-action:none;box-shadow:var(--shadow);}
+.circ-live .cm-pod{cursor:pointer;}
+.circ-live .cm-est,.circ-live .cm-el{cursor:default;}
+.cm-pod{position:absolute;width:40px;height:40px;transform:translate(-50%,-50%);border-radius:50%;border:3px solid var(--cm-pod-borde,var(--muted));background:var(--surface-1);color:var(--text);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0;cursor:grab;touch-action:none;box-shadow:var(--shadow);}
+/* Encendido: el color lo pone el subcronometro en una variable, no en el
+   atributo style. Asi apagarlo no se lleva por delante el color de reposo de un
+   Pod con color fijo. */
+.cm-pod.on{background:var(--cm-pod-on,var(--accent));border-color:var(--cm-pod-on,var(--accent));color:#0b1014;}
 .cm-pod.drag{cursor:grabbing;z-index:6;box-shadow:var(--shadow-lg);}
 .cm-pod.sel{outline:3px solid var(--accent);outline-offset:3px;}
 .cm-pod.base{border-style:double;border-width:6px;}
-.cm-pod.on{color:#0b1014;}
 /* El vinculo se ve sin tener que seleccionar nada: aro exterior del color de
    la estacion a la que pertenece el Pod. Un Pod suelto no lleva aro. */
 .cm-pod.atado{box-shadow:0 0 0 3px var(--cm-est-col,var(--accent)),var(--shadow);}
@@ -1439,6 +1444,13 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .circ-flechas{display:inline-flex;gap:.15rem;}
 .circ-col{width:24px;height:24px;min-width:24px;border-radius:50%;border:2px solid var(--border);background:var(--surface-2);color:var(--muted);padding:0;cursor:pointer;font-size:.7rem;line-height:1;}
 .circ-col.on{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
+/* El subcronometro de Pods, dentro de la pantalla en vivo. */
+.cl-pods{margin:.5rem auto 0;max-width:760px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:.5rem .7rem;}
+.cl-pod-fila{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.15rem 0;}
+.cl-pod-d{font-family:var(--font-display);font-size:1.05rem;color:var(--accent);}
+.cl-pod-v{font-size:.78rem;color:#cbd5e1;}
+.cl-pod-c{font-size:.78rem;color:#f1f5f9;font-weight:700;}
+.cl-pod-aviso{font-size:.62rem;color:#94a3b8;margin-top:.3rem;line-height:1.4;}
 .cm-ro{background:rgba(234,179,8,.10);border:1px solid rgba(234,179,8,.35);border-radius:10px;padding:.5rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:var(--warn);line-height:1.45;}
 @media (max-width:560px){
   /* Con el dedo, 44 px es el minimo con el que se acierta un Pod. */
@@ -1455,11 +1467,17 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .cr-item .cr-n{font-size:.7rem;font-weight:700;margin-top:.25rem;line-height:1.15;}
 .cr-item .cr-m{font-size:.62rem;color:var(--muted);}
 .circ-live .cm-est{cursor:default;}
-.cl-mapa{width:min(96vw,calc((100vh - 250px) * 1.78));margin-top:.5rem;}
+/* La proporcion la escribe circMapaHtml en --cm-ratio: aqui ya no se puede dar
+   por hecho que la sala es 16:9. flex:0 0 auto es lo que impide que el plano se
+   encoja cuando debajo aparece el subcronometro de Pods. */
+/* El ancho de aqui es solo el respaldo por si circLiveAjustarMapa no llega a
+   correr: quien manda es el alto que le pone esa funcion, medido del hueco que
+   queda de verdad. flex:0 0 auto impide que el navegador lo aplaste. */
+.cl-mapa{width:min(96vw,calc((100vh - 250px) * var(--cm-ratio,1.78)));max-width:96vw;margin-top:.5rem;flex:0 0 auto;align-self:center;}
 .cl-mapa .cm-est{min-width:96px;max-width:200px;width:16%;}
 .cl-mapa .cm-nom{font-size:clamp(.72rem,1.4vw,1rem);}
 .cl-mapa .cm-grupo{font-size:clamp(1rem,2.2vw,1.6rem);}
-.cl-mapa-min{width:min(72vw,calc((100vh - 430px) * 1.78));margin-top:.3rem;}
+.cl-mapa-min{width:min(72vw,calc((100vh - 430px) * var(--cm-ratio,1.78)));max-width:72vw;margin-top:.3rem;flex:0 0 auto;align-self:center;}
 .cl-mapa-min .cm-est{min-width:72px;max-width:120px;width:12%;}
 @media (max-width:480px){
   .cm-est{min-width:64px;padding:.25rem;}
@@ -18248,8 +18266,8 @@ function circPodsHtml(c, opts){
     var on = activos.indexOf(pod.n) >= 0, hex = colores[pod.n] || "";
     var estilo = 'left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;';
     if (colEst) estilo += '--cm-est-col:' + colEst + ';';
-    if (on && hex) estilo += 'background:' + escapeAttr(hex) + ';border-color:' + escapeAttr(hex) + ';';
-    else if (fijo) estilo += 'border-color:' + escapeAttr(fijo.hex) + ';';
+    if (fijo) estilo += '--cm-pod-borde:' + escapeAttr(fijo.hex) + ';';
+    if (on && hex) estilo += '--cm-pod-on:' + escapeAttr(hex) + ';';
     html += '<button type="button" class="cm-pod' + (on ? ' on' : '') + (pod.base ? ' base' : '') + (colEst ? ' atado' : '') + (opts.selPod === pod.id ? ' sel' : '') + '"'
       + ' data-pod="' + escapeAttr(pod.id) + '"' + (opts.lectura ? ' tabindex="-1" disabled' : '')
       + ' style="' + estilo + '"'
@@ -18285,7 +18303,7 @@ function circMapaHtml(c, opts){
   opts = opts || {};
   var N = c.estaciones.length, e = circEspacio(c), ratio = e.anchoM / e.largoM, H = Math.round(1000 / ratio);
   var nPods = circPods(c).length, nEl = circElementos(c).length;
-  var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + (opts.lectura ? ' lectura' : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';">'
+  var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + (opts.lectura ? ' lectura' : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';--cm-ratio:' + ratio.toFixed(3) + ';">'
     + '<svg class="cm-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">'
       + circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
       + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, opts)
@@ -19410,6 +19428,248 @@ window.circImprimirObj = function(c){
   w.document.open(); w.document.write(doc); w.document.close();
 };
 
+/* ---------- el subcronometro de Pods ---------- */
+/* Vive DENTRO del bloque de trabajo del cronometro global y no tiene reloj
+   propio: su tiempo es t = dur - L.restante, una funcion pura del global. De ahi
+   sale la garantia que pidio Diego — el subcronometro no puede alargar ni cortar
+   el bloque. Si el global se pausa, se congela. Si el bloque termina, la lista
+   de estimulos (generada para exactamente esa duracion) se acaba y los Pods se
+   apagan solos. Nadie toca L.fin mas que el global.
+
+   El motor es el de BlazePod, sin tocarlo: blzGenerar da la lista de estimulos
+   y blzSimEnT dice cual esta sonando en el segundo t. Misma semilla, misma
+   serie, y por eso lo que se vio en pantalla se puede repetir en la cancha.
+
+   ESTO SIGUE SIN HABLAR CON LOS PODS. No hay SDK en este repositorio: los
+   toques que cuenta son los de la pantalla, y la vista lo dice. */
+var _circPods = null;
+
+/* Arma un plan del motor viejo con los Pods de UN grupo y su configuracion.
+   Devuelve tambien `ids`, porque blzNormalizar renumera los Pods de 1 a N
+   dentro del grupo y hace falta saber a que Pod del circuito corresponde
+   cada numero. */
+function circPodsPlan(c, estacionId, duracionSeg){
+  var e = circEspacio(c), cfg = circPodsConfigDe(c, estacionId), grupo = circPodsDe(c, estacionId);
+  var plan = blzPlanNuevo();
+  plan.activo = true;
+  plan.superficie = { tipo: (e.plantilla === "cancha" || e.plantilla === "cancha2") ? "cancha" : "vacio",
+                      anchoM: e.anchoM, altoM: e.largoM, rejilla: e.cuadricula };
+  plan.pods = grupo.map(function(p, i){
+    return { id: p.id, n: i + 1, x: p.x, y: p.y, etiqueta: p.etiqueta, base: p.base, color: p.color, peso: p.peso };
+  });
+  plan.adornos = [];
+  plan.colores = u19Arr(cfg.colores).map(function(id){
+    var ref = blzColorRef(id) || BLZ_COLORES[0];
+    return { id: ref.id, hex: ref.hex, consigna: ref.consigna };
+  });
+  if (!plan.colores.length) plan.colores = blzPlanNuevo().colores;
+  plan.logica.modo = cfg.modo;
+  plan.logica.intervalo = cfg.intervalo;
+  plan.logica.luz = cfg.luz;
+  plan.logica.respuesta = cfg.tiempoRespuestaMs / 1000;
+  plan.logica.disparo = cfg.disparo;
+  plan.logica.simultaneos = cfg.simultaneos;
+  plan.logica.sinRepetir = !!cfg.aleatorio;
+  plan.logica.semilla = cfg.semilla;
+  plan.logica.sonido = cfg.sonido;
+  /* El calentamiento, las vueltas y el descanso los lleva el cronometro global:
+     el subcronometro solo rellena el bloque de trabajo, ni un segundo mas. */
+  plan.logica.preparacion = 0;
+  plan.logica.duracion = Math.max(1, Math.round(duracionSeg || 30));
+  plan.series = 1;
+  plan.descanso = 0;
+  return { plan: blzNormalizar(plan), ids: grupo.map(function(p){ return p.id; }), cfg: cfg };
+}
+/* Que grupos corren en este bloque. En secuencia, el de la estacion en curso.
+   En rotacion todas las estaciones trabajan a la vez, asi que corren todos los
+   grupos que tengan Pods. Los sueltos NUNCA entran aqui: esos los enciende el
+   usuario a mano, como se pidio. */
+function circPodsGrupos(c, fase){
+  var l = [];
+  if (!c || !fase || fase.tipo !== "trabajo") return l;
+  if (c.modo === "secuencia"){
+    var st = u19Arr(c.estaciones)[fase.estacion];
+    if (st && circPodsDe(c, st.id).length) l.push(st.id);
+  } else {
+    u19Arr(c.estaciones).forEach(function(st){ if (circPodsDe(c, st.id).length) l.push(st.id); });
+  }
+  return l;
+}
+function circPodsArrancar(){
+  var L = _live; if (!L) return;
+  circPodsParar();
+  var p = circLiveFase(), grupos = circPodsGrupos(L.c, p);
+  if (!grupos.length) return;
+  _circPods = { dur: p.dur, runners: grupos.map(function(id){
+      var q = circPodsPlan(L.c, id, p.dur);
+      return { estacionId: id, ids: q.ids, cfg: q.cfg, eventos: blzGenerar(q.plan), toques: 0, ultimo: -2 };
+    }), sueltos: null };
+}
+/* Los Pods sueltos: su propio origen, porque no los manda el bloque sino el
+   usuario. Se apagan igual al cambiar de fase o al salir. */
+window.circPodsSueltosToggle = function(){
+  var L = _live; if (!L) return;
+  if (!_circPods) _circPods = { dur: circLiveFase().dur, runners: [], sueltos: null };
+  if (_circPods.sueltos){ _circPods.sueltos = null; circLivePodsPintar(); return; }
+  var c = L.c;
+  if (!circPodsSueltos(c).length) return;
+  var q = circPodsPlan(c, null, 3600);
+  _circPods.sueltos = { estacionId: null, ids: q.ids, cfg: q.cfg, eventos: blzGenerar(q.plan),
+                        toques: 0, ultimo: -2, t0: Date.now() };
+  circLivePodsPintar();
+};
+function circPodsParar(){
+  if (!_circPods) return;
+  _circPods = null;
+  circLivePodsApagar();
+}
+/* El segundo en que va el bloque, leido del reloj global. Nunca al reves. */
+function circPodsT(){
+  var L = _live; if (!L) return 0;
+  var p = circLiveFase();
+  if (!p || p.tipo !== "trabajo") return 0;
+  return Math.max(0, p.dur - L.restante);
+}
+/* Que Pods estan encendidos ahora mismo, y con que color. */
+function circPodsEstado(){
+  var out = { on: {}, hud: [] };
+  if (!_circPods) return out;
+  var t = circPodsT(), L = _live;
+  var mirar = function(r, tt){
+    var i = blzSimEnT(r.eventos, tt);
+    var ev = (i >= 0) ? r.eventos[i] : null;
+    var activo = (ev && ev.tipo === "estimulo" && tt >= ev.t && tt < ev.t + ev.dur) ? ev : null;
+    if (activo){
+      u19Arr(activo.pods).forEach(function(n){
+        var id = r.ids[n - 1];
+        if (id) out.on[id] = (activo.colores && activo.colores[n]) || "";
+      });
+    }
+    out.hud.push({ estacionId: r.estacionId, cfg: r.cfg, toques: r.toques,
+                   paso: activo ? activo.paso : 0, consigna: activo ? activo.consigna : "",
+                   total: r.eventos.length - 1, restante: Math.max(0, blzSimTotal(r.eventos) - tt) });
+    r.ultimo = activo ? activo.paso : -1;
+  };
+  /* Pausado o no, se pinta: si el global esta en pausa, t no se mueve y lo que
+     se ve es el estado congelado, que es justo lo que se quiere. */
+  u19Arr(_circPods.runners).forEach(function(r){ mirar(r, t); });
+  if (_circPods.sueltos) mirar(_circPods.sueltos, (Date.now() - _circPods.sueltos.t0) / 1000);
+  return out;
+}
+/* Pintar: solo toca las clases y una variable CSS de cada Pod. No repinta el
+   plano — repintarlo 5 veces por segundo en la vista en vivo es tiron seguro. */
+function circLivePodsPintar(){
+  var ov = document.getElementById("circ-live");
+  if (!ov || ov.hidden) return;
+  var est = circPodsEstado(), pods = ov.querySelectorAll(".cm-pod");
+  for (var i = 0; i < pods.length; i++){
+    var b = pods[i], id = b.getAttribute("data-pod");
+    if (Object.prototype.hasOwnProperty.call(est.on, id)){
+      b.classList.add("on");
+      if (est.on[id]) b.style.setProperty("--cm-pod-on", est.on[id]);
+    } else {
+      b.classList.remove("on");
+      b.style.removeProperty("--cm-pod-on");
+    }
+  }
+  var hud = document.getElementById("cl-pods");
+  if (hud) hud.innerHTML = circLivePodsHud(est);
+  circLivePodsAlto(ov, hud);
+}
+/* El HUD tiene una fila por grupo con Pods, asi que mide distinto con uno que
+   con tres. Cuando cambia de alto hay que rehacer el hueco del plano — pero
+   solo cuando cambia: esto lo llama el tick, cinco veces por segundo. */
+function circLivePodsAlto(ov, hud){
+  if (!ov) return;
+  var h = (hud && hud.innerHTML) ? (hud.offsetHeight || 0) : 0;
+  if (ov._podsH === h) return;
+  ov._podsH = h;
+  ov.classList.toggle("con-pods", h > 0);
+  circLiveAjustarMapa(ov);
+}
+/* El plano se queda con el hueco que sobra, medido. Se colapsa, se mide lo que
+   ocupa todo lo demas de la columna —con sus margenes y el gap, que asi entran
+   solos— y se le da el resto. El ancho lo saca aspect-ratio de ese alto, asi
+   que un Gym US19 de 10 x 4,5 sale apaisado y una Sala cardio de 4,5 x 5 sale
+   casi cuadrada, sin que el CSS tenga que saberlo. */
+function circLiveAjustarMapa(ov){
+  if (!ov || ov.hidden) return;
+  var main = ov.querySelector(".cl-main");
+  var mapa = main && main.querySelector(".circ-mapa");
+  if (!main || !mapa) return;
+  var previo = mapa.style.height, previoW = mapa.style.width;
+  mapa.style.height = "0px";
+  mapa.style.width = "auto";
+  /* OJO: no vale scrollHeight. Nunca baja de clientHeight, asi que con el plano
+     colapsado la resta sale negativa y no se ajusta nunca. Se suman los hijos,
+     con sus margenes y con el gap de la columna. */
+  var cs = getComputedStyle(main);
+  var gap = parseFloat(cs.rowGap || cs.gap) || 0;
+  var dispo = main.clientHeight - (parseFloat(cs.paddingTop) || 0) - (parseFloat(cs.paddingBottom) || 0);
+  var resto = 0, n = main.children.length, i, el, m;
+  for (i = 0; i < n; i++){
+    el = main.children[i];
+    m = getComputedStyle(el);
+    if (el !== mapa) resto += el.offsetHeight;
+    resto += (parseFloat(m.marginTop) || 0) + (parseFloat(m.marginBottom) || 0);
+  }
+  resto += Math.max(0, n - 1) * gap;
+  var libre = dispo - resto - 4;
+  if (!(libre > 80)){
+    /* No cabe: se deja el respaldo del CSS y que la columna haga scroll, en vez
+       de dibujar un plano de dos centimetros. */
+    mapa.style.height = previo || "";
+    mapa.style.width = previoW || "";
+    return;
+  }
+  mapa.style.height = Math.round(libre) + "px";
+}
+function circLivePodsApagar(){
+  var ov = document.getElementById("circ-live");
+  if (!ov) return;
+  var pods = ov.querySelectorAll(".cm-pod");
+  for (var i = 0; i < pods.length; i++){ pods[i].classList.remove("on"); pods[i].style.removeProperty("--cm-pod-on"); }
+  var hud = document.getElementById("cl-pods");
+  if (hud) hud.innerHTML = circLivePodsHud({ on: {}, hud: [] });
+  circLivePodsAlto(ov, hud);
+}
+function circLivePodsHud(est){
+  var L = _live; if (!L) return "";
+  var c = L.c, filas = u19Arr(est.hud), html = "";
+  var sueltos = circPodsSueltos(c).length;
+  if (!filas.length && !sueltos) return "";
+  filas.forEach(function(f){
+    var i = f.estacionId ? circEstacionIdx(c, f.estacionId) : -1;
+    var donde = (i >= 0) ? ("Estación " + (i + 1)) : "Pods sueltos";
+    var resp = (f.cfg.tiempoRespuestaMs / 1000).toFixed(1).replace(".", ",");
+    html += '<div class="cl-pod-fila">'
+      + '<span class="cl-pod-d">🔵 ' + escapeHtml(donde) + '</span>'
+      + '<span class="cl-pod-v">respuesta ' + resp + ' s</span>'
+      + '<span class="cl-pod-v">toques ' + f.toques + '</span>'
+      + (f.paso ? '<span class="cl-pod-v">paso ' + f.paso + '</span>' : '<span class="cl-pod-v">—</span>')
+      + (f.consigna ? '<span class="cl-pod-c">' + escapeHtml(f.consigna) + '</span>' : '')
+      + '</div>';
+  });
+  if (sueltos){
+    html += '<div class="cl-pod-fila"><button class="btn btn-ghost btn-sm" onclick="circPodsSueltosToggle()">'
+      + ((_circPods && _circPods.sueltos) ? '⏸ Parar los sueltos' : '▶ Encender los ' + sueltos + ' Pods sueltos')
+      + '</button><span class="cl-pod-v">se encienden a mano, no los manda el bloque</span></div>';
+  }
+  if (html) html = '<div class="cl-pods">' + html
+    + '<div class="cl-pod-aviso">' + escapeHtml(BLZ_AVISO) + '. Los toques que se cuentan son los de esta pantalla.</div></div>';
+  return html;
+}
+/* Un toque en un Pod encendido cuenta. En un Pod apagado, no. */
+window.circPodTocar = function(id){
+  if (!_circPods) return;
+  var est = circPodsEstado();
+  if (!Object.prototype.hasOwnProperty.call(est.on, id)) return;
+  var suma = function(r){ if (r && r.ids.indexOf(id) >= 0) r.toques++; };
+  u19Arr(_circPods.runners).forEach(suma);
+  suma(_circPods.sueltos);
+  circLivePodsPintar();
+};
+
 /* ---------- en vivo ---------- */
 function circPlan(c){
   var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1));
@@ -19435,8 +19695,18 @@ window.circEnVivoObj = function(c){
   _live = { c: c, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), total: total, hecho: 0, ultimoSeg: -1, timer: null };
   var ov = document.getElementById("circ-live");
   ov.hidden = false; document.body.classList.add("circ-live-open");
+  /* Un solo oyente delegado para los toques en los Pods, montado una vez sobre
+     el overlay, que no se sustituye: el innerHTML cambia por debajo. */
+  if (!ov._podsMontado){
+    ov._podsMontado = true;
+    ov.addEventListener("click", function(ev){
+      var b = ev.target && ev.target.closest ? ev.target.closest(".cm-pod") : null;
+      if (b && b.getAttribute("data-pod")) circPodTocar(b.getAttribute("data-pod"));
+    });
+  }
   document.addEventListener("keydown", circLiveTeclas);
   document.addEventListener("visibilitychange", circLiveVisible);
+  window.addEventListener("resize", circLiveResize);
   circLivePintar();
 };
 function circLiveFase(){ return _live.plan[_live.i]; }
@@ -19475,6 +19745,7 @@ function circLivePintar(){
     html += '<div class="cl-sig">' + (p.tipo === "trabajo" ? "Cada grupo en su estación" : (p.tipo === "listos" ? "Posiciones de salida" : "Así quedan al cambiar")) + '</div>'
       + circMapaHtml(c, { turno: tv, compacto: true, clase: "cl-mapa" });
   }
+  html += '<div id="cl-pods"></div>';
   html += '</div><div class="cl-bar"><span id="cl-bar"></span></div>';
   html += '<div class="cl-ctrl">'
     + '<button class="btn btn-secondary" onclick="circLiveSalto(-1)" title="Fase anterior">⏮</button>'
@@ -19487,6 +19758,12 @@ function circLivePintar(){
     + '</div>';
   ov.innerHTML = html;
   circLiveBarra();
+  /* El overlay se acaba de rehacer: el HUD de Pods y los Pods encendidos se
+     pintan aqui y no solo en el tick, porque en pausa el tick no llega y el
+     subcronometro se quedaria invisible aunque este corriendo. */
+  ov._podsH = -1;              /* el overlay es nuevo: hay que volver a medir */
+  circLivePodsPintar();
+  circLiveAjustarMapa(ov);
 }
 function circLiveBarra(){
   var L = _live; if (!L) return;
@@ -19497,6 +19774,9 @@ function circLiveBarra(){
 function circLiveEmpezarFase(){
   var L = _live, p = circLiveFase();
   L.restante = p.dur; L.fin = Date.now() + p.dur * 1000; L.ultimoSeg = -1;
+  /* Cada fase decide de cero si hay Pods que encender. Fuera del trabajo, no
+     los hay: circPodsArrancar se va sola si la fase no es de trabajo. */
+  circPodsArrancar();
 }
 window.circLiveToggle = function(){
   var L = _live; if (!L) return;
@@ -19504,6 +19784,8 @@ window.circLiveToggle = function(){
   if (L.corriendo){
     L.corriendo = false; clearInterval(L.timer); L.timer = null;
     circWakeOff();
+    /* No hace falta parar nada: el tiempo del subcronometro es dur - restante,
+       y al pausarse el global, restante deja de moverse. Se congela solo. */
   } else {
     L.corriendo = true; L.fin = Date.now() + L.restante * 1000;
     circBeep(660, 0.12, 0.15);
@@ -19522,11 +19804,17 @@ function circLiveTick(){
     var t = document.getElementById("cl-timer"); if (t) t.textContent = circFmt(seg);
     circLiveBarra();
   }
+  /* Los Pods se pintan a 5 por segundo, con el tick del global: es el mismo
+     reloj, no uno paralelo. */
+  if (_circPods) circLivePodsPintar();
   if (L.restante <= 0) circLiveAvanzar(true);
 }
 function circLiveAvanzar(sonar){
   var L = _live; if (!L) return;
   var p = circLiveFase();
+  /* Se acabo el bloque: los Pods se apagan. Esta es la regla que Diego pidio y
+     se cumple aqui, antes de tocar nada mas. */
+  circPodsParar();
   L.hecho += p.dur;
   L.i = Math.min(L.i + 1, L.plan.length - 1);
   var q = circLiveFase();
@@ -19571,12 +19859,15 @@ window.circLiveSalir = function(){
   var L = _live; if (!L) return;
   if (L.corriendo && !window.confirm("El circuito está en marcha. ¿Salir?")) return;
   clearInterval(L.timer); circWakeOff();
+  circPodsParar();
   try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch(e){}
   document.removeEventListener("keydown", circLiveTeclas);
   document.removeEventListener("visibilitychange", circLiveVisible);
+  window.removeEventListener("resize", circLiveResize);
   _live = null;
   var ov = document.getElementById("circ-live");
-  ov.hidden = true; ov.innerHTML = ""; ov.className = "circ-live";
+  ov.hidden = true; ov.innerHTML = ""; ov.className = "circ-live";   /* incluida con-pods */
+  ov._podsH = -1;
   document.body.classList.remove("circ-live-open");
 };
 function circLiveTeclas(ev){
@@ -19588,6 +19879,11 @@ function circLiveTeclas(ev){
 }
 function circLiveVisible(){
   if (_live && _live.corriendo && document.visibilityState === "visible") circWakeOn();
+}
+/* Girar el telefono o entrar en pantalla completa cambia el hueco: se remide. */
+function circLiveResize(){
+  var ov = document.getElementById("circ-live");
+  if (ov && !ov.hidden) circLiveAjustarMapa(ov);
 }
 /* Sonido con Web Audio (sin archivos) y vibración en el teléfono. Tres modos:
    pitido (corto), silbato (dos notas largas, se oye en un patio) y sin sonido. */
