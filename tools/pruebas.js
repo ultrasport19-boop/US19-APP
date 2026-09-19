@@ -462,6 +462,15 @@ function extraerFuncion(nombre) {
        deja vacio (u19DeuVacio), sin volver a los valores de partida. */
     deudas:     { sync: true,  respaldo: true,  borrado: true },
 
+    /* Los supuestos del simulador financiero (19-sep-2026): ingresos y
+       gastos del gimnasio Y del bolsillo de Diego, su retiro mensual y su
+       fondo de emergencia. Viaja cifrado con la sincronizacion y con el
+       respaldo —si no, lo escrito en el PC no existe en el telefono— y
+       «borrar TODO» lo deja en null, no en los valores de partida.
+       Nacio SIN esto: la guarda de abajo solo miraba loadState y no lo
+       vio. Por eso ahora mira el archivo entero. */
+    finSim:     { sync: true,  respaldo: true,  borrado: true },
+
     /* horasExtra NO se sincroniza, a proposito. Un equipo que solo anadio
        horas no mueve las fechas de rutinas ni clientes; meterlo en el payload
        antes de que localTime sea de fiar convertiria la divergencia de hoy en
@@ -483,10 +492,18 @@ function extraerFuncion(nombre) {
   };
   const loadState = extraerFuncion('loadState');
 
-  /* a) Ninguna clave del estado puede quedar sin declarar. */
+  /* a) Ninguna clave del estado puede quedar sin declarar.
+
+     Se barre el ARCHIVO ENTERO, no solo loadState. Hasta el 19-sep-2026
+     esto miraba unicamente el cuerpo de loadState, y `state.finSim` —los
+     supuestos del simulador— nacia en u19SimGuardar, fuera de ahi: la
+     guarda dio verde mientras el dato no viajaba ni en la sincronizacion
+     ni en el respaldo, y «borrar TODO» lo dejaba puesto. Una clave del
+     estado puede nacer en cualquier sitio; la decision de si viaja hay
+     que tomarla igual. */
   if (loadState) {
     const asignadas = {};
-    (loadState.match(/state\.([A-Za-z0-9_$]+)\s*=/g) || []).forEach(function (m) {
+    (src.match(/state\.([A-Za-z0-9_$]+)\s*=/g) || []).forEach(function (m) {
       asignadas[m.replace(/^state\./, '').replace(/\s*=$/, '')] = true;
     });
     /* lastChangeAt es la marca de agua de saveState, no una coleccion. */

@@ -1184,6 +1184,66 @@ img{max-width:100%;display:block;}
 .fin-k-v{font-size:1.45rem;font-weight:800;line-height:1.1;}
 .fin-k-x{font-size:.7rem;color:var(--muted);}
 
+
+/* --- Simulador financiero (pestaña Simulador de Finanzas) --------------
+   Reutiliza card, fin-k, fin-be y rc-cmp: aquí solo va lo que no existía.
+   Todo con los tokens de la app, para que en el teléfono se lea igual. */
+.sim-seccion{border-top:1px solid var(--border);padding-top:.8rem;margin-top:1rem;}
+.sim-seccion:first-of-type{border-top:0;padding-top:0;margin-top:.2rem;}
+.sim-seccion-t{display:flex;align-items:baseline;justify-content:space-between;gap:.6rem;font-family:var(--font-display);font-size:1.02rem;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.5rem;}
+.sim-seccion-t span{font-size:1.15rem;font-weight:800;color:var(--accent);}
+.sim-bloque,.sim-fondo,.sim-bolsillo{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:.65rem .7rem;margin-bottom:.7rem;}
+.sim-fondo,.sim-bolsillo{margin-top:.8rem;}
+.sim-bloque-t{display:flex;align-items:baseline;justify-content:space-between;gap:.5rem;flex-wrap:wrap;font-size:.86rem;font-weight:800;}
+.sim-sub{font-size:1.02rem;font-weight:800;display:inline-flex;align-items:baseline;gap:.35rem;white-space:nowrap;}
+.sim-sub small{font-size:.66rem;font-weight:600;color:var(--muted);text-transform:none;letter-spacing:0;}
+.sim-tab td{padding:.3rem .25rem;}
+.sim-tab td:first-child{width:46%;}
+.sim-tab input[type=text]{width:100%;min-width:90px;}
+.sim-tab input[type=number]{width:100%;min-width:74px;text-align:right;}
+.sim-tab select{width:100%;min-width:92px;}
+.sim-tab td:last-child{width:34px;text-align:right;}
+.sim-campo{max-width:280px;margin-top:.5rem;}
+.sim-campo input{width:100%;}
+.sim-manual{margin-top:.45rem;font-size:.74rem;color:var(--warn);display:flex;align-items:center;gap:.45rem;flex-wrap:wrap;}
+.sim-bol td{padding:.35rem .3rem;font-size:.82rem;}
+.sim-bol td:last-child{text-align:right;font-weight:700;white-space:nowrap;}
+.sim-bol tr:last-child td{border-bottom:0;}
+.sim-esc{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.sim-esc-b{flex:1 1 130px;border:1px solid var(--border);background:var(--surface-3);color:var(--muted);border-radius:10px;padding:.45rem .6rem;cursor:pointer;display:flex;flex-direction:column;gap:.05rem;text-align:left;min-height:44px;}
+.sim-esc-b b{font-size:.84rem;}
+.sim-esc-b small{font-size:.68rem;}
+.sim-esc-b.on{border-color:var(--accent);color:var(--text);box-shadow:inset 0 0 0 1px var(--accent);}
+.sim-esc-cfg{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:.6rem;}
+.sim-graf{margin:.4rem 0 .2rem;}
+.sim-graf svg{width:100%;height:190px;display:block;}
+.sim-graf-x{display:flex;justify-content:space-between;margin-top:.15rem;}
+.sim-graf-x span{font-size:.62rem;color:var(--muted);flex:1 1 0;text-align:center;}
+.sim-resumen{font-size:.82rem;margin:.5rem 0 .2rem;}
+.sim-proy{font-size:.78rem;}
+.sim-proy td{white-space:nowrap;}
+@media (max-width:640px){
+  .sim-seccion-t{font-size:.92rem;}
+  /* En el telefono, cuatro columnas en 412 px dejan el monto en «3200»
+     y el desplegable en «Cada m»: no se lee lo que uno mismo acaba de
+     escribir. Cada fila pasa a ser una tarjetita de dos lineas: el
+     concepto arriba, entero, y debajo el monto y el cuando. Medido a
+     412 px, el ancho real del Galaxy A55 de Diego. */
+  .sim-tab{font-size:.8rem;}
+  .sim-tab tr:first-child{display:none;}           /* la cabecera sobra si cada fila es una tarjeta */
+  .sim-tab,.sim-tab tbody,.sim-tab tr{display:block;width:100%;}
+  .sim-tab tr{border:1px solid var(--border);border-radius:9px;padding:.4rem .45rem;margin-bottom:.45rem;}
+  .sim-tab td{display:inline-block;padding:.18rem .12rem;vertical-align:middle;border-bottom:0;}
+  .sim-tab td:first-child{display:block;width:100%;}
+  .sim-tab td:nth-child(2){width:41%;}
+  .sim-tab td:nth-child(3){width:45%;}
+  .sim-tab td:last-child{width:11%;text-align:right;}
+  .sim-tab td:nth-child(3) select+select{margin-top:.25rem;}
+  .sim-proy{display:block;overflow-x:auto;}
+  .sim-graf svg{height:160px;}
+  .sim-graf-x span{font-size:.56rem;}
+}
+
 .fin-bar{display:flex;width:100%;height:26px;border-radius:6px;overflow:hidden;background:var(--line);}
 .fin-seg{display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:800;color:#fff;min-width:2px;transition:width .3s ease;}
 .fin-legs{display:flex;flex-wrap:wrap;gap:.35rem .9rem;margin-top:.5rem;}
@@ -10774,6 +10834,7 @@ function exportBackup(){
     circuitos: state.circuitos || [],
     series: state.series || [],
     deudas: state.deudas || null,
+    finSim: state.finSim || null,
     reports: (typeof loadReports === "function" ? loadReports() : []),
     settings: (function(){
       /* El respaldo PLANO tampoco se lleva las llaves. El cifrado ya las quitaba
@@ -10827,6 +10888,7 @@ function importBackup(file){
       if (Array.isArray(data.circuitos)) state.circuitos = data.circuitos;
       if (Array.isArray(data.series)) state.series = data.series;
       if (data.deudas && typeof data.deudas === "object" && !Array.isArray(data.deudas)) state.deudas = data.deudas;
+      if (data.finSim && typeof data.finSim === "object" && !Array.isArray(data.finSim)) state.finSim = data.finSim;
       if (Array.isArray(data.reports) && typeof saveReports === "function") { try { saveReports(data.reports); } catch(e){} }
       if (data.settings && typeof data.settings === "object") { try { Object.keys(data.settings).forEach(function(k){ /* Un respaldo ya no trae las llaves: no dejar que un campo vacio borre el token que este navegador si tiene. Mismo criterio que u19RespFundirSecretos. */ if (RESP_SECRETO_CAMPOS.indexOf(k) !== -1 && !data.settings[k]) return; settings[k] = data.settings[k]; }); if (typeof saveSettings === "function") saveSettings(); } catch(e){} }
       if (typeof data.dashboard === "string" && data.dashboard) { try { localStorage.setItem("us19_dashboard_v5", data.dashboard); } catch(e){} }
@@ -10860,6 +10922,10 @@ function wipeAll(){
   state.clients = []; state.routines = []; state.exercises = []; state.protocols = [];
   state.libFav = {}; state.libRec = []; state.circuitos = []; state.series = [];
   state.deudas = u19DeuVacio();   /* deudas (15-sep-2026): vacías, sin volver a los valores de partida */
+  /* Los supuestos del simulador (19-sep-2026). A null, no a los de partida:
+     u19SimLeer vuelve a leer la realidad —ya vacía— y se rehace solo. Son
+     cifras del bolsillo de Diego: un «borrar TODO» tiene que llevárselas. */
+  state.finSim = null;
   /* Estas dos tambien. Sin ellas, un "borrar TODO" confirmado dos veces dejaba
      la papelera ofreciendo rutinas de socios que ya no existen (con su
      clientId) y las horas extra del mes intactas. */
@@ -12261,6 +12327,7 @@ function buildSyncPayload(){
     circuitos: state.circuitos || [],
     series: state.series || [],
     deudas: state.deudas || null,
+    finSim: state.finSim || null,
     lastChangeAt: state.lastChangeAt || 0
   };
 }
@@ -12446,6 +12513,7 @@ function syncDownload(){
         if (Array.isArray(data.circuitos)) state.circuitos = data.circuitos;
         if (Array.isArray(data.series)) state.series = data.series;
         if (data.deudas && typeof data.deudas === "object" && !Array.isArray(data.deudas)) state.deudas = data.deudas;
+        if (data.finSim && typeof data.finSim === "object" && !Array.isArray(data.finSim)) state.finSim = data.finSim;
         /* Lo bajado puede traer rutinas que usan fichas de la semilla que
            el catalogo bajado no tiene: se reponen antes de guardar. */
         try { if (typeof u19RepararFichasSemilla === "function" && u19RepararFichasSemilla()) _reSubir = true; } catch(eSem){}
@@ -26650,6 +26718,564 @@ function u19SvcProyHTML(ingresos){
 function u19SvcNum(v){ var n = u19FinNum(v); return n ? n : ''; }
 
 /* Meta de ingreso: qué hace falta y si cabe en la agenda. */
+/* ============================================================
+   SIMULADOR FINANCIERO · la pestaña «Simulador» de Finanzas
+
+   Las tarjetas de arriba dicen DÓNDE ESTÁS. Esto dice QUÉ PASARÍA SI, y
+   nunca al revés: el simulador LEE los números reales de la app como
+   punto de partida y deja sobrescribirlos, pero no los cambia jamás.
+
+   19-sep-2026 — Diego: «quiero añadir igual mis ingresos personales, ya
+   no lo divido». Por eso hay cuatro listas y no dos: el gimnasio y el
+   bolsillo van en el mismo panel, con subtotales aparte, para que se
+   siga viendo cuál de los dos aguanta al otro.
+
+   Lo que sale de la app y NO se inventa:
+     · ingreso del gimnasio = Monto membresía de los activos (Notion, o
+       planPrice local si Notion no está conectado)
+     · ticket promedio      = el mismo de la tarjeta de arriba
+     · costo fijo del gym   = settings.costoFijo. Es UN número: la app no
+       guarda el desglose, así que se precarga UNA fila y el resto lo
+       escribe Diego. Inventar el desglose sería peor que dejarlo vacío.
+     · deuda                = el neto de la tarjeta DEUDAS (u19DeuTotales)
+   Lo que la app no sabe —gastos variables, gastos personales, ingresos
+   por fuera— entra vacío y dice «Dato a confirmar» hasta que se llena.
+
+   Los supuestos viven en `state.finSim`, por el mismo camino que las
+   deudas: en el equipo, el localStorage detrás del PIN del candado; fuera
+   de él, solo cifrados (buildSyncPayload y exportBackup). No salen nunca a
+   Notion y «borrar TODO» se los lleva. Añadir un campo aquí no obliga a
+   tocar nada de eso: viaja el objeto entero.
+   ============================================================ */
+
+var SIM_ESCENARIOS = [
+  { id: "base",      t: "Base",      s: "todo sigue igual" },
+  { id: "optimista", t: "Optimista", s: "entran socios" },
+  { id: "pesimista", t: "Pesimista", s: "se van socios" }
+];
+/* Las cuatro tablas editables. `gym` decide en qué subtotal cae cada una
+   y el punto de equilibrio: el bolsillo no entra en el equilibrio del
+   gimnasio, porque el gimnasio no lo paga. */
+var SIM_LISTAS = [
+  { id: "ingExtra",  gym: false, signo: 1,  t: "Ingresos por fuera",        ayuda: "Lo que entra y no es del gimnasio: clases, atenciones, arriendos, lo que sea." },
+  { id: "gastoFijo", gym: true,  signo: -1, t: "Gastos fijos del gimnasio", ayuda: "Lo que se paga sí o sí cada mes aunque no venga nadie." },
+  { id: "gastoVar",  gym: true,  signo: -1, t: "Gastos variables del gym",  ayuda: "Lo que sube y baja: insumos, mantención, marketing." },
+  { id: "gastoPers", gym: false, signo: -1, t: "Gastos personales",         ayuda: "Tu bolsillo. La diferencia con lo de arriba es tu capacidad real de ahorro." }
+];
+/* Las cuatro etiquetas del bolsillo se precargan en CERO. Se precarga el
+   NOMBRE, no la cifra: son las categorías que Diego ya usaba, y un cero
+   visible se distingue de un dato inventado. */
+var SIM_PERS_INICIAL = ["Vivienda / casa", "Alimentación", "Transporte / bencina", "Personal (salidas, ropa…)"];
+var SIM_MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+
+/* ---------- los datos de verdad ---------- */
+
+/* Lo que la app SABE hoy. Mismo criterio y mismas fuentes que las
+   tarjetas de arriba, para que no haya dos ingresos distintos en la
+   misma pantalla. */
+function u19SimReal(){
+  var d = _finCachedLoad(), local = _finLocal();
+  var hayNotion = !!(d && d.clientes != null);
+  var ingresos = (hayNotion && d.ingresos != null) ? d.ingresos : local.ingresos;
+  var ticket   = (hayNotion && d.ticket   != null) ? d.ticket   : local.ticket;
+  var clientes = hayNotion ? d.clientes : local.clientes;
+  var deuda = null;
+  try { deuda = Math.round(u19FinNum(u19DeuTotales(u19DeuLeer()).neto)); } catch (e) { deuda = null; }
+  return {
+    ingresoGym: Math.round(u19FinNum(ingresos)),
+    ticket:     Math.round(u19FinNum(ticket)),
+    clientes:   Math.round(u19FinNum(clientes)),
+    costoFijo:  Math.round(u19FinNum(settings.costoFijo)),
+    deuda:      deuda,
+    hayNotion:  hayNotion
+  };
+}
+
+/* ---------- el modelo ---------- */
+
+function u19SimEnt(v, porDefecto, min, max){
+  var n = Number(v);
+  if (isNaN(n)) n = Number(porDefecto) || 0;
+  n = Math.round(n);
+  if (n < min) n = min;
+  if (n > max) n = max;
+  return n;
+}
+
+function u19SimFilaNorm(f){
+  f = (f && typeof f === "object") ? f : {};
+  var tipo = (f.tipo === "unico") ? "unico" : "rec";
+  return {
+    id: String(f.id || genId()),
+    concepto: String(f.concepto == null ? "" : f.concepto).slice(0, 40),
+    monto: u19SimEnt(f.monto, 0, 0, 999999999),
+    tipo: tipo,
+    mes: u19SimEnt(f.mes, 1, 1, 12)
+  };
+}
+
+/* Deja el modelo en forma sea cual sea lo que había guardado. Un supuesto
+   mal guardado no puede tumbar Finanzas entera. */
+function u19SimNorm(s, real){
+  real = real || u19SimReal();
+  s = (s && typeof s === "object" && !Array.isArray(s)) ? s : {};
+  var esc = "base";
+  for (var i = 0; i < SIM_ESCENARIOS.length; i++) if (SIM_ESCENARIOS[i].id === s.escenario) esc = s.escenario;
+  var out = {
+    v: 1,
+    ingGymManual: s.ingGymManual === true,
+    ingGym: u19SimEnt(s.ingGym, real.ingresoGym, 0, 999999999),
+    escenario: esc,
+    nuevosMes: u19SimEnt(s.nuevosMes, 2, 0, 50),
+    precioNuevo: u19SimEnt(s.precioNuevo, real.ticket, 0, 999999999),
+    bajasPct: u19SimEnt(s.bajasPct, 5, 0, 100),
+    fondoActual: u19SimEnt(s.fondoActual, 0, 0, 999999999),
+    /* Lo que Diego se saca del gimnasio. No es un costo del gimnasio: es
+       plata que cambia de bolsillo. Por eso el excedente TOTAL no se mueve
+       cuando sube o baja — solo cambia de qué lado está. */
+    retiro: u19SimEnt(s.retiro, 0, 0, 999999999)
+  };
+  /* Sin sobrescritura manual manda SIEMPRE el dato real: si Diego suma un
+     socio en Notion, el simulador parte del número nuevo sin tocar nada. */
+  if (!out.ingGymManual) out.ingGym = real.ingresoGym;
+  SIM_LISTAS.forEach(function(L){
+    out[L.id] = u19Arr(s[L.id]).slice(0, 40).map(u19SimFilaNorm);
+  });
+  return out;
+}
+
+/* La primera vez: lo que la app ya sabe, y nada más. */
+function u19SimInicial(real){
+  var m = u19SimNorm({}, real);
+  m.gastoFijo = [u19SimFilaNorm({ concepto: "Costo fijo mensual", monto: real.costoFijo, tipo: "rec" })];
+  m.gastoPers = SIM_PERS_INICIAL.map(function(t){ return u19SimFilaNorm({ concepto: t, monto: 0, tipo: "rec" }); });
+  return m;
+}
+
+function u19SimLeer(){
+  var real = u19SimReal();
+  if (state.finSim && typeof state.finSim === "object" && !Array.isArray(state.finSim))
+    return u19SimNorm(state.finSim, real);
+  return u19SimInicial(real);
+}
+
+function u19SimGuardar(m){
+  state.finSim = u19SimNorm(m, u19SimReal());
+  saveState();
+  return state.finSim;
+}
+
+/* ---------- los cálculos, aparte y puros ---------- */
+
+/* Suma de una lista. `rec` es lo de todos los meses; `unico` se cuenta
+   aparte porque mezclarlo en el mes daría un excedente que no se repite. */
+function u19SimSuma(filas, tipo){
+  var t = 0;
+  u19Arr(filas).forEach(function(f){ if (f && f.tipo === tipo) t += u19FinNum(f.monto); });
+  return Math.round(t);
+}
+
+function u19SimTotales(m, real){
+  var ingExtra  = u19SimSuma(m.ingExtra, "rec");
+  var gastoFijo = u19SimSuma(m.gastoFijo, "rec");
+  var gastoVar  = u19SimSuma(m.gastoVar, "rec");
+  var gastoPers = u19SimSuma(m.gastoPers, "rec");
+  var ingTotal  = m.ingGym + ingExtra;
+  var gastoGym  = gastoFijo + gastoVar;
+  var egTotal   = gastoGym + gastoPers;
+  var excedente = ingTotal - egTotal;
+  var utilGym   = m.ingGym - gastoGym;
+  /* Equilibrio: cuántos socios pagan los gastos DEL GIMNASIO. Los
+     personales no entran: el gimnasio no los paga. */
+  var porSocio  = (real.clientes > 0) ? (m.ingGym / real.clientes) : u19FinNum(real.ticket);
+  var equilibrio = (porSocio > 0) ? Math.ceil(gastoGym / porSocio) : null;
+  var deuda = (real.deuda == null) ? null : real.deuda;
+  var mesesDeuda = null;
+  if (deuda != null){
+    if (deuda <= 0) mesesDeuda = 0;
+    else if (excedente > 0) mesesDeuda = Math.ceil(deuda / excedente);
+  }
+  /* Los tres bolsillos, que es como Diego lo piensa: lo que produce el
+     gimnasio, lo que él se saca de ahí, y lo que junta por fuera. El
+     retiro NO cambia el excedente total: solo lo mueve de lado. */
+  var cajaGym  = utilGym - m.retiro;
+  var bolsillo = m.retiro + ingExtra - gastoPers;
+  var fondoMeta = gastoFijo * 3;
+  var fondoFalta = Math.max(0, fondoMeta - m.fondoActual);
+  var fondoMeses = (fondoFalta <= 0) ? 0 : (excedente > 0 ? Math.ceil(fondoFalta / excedente) : null);
+  return {
+    ingGym: m.ingGym, ingExtra: ingExtra, ingTotal: ingTotal,
+    gastoFijo: gastoFijo, gastoVar: gastoVar, gastoGym: gastoGym,
+    gastoPers: gastoPers, egTotal: egTotal,
+    excedente: excedente, utilGym: utilGym,
+    retiro: m.retiro, cajaGym: cajaGym, bolsillo: bolsillo,
+    tasaAhorro: (ingTotal > 0) ? Math.round(excedente / ingTotal * 100) : null,
+    porSocio: Math.round(porSocio), equilibrio: equilibrio,
+    deuda: deuda, mesesDeuda: mesesDeuda,
+    fondoMeta: fondoMeta, fondoActual: m.fondoActual, fondoFalta: fondoFalta, fondoMeses: fondoMeses,
+    puntualesIng: u19SimSuma(m.ingExtra, "unico"),
+    puntualesEg: u19SimSuma(m.gastoFijo, "unico") + u19SimSuma(m.gastoVar, "unico") + u19SimSuma(m.gastoPers, "unico")
+  };
+}
+
+/* Lo puntual de un mes concreto (1-12). */
+function u19SimPuntual(filas, mes){
+  var t = 0;
+  u19Arr(filas).forEach(function(f){ if (f && f.tipo === "unico" && u19SimEnt(f.mes, 1, 1, 12) === mes) t += u19FinNum(f.monto); });
+  return Math.round(t);
+}
+
+/* Doce meses. El escenario SOLO mueve el ingreso del gimnasio y el número
+   de socios: los gastos y lo de fuera son los mismos supuestos, que es lo
+   que pidió Diego («los tres escenarios se calculan sobre los mismos
+   supuestos editados arriba»). */
+function u19SimProy(m, real, escenario){
+  var t = u19SimTotales(m, real);
+  var socios0 = Math.max(0, u19FinNum(real.clientes));
+  var filas = [], acum = 0;
+  var hoy = new Date(), mes0 = hoy.getMonth();
+  for (var i = 1; i <= 12; i++){
+    var socios = socios0, ingGym = m.ingGym;
+    if (escenario === "optimista"){
+      socios = socios0 + m.nuevosMes * i;
+      ingGym = m.ingGym + m.nuevosMes * i * m.precioNuevo;
+    } else if (escenario === "pesimista"){
+      var queda = Math.pow(1 - (m.bajasPct / 100), i);
+      socios = socios0 * queda;
+      ingGym = m.ingGym * queda;
+    }
+    var ing = Math.round(ingGym) + t.ingExtra + u19SimPuntual(m.ingExtra, ((mes0 + i) % 12) + 1);
+    var eg = t.egTotal
+      + u19SimPuntual(m.gastoFijo, ((mes0 + i) % 12) + 1)
+      + u19SimPuntual(m.gastoVar,  ((mes0 + i) % 12) + 1)
+      + u19SimPuntual(m.gastoPers, ((mes0 + i) % 12) + 1);
+    var exc = ing - eg;
+    acum += exc;
+    filas.push({
+      i: i, etiqueta: SIM_MESES_CORTOS[(mes0 + i) % 12],
+      socios: Math.round(socios), ingresos: ing, egresos: eg, excedente: exc, acumulado: acum
+    });
+  }
+  return filas;
+}
+
+/* ---------- la pantalla ---------- */
+
+function u19SimDato(v, texto){
+  return (v == null) ? '<span class="text-muted">Dato a confirmar</span>' : (texto || _finCLP(v));
+}
+
+function u19SimFilasHTML(L, filas){
+  var h = '<table class="rc-cmp sim-tab"><tr><th>Concepto</th><th>Monto</th><th>Cuándo</th><th></th></tr>';
+  u19Arr(filas).forEach(function(f){
+    h += '<tr>'
+      + '<td><input type="text" maxlength="40" value="' + escapeAttr(f.concepto) + '" placeholder="Ej: arriendo"'
+      + ' onchange="u19SimFila(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\',\'concepto\',this.value)"></td>'
+      + '<td><input type="number" min="0" step="1000" value="' + f.monto + '"'
+      + ' oninput="u19SimFilaVivo(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\',this.value)"'
+      + ' onchange="u19SimFila(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\',\'monto\',this.value)"></td>'
+      + '<td><select onchange="u19SimFila(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\',\'tipo\',this.value)">'
+      + '<option value="rec"' + (f.tipo === "rec" ? " selected" : "") + '>Cada mes</option>'
+      + '<option value="unico"' + (f.tipo === "unico" ? " selected" : "") + '>Una sola vez</option></select>'
+      + (f.tipo === "unico"
+          ? '<select onchange="u19SimFila(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\',\'mes\',this.value)">'
+            + SIM_MESES_CORTOS.map(function(nm, k){
+                return '<option value="' + (k + 1) + '"' + ((k + 1) === f.mes ? " selected" : "") + '>' + nm + '</option>';
+              }).join("") + '</select>'
+          : '')
+      + '</td>'
+      + '<td><button type="button" class="btn btn-ghost btn-sm" title="Quitar esta fila"'
+      + ' onclick="u19SimQuitar(\'' + L.id + '\',\'' + escapeAttr(f.id) + '\')">×</button></td></tr>';
+  });
+  h += '</table>';
+  h += '<button type="button" class="btn btn-secondary btn-sm" style="margin-top:.4rem;" onclick="u19SimAnadir(\'' + L.id + '\')">+ Agregar</button>';
+  return h;
+}
+
+function u19SimListaHTML(L, m, subtotal){
+  return '<div class="sim-bloque"><div class="sim-bloque-t">' + escapeHtml(L.t)
+    + '<span class="sim-sub">' + (L.signo < 0 ? "−" : "+") + _finCLP(subtotal) + '<small>al mes</small></span></div>'
+    + '<p class="text-xs text-muted" style="margin:.1rem 0 .4rem;">' + escapeHtml(L.ayuda) + '</p>'
+    + u19SimFilasHTML(L, m[L.id]) + '</div>';
+}
+
+function u19SimResultadoHTML(m, real){
+  var t = u19SimTotales(m, real);
+  var col = t.excedente >= 0 ? "var(--success)" : "var(--danger)";
+  var h = '<div class="fin-kpis">';
+  h += '<div class="fin-k"><span class="fin-k-l">Excedente</span><span class="fin-k-v" style="color:' + col + ';">'
+    + _finCLP(t.excedente) + '</span><span class="fin-k-x">al mes, después de todo</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Tasa de ahorro</span><span class="fin-k-v">'
+    + (t.tasaAhorro == null ? '<span class="text-muted">—</span>' : t.tasaAhorro + "%")
+    + '</span><span class="fin-k-x">de lo que entra</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Equilibrio</span><span class="fin-k-v">'
+    + (t.equilibrio == null ? '<span class="text-muted">—</span>' : t.equilibrio)
+    + '</span><span class="fin-k-x">socios pagan el gimnasio</span></div>';
+  h += '<div class="fin-k"><span class="fin-k-l">Deuda liquidada en</span><span class="fin-k-v">'
+    + (t.mesesDeuda == null ? '<span class="text-muted">—</span>' : (t.mesesDeuda + (t.mesesDeuda === 1 ? " mes" : " meses")))
+    + '</span><span class="fin-k-x">' + (t.deuda == null ? "sin dato de deuda" : _finCLP(t.deuda) + " por pagar") + '</span></div>';
+  h += '</div>';
+
+  /* A tu bolsillo al mes · las tres cosas que Diego separa a mano: lo que
+     produce el gimnasio, lo que se saca de ahí y lo que junta por fuera.
+     Subir el retiro NO crea plata: mueve la misma de un lado al otro, y
+     por eso el excedente de arriba no se inmuta. */
+  h += '<div class="sim-bolsillo"><div class="sim-bloque-t">A tu bolsillo al mes'
+    + '<span class="sim-sub" style="color:' + (t.bolsillo >= 0 ? "var(--success)" : "var(--danger)") + ';">'
+    + _finCLP(t.bolsillo) + '<small>lo que te queda a ti</small></span></div>';
+  h += '<table class="rc-cmp sim-bol"><tbody>'
+    + '<tr><td>El gimnasio genera</td><td>' + _finCLP(t.ingGym) + '</td></tr>'
+    + '<tr><td>Excedente del gym (antes de tu retiro)</td><td style="color:' + (t.utilGym >= 0 ? "var(--success)" : "var(--danger)") + ';">' + _finCLP(t.utilGym) + '</td></tr>'
+    + '<tr><td>Tu retiro personal</td><td>' + _finCLP(t.retiro) + '</td></tr>'
+    + '<tr><td>Caja que queda en el gym</td><td style="color:' + (t.cajaGym >= 0 ? "var(--success)" : "var(--danger)") + ';">' + _finCLP(t.cajaGym) + '</td></tr>'
+    + '<tr><td>Ingresos por fuera</td><td>' + _finCLP(t.ingExtra) + '</td></tr>'
+    + '<tr><td>Gastos personales</td><td style="color:var(--danger);">−' + _finCLP(t.gastoPers) + '</td></tr>'
+    + '</tbody></table>';
+  h += '<div class="sim-campo"><label class="form-label">Tu retiro personal al mes (CLP)</label>'
+    + '<input type="number" min="0" step="10000" value="' + m.retiro + '"'
+    + ' oninput="u19SimVivo(\'retiro\',this.value)" onchange="u19SimCampo(\'retiro\',this.value)"></div>';
+  h += '<p class="text-xs text-muted" style="margin:.4rem 0 0;line-height:1.5;">El retiro <b>no es un costo del gimnasio</b>: '
+    + 'es plata que cambia de bolsillo. Por eso el excedente de arriba no se mueve cuando lo subes — solo cambia de qué lado queda.</p>';
+  /* Solo molesta si de verdad se esta sacando algo: con retiro en cero, un
+     gimnasio en perdida ya lo dice el excedente de arriba. */
+  if (t.retiro > 0 && t.retiro > t.utilGym)
+    h += '<p class="text-xs" style="margin:.35rem 0 0;color:var(--danger);">⚠ Te estás sacando más de lo que el gimnasio produce: '
+      + 'la caja del gym queda en ' + _finCLP(t.cajaGym) + '. Eso sale de algún lado.</p>';
+  h += '</div>';
+
+  if (t.excedente <= 0 && t.deuda)
+    h += '<div class="fin-estado" style="border-color:var(--danger);"><b style="color:var(--danger);">Sin excedente no se paga deuda.</b> '
+      + 'Con estos supuestos no sobra nada al mes, así que los ' + _finCLP(t.deuda) + ' no bajan nunca. Sube ingresos o baja gastos y mira cómo cambia.</div>';
+
+  if (t.puntualesIng || t.puntualesEg)
+    h += '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Además, este año: '
+      + (t.puntualesIng ? '<b style="color:var(--success);">+' + _finCLP(t.puntualesIng) + '</b> de una sola vez' : '')
+      + (t.puntualesIng && t.puntualesEg ? ' y ' : '')
+      + (t.puntualesEg ? '<b style="color:var(--danger);">−' + _finCLP(t.puntualesEg) + '</b> de una sola vez' : '')
+      + '. Eso no se repite cada mes: se ve en la proyección, en su mes.</p>';
+
+  /* Fondo de emergencia: tres meses de gastos fijos del gimnasio. */
+  var pct = t.fondoMeta > 0 ? Math.min(100, Math.round(t.fondoActual / t.fondoMeta * 100)) : 0;
+  h += '<div class="sim-fondo"><div class="sim-bloque-t">Fondo de emergencia'
+    + '<span class="sim-sub">' + _finCLP(t.fondoMeta) + '<small>meta: 3 meses de gastos fijos</small></span></div>';
+  h += '<p class="text-xs text-muted" style="margin:.1rem 0 .5rem;">Si un mes se cae todo, esto te da tres meses de aire para reordenar sin endeudarte más.</p>';
+  h += '<div class="fin-be"><div class="fin-be-track"><div class="fin-be-fill" style="width:' + pct
+    + '%;background:' + (pct >= 100 ? "var(--success)" : "var(--accent)") + ';"></div></div>'
+    + '<div class="fin-be-f"><span>' + _finCLP(0) + '</span><span>' + _finCLP(t.fondoMeta) + '</span></div></div>';
+  h += '<div class="sim-campo"><label class="form-label">Ahorrado hoy (CLP)</label>'
+    + '<input type="number" min="0" step="10000" value="' + m.fondoActual + '"'
+    + ' oninput="u19SimVivo(\'fondoActual\',this.value)" onchange="u19SimCampo(\'fondoActual\',this.value)"></div>';
+  h += '<p class="text-xs" style="margin:.4rem 0 0;line-height:1.5;">'
+    + (t.fondoFalta <= 0
+        ? '<b style="color:var(--success);">Fondo completo.</b> Tienes los tres meses cubiertos.'
+        : ('Faltan <b>' + _finCLP(t.fondoFalta) + '</b>'
+           + (t.fondoMeses == null
+              ? ' y con este excedente no se llena nunca: primero hay que hacer que sobre algo.'
+              : ' · al ritmo de hoy lo completas en <b>' + t.fondoMeses + (t.fondoMeses === 1 ? ' mes' : ' meses') + '</b>.')))
+    + '</p></div>';
+  return h;
+}
+
+/* El gráfico: línea del excedente acumulado. El texto va FUERA del SVG
+   —en HTML—, porque el de los otros gráficos de Finanzas se queda en 7,5
+   px en el teléfono de Diego y no se lee. */
+function u19SimGraficoHTML(filas){
+  var W = 1000, H = 260, P = 18;
+  var vals = filas.map(function(f){ return f.acumulado; });
+  var max = Math.max.apply(null, vals.concat([0]));
+  var min = Math.min.apply(null, vals.concat([0]));
+  var rango = (max - min) || 1;
+  var x = function(i){ return P + (i * (W - 2 * P) / 11); };
+  var y = function(v){ return H - P - ((v - min) / rango) * (H - 2 * P); };
+  var pts = filas.map(function(f, i){ return x(i).toFixed(1) + "," + y(f.acumulado).toFixed(1); }).join(" ");
+  var cero = y(0);
+  var h = '<div class="sim-graf"><svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img"'
+    + ' aria-label="Excedente acumulado a doce meses">';
+  h += '<line x1="' + P + '" y1="' + cero.toFixed(1) + '" x2="' + (W - P) + '" y2="' + cero.toFixed(1)
+    + '" stroke="var(--border)" stroke-width="2" stroke-dasharray="6 6"></line>';
+  h += '<polyline points="' + pts + '" fill="none" stroke="' + (filas[11].acumulado >= 0 ? "#a8d139" : "#f87171")
+    + '" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"></polyline>';
+  filas.forEach(function(f, i){
+    h += '<circle cx="' + x(i).toFixed(1) + '" cy="' + y(f.acumulado).toFixed(1) + '" r="5" fill="'
+      + (f.acumulado >= 0 ? "#a8d139" : "#f87171") + '"></circle>';
+  });
+  h += '</svg><div class="sim-graf-x">'
+    + filas.map(function(f){ return '<span>' + escapeHtml(f.etiqueta) + '</span>'; }).join("")
+    + '</div></div>';
+  return h;
+}
+
+function u19SimProyHTML(m, real){
+  var filas = u19SimProy(m, real, m.escenario);
+  var fin = filas[11];
+  var h = '<div class="sim-esc">' + SIM_ESCENARIOS.map(function(e){
+    return '<button type="button" class="sim-esc-b' + (e.id === m.escenario ? " on" : "") + '"'
+      + ' onclick="u19SimCampo(\'escenario\',\'' + e.id + '\')"><b>' + escapeHtml(e.t) + '</b><small>'
+      + escapeHtml(e.s) + '</small></button>';
+  }).join("") + '</div>';
+
+  if (m.escenario === "optimista")
+    h += '<div class="sim-esc-cfg"><div class="sim-campo"><label class="form-label">Socios nuevos al mes</label>'
+      + '<input type="number" min="0" max="50" step="1" value="' + m.nuevosMes + '" onchange="u19SimCampo(\'nuevosMes\',this.value)"></div>'
+      + '<div class="sim-campo"><label class="form-label">A qué precio (CLP)</label>'
+      + '<input type="number" min="0" step="1000" value="' + m.precioNuevo + '" onchange="u19SimCampo(\'precioNuevo\',this.value)"></div></div>';
+  else if (m.escenario === "pesimista")
+    h += '<div class="sim-esc-cfg"><div class="sim-campo"><label class="form-label">Bajas al mes (%)</label>'
+      + '<input type="number" min="0" max="100" step="1" value="' + m.bajasPct + '" onchange="u19SimCampo(\'bajasPct\',this.value)"></div>'
+      + '<p class="text-xs text-muted" style="align-self:center;margin:0;">Se va ese porcentaje de los que queden, cada mes.</p></div>';
+
+  h += u19SimGraficoHTML(filas);
+  h += '<div class="sim-resumen">Al mes 12: <b>' + fin.socios + '</b> socios · excedente acumulado <b style="color:'
+    + (fin.acumulado >= 0 ? "var(--success)" : "var(--danger)") + ';">' + _finCLP(fin.acumulado) + '</b></div>';
+  h += '<table class="rc-cmp sim-proy"><tr><th>Mes</th><th>Socios</th><th>Ingresos</th><th>Egresos</th><th>Excedente</th><th>Acumulado</th></tr>';
+  filas.forEach(function(f){
+    h += '<tr><td>' + escapeHtml(f.etiqueta) + '</td><td>' + f.socios + '</td><td>' + _finCLP(f.ingresos)
+      + '</td><td>' + _finCLP(f.egresos) + '</td><td style="color:' + (f.excedente >= 0 ? "var(--success)" : "var(--danger)")
+      + ';">' + _finCLP(f.excedente) + '</td><td>' + _finCLP(f.acumulado) + '</td></tr>';
+  });
+  return h + '</table>';
+}
+
+function u19SimHTML(){
+  var real = u19SimReal(), m = u19SimLeer();
+  var t = u19SimTotales(m, real);
+  var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
+  h += '<div class="card-title">🧮 Simulador financiero</div>';
+  h += '<p class="text-xs text-muted" style="margin:.2rem 0 .8rem;line-height:1.5;">Las tarjetas de arriba dicen dónde estás. '
+    + 'Esto dice qué pasaría si. Cambia lo que quieras: <b>no toca ningún dato real</b>. Se guarda solo en este equipo, '
+    + 'viaja cifrado con tu sincronización y con el respaldo, y no sale nunca a Notion.</p>';
+
+  /* --- ingresos --- */
+  h += '<div class="sim-seccion"><div class="sim-seccion-t">Ingresos<span>' + _finCLP(t.ingTotal) + '</span></div>';
+  h += '<div class="sim-bloque"><div class="sim-bloque-t">Ingreso del gimnasio'
+    + '<span class="sim-sub">+' + _finCLP(m.ingGym) + '<small>al mes</small></span></div>';
+  h += '<p class="text-xs text-muted" style="margin:.1rem 0 .4rem;">'
+    + (real.hayNotion
+        ? 'Suma de «Monto membresía» de tus ' + real.clientes + ' socios activos, desde Notion.'
+        : 'Estimado con los precios que tienes cargados en la app: conecta Notion para el dato real.')
+    + '</p>';
+  h += '<div class="sim-campo"><label class="form-label">Ingreso mensual del gimnasio (CLP)</label>'
+    + '<input type="number" min="0" step="10000" value="' + m.ingGym + '"'
+    + ' oninput="u19SimVivo(\'ingGym\',this.value)" onchange="u19SimIngGym(this.value)"></div>';
+  if (m.ingGymManual)
+    h += '<div class="sim-manual">✏️ Estás simulando con un número tuyo. El real son ' + _finCLP(real.ingresoGym) + '. '
+      + '<button type="button" class="btn btn-ghost btn-sm" onclick="u19SimIngReal()">Volver al dato real</button></div>';
+  h += '</div>';
+  h += u19SimListaHTML(SIM_LISTAS[0], m, t.ingExtra);
+  h += '</div>';
+
+  /* --- egresos --- */
+  h += '<div class="sim-seccion"><div class="sim-seccion-t">Egresos<span>' + _finCLP(t.egTotal) + '</span></div>';
+  h += u19SimListaHTML(SIM_LISTAS[1], m, t.gastoFijo);
+  h += u19SimListaHTML(SIM_LISTAS[2], m, t.gastoVar);
+  h += u19SimListaHTML(SIM_LISTAS[3], m, t.gastoPers);
+  h += '<p class="text-xs text-muted" style="margin:.3rem 0 0;">Gimnasio ' + _finCLP(t.gastoGym)
+    + ' · bolsillo ' + _finCLP(t.gastoPers) + '. Solo los del gimnasio entran en el punto de equilibrio.</p>';
+  h += '</div>';
+
+  /* --- resultado --- */
+  h += '<div class="sim-seccion"><div class="sim-seccion-t">Resultado<span id="sim-exc">' + _finCLP(t.excedente) + '</span></div>';
+  h += '<div id="sim-res">' + u19SimResultadoHTML(m, real) + '</div></div>';
+
+  /* --- proyección --- */
+  h += '<div class="sim-seccion"><div class="sim-seccion-t">Proyección a 12 meses<span></span></div>';
+  h += '<div id="sim-proy">' + u19SimProyHTML(m, real) + '</div></div>';
+
+  h += '<div style="margin-top:.9rem;display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;">'
+    + '<button type="button" class="btn btn-ghost btn-sm" onclick="u19SimReset()">⟲ Reiniciar supuestos</button>'
+    + '<span class="text-xs text-muted">Vuelve a los datos reales de la app y borra lo que hayas escrito aquí.</span></div>';
+  return h + '</div></div>';
+}
+
+/* ---------- acciones ---------- */
+
+/* Mientras se escribe se recalcula SOLO lo calculado: si se repintara la
+   pestaña entera, el cursor saltaría fuera del campo a cada tecla. Al
+   salir del campo (change) ya se guarda y se repinta todo. */
+function u19SimRefrescar(m){
+  var real = u19SimReal();
+  m = u19SimNorm(m, real);
+  var res = document.getElementById("sim-res");
+  if (res) res.innerHTML = u19SimResultadoHTML(m, real);
+  var pr = document.getElementById("sim-proy");
+  if (pr) pr.innerHTML = u19SimProyHTML(m, real);
+  var ex = document.getElementById("sim-exc");
+  if (ex) ex.textContent = _finCLP(u19SimTotales(m, real).excedente);
+}
+
+window.u19SimVivo = function(campo, valor){
+  var m = u19SimLeer();
+  m[campo] = u19SimEnt(valor, 0, 0, 999999999);
+  if (campo === "ingGym") m.ingGymManual = true;
+  u19SimRefrescar(m);
+};
+
+window.u19SimCampo = function(campo, valor){
+  var m = u19SimLeer();
+  m[campo] = (campo === "escenario") ? String(valor) : u19SimEnt(valor, 0, 0, 999999999);
+  u19SimGuardar(m);
+  renderFinanzas();
+};
+
+window.u19SimIngGym = function(valor){
+  var m = u19SimLeer();
+  m.ingGym = u19SimEnt(valor, 0, 0, 999999999);
+  m.ingGymManual = true;
+  u19SimGuardar(m);
+  renderFinanzas();
+};
+
+window.u19SimIngReal = function(){
+  var m = u19SimLeer();
+  m.ingGymManual = false;
+  m.ingGym = u19SimReal().ingresoGym;
+  u19SimGuardar(m);
+  renderFinanzas();
+  toast("Ingreso del gimnasio: de vuelta al dato real", "success");
+};
+
+window.u19SimFilaVivo = function(lista, id, valor){
+  var m = u19SimLeer();
+  u19Arr(m[lista]).forEach(function(f){ if (f.id === id) f.monto = u19SimEnt(valor, 0, 0, 999999999); });
+  u19SimRefrescar(m);
+};
+
+window.u19SimFila = function(lista, id, campo, valor){
+  var m = u19SimLeer();
+  u19Arr(m[lista]).forEach(function(f){
+    if (f.id !== id) return;
+    if (campo === "concepto") f.concepto = String(valor).slice(0, 40);
+    else if (campo === "tipo") f.tipo = (valor === "unico") ? "unico" : "rec";
+    else if (campo === "mes") f.mes = u19SimEnt(valor, 1, 1, 12);
+    else f.monto = u19SimEnt(valor, 0, 0, 999999999);
+  });
+  u19SimGuardar(m);
+  renderFinanzas();
+};
+
+window.u19SimAnadir = function(lista){
+  var m = u19SimLeer();
+  if (u19Arr(m[lista]).length >= 40){ toast("Ya hay 40 filas en esa tabla", "warn"); return; }
+  m[lista] = u19Arr(m[lista]).concat([u19SimFilaNorm({})]);
+  u19SimGuardar(m);
+  renderFinanzas();
+};
+
+window.u19SimQuitar = function(lista, id){
+  var m = u19SimLeer();
+  m[lista] = u19Arr(m[lista]).filter(function(f){ return f.id !== id; });
+  u19SimGuardar(m);
+  renderFinanzas();
+};
+
+window.u19SimReset = function(){
+  if (!confirm("¿Volver a los datos reales de la app? Se borra lo que hayas escrito en el simulador.")) return;
+  state.finSim = u19SimInicial(u19SimReal());
+  saveState();
+  renderFinanzas();
+  toast("Supuestos reiniciados", "success");
+};
+
 function u19FinMetaHTML(ingresos, ticket, costo){
   var obj = u19FinNum(settings.finMeta);
   var h = '<div class="card" style="margin-top:1rem;"><div class="card-main">';
@@ -28029,6 +28655,7 @@ var FIN_TABS = [
   { id: "cartera",    t: "Cartera",    s: "cobros y retención" },
   { id: "agenda",     t: "Agenda",     s: "ocupación" },
   { id: "asistencia", t: "Asistencia", s: "quién viene de verdad" },
+  { id: "simulador",  t: "Simulador",  s: "qué pasaría si" },
   { id: "proyeccion", t: "Proyección", s: "colchón, meta y modelo" },
   { id: "conexion",   t: "Conexión",   s: "Notion y ecosistema" }
 ];
@@ -28990,6 +29617,9 @@ function u19FinRealHTML(){
   /* Asistencia (16-sep-2026): quién viene de verdad, según las listas que
      pasa el equipo por WhatsApp. */
   html += u19FinPane('asistencia', actual, u19AsistenciaHTML());
+  /* Simulador (19-sep-2026): los supuestos de Diego, separados de la
+     realidad que enseñan las tarjetas. No toca ningún dato real. */
+  html += u19FinPane('simulador', actual, u19SimHTML());
   /* Proyección: colchón, meta, tendencia; el modelo estratégico sigue debajo. */
   html += u19FinPane('proyeccion', actual,
       u19FinColchonHTML(ingresos, costo, ticket) + u19FinMetaHTML(ingresos, ticket, costo) + u19FinTendenciaHTML(d, ingresos, costo, clientes) + u19SvcProyHTML(ingresos));

@@ -67,7 +67,18 @@ const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   /* Asistencia (16-sep-2026): las cuentas y el gráfico de la pestaña. */
   'function escapeHtml(s){ return String(s); }', 'function escapeAttr(s){ return String(s); }',
   fn('u19AsisSumarDias'), fn('u19AsisDiaSemana'), fn('u19AsisLunes'), fn('u19AsisNorm'), fn('u19AsisResumen'),
-  fn('u19AsisActivo'), fn('u19AsisFicha'), fn('u19AsisMotivos'), fn('u19AsisBarrasSVG')].join('\n');
+  fn('u19AsisActivo'), fn('u19AsisFicha'), fn('u19AsisMotivos'), fn('u19AsisBarrasSVG'),
+  /* Simulador financiero (19-sep-2026): las cuatro listas, los escenarios y
+     las cuentas. Nada de pantalla. `u19SimReal` NO se extrae —lee Notion,
+     settings y las deudas—: aqui la realidad se pasa a mano, que es como se
+     prueba que el simulador la respeta en vez de inventarsela. */
+  'function genId(){ return "id" + (genId._n = (genId._n || 0) + 1); }',
+  tramo('var SIM_ESCENARIOS = [', '\n];\n', 'SIM_ESCENARIOS') + '\n];\n',
+  tramo('var SIM_LISTAS = [', '\n];\n', 'SIM_LISTAS') + '\n];\n',
+  tramo('var SIM_PERS_INICIAL = ', ';\n', 'SIM_PERS_INICIAL') + ';',
+  tramo('var SIM_MESES_CORTOS = ', ';\n', 'SIM_MESES_CORTOS') + ';',
+  fn('u19SimEnt'), fn('u19SimFilaNorm'), fn('u19SimNorm'), fn('u19SimInicial'),
+  fn('u19SimSuma'), fn('u19SimTotales'), fn('u19SimPuntual'), fn('u19SimProy')].join('\n');
 
 let m;
 try {
@@ -79,6 +90,9 @@ try {
     + ' deuCapacidad: u19DeuCapacidad, deuLibre: u19DeuLibre, deuUSD: u19DeuUSD, deuPesosDec: u19DeuPesosDec,'
     + ' deuAbonoCalc: u19DeuAbonoCalc, deuAjusteCalc: u19DeuAjusteCalc, deuDeshacerCalc: u19DeuDeshacerCalc,'
     + ' deuUrgente: u19DeuHacerUrgente, deuFechaMas: u19DeuFechaMas,'
+    + ' simEnt: u19SimEnt, simFilaNorm: u19SimFilaNorm, simNorm: u19SimNorm, simInicial: u19SimInicial,'
+    + ' simSuma: u19SimSuma, simTotales: u19SimTotales, simPuntual: u19SimPuntual, simProy: u19SimProy,'
+    + ' simListas: SIM_LISTAS, simEscenarios: SIM_ESCENARIOS, simPers: SIM_PERS_INICIAL,'
     + ' asisResumen: u19AsisResumen, asisLunes: u19AsisLunes, asisFicha: u19AsisFicha, asisMotivos: u19AsisMotivos, asisBarras: u19AsisBarrasSVG };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
@@ -476,6 +490,155 @@ avisos.push('deudas · la cuarta tarjeta: total, fecha, cupo, abonos en CLP y US
     'barras · una barra verde y una roja, con su detalle al pasar el dedo');
   di(!/<svg/.test(m.asisBarras([{ lbl: 'Lu', vino: 0, falto: 0 }])), 'barras · sin datos no dibuja un gráfico vacío');
   avisos.push('asistencia · la pestaña: 30 días, semanas, horas, días, quién falta más, ficha de ingreso y motivos, ejecutados con listas inventadas');
+}
+
+/* =====================================================================
+ * 6 - SIMULADOR FINANCIERO  (19-sep-2026)
+ *
+ * Es la pestana donde Diego decide cuanto sacarse del gimnasio y en
+ * cuanto liquida la deuda. Las cuentas son puras, asi que se ejecutan
+ * enteras con un plantel inventado y cifras redondas a mano.
+ *
+ * Lo que mas se vigila aqui no es una formula: son las TRES PROMESAS que
+ * la pantalla le hace por escrito.
+ *   1. "No toca ningun dato real"  -> el escenario no cambia los gastos.
+ *   2. "El retiro no crea plata"   -> mover el retiro no mueve el excedente.
+ *   3. "Solo el gimnasio entra en el equilibrio" -> lo personal no cuenta.
+ * Si alguna deja de ser cierta, la pantalla miente, y eso es peor que un
+ * numero mal: es un numero mal en el que se confia.
+ * ===================================================================== */
+{
+  /* La realidad que la app YA sabe. Se pasa a mano a proposito: asi se
+     comprueba que el simulador parte de ella en vez de inventarsela. */
+  const REAL = { ingresoGym: 1000000, ticket: 50000, clientes: 20, costoFijo: 600000, deuda: 900000, hayNotion: true };
+  const POBRE = { ingresoGym: 0, ticket: 0, clientes: 0, costoFijo: 0, deuda: null, hayNotion: false };
+
+  const filas = (arr) => arr.map((f, i) => ({ id: 'f' + i, concepto: f[0], monto: f[1], tipo: f[2] || 'rec', mes: f[3] || 1 }));
+  const MODELO = m.simNorm({
+    ingExtra:  filas([['Clases fuera', 200000]]),
+    gastoFijo: filas([['Arriendo', 400000], ['Luz y agua', 100000]]),
+    gastoVar:  filas([['Insumos', 100000]]),
+    gastoPers: filas([['Casa', 300000]]),
+    retiro: 400000, fondoActual: 500000
+  }, REAL);
+
+  /* --- normalizacion: lo guardado puede venir de cualquier version --- */
+  igual(m.simNorm(null, REAL).ingGym, 1000000, 'sim - sin nada guardado, el ingreso del gym es el REAL');
+  igual(m.simNorm([], REAL).escenario, 'base', 'sim - un array donde iba un objeto no tumba Finanzas');
+  igual(m.simNorm({ escenario: 'inventado' }, REAL).escenario, 'base', 'sim - un escenario que no existe cae en base');
+  igual(m.simNorm({ ingGym: 5, ingGymManual: false }, REAL).ingGym, 1000000,
+    'sim - sin sobrescritura manual manda SIEMPRE el dato real, aunque hubiera otro guardado');
+  igual(m.simNorm({ ingGym: 5, ingGymManual: true }, REAL).ingGym, 5,
+    'sim - con sobrescritura manual manda el numero de Diego');
+  igual(m.simNorm({ bajasPct: 500 }, REAL).bajasPct, 100, 'sim - un porcentaje de bajas de 500 se recorta a 100');
+  igual(m.simNorm({ nuevosMes: -3 }, REAL).nuevosMes, 0, 'sim - no se pueden captar socios negativos');
+  igual(m.simNorm({ gastoFijo: 'esto no es una lista' }, REAL).gastoFijo.length, 0,
+    'sim - una lista que no es lista queda vacia, no revienta');
+  igual(m.simNorm({ gastoPers: new Array(60).fill({ concepto: 'x', monto: 1 }) }, REAL).gastoPers.length, 40,
+    'sim - el tope de 40 filas se aplica al leer, no solo al anadir');
+  igual(m.simFilaNorm({ monto: -500 }).monto, 0, 'sim - un monto negativo queda en cero');
+  igual(m.simFilaNorm({ mes: 99 }).mes, 12, 'sim - el mes de un gasto puntual no se sale del ano');
+  igual(m.simFilaNorm({ tipo: 'loquesea' }).tipo, 'rec', 'sim - un tipo desconocido es "cada mes"');
+  igual(m.simFilaNorm({ concepto: 'x'.repeat(80) }).concepto.length, 40, 'sim - el concepto se corta en 40');
+  di(m.simFilaNorm({}).id.length > 0, 'sim - una fila sin id se lleva uno propio');
+  igual(m.simEnt('no es un numero', 7, 0, 10), 7, 'sim - texto en un campo de numero cae en el valor por defecto');
+
+  /* --- lo que se precarga la primera vez --- */
+  const INI = m.simInicial(REAL);
+  igual(JSON.stringify([INI.gastoFijo.length, INI.gastoFijo[0].monto]), '[1,600000]',
+    'sim - de partida, UNA fila de gasto fijo con el costo fijo real de la app');
+  igual(INI.gastoPers.length, m.simPers.length, 'sim - las etiquetas del bolsillo vienen puestas');
+  di(INI.gastoPers.every(f => f.monto === 0),
+    'sim - el bolsillo viene en CERO: se precarga el nombre, nunca una cifra inventada');
+  igual(JSON.stringify([INI.ingExtra.length, INI.gastoVar.length]), '[0,0]',
+    'sim - lo que la app no sabe (ingresos por fuera, gastos variables) entra vacio');
+
+  /* --- las cuentas --- */
+  const T = m.simTotales(MODELO, REAL);
+  igual(JSON.stringify([T.ingTotal, T.gastoGym, T.egTotal, T.excedente]), '[1200000,600000,900000,300000]',
+    'sim - entra 1.200.000, sale 900.000 (600.000 del gym + 300.000 del bolsillo), sobran 300.000');
+  igual(T.utilGym, 400000, 'sim - el gimnasio solo produce 400.000: 1.000.000 menos sus propios 600.000');
+  igual(T.tasaAhorro, 25, 'sim - se ahorra el 25% de lo que entra');
+  igual(T.equilibrio, 12, 'sim - con 20 socios a 50.000, 12 pagan los 600.000 del gimnasio');
+  igual(T.mesesDeuda, 3, 'sim - 900.000 de deuda a 300.000 al mes son 3 meses');
+  igual(JSON.stringify([T.fondoMeta, T.fondoFalta, T.fondoMeses]), '[1500000,1000000,4]',
+    'sim - el fondo son 3 meses de gasto FIJO (1.500.000); faltan 1.000.000 y son 4 meses');
+
+  /* PROMESA 2 - el retiro mueve la plata de bolsillo, no la crea. */
+  const SIN_RETIRO = m.simTotales(Object.assign({}, MODELO, { retiro: 0 }), REAL);
+  igual(SIN_RETIRO.excedente, T.excedente, 'sim - PROMESA: subir el retiro NO cambia el excedente total');
+  igual(JSON.stringify([T.cajaGym, T.bolsillo]), '[0,300000]',
+    'sim - con 400.000 de retiro la caja del gym queda en 0 y al bolsillo llegan 300.000');
+  igual(JSON.stringify([SIN_RETIRO.cajaGym, SIN_RETIRO.bolsillo]), '[400000,-100000]',
+    'sim - sin retiro el gym se queda los 400.000 y el bolsillo entra en rojo: la misma plata, otro lado');
+  igual(T.cajaGym + T.bolsillo, SIN_RETIRO.cajaGym + SIN_RETIRO.bolsillo,
+    'sim - los dos bolsillos suman siempre lo mismo, se reparta como se reparta');
+
+  /* PROMESA 3 - lo personal no entra en el equilibrio del gimnasio. */
+  const CARO = m.simTotales(m.simNorm(Object.assign({}, MODELO, {
+    gastoPers: filas([['Casa', 300000], ['Un gasto enorme', 9000000]])
+  }), REAL), REAL);
+  igual(CARO.equilibrio, T.equilibrio,
+    'sim - PROMESA: un gasto personal gigante no cambia el equilibrio (el gimnasio no lo paga)');
+  di(CARO.excedente < 0, 'sim - pero si hunde el excedente, que es de los dos');
+
+  /* Divisiones por cero, que es donde estas cuentas revientan de verdad. */
+  const CERO = m.simTotales(m.simNorm({ gastoFijo: filas([['Arriendo', 400000]]) }, POBRE), POBRE);
+  igual(CERO.equilibrio, null, 'sim - sin socios y sin ticket el equilibrio es "-", nunca Infinity');
+  /* El caso que de verdad muerde, y que la primera version de esta prueba no
+     cubria: SIN Notion la app estima un ingreso pero el numero de socios
+     puede ser 0. Dividir por cero da Infinity, y el equilibrio saldria «0
+     socios pagan el gimnasio», que es mentira y suena a buena noticia. Lo
+     encontro un mutante que escapaba, no yo leyendo el codigo. */
+  const SIN_SOCIOS = { ingresoGym: 1000000, ticket: 50000, clientes: 0, costoFijo: 600000, deuda: null, hayNotion: false };
+  const TS = m.simTotales(m.simNorm({ gastoFijo: filas([['Arriendo', 400000]]) }, SIN_SOCIOS), SIN_SOCIOS);
+  igual(TS.porSocio, 50000, 'sim - sin socios contados, cada socio aporta el TICKET, no una division por cero');
+  igual(TS.equilibrio, 8, 'sim - y el equilibrio son 8 socios de verdad, nunca 0 por haber dividido por Infinity');
+  igual(CERO.mesesDeuda, null, 'sim - sin dato de deuda no se inventa un plazo');
+  igual(CERO.tasaAhorro, null, 'sim - sin ingresos la tasa de ahorro es "-", no NaN');
+  igual(CERO.fondoMeses, null, 'sim - sin excedente el fondo no se llena "nunca", no en Infinity meses');
+  const AHOGADO = m.simTotales(m.simNorm(Object.assign({}, MODELO, { gastoPers: filas([['Casa', 5000000]]) }), REAL), REAL);
+  igual(AHOGADO.mesesDeuda, null, 'sim - con el excedente en rojo la deuda no se paga "en X meses": no se paga');
+
+  /* --- gastos de una sola vez --- */
+  const PUNT = m.simNorm(Object.assign({}, MODELO, {
+    gastoVar: filas([['Insumos', 100000], ['Maquina nueva', 1200000, 'unico', 5]])
+  }), REAL);
+  const TP = m.simTotales(PUNT, REAL);
+  igual(TP.gastoVar, 100000, 'sim - lo de una sola vez NO se suma al gasto de cada mes');
+  igual(TP.puntualesEg, 1200000, 'sim - pero se cuenta aparte, para que se vea que existe');
+  igual(m.simPuntual(PUNT.gastoVar, 5), 1200000, 'sim - y cae en su mes');
+  igual(m.simPuntual(PUNT.gastoVar, 6), 0, 'sim - y en ningun otro');
+  const P12 = m.simProy(PUNT, REAL, 'base');
+  igual(P12.reduce((s, f) => s + f.egresos, 0) - P12.length * TP.egTotal, 1200000,
+    'sim - en los doce meses la maquina aparece UNA vez, ni cero ni doce');
+
+  /* --- la proyeccion --- */
+  const BASE = m.simProy(MODELO, REAL, 'base');
+  igual(BASE.length, 12, 'sim - la proyeccion son doce meses');
+  igual(JSON.stringify([BASE[0].excedente, BASE[11].acumulado]), '[300000,3600000]',
+    'sim - en base se repite el mismo mes: 300.000 doce veces son 3.600.000');
+  igual(BASE[11].socios, 20, 'sim - en base no entra ni se va nadie');
+
+  const OPT = m.simProy(m.simNorm(Object.assign({}, MODELO, { nuevosMes: 2, precioNuevo: 50000 }), REAL), REAL, 'optimista');
+  igual(JSON.stringify([OPT[11].socios, OPT[11].ingresos]), '[44,2400000]',
+    'sim - optimista: 2 socios al mes son 44 en el mes doce y 2.400.000 entrando');
+  igual(OPT[11].acumulado, 11400000, 'sim - y el acumulado sale de sumar los doce, no de multiplicar el ultimo');
+
+  const PES = m.simProy(m.simNorm(Object.assign({}, MODELO, { bajasPct: 10 }), REAL), REAL, 'pesimista');
+  igual(PES[0].socios, 18, 'sim - pesimista: se va el 10% de los que QUEDAN, no del total de partida');
+  igual(PES[11].socios, 6, 'sim - y en el mes doce quedan 6 de los 20');
+  di(PES[11].ingresos < PES[0].ingresos && PES[11].excedente < BASE[11].excedente,
+    'sim - perdiendo socios se cobra menos y sobra menos');
+
+  /* PROMESA 1 - los escenarios no son tres modelos distintos: son el MISMO
+     supuesto mirado de tres maneras. Si el optimista cambiara los gastos,
+     comparar no serviria de nada. */
+  igual(JSON.stringify([BASE[0].egresos, OPT[0].egresos, PES[0].egresos]),
+    JSON.stringify([900000, 900000, 900000]),
+    'sim - PROMESA: los tres escenarios gastan lo mismo; solo cambia lo que entra');
+
+  avisos.push('simulador - cuatro listas, tres escenarios, doce meses y las tres promesas de la pantalla, ejecutados con cifras inventadas');
 }
 
 /* --- salida --- */

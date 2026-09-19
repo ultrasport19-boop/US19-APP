@@ -122,6 +122,76 @@
       "nombre": "semana · una semana sin lista sale en 0 %",
       "de": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });",
       "a": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : 0 });"
+    },
+    {
+      "nombre": "el equilibrio pasa a incluir los gastos PERSONALES: el gimnasio parece necesitar mas socios de los que necesita",
+      "de": "  var equilibrio = (porSocio > 0) ? Math.ceil(gastoGym / porSocio) : null;",
+      "a": "  var equilibrio = (porSocio > 0) ? Math.ceil(egTotal / porSocio) : null;"
+    },
+    {
+      "nombre": "el retiro personal se descuenta del excedente: sacarse plata pareceria hacerla desaparecer",
+      "de": "  var excedente = ingTotal - egTotal;",
+      "a": "  var excedente = ingTotal - egTotal - m.retiro;"
+    },
+    {
+      "nombre": "la caja del gimnasio deja de restar el retiro y el dinero se cuenta dos veces",
+      "de": "  var cajaGym  = utilGym - m.retiro;",
+      "a": "  var cajaGym  = utilGym;"
+    },
+    {
+      "nombre": "al bolsillo no llega el retiro: la plata que se saca del gimnasio se evapora",
+      "de": "  var bolsillo = m.retiro + ingExtra - gastoPers;",
+      "a": "  var bolsillo = ingExtra - gastoPers;"
+    },
+    {
+      "nombre": "los meses para llenar el fondo redondean hacia abajo: promete el colchon un mes antes",
+      "de": "  var fondoMeses = (fondoFalta <= 0) ? 0 : (excedente > 0 ? Math.ceil(fondoFalta / excedente) : null);",
+      "a": "  var fondoMeses = (fondoFalta <= 0) ? 0 : (excedente > 0 ? Math.floor(fondoFalta / excedente) : null);"
+    },
+    {
+      "nombre": "el fondo de emergencia pasa de tres meses a seis sin decirlo",
+      "de": "  var fondoMeta = gastoFijo * 3;",
+      "a": "  var fondoMeta = gastoFijo * 6;"
+    },
+    {
+      "nombre": "sin socios se divide por cero y el equilibrio sale 0 en vez de «sin dato»",
+      "de": "  var porSocio  = (real.clientes > 0) ? (m.ingGym / real.clientes) : u19FinNum(real.ticket);",
+      "a": "  var porSocio  = (m.ingGym / real.clientes);"
+    },
+    {
+      "nombre": "con el excedente en rojo se anuncia igual un plazo para liquidar la deuda",
+      "de": "    else if (excedente > 0) mesesDeuda = Math.ceil(deuda / excedente);",
+      "a": "    else if (excedente !== 0) mesesDeuda = Math.ceil(deuda / excedente);"
+    },
+    {
+      "nombre": "sin ingresos la tasa de ahorro sale NaN en pantalla en vez de un guion",
+      "de": "    tasaAhorro: (ingTotal > 0) ? Math.round(excedente / ingTotal * 100) : null,",
+      "a": "    tasaAhorro: Math.round(excedente / ingTotal * 100),"
+    },
+    {
+      "nombre": "los gastos de una sola vez se suman al gasto de CADA mes",
+      "de": "  u19Arr(filas).forEach(function(f){ if (f && f.tipo === tipo) t += u19FinNum(f.monto); });",
+      "a": "  u19Arr(filas).forEach(function(f){ if (f) t += u19FinNum(f.monto); });"
+    },
+    {
+      "nombre": "en el escenario pesimista las bajas dejan de componerse: el desplome se subestima",
+      "de": "      var queda = Math.pow(1 - (m.bajasPct / 100), i);",
+      "a": "      var queda = 1 - (m.bajasPct / 100) * i;"
+    },
+    {
+      "nombre": "en el optimista los socios nuevos no se acumulan mes a mes",
+      "de": "      socios = socios0 + m.nuevosMes * i;",
+      "a": "      socios = socios0 + m.nuevosMes;"
+    },
+    {
+      "nombre": "el ingreso del gimnasio deja de seguir al dato real: se congela en lo que hubiera guardado",
+      "de": "  if (!out.ingGymManual) out.ingGym = real.ingresoGym;",
+      "a": "  if (false) out.ingGym = real.ingresoGym;"
+    },
+    {
+      "nombre": "se cae el tope de 40 filas al leer y un modelo inflado entra entero",
+      "de": "    out[L.id] = u19Arr(s[L.id]).slice(0, 40).map(u19SimFilaNorm);",
+      "a": "    out[L.id] = u19Arr(s[L.id]).map(u19SimFilaNorm);"
     }
   ]
 }
