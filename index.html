@@ -28413,47 +28413,79 @@ function u19AsisNorm(s){
   return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/* Pura. `filas` = [{f: 'yyyy-mm-dd', h: 'HH:mm', n, t: 8 dígitos, v: 1|0, m}]
+/* En qué casilla cae una fila de la hoja. Mismo vocabulario que
+   `US19_ASIST_cubo_` del asistente, a propósito: si los dos lados no llaman
+   igual a lo mismo, uno de los dos acaba contando otra cosa.
+
+   19-sep-2026 · Fase 8 — desde el 18-sep la hoja distingue CINCO estados y
+   **avisar no es faltar**: quien avisa que no puede venir no puede contar
+   igual que quien deja la hora plantada. Las filas nuevas traen `e`; las
+   guardadas antes solo traen `v` y se deducen, que es lo que las mantiene
+   vivas. Un `e` que no reconozcamos NO se cuenta en ninguna casilla: antes
+   que sumarlo mal, no sumarlo. */
+function u19AsisCubo(r){
+  if (!r) return "";
+  var e = String(r.e || "").toLowerCase();
+  if (e) return (e === "vino" || e === "falta" || e === "aviso" || e === "cancelo") ? e : "";
+  return Number(r.v) === 1 ? "vino" : "falta";
+}
+
+/* Pura. `filas` = [{f: 'yyyy-mm-dd', h: 'HH:mm', n, t: 8 dígitos, v: 1|0, e, m}]
    tal como las entrega el asistente; `hoy` = 'yyyy-mm-dd'. Los 30 días
    cuentan hoy. Las semanas van de lunes a domingo y son `semanas` hasta la
-   de hoy, también las vacías (una semana sin lista se ve como hueco). */
+   de hoy, también las vacías (una semana sin lista se ve como hueco).
+
+   El porcentaje de asistencia se calcula sobre vino + faltó, SIN los avisos:
+   un aviso no es una hora perdida ni una hora cumplida, y meterlo en
+   cualquiera de los dos lados movería el número que Diego mira. */
 function u19AsisResumen(filas, hoy, semanas){
   semanas = semanas || 12;
   var c30 = u19AsisSumarDias(hoy, -29);
   var lunesIni = u19AsisSumarDias(u19AsisLunes(hoy), -7 * (semanas - 1));
-  var out = { vino30: 0, falto30: 0, pct30: null, dias30: 0, semanas: [], horas: [], diasSemana: [], top: [], hayDatos: false };
+  var out = { vino30: 0, falto30: 0, aviso30: 0, cancelo30: 0, pct30: null, dias30: 0, semanas: [], horas: [], diasSemana: [], top: [], hayDatos: false };
   var dias30 = {}, porSem = {}, porHora = {}, porDia = {}, porPersona = {};
   u19Arr(filas).forEach(function(r){
     if (!r || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.f || "")) || r.f > hoy) return;
-    var vino = Number(r.v) === 1;
+    var cubo = u19AsisCubo(r);
+    if (!cubo) return;                       /* ANULADO o un estado que no conocemos */
+    var vino = cubo === "vino", falto = cubo === "falta";
+    /* Aviso y cancelación van juntos en los gráficos — los dos son «no vino,
+       pero lo dijo»— y separados en las cifras de arriba, que es donde la
+       diferencia importa. */
+    var avisado = !vino && !falto;
     out.hayDatos = true;
+    var suma = function(z){ if (vino) z.vino++; else if (falto) z.falto++; else z.aviso++; };
     var lun = u19AsisLunes(r.f);
-    if (lun >= lunesIni){ var s = porSem[lun] || (porSem[lun] = { vino: 0, falto: 0 }); if (vino) s.vino++; else s.falto++; }
+    if (lun >= lunesIni) suma(porSem[lun] || (porSem[lun] = { vino: 0, falto: 0, aviso: 0 }));
     if (r.f < c30) return;
     dias30[r.f] = true;
-    if (vino) out.vino30++; else out.falto30++;
+    if (vino) out.vino30++;
+    else if (falto) out.falto30++;
+    else if (cubo === "aviso") out.aviso30++;
+    else out.cancelo30++;
     var hh = String(r.h || "").slice(0, 2);
-    if (/^\d{2}$/.test(hh)){ var x = porHora[hh] || (porHora[hh] = { vino: 0, falto: 0 }); if (vino) x.vino++; else x.falto++; }
+    if (/^\d{2}$/.test(hh)) suma(porHora[hh] || (porHora[hh] = { vino: 0, falto: 0, aviso: 0 }));
     var dw = u19AsisDiaSemana(r.f);
-    var y = porDia[dw] || (porDia[dw] = { vino: 0, falto: 0 }); if (vino) y.vino++; else y.falto++;
+    suma(porDia[dw] || (porDia[dw] = { vino: 0, falto: 0, aviso: 0 }));
     var k = String(r.t || "") || u19AsisNorm(r.n);
     if (!k) return;
-    var p = porPersona[k] || (porPersona[k] = { nombre: String(r.n || ""), t: String(r.t || ""), vino: 0, falto: 0, ultima: "" });
+    var p = porPersona[k] || (porPersona[k] = { nombre: String(r.n || ""), t: String(r.t || ""), vino: 0, falto: 0, aviso: 0, ultima: "" });
     if (vino) p.vino++;
+    else if (avisado) p.aviso++;
     else { p.falto++; if (r.f > p.ultima) p.ultima = r.f; }
   });
   var tot = out.vino30 + out.falto30;
   out.pct30 = tot ? Math.round(out.vino30 / tot * 100) : null;
   out.dias30 = Object.keys(dias30).length;
   for (var i = 0; i < semanas; i++){
-    var l = u19AsisSumarDias(lunesIni, 7 * i), s2 = porSem[l] || { vino: 0, falto: 0 };
-    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });
+    var l = u19AsisSumarDias(lunesIni, 7 * i), s2 = porSem[l] || { vino: 0, falto: 0, aviso: 0 };
+    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, aviso: s2.aviso, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });
   }
-  Object.keys(porHora).sort().forEach(function(h){ out.horas.push({ h: h, vino: porHora[h].vino, falto: porHora[h].falto }); });
+  Object.keys(porHora).sort().forEach(function(h){ out.horas.push({ h: h, vino: porHora[h].vino, falto: porHora[h].falto, aviso: porHora[h].aviso }); });
   /* Lunes a viernes siempre; sábado y domingo solo si hubo lista. */
   [1, 2, 3, 4, 5, 6, 7].forEach(function(d){
     var z = porDia[d];
-    if (z || d <= 5) out.diasSemana.push({ d: d, vino: z ? z.vino : 0, falto: z ? z.falto : 0 });
+    if (z || d <= 5) out.diasSemana.push({ d: d, vino: z ? z.vino : 0, falto: z ? z.falto : 0, aviso: z ? z.aviso : 0 });
   });
   out.top = Object.keys(porPersona).map(function(k){
     var p = porPersona[k]; p.pct = Math.round(p.vino / (p.vino + p.falto) * 100); return p;
@@ -28499,11 +28531,13 @@ function u19AsisMotivos(clients){
   return out;
 }
 
-/* Barras apiladas: presentes en verde abajo, faltas en rojo arriba.
-   `items` = [{lbl, vino, falto, top}]; `top` es el rótulo sobre la barra. */
+/* Barras apiladas: presentes en verde abajo, quien avisó o canceló en ámbar
+   en medio, y las faltas de verdad en rojo arriba.
+   `items` = [{lbl, vino, falto, aviso, top}]; `top` es el rótulo sobre la barra.
+   `aviso` puede no venir (datos de antes del 19-sep-2026): cuenta como 0. */
 function u19AsisBarrasSVG(items){
   var max = 0;
-  u19Arr(items).forEach(function(x){ max = Math.max(max, x.vino + x.falto); });
+  u19Arr(items).forEach(function(x){ max = Math.max(max, x.vino + x.falto + (x.aviso || 0)); });
   if (!max) return '<p class="text-xs text-muted" style="margin:.4rem 0 0;">Sin listas pasadas en este tramo.</p>';
   var W = 300, H = 150, padL = 4, padR = 4, padT = 16, padB = 22;
   var n = items.length, bw = (W - padL - padR) / n, esc = (H - padT - padB) / max;
@@ -28511,10 +28545,13 @@ function u19AsisBarrasSVG(items){
   s += '<line x1="' + padL + '" y1="' + (H - padB) + '" x2="' + (W - padR) + '" y2="' + (H - padB) + '" stroke="var(--border)"/>';
   items.forEach(function(x, i){
     var w = bw * 0.64, x0 = padL + i * bw + bw * 0.18, xm = x0 + w / 2;
-    var hV = x.vino * esc, hF = x.falto * esc, yV = H - padB - hV, yF = yV - hF;
+    var av = x.aviso || 0;
+    var hV = x.vino * esc, hA = av * esc, hF = x.falto * esc;
+    var yV = H - padB - hV, yA = yV - hA, yF = yA - hF;
     if (x.vino) s += '<rect x="' + x0.toFixed(1) + '" y="' + yV.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hV.toFixed(1) + '" fill="var(--success)"><title>' + escapeAttr(x.lbl + ': ' + x.vino + ' vinieron') + '</title></rect>';
+    if (av) s += '<rect x="' + x0.toFixed(1) + '" y="' + yA.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hA.toFixed(1) + '" fill="var(--warn)"><title>' + escapeAttr(x.lbl + ': ' + av + ' avisaron o cancelaron') + '</title></rect>';
     if (x.falto) s += '<rect x="' + x0.toFixed(1) + '" y="' + yF.toFixed(1) + '" width="' + w.toFixed(1) + '" height="' + hF.toFixed(1) + '" fill="var(--danger)"><title>' + escapeAttr(x.lbl + ': ' + x.falto + ' faltaron') + '</title></rect>';
-    if ((x.vino + x.falto) && x.top) s += '<text x="' + xm.toFixed(1) + '" y="' + (yF - 4).toFixed(1) + '" text-anchor="middle" font-size="8" font-weight="700" fill="var(--text)">' + escapeHtml(x.top) + '</text>';
+    if ((x.vino + x.falto + av) && x.top) s += '<text x="' + xm.toFixed(1) + '" y="' + (yF - 4).toFixed(1) + '" text-anchor="middle" font-size="8" font-weight="700" fill="var(--text)">' + escapeHtml(x.top) + '</text>';
     s += '<text x="' + xm.toFixed(1) + '" y="' + (H - padB + 12) + '" text-anchor="middle" font-size="8" fill="var(--muted)">' + escapeHtml(x.lbl) + '</text>';
   });
   return s + '</svg>';
@@ -28531,7 +28568,10 @@ function u19AsisPedir(forzar){
   if (!forzar && _asisDatos.filas && (Date.now() - _asisDatos.at) < 30 * 60 * 1000) return;
   var previas = _asisDatos.filas;
   _asisDatos = { at: Date.now(), dias: 90, filas: previas, simulacion: _asisDatos.simulacion, cargando: true, error: "" };
-  fetch(u19DashUrl("asistencia") + "&dias=90").then(function(r){ return r.json(); }).then(function(d){
+  /* `est=1` dice al asistente que esta app sabe contar los cinco estados de la
+     hoja. Sin ese aviso manda solo vino/no vino, como hasta el 18-sep: una app
+     vieja en caché no puede recibir avisos y sumarlos a las faltas. */
+  fetch(u19DashUrl("asistencia") + "&dias=90&est=1").then(function(r){ return r.json(); }).then(function(d){
     if (!d || d.error) throw new Error((d && d.error) || "sin respuesta");
     _asisDatos = { at: Date.now(), dias: d.dias || 90, filas: u19Arr(d.filas), simulacion: !!d.simulacion, cargando: false, error: "" };
   }).catch(function(e){
@@ -28578,12 +28618,14 @@ function u19AsisInnerHTML(){
       h += '<div class="fin-kpis" style="margin-top:.6rem;">';
       h += '<div class="fin-k"><span class="fin-k-l">Asistencia · 30 días</span><span class="fin-k-v" style="color:' + col + ';">' + (r.pct30 == null ? "—" : r.pct30 + "%") + '</span><span class="fin-k-x">de las horas con lista</span></div>';
       h += '<div class="fin-k"><span class="fin-k-l">Vinieron</span><span class="fin-k-v">' + r.vino30 + '</span><span class="fin-k-x">sesiones</span></div>';
-      h += '<div class="fin-k"><span class="fin-k-l">Faltaron</span><span class="fin-k-v" style="color:' + (r.falto30 ? "var(--danger)" : "var(--muted)") + ';">' + r.falto30 + '</span><span class="fin-k-x">sesiones</span></div>';
+      h += '<div class="fin-k"><span class="fin-k-l">Faltaron</span><span class="fin-k-v" style="color:' + (r.falto30 ? "var(--danger)" : "var(--muted)") + ';">' + r.falto30 + '</span><span class="fin-k-x">sin avisar</span></div>';
+      h += '<div class="fin-k"><span class="fin-k-l">Avisaron</span><span class="fin-k-v" style="color:' + ((r.aviso30 + r.cancelo30) ? "var(--warn)" : "var(--muted)") + ';">' + (r.aviso30 + r.cancelo30) + '</span><span class="fin-k-x">'
+        + (r.cancelo30 ? r.aviso30 + ' avisaron · ' + r.cancelo30 + ' cancelaron' : 'no cuenta como falta') + '</span></div>';
       h += '<div class="fin-k"><span class="fin-k-l">Días con lista</span><span class="fin-k-v">' + r.dias30 + '</span><span class="fin-k-x">en 30 días</span></div>';
       h += '</div>';
-      var sem = r.semanas.map(function(s){ return { lbl: u19AsisFechaCorta(s.lunes), vino: s.vino, falto: s.falto, top: s.pct == null ? "" : s.pct + "%" }; });
-      var hrs = r.horas.map(function(x){ return { lbl: x.h, vino: x.vino, falto: x.falto, top: x.falto ? String(x.falto) : "" }; });
-      var dws = r.diasSemana.map(function(x){ return { lbl: ASIS_DIAS[x.d], vino: x.vino, falto: x.falto, top: x.falto ? String(x.falto) : "" }; });
+      var sem = r.semanas.map(function(s){ return { lbl: u19AsisFechaCorta(s.lunes), vino: s.vino, falto: s.falto, aviso: s.aviso, top: s.pct == null ? "" : s.pct + "%" }; });
+      var hrs = r.horas.map(function(x){ return { lbl: x.h, vino: x.vino, falto: x.falto, aviso: x.aviso, top: x.falto ? String(x.falto) : "" }; });
+      var dws = r.diasSemana.map(function(x){ return { lbl: ASIS_DIAS[x.d], vino: x.vino, falto: x.falto, aviso: x.aviso, top: x.falto ? String(x.falto) : "" }; });
       h += '<div class="fin-graficos" style="margin-top:.4rem;">';
       h += '<div class="fin-g"><div class="fin-g-t">Por semana <span>% que vino · 12 semanas</span></div>' + u19AsisBarrasSVG(sem) + '</div>';
       h += '<div class="fin-g"><div class="fin-g-t">Por hora <span>faltas sobre cada barra · 30 días</span></div>' + u19AsisBarrasSVG(hrs) + '</div>';
@@ -28591,15 +28633,17 @@ function u19AsisInnerHTML(){
       h += '</div>';
       if (r.top.length){
         h += '<div class="ml-t">Quién falta más · 30 días</div><div class="u19-scrollx"><table class="rc-cmp fin-tbl">'
-          + '<tr><th>Socio</th><th>Faltas</th><th>Vino</th><th>Asistencia</th><th>Última falta</th></tr>';
+          + '<tr><th>Socio</th><th>Faltas</th><th>Avisó</th><th>Vino</th><th>Asistencia</th><th>Última falta</th></tr>';
         r.top.forEach(function(p){
           var c2 = p.pct < 70 ? "var(--danger)" : (p.pct < 85 ? "var(--warn)" : "var(--muted)");
-          h += '<tr><td>' + escapeHtml(p.nombre || "Sin nombre") + '</td><td style="font-weight:700;">' + p.falto + '</td><td>' + p.vino
+          h += '<tr><td>' + escapeHtml(p.nombre || "Sin nombre") + '</td><td style="font-weight:700;">' + p.falto + '</td>'
+            + '<td style="color:' + (p.aviso ? "var(--warn)" : "var(--muted)") + ';">' + (p.aviso || 0) + '</td><td>' + p.vino
             + '</td><td style="color:' + c2 + ';">' + p.pct + '%</td><td>' + u19AsisFechaCorta(p.ultima) + '</td></tr>';
         });
         h += '</table></div>';
       }
-      h += '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">Solo cuenta las horas en que alguien pasó lista. Un día sin lista no es un día sin faltas: mira «Días con lista».</p>';
+      h += '<p class="text-xs text-muted" style="margin-top:.6rem;line-height:1.5;">Solo cuenta las horas en que alguien pasó lista. Un día sin lista no es un día sin faltas: mira «Días con lista». '
+        + 'Quien <b>avisó o canceló</b> sale en ámbar y <b>no cuenta como falta</b> — tampoco entra en el porcentaje, ni a favor ni en contra.</p>';
     }
   }
   /* La ficha de ingreso y los motivos de salida vienen de Notion con

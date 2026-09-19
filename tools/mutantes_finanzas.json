@@ -120,8 +120,8 @@
     },
     {
       "nombre": "semana · una semana sin lista sale en 0 %",
-      "de": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });",
-      "a": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : 0 });"
+      "de": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, aviso: s2.aviso, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : null });",
+      "a": "    out.semanas.push({ lunes: l, vino: s2.vino, falto: s2.falto, aviso: s2.aviso, pct: (s2.vino + s2.falto) ? Math.round(s2.vino / (s2.vino + s2.falto) * 100) : 0 });"
     },
     {
       "nombre": "el equilibrio pasa a incluir los gastos PERSONALES: el gimnasio parece necesitar mas socios de los que necesita",
@@ -192,6 +192,41 @@
       "nombre": "se cae el tope de 40 filas al leer y un modelo inflado entra entero",
       "de": "    out[L.id] = u19Arr(s[L.id]).slice(0, 40).map(u19SimFilaNorm);",
       "a": "    out[L.id] = u19Arr(s[L.id]).map(u19SimFilaNorm);"
+    },
+    {
+      "nombre": "un estado que no conocemos se cuenta como falta en vez de dejarse fuera",
+      "de": "  if (e) return (e === \"vino\" || e === \"falta\" || e === \"aviso\" || e === \"cancelo\") ? e : \"\";",
+      "a": "  if (e) return (e === \"vino\" || e === \"falta\" || e === \"aviso\" || e === \"cancelo\") ? e : (Number(r.v) === 1 ? \"vino\" : \"falta\");"
+    },
+    {
+      "nombre": "lo ANULADO vuelve a entrar en las cuentas",
+      "de": "    if (!cubo) return;                       /* ANULADO o un estado que no conocemos */",
+      "a": "    if (!cubo) cubo = \"falta\";"
+    },
+    {
+      "nombre": "avisar vuelve a contar como faltar en los graficos",
+      "de": "    var suma = function(z){ if (vino) z.vino++; else if (falto) z.falto++; else z.aviso++; };",
+      "a": "    var suma = function(z){ if (vino) z.vino++; else z.falto++; };"
+    },
+    {
+      "nombre": "el aviso de un socio se le apunta como falta en «quien falta mas»",
+      "de": "    else if (avisado) p.aviso++;",
+      "a": "    else if (false) p.aviso++;"
+    },
+    {
+      "nombre": "los avisos y las cancelaciones se confunden entre si",
+      "de": "    else if (cubo === \"aviso\") out.aviso30++;",
+      "a": "    else if (cubo === \"cancelo\") out.aviso30++;"
+    },
+    {
+      "nombre": "la escala de las barras no cuenta el tramo ambar y se sale del grafico",
+      "de": "  u19Arr(items).forEach(function(x){ max = Math.max(max, x.vino + x.falto + (x.aviso || 0)); });",
+      "a": "  u19Arr(items).forEach(function(x){ max = Math.max(max, x.vino + x.falto); });"
+    },
+    {
+      "nombre": "la app deja de avisar que sabe contar los cinco estados",
+      "de": "  fetch(u19DashUrl(\"asistencia\") + \"&dias=90&est=1\")",
+      "a": "  fetch(u19DashUrl(\"asistencia\") + \"&dias=90\")"
     }
   ]
 }

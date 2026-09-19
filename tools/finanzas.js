@@ -66,7 +66,7 @@ const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   fn('u19DeuAbonoCalc'), fn('u19DeuAjusteCalc'), fn('u19DeuDeshacerCalc'), fn('u19DeuHacerUrgente'),
   /* Asistencia (16-sep-2026): las cuentas y el gráfico de la pestaña. */
   'function escapeHtml(s){ return String(s); }', 'function escapeAttr(s){ return String(s); }',
-  fn('u19AsisSumarDias'), fn('u19AsisDiaSemana'), fn('u19AsisLunes'), fn('u19AsisNorm'), fn('u19AsisResumen'),
+  fn('u19AsisSumarDias'), fn('u19AsisDiaSemana'), fn('u19AsisLunes'), fn('u19AsisNorm'), fn('u19AsisCubo'), fn('u19AsisResumen'),
   fn('u19AsisActivo'), fn('u19AsisFicha'), fn('u19AsisMotivos'), fn('u19AsisBarrasSVG'),
   /* Simulador financiero (19-sep-2026): las cuatro listas, los escenarios y
      las cuentas. Nada de pantalla. `u19SimReal` NO se extrae —lee Notion,
@@ -93,6 +93,7 @@ try {
     + ' simEnt: u19SimEnt, simFilaNorm: u19SimFilaNorm, simNorm: u19SimNorm, simInicial: u19SimInicial,'
     + ' simSuma: u19SimSuma, simTotales: u19SimTotales, simPuntual: u19SimPuntual, simProy: u19SimProy,'
     + ' simListas: SIM_LISTAS, simEscenarios: SIM_ESCENARIOS, simPers: SIM_PERS_INICIAL,'
+    + ' asisCubo: u19AsisCubo,'
     + ' asisResumen: u19AsisResumen, asisLunes: u19AsisLunes, asisFicha: u19AsisFicha, asisMotivos: u19AsisMotivos, asisBarras: u19AsisBarrasSVG };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
@@ -489,6 +490,94 @@ avisos.push('deudas · la cuarta tarjeta: total, fecha, cupo, abonos en CLP y US
   di(/<svg/.test(svg) && (svg.match(/<rect/g) || []).length === 2 && /Lu: 3 vinieron/.test(svg) && /Lu: 1 faltaron/.test(svg),
     'barras · una barra verde y una roja, con su detalle al pasar el dedo');
   di(!/<svg/.test(m.asisBarras([{ lbl: 'Lu', vino: 0, falto: 0 }])), 'barras · sin datos no dibuja un gráfico vacío');
+
+  /* --- 19-sep-2026 · Fase 8: avisar no es faltar ------------------------
+     La hoja del asistente distingue cinco estados desde el 18-sep. Hasta hoy
+     la app solo recibía vino/no vino, así que quien avisaba que no podía
+     venir contaba igual que quien dejaba la hora plantada. Eso mueve el
+     número que Diego mira y señala al socio equivocado en «quién falta más».
+
+     Lo que más se vigila aquí: que los datos VIEJOS —los que solo traen `v`—
+     sigan dando exactamente los mismos números que antes. Un cambio que
+     mejora el futuro y reescribe el pasado no es una mejora. */
+  igual(m.asisCubo({ e: 'aviso' }), 'aviso', 'estados · un aviso es un aviso');
+  igual(m.asisCubo({ e: 'CANCELO' }), 'cancelo', 'estados · da igual cómo venga escrito');
+  igual(m.asisCubo({ e: 'anulado' }), '', 'estados · lo anulado no cae en ninguna casilla');
+  igual(m.asisCubo({ e: 'lo que sea', v: 0 }), '',
+    'estados · un estado que no conocemos NO se cuenta: antes que sumarlo mal, no sumarlo');
+  igual(m.asisCubo({ v: 1 }), 'vino', 'estados · una fila vieja sin estado se deduce de v');
+  igual(m.asisCubo({ v: 0 }), 'falta', 'estados · y un v:0 viejo sigue siendo una falta');
+  igual(m.asisCubo(null), '', 'estados · una fila nula no revienta');
+
+  const HOYB = '2026-09-19';
+  const f = (dia, nombre, cubo, hora) => ({ f: dia, h: hora || '18:00', n: nombre, t: nombre === 'Ana' ? '11111111' : '22222222',
+    v: cubo === 'vino' ? 1 : 0, e: cubo });
+  const BASE = [f('2026-09-15', 'Ana', 'vino'), f('2026-09-16', 'Ana', 'vino'),
+                f('2026-09-17', 'Ana', 'falta'), f('2026-09-18', 'Bruno', 'vino')];
+  const CON_AVISOS = BASE.concat([f('2026-09-18', 'Ana', 'aviso'), f('2026-09-19', 'Bruno', 'cancelo')]);
+
+  const rB = m.asisResumen(BASE, HOYB, 12);
+  const rA = m.asisResumen(CON_AVISOS, HOYB, 12);
+  igual(JSON.stringify([rB.vino30, rB.falto30, rB.pct30]), '[3,1,75]', 'estados · el caso de partida: 3 de 4');
+  igual(JSON.stringify([rA.vino30, rA.falto30, rA.pct30]), '[3,1,75]',
+    'estados · dos avisos más NO mueven el porcentaje: no cuentan ni a favor ni en contra');
+  igual(JSON.stringify([rA.aviso30, rA.cancelo30]), '[1,1]', 'estados · pero se cuentan aparte, uno de cada');
+  igual(rA.dias30, 5, 'estados · un día en que solo hubo un aviso SÍ es un día con lista');
+
+  /* El error que esto viene a deshacer, escrito como prueba: si el aviso se
+     colara como falta, serían 3 de 6 = 50 %, y Ana saldría con 2 faltas. */
+  const COMO_ANTES = m.asisResumen(CON_AVISOS.map(x => ({ f: x.f, h: x.h, n: x.n, t: x.t, v: x.v })), HOYB, 12);
+  igual(COMO_ANTES.pct30, 50, 'estados · sin el estado, los mismos datos dan 50 % (era el error)');
+  di(rA.pct30 !== COMO_ANTES.pct30, 'estados · o sea que la diferencia no es cosmética: son 25 puntos');
+
+  const ana = rA.top.filter(p => p.nombre === 'Ana')[0];
+  igual(JSON.stringify([ana.falto, ana.aviso, ana.vino]), '[1,1,2]',
+    'estados · en «quién falta más», el aviso de Ana va en su columna, no en sus faltas');
+  igual(ana.ultima, '2026-09-17', 'estados · y su última falta es la falta, no el aviso del día siguiente');
+  di(!rA.top.some(p => p.nombre === 'Bruno'),
+    'estados · quien solo canceló no aparece en «quién falta más»: no ha faltado');
+
+  /* Las seis filas caen en la MISMA semana (lunes 2026-09-14): lo que se
+     comprueba es que el aviso va en su propia cuenta y no se mezcla con las
+     otras dos, no que caigan en semanas distintas. */
+  const semA = rA.semanas.filter(s => s.aviso > 0);
+  di(semA.length === 1 && JSON.stringify([semA[0].vino, semA[0].falto, semA[0].aviso]) === '[3,1,2]',
+    'estados · la semana lleva su propio recuento de avisos, aparte de vino y faltó');
+  igual(semA[0].pct, 75, 'estados · y el % de la semana tampoco se mueve por los avisos');
+  const dia18 = rA.horas.filter(x => x.h === '18')[0];
+  igual(JSON.stringify([dia18.vino, dia18.falto, dia18.aviso]), '[3,1,2]', 'estados · y la hora también');
+
+  /* Las barras: tres tramos, y la escala tiene que contar el de en medio o el
+     ámbar se sale del gráfico por arriba. */
+  const svg3 = m.asisBarras([{ lbl: 'Lu', vino: 2, falto: 1, aviso: 3, top: '' }]);
+  igual((svg3.match(/<rect/g) || []).length, 3, 'barras · tres tramos cuando hay avisos');
+  di(/avisaron o cancelaron/.test(svg3), 'barras · y el tramo ámbar se explica al pasar el dedo');
+  const alturas = (svg3.match(/height="([\d.]+)"/g) || []).map(s => Number(s.match(/[\d.]+/)[0]));
+  di(Math.abs(alturas.reduce((a, b) => a + b, 0) - (150 - 16 - 22)) < 0.5,
+    'barras · los tres tramos juntos llenan la barra: la escala cuenta el ámbar');
+  igual((m.asisBarras([{ lbl: 'Lu', vino: 2, falto: 1, top: '' }]).match(/<rect/g) || []).length, 2,
+    'barras · sin avisos siguen siendo dos, como antes');
+
+
+  /* Tres agujeros que encontraron los mutantes, no yo leyendo: */
+
+  /* a) que el clasificador sepa qué es ANULADO no sirve de nada si el resumen
+        no lo saltaba: una hora anulada volvía a las cuentas como falta. */
+  const CON_ANULADO = CON_AVISOS.concat([f('2026-09-19', 'Ana', 'anulado'), { f: '2026-09-19', h: '18:00', n: 'Ana', t: '11111111', v: 0, e: 'inventado' }]);
+  igual(JSON.stringify([m.asisResumen(CON_ANULADO, HOYB, 12).vino30, m.asisResumen(CON_ANULADO, HOYB, 12).falto30]),
+    '[3,1]', 'estados · una hora anulada, y una con un estado desconocido, no entran en ninguna cuenta');
+
+  /* b) con un aviso y una cancelación no se puede ver si están cambiados:
+        salen [1,1] igual. Hacen falta cantidades distintas. */
+  const ASIM = BASE.concat([f('2026-09-18', 'Ana', 'aviso'), f('2026-09-18', 'Bruno', 'aviso'), f('2026-09-19', 'Bruno', 'cancelo')]);
+  igual(JSON.stringify([m.asisResumen(ASIM, HOYB, 12).aviso30, m.asisResumen(ASIM, HOYB, 12).cancelo30]),
+    '[2,1]', 'estados · dos avisos y UNA cancelación: cada uno en su cuenta, sin cambiarse');
+
+  /* c) y que la app se lo pida al asistente. Sin `est=1` el puente manda solo
+        vino/no vino y toda esta pestaña se queda como estaba, sin decir nada. */
+  di(/u19DashUrl\("asistencia"\) \+ "&dias=90&est=1"/.test(src),
+    'estados · la app le avisa al asistente de que sabe contarlos (est=1)');
+  avisos.push('estados · los cinco de la hoja, con el caso que prueba que los datos viejos no cambian de número');
   avisos.push('asistencia · la pestaña: 30 días, semanas, horas, días, quién falta más, ficha de ingreso y motivos, ejecutados con listas inventadas');
 }
 
