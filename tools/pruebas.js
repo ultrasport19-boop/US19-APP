@@ -471,6 +471,12 @@ function extraerFuncion(nombre) {
        vio. Por eso ahora mira el archivo entero. */
     finSim:     { sync: true,  respaldo: true,  borrado: true },
 
+    /* Los dias que el entrenador NO trabajo (19-sep-2026). Misma decision
+       que horasExtra y por el mismo motivo: es un registro de la pestana
+       Horas, no del plantel. Viaja en el respaldo, que es una accion
+       explicita, y un "borrar TODO" se lo lleva. */
+    horasMenos: { sync: false, respaldo: true,  borrado: true },
+
     /* horasExtra NO se sincroniza, a proposito. Un equipo que solo anadio
        horas no mueve las fechas de rutinas ni clientes; meterlo en el payload
        antes de que localTime sea de fiar convertiria la divergencia de hoy en

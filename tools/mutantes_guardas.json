@@ -36,6 +36,16 @@
       "nombre": "vuelve una llamada pegada (.concat se come el parentesis)",
       "de": "out = out.concat(u19Arr(d.collection));",
       "a": "out = out.concatu19Arr(d.collection);"
+    },
+    {
+      "nombre": "los dias no trabajados se caen del respaldo y se pierden al cambiar de equipo",
+      "de": "    horasMenos: u19Arr(state.horasMenos),\n",
+      "a": ""
+    },
+    {
+      "nombre": "un borrar TODO deja puestos los dias no trabajados del mes",
+      "de": "  state.trash = []; state.horasExtra = []; state.horasMenos = [];",
+      "a": "  state.trash = []; state.horasExtra = [];"
     }
   ]
 }

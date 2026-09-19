@@ -227,6 +227,76 @@
       "nombre": "la app deja de avisar que sabe contar los cinco estados",
       "de": "  fetch(u19DashUrl(\"asistencia\") + \"&dias=90&est=1\")",
       "a": "  fetch(u19DashUrl(\"asistencia\") + \"&dias=90\")"
+    },
+    {
+      "nombre": "el descuento no llega a horasTotal: la app dice $0 y Notion paga el turno entero",
+      "de": "    d.horasTotal = d.horasNetas + d.horasExtra;",
+      "a": "    d.horasTotal = d.horas + d.horasExtra;"
+    },
+    {
+      "nombre": "el dia quitado sigue costando",
+      "de": "    d.costo = d.horasNetas * c.valorHora;",
+      "a": "    d.costo = d.horas * c.valorHora;"
+    },
+    {
+      "nombre": "un dia sin entrenador sigue ofreciendo cupos y hunde la ocupacion",
+      "de": "    d.capacidad = d.horasNetas * c.capacidad;",
+      "a": "    d.capacidad = d.horas * c.capacidad;"
+    },
+    {
+      "nombre": "un dia quitado vuelve a contar como turno cerrado",
+      "de": "      d.pasado = true; d.horasHechas = d.horasNetas; d.completo = d.esTurno && d.horasNetas > 0;",
+      "a": "      d.pasado = true; d.horasHechas = d.horasNetas; d.completo = d.esTurno;"
+    },
+    {
+      "nombre": "el devengado de un dia pasado ignora lo quitado",
+      "de": "      d.pasado = true; d.horasHechas = d.horasNetas; d.completo = d.esTurno && d.horasNetas > 0;",
+      "a": "      d.pasado = true; d.horasHechas = d.horas; d.completo = d.esTurno && d.horasNetas > 0;"
+    },
+    {
+      "nombre": "se cae el tope y se pueden quitar mas horas de las que tiene el turno",
+      "de": "    var hm = Math.max(0, Math.min(Number(x.horas) || 0, d.horas - d.horasMenos));",
+      "a": "    var hm = Math.max(0, Number(x.horas) || 0);"
+    },
+    {
+      "nombre": "lo descontado se calcula sobre lo pedido y no sobre lo que de verdad se quito",
+      "de": "    d.costoMenos += hm * c.valorHora;",
+      "a": "    d.costoMenos += (Number(x.horas) || 0) * c.valorHora;"
+    },
+    {
+      "nombre": "los clientes de un dia sin entrenador se esfuman sin decirlo",
+      "de": "    if (d.esTurno && d.horasNetas <= 0) T.clientesSinTurno += d.clientes;",
+      "a": "    if (d.esTurno && d.horasNetas < 0) T.clientesSinTurno += d.clientes;"
+    },
+    {
+      "nombre": "el total de horas del ciclo vuelve a ser el del calendario",
+      "de": "    T.horas += d.horasNetas; T.costo += d.costo; T.clientes += d.clientes;",
+      "a": "    T.horas += d.horas; T.costo += d.costo; T.clientes += d.clientes;"
+    },
+    {
+      "nombre": "el contador de horas quitadas se queda en cero y la pantalla no lo dice",
+      "de": "    T.horasMenos += d.horasMenos; T.costoMenos += d.costoMenos;",
+      "a": "    T.horasMenos += 0; T.costoMenos += d.costoMenos;"
+    },
+    {
+      "nombre": "se cuentan como turnos los dias que nadie trabajo",
+      "de": "  T.turnos = lista.filter(function(d){ return d.esTurno && d.horasNetas > 0; }).length;",
+      "a": "  T.turnos = lista.filter(function(d){ return d.esTurno; }).length;"
+    },
+    {
+      "nombre": "un registro que ya no descuenta nada se traga en silencio",
+      "de": "    if (!hm){ menosIgnorados += 1; return; }",
+      "a": "    if (!hm){ return; }"
+    },
+    {
+      "nombre": "un descuento en un dia sin turno desaparece sin aviso",
+      "de": "    if (!d || !d.esTurno){ menosIgnorados += 1; return; }",
+      "a": "    if (!d || !d.esTurno){ return; }"
+    },
+    {
+      "nombre": "la lista de dias quitados no se lee y todo vuelve a pagarse entero",
+      "de": "  var menos = horasMenosList(ciclo), menosIgnorados = 0;",
+      "a": "  var menos = [], menosIgnorados = 0;"
     }
   ]
 }

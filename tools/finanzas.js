@@ -78,7 +78,15 @@ const codigo = [ENTORNO, fn('u19Arr'), fn('u19FinNum'), fn('u19FinMes'),
   tramo('var SIM_PERS_INICIAL = ', ';\n', 'SIM_PERS_INICIAL') + ';',
   tramo('var SIM_MESES_CORTOS = ', ';\n', 'SIM_MESES_CORTOS') + ';',
   fn('u19SimEnt'), fn('u19SimFilaNorm'), fn('u19SimNorm'), fn('u19SimInicial'),
-  fn('u19SimSuma'), fn('u19SimTotales'), fn('u19SimPuntual'), fn('u19SimProy')].join('\n');
+  fn('u19SimSuma'), fn('u19SimTotales'), fn('u19SimPuntual'), fn('u19SimProy'),
+  /* Horas del entrenador (19-sep-2026). Se traen en dos trozos enteros en vez
+     de funcion a funcion porque varias son de una sola linea: `fn()` corta en
+     el primer «\n}\n» y se llevaria por delante a las de al lado. */
+  'var settings = {};',
+  'state.horasExtra = []; state.horasMenos = [];',
+  tramo('function horasCfg(', '\nfunction horasNav(', 'config y ciclo de horas'),
+  tramo('function horasExtraAll(', '/* ---- Alta / baja de horas extra ---- */', 'listas y computo de horas'),
+].join('\n');
 
 let m;
 try {
@@ -94,7 +102,10 @@ try {
     + ' simSuma: u19SimSuma, simTotales: u19SimTotales, simPuntual: u19SimPuntual, simProy: u19SimProy,'
     + ' simListas: SIM_LISTAS, simEscenarios: SIM_ESCENARIOS, simPers: SIM_PERS_INICIAL,'
     + ' asisCubo: u19AsisCubo,'
-    + ' asisResumen: u19AsisResumen, asisLunes: u19AsisLunes, asisFicha: u19AsisFicha, asisMotivos: u19AsisMotivos, asisBarras: u19AsisBarrasSVG };')();
+    + ' asisResumen: u19AsisResumen, asisLunes: u19AsisLunes, asisFicha: u19AsisFicha, asisMotivos: u19AsisMotivos, asisBarras: u19AsisBarrasSVG,'
+    + ' ponHoras: function(cfg, extra, menos){ for (var k in cfg) settings[k] = cfg[k];'
+    + '   state.horasExtra = extra || []; state.horasMenos = menos || []; },'
+    + ' horasCfg: horasCfg, horasCiclo: horasCiclo, horasISO: horasISO, horasComputar: horasComputar };')();
 } catch (e) {
   console.error('finanzas: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -728,6 +739,139 @@ avisos.push('deudas · la cuarta tarjeta: total, fecha, cupo, abonos en CLP y US
     'sim - PROMESA: los tres escenarios gastan lo mismo; solo cambia lo que entra');
 
   avisos.push('simulador - cuatro listas, tres escenarios, doce meses y las tres promesas de la pantalla, ejecutados con cifras inventadas');
+}
+
+/* --- 7 · HORAS DEL ENTRENADOR: quitar los días que no trabajó ---------
+   19-sep-2026. Diego manda la captura del ciclo: el viernes 18 su entrenador
+   no vino —0 sesiones, 0 clientes, 0 %— y la fila seguía diciendo $19.800.
+   El turno fijo se daba por trabajado pasara lo que pasara.
+
+   Lo que de verdad se paga no es lo que sale en esta pantalla: el bot escribe
+   `d.horasTotal` en «Horas trabajadas» de Notion y de ahí sale la fórmula
+   «Total a pagar». Por eso la prueba que más importa aquí no mira el costo:
+   mira `horasTotal`. Un descuento que no llegue hasta ahí deja la app
+   diciendo $0 y a Notion pagando el turno entero.
+   ------------------------------------------------------------------- */
+{
+  const CFG = { horasDias: '1,2,3,4,5', horasInicio: 16, horasTermino: 22,
+                horasCapacidad: 8, horasValorHora: 3300, horasEntrenador: 'Eric' };
+  const H = 6;                                    /* 16:00 a 22:00 */
+  /* Un ciclo ENTERO en el pasado (16-jul al 15-ago-2026): así todos los días
+     están cerrados y el prorrateo del día en curso no mete ruido. */
+  const CICLO = (m.ponHoras(CFG, [], []), m.horasCiclo(new Date(2026, 6, 20)));
+  igual(m.horasISO(CICLO.ini) + '/' + m.horasISO(CICLO.fin), '2026-07-16/2026-08-15',
+    'horas - el ciclo de pago va del 16 al 15, ambos incluidos');
+
+  const SIN = m.horasComputar([], CICLO);
+  const DIAS = SIN.dias.filter(d => d.esTurno).map(d => d.fecha);
+  const DIA = DIAS[0];                            /* el primer día con turno */
+  di(DIAS.length > 15, 'horas - el ciclo trae los turnos de lunes a viernes');
+  igual(SIN.total.costoTotal, DIAS.length * H * 3300,
+    'horas - sin tocar nada, el ciclo cuesta todos los turnos completos');
+  igual(SIN.total.horasMenos, 0, 'horas - y no hay ninguna hora quitada');
+
+  /* --- quitar un día entero --- */
+  const UNO = [{ id: 'x1', fecha: DIA, horas: H, motivo: 'no asistió' }];
+  m.ponHoras(CFG, [], UNO);
+  const Q = m.horasComputar([], CICLO);
+  const fQ = Q.dias.filter(d => d.fecha === DIA)[0];
+
+  igual(SIN.total.costoTotal - Q.total.costoTotal, H * 3300,
+    'horas - quitar un día baja el ciclo EXACTAMENTE ese turno, ni un peso más');
+  igual(fQ.costoTotal, 0, 'horas - y ese día deja de costar');
+  igual(fQ.horasTotal, 0,
+    'horas - horasTotal a 0: es el numero que el bot escribe en Notion y del que sale «Total a pagar»');
+  igual(fQ.capacidad, 0, 'horas - un día sin entrenador tampoco ofrece cupos');
+  igual(fQ.completo, false, 'horas - y no cuenta como turno cerrado');
+  igual(Q.total.turnos, DIAS.length - 1, 'horas - el ciclo tiene un turno efectivo menos');
+  igual(Q.total.horasMenos, H, 'horas - el total dice cuántas horas se quitaron');
+  igual(Q.total.costoMenos, H * 3300, 'horas - y cuánto dinero es eso');
+  igual(Q.total.horas, (DIAS.length - 1) * H,
+    'horas - las horas del ciclo son las netas, no las del calendario');
+  igual(Q.total.costoDevengado, Q.total.costoTotal,
+    'horas - en un ciclo ya cerrado, lo devengado es exactamente lo que cuesta');
+
+  /* REGRESIÓN · el error del 19-sep. Con los mismos datos y SIN el registro,
+     ese día vuelve a costar el turno entero. Si alguien quita el descuento,
+     esta línea es la que lo dice. */
+  m.ponHoras(CFG, [], []);
+  igual(m.horasComputar([], CICLO).dias.filter(d => d.fecha === DIA)[0].costoTotal, H * 3300,
+    'horas - sin el registro, el mismo día cuesta el turno entero (era el error)');
+
+  /* --- la ocupación no se hunde --- */
+  /* Dos clientes el segundo día; el primero, sin entrenador, con tres. */
+  const EV = [
+    { start_time: DIAS[1] + 'T18:00:00', invitees_counter: { active: 2 } },
+    { start_time: DIA     + 'T18:00:00', invitees_counter: { active: 3 } },
+  ];
+  m.ponHoras(CFG, [], UNO);
+  const OC = m.horasComputar(EV, CICLO);
+  igual(OC.total.capacidadPasada, (DIAS.length - 1) * H * 8,
+    'horas - la capacidad del ciclo pierde la del día que nadie trabajó');
+  igual(OC.total.clientesPasados, 2,
+    'horas - y sus clientes no entran en la ocupación: no hubo turno que ocupar');
+  igual(OC.total.clientesSinTurno, 3,
+    'horas - pero tampoco se esfuman: vinieron, y se dicen aparte');
+  igual(OC.dias.filter(d => d.fecha === DIA)[0].clientes, 3,
+    'horas - la fila del día los sigue enseñando');
+
+  /* --- lo extra se sigue pagando --- */
+  m.ponHoras(CFG, [{ id: 'e1', fecha: DIA, horas: 2, motivo: 'cubrió la mañana' }], UNO);
+  const MIX = m.horasComputar([], CICLO);
+  const fM = MIX.dias.filter(d => d.fecha === DIA)[0];
+  igual(fM.horasTotal, 2, 'horas - el descuento muerde el turno fijo, no las horas extra');
+  igual(fM.costoTotal, 2 * 3300, 'horas - esas dos horas extra se pagan igual');
+
+  /* --- no se puede quitar más de lo que hay --- */
+  m.ponHoras(CFG, [], [{ id: 'x2', fecha: DIA, horas: 10, motivo: 'dedo gordo' }]);
+  const TOPE = m.horasComputar([], CICLO);
+  const fT = TOPE.dias.filter(d => d.fecha === DIA)[0];
+  igual(fT.horasMenos, H, 'horas - pedir 10 h de un turno de 6 quita 6, no 10');
+  igual(fT.costoTotal, 0, 'horas - el costo toca fondo en cero, nunca en negativo');
+  di(TOPE.total.costoTotal > 0, 'horas - y el ciclo entero tampoco se va a negativo');
+  igual(TOPE.total.costoMenos, H * 3300,
+    'horas - lo descontado es el turno que había, no las 10 h que se pidieron');
+
+  /* --- varios registros el mismo día --- */
+  /* 4 + 4 + 4 sobre un turno de 6: el primero muerde 4, el segundo se RECORTA
+     a 2 —no se descarta— y el tercero ya no tiene nada que morder. Solo ese
+     último es «ignorado». La diferencia importa: si el recorte contara como
+     ignorado, el aviso de la pantalla saltaría en un caso que sí descuenta. */
+  m.ponHoras(CFG, [], [{ id: 'a', fecha: DIA, horas: 4, motivo: 'se fue' },
+                       { id: 'b', fecha: DIA, horas: 4, motivo: 'otra vez' },
+                       { id: 'c', fecha: DIA, horas: 4, motivo: 'y otra' }]);
+  const DOS = m.horasComputar([], CICLO);
+  igual(DOS.dias.filter(d => d.fecha === DIA)[0].horasMenos, H,
+    'horas - varios registros que suman más que el turno se topan en el turno');
+  igual(DOS.dias.filter(d => d.fecha === DIA)[0].costoTotal, 0,
+    'horas - y el día cuesta cero, no menos que cero');
+  igual(DOS.total.menosIgnorados, 1,
+    'horas - solo el que ya no descontaba nada se cuenta como ignorado');
+
+  /* --- descuento parcial --- */
+  m.ponHoras(CFG, [], [{ id: 'p', fecha: DIA, horas: 2, motivo: 'se fue antes' }]);
+  const PAR = m.horasComputar([], CICLO);
+  const fP = PAR.dias.filter(d => d.fecha === DIA)[0];
+  igual(fP.horasNetas, 4, 'horas - quitar 2 de 6 deja 4');
+  igual(fP.horasTotal, 4, 'horas - y a Notion le llegan 4');
+  igual(fP.capacidad, 4 * 8, 'horas - la capacidad baja con las horas, no de golpe');
+  igual(fP.completo, true, 'horas - un día a medias sigue siendo un turno cerrado');
+
+  /* --- un día sin turno fijo no tiene nada que quitar --- */
+  let sab = null;
+  for (let d = new Date(CICLO.ini.getTime()); d <= CICLO.fin;
+       d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1)) {
+    if (d.getDay() === 0 || d.getDay() === 6) { sab = m.horasISO(d); break; }
+  }
+  m.ponHoras(CFG, [], [{ id: 's', fecha: sab, horas: H, motivo: 'no había turno' }]);
+  const FDS = m.horasComputar([], CICLO);
+  igual(FDS.total.costoTotal, DIAS.length * H * 3300,
+    'horas - un descuento en sábado no baja el ciclo: no había turno que quitar');
+  igual(FDS.total.menosIgnorados, 1,
+    'horas - y se avisa en vez de quedarse callado, que es como se cuelan los ceros');
+
+  m.ponHoras(CFG, [], []);
+  avisos.push('horas - un ciclo entero de pago con días quitados, parciales, topados y en sábado; incluido horasTotal, que es lo que Notion paga');
 }
 
 /* --- salida --- */
