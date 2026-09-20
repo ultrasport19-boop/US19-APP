@@ -27,19 +27,25 @@ function tramo(inicio, fin, nombre) {
 }
 function fn(nombre) { return tramo('function ' + nombre + '(', '\n}\n', nombre) + '\n}\n'; }
 
-/* El motor entero, de la primera constante a las plantillas. */
-const motor = tramo('var BLZ_VERSION = 1;', '/* ---------- plantillas de actividad ---------- */', 'el motor BlazePod');
+/* El motor entero, de la primera constante al marcador de fin. El editor que
+   habia debajo se borro el 19-sep-2026 al unificar la planilla; lo que queda es
+   puro y sin pantalla, y es lo que hace correr el subcronometro de Pods. */
+/* Las acciones de la interfaz se declaran `window.X = function`, no
+   `function X`: para leerlas hace falta su propio extractor. */
+function win(nombre) { return tramo('window.' + nombre + ' = function', '\n};\n', nombre) + '\n};\n'; }
+
+const motor = tramo('var BLZ_VERSION = 1;', '/* ===BLZ_MOTOR_FIN=== */', 'el motor BlazePod');
 const codigo = [fn('u19Arr'), motor].join('\n');
 
 let m;
 try {
   m = new Function(codigo + '\nreturn { BLZ_COLORES: BLZ_COLORES, BLZ_MODOS: BLZ_MODOS, BLZ_MAX_PODS: BLZ_MAX_PODS, BLZ_AVISO: BLZ_AVISO,'
     + ' blzNum: blzNum, blzEnt: blzEnt, blzTexto: blzTexto, blzRnd: blzRnd, blzSemillaNum: blzSemillaNum, blzTomar: blzTomar,'
-    + ' blzPlanNuevo: blzPlanNuevo, blzPlanDe: blzPlanDe, blzActivo: blzActivo, blzNormalizar: blzNormalizar,'
-    + ' blzColorPorId: blzColorPorId, blzPodPorN: blzPodPorN, blzPodBase: blzPodBase, blzHuerfanos: blzHuerfanos,'
-    + ' blzPosAuto: blzPosAuto, blzColocar: blzColocar, blzElegirPods: blzElegirPods, blzEstimulos: blzEstimulos,'
-    + ' blzSerieDur: blzSerieDur, blzGenerar: blzGenerar, blzDuracion: blzDuracion, blzSimEnT: blzSimEnT, blzSimTotal: blzSimTotal,'
-    + ' blzDistancias: blzDistancias, blzMontaje: blzMontaje, blzMontajeTexto: blzMontajeTexto, blzSeg: blzSeg };')();
+    + ' blzPlanNuevo: blzPlanNuevo, blzNormalizar: blzNormalizar,'
+    + ' blzColorPorId: blzColorPorId, blzPodPorN: blzPodPorN, blzPodBase: blzPodBase,'
+    + ' blzElegirPods: blzElegirPods, blzEstimulos: blzEstimulos,'
+    + ' blzSerieDur: blzSerieDur, blzGenerar: blzGenerar, blzSimEnT: blzSimEnT, blzSimTotal: blzSimTotal,'
+    + ' blzSeg: blzSeg, blzM: blzM };')();
 } catch (e) {
   console.error('blazepod: el motor no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -112,9 +118,9 @@ huerf.secuencia = [
 const lh = m.blzEstimulos(huerf, 1);
 igual('secuencia · el paso que apunta a un Pod inexistente se salta', lh.length, 2);
 di(lh.every(e => e.pods.every(n => nums.indexOf(n) >= 0)), 'secuencia · no se cuela el Pod 9');
-igual('huérfanos · se detecta y se nombra el paso', m.blzHuerfanos(huerf).length, 1);
-igual('huérfanos · dice qué Pod falta', m.blzHuerfanos(huerf)[0].pods[0], 9);
-igual('huérfanos · un plan sano no tiene ninguno', m.blzHuerfanos(demo).length, 0);
+/* El aviso de Pods huerfanos lo pintaba el editor, que ya no existe. Lo que
+   importa de verdad -que un paso que apunta a un Pod inexistente no encienda
+   nada- lo cubren las dos comprobaciones de aqui arriba. */
 
 /* ================= 3. sin repetir el mismo Pod seguido ================= */
 let repes = 0;
@@ -210,7 +216,9 @@ igual('línea · tres series traen tres preparaciones', ev.filter(e => e.tipo ==
 igual('línea · y dos descansos, no tres', ev.filter(e => e.tipo === 'descanso').length, 2);
 igual('línea · treinta estímulos en total', ev.filter(e => e.tipo === 'estimulo').length, 30);
 igual('línea · termina en «fin»', ev[ev.length - 1].tipo, 'fin');
-igual('línea · duración = 3×(5+30) + 2×20', m.blzDuracion(conSeries), 145);
+/* Lo medimos por el final de la linea de sucesos, que es de donde lee el
+   subcronometro, y no por blzDuracion, que era del editor. */
+igual('línea · duración = 3×(5+30) + 2×20', m.blzSimTotal(ev), 145);
 di(ev.every((e, i) => i === 0 || e.t >= ev[i - 1].t), 'línea · los sucesos van en orden de tiempo');
 igual('simulación · en el segundo 0 manda el primer suceso', m.blzSimEnT(ev, 0), 0);
 igual('simulación · pasado el final no hay suceso vivo', m.blzSimEnT(ev, 10000), -1);
@@ -225,11 +233,9 @@ igual('reiniciar · vuelve al primer suceso', m.blzSimEnT(ev, 0), 0);
 di(m.blzSimEnT(m.blzGenerar(planDemo()), 0) === 0, 'reiniciar · también sin preparación');
 
 /* ================= 7. normalizar, validar, no romper lo viejo ================= */
-igual('viejo · un circuito sin blazePlan no tiene plan', m.blzPlanDe({ id: 'c1', estaciones: [] }), null);
-igual('viejo · y no cuenta como activo', m.blzActivo({ id: 'c1', estaciones: [] }), false);
-igual('viejo · un plan apagado tampoco', m.blzActivo({ blazePlan: { activo: false, pods: [{ n: 1 }] } }), false);
-igual('viejo · un plan activo pero sin Pods tampoco', m.blzActivo({ blazePlan: { activo: true, pods: [] } }), false);
-igual('viejo · un plan activo con Pods sí', m.blzActivo({ blazePlan: { activo: true, pods: [{ n: 1, x: 0.5, y: 0.5 }] } }), true);
+/* El plan ya no cuelga del circuito: los Pods viven en c.pods y el vinculo lo
+   lleva estacionId. Quien prueba esa parte es tools/planilla.js, incluida la
+   migracion desde un blazePlan de los de antes. */
 di(m.blzNormalizar(undefined).pods.length === 0, 'normalizar · sin plan devuelve uno vacío y no revienta');
 di(m.blzNormalizar(null).logica.modo === 'random', 'normalizar · null también');
 di(m.blzNormalizar({ pods: 'no soy un array' }).pods.length === 0, 'normalizar · una colección corrupta no se recorre letra a letra');
@@ -255,129 +261,189 @@ const nplan = m.blzNormalizar(planDemo());
 di(!('timer' in nplan) && !('t' in nplan) && !('corriendo' in nplan), 'plan · no guarda estado de reproducción');
 di(JSON.stringify(nplan) === JSON.stringify(m.blzNormalizar(nplan)), 'plan · normalizar dos veces da lo mismo (idempotente)');
 
-/* ================= 8. montaje y distancias ================= */
-const mont = m.blzMontaje(demo);
-di(mont.length > 8, 'montaje · sale la lista completa');
-const claves = mont.map(x => x.k);
-['Pods', 'Distancias', 'Pod base', 'Colocación', 'Colores', 'Modalidad', 'Ritmo', 'Series', 'Duración total', 'Material', 'Seguridad', 'Aviso'].forEach(k => {
-  di(claves.indexOf(k) >= 0, 'montaje · incluye «' + k + '»');
-});
-di(m.blzMontajeTexto(demo).indexOf(m.BLZ_AVISO) >= 0, 'montaje · el texto copiado lleva el aviso de que esto no controla los Pods');
-const d = m.blzDistancias(demo);
-di(d.min > 0 && d.max >= d.min && d.pares === 15, 'distancias · 6 Pods dan 15 pares, con mínimo y máximo');
-igual('distancias · con un solo Pod no hay pares', m.blzDistancias({ pods: [{ n: 1, x: 0.5, y: 0.5 }] }).pares, 0);
+/* ================= 8. como se leen los tiempos y las medidas ================= */
+/* La hoja de montaje y las distancias las armaba el editor, que ya no existe:
+   ahora esa informacion sale del plano unificado y la prueba tools/planilla.js.
+   Lo que sigue aqui son los dos formateadores, que usa la planilla. */
 di(m.blzSeg(90) === '1 min 30 s', 'tiempos · 90 s se leen como 1 min 30 s');
 di(m.blzSeg(45) === '45 s', 'tiempos · 45 s se quedan en segundos');
-/* El montaje no promete resultados médicos. */
-const textoMontaje = m.blzMontajeTexto(demo).toLowerCase();
-di(!/\b(diagn[oó]stic|patolog|lesi[oó]n|tratamiento|terapia|rehabilitaci|d[eé]ficit)/.test(textoMontaje),
-   'montaje · sin vocabulario clínico ni promesas médicas');
+di(m.blzSeg(0) === '0 s', 'tiempos · cero segundos no se lee como vacío');
+di(m.blzM(5) === '5 m', 'medidas · los metros llevan su unidad');
+di(m.blzM(4.5) === '4,5 m', 'medidas · con coma decimal, como se escribe en español');
+/* El aviso de que esto NO habla con los Pods sigue existiendo y sigue diciendo
+   lo mismo: es lo que evita prometer lo que la app no hace. */
+di(typeof m.BLZ_AVISO === 'string' && m.BLZ_AVISO.length > 20, 'aviso · sigue estando');
+di(!/\b(diagn[oó]stic|patolog|lesi[oó]n|tratamiento|terapia|rehabilitaci|d[eé]ficit)/.test(m.BLZ_AVISO.toLowerCase()),
+   'aviso · sin vocabulario clínico ni promesas médicas');
 
-/* ================= 9. lo que solo se ve en el archivo ================= */
-/* Temporizadores: uno solo, y se apaga al salir. */
-dentro('blzSimParar', 'clearInterval(_blzSim.timer)', 'temporizador · blzSimParar hace clearInterval de verdad');
-dentro('blzSimParar', 'removeEventListener("visibilitychange"', 'temporizador · y se quita el oyente de la pestaña');
-dentro('blzSimParar', '_blzSim = null', 'temporizador · y suelta el estado de la simulación');
-dentro('renderCircuitos', 'blzSimParar()', 'temporizador · repintar la vista de circuitos lo apaga');
-const volver = tramo('window.circVolver = function(){', '\n};\n', 'circVolver');
-di(volver.indexOf('blzSimParar();') >= 0, 'temporizador · salir del editor lo apaga');
-di(volver.indexOf('_blzSel = 0;') >= 0, 'temporizador · y suelta el Pod seleccionado');
-dentro('blzSimVisible', 'document.hidden', 'temporizador · esconder la pestaña pausa la simulación');
-const modulo = tramo('var BLZ_VERSION = 1;', '\n/* --- Plantillas --- */', 'el módulo BlazePod entero');
-igual('temporizador · un único setInterval en todo el módulo', modulo.split('setInterval(').length - 1, 1);
-di(modulo.indexOf('setTimeout(') < 0, 'temporizador · ningún setTimeout suelto');
-di(modulo.indexOf('requestAnimationFrame') < 0, 'temporizador · no se pide un frame que nadie cancela');
+/* ================= 9. lo que solo se ve en el archivo =================
+   El editor BlazePod de antes se borro el 19-sep-2026: los Pods viven ahora
+   en la planilla unica y quien los enciende es el subcronometro de la vista
+   en vivo. Las garantias son las mismas de siempre —un solo reloj y que se
+   apague, escapar lo que escribe Diego, que el enlace compartido no edite ni
+   arranque nada— pero se comprueban sobre el codigo que hoy las cumple. */
 
-/* Escapado: todo lo que escribe Diego pasa por escapeHtml. */
-dentro('blzMontajeHtml', "'<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>'", 'escapado · el montaje escapa clave y valor');
-dentro('blzVistaHtml', "html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>'", 'escapado · la vista compartida también');
-dentro('blzLienzoHtml', 'escapeHtml(pod.etiqueta)', 'escapado · la etiqueta del Pod');
-dentro('blzLienzoHtml', 'escapeHtml(a.etiqueta)', 'escapado · la etiqueta de un elemento del lienzo');
-dentro('blzSelHtml', 'escapeAttr(pod.etiqueta)', 'escapado · la etiqueta en el campo de edición');
-dentro('blzPaso2Html', 'escapeAttr(paso.consigna)', 'escapado · la instrucción de cada paso');
-dentro('blzHudHtml', "escapeHtml(e.consigna || \"\")", 'escapado · la consigna que se ve durante la simulación');
-di(fn('blzImprimirHtml').indexOf('escapeHtml(pod.etiqueta.slice(0, 18))') >= 0, 'escapado · la hoja impresa');
-di(fn('blzImprimirHtml').indexOf('escapeHtml(x.v)') >= 0, 'escapado · la tabla de la hoja impresa');
-di(fn('blzEditorHtml').indexOf('innerHTML') < 0, 'escapado · el editor no escribe HTML del usuario a pelo');
+/* --- el subcronometro de Pods: se apaga, y lo apaga quien debe --- */
+dentro('circPodsParar', '_circPods = null', 'subcronometro · pararlo suelta el estado');
+dentro('circPodsParar', 'circLivePodsApagar()', 'subcronometro · y deja los Pods apagados en pantalla');
+dentro('circPodsArrancar', 'circPodsParar();', 'subcronometro · arrancar apaga antes lo anterior: nunca dos a la vez');
+dentro('circLiveAvanzar', 'circPodsParar();', 'subcronometro · al acabar el bloque los Pods se apagan');
+di(win('circLiveSalir').indexOf('circPodsParar();') >= 0, 'subcronometro · y al salir de la vista en vivo, tambien');
+/* El reloj es el del circuito, no uno propio: esa es la razon de que no haya
+   un segundo setInterval que se pueda quedar vivo. */
+dentro('circPodsT', 'p.dur - L.restante', 'subcronometro · el segundo lo lee del reloj global, no lleva el suyo');
+const modPods = tramo('function circPodsPlan(', '/* ---------- en vivo ---------- */', 'el modulo de Pods en vivo');
+igual('subcronometro · ningun setInterval propio', modPods.split('setInterval(').length - 1, 0);
+di(modPods.indexOf('setTimeout(') < 0, 'subcronometro · ningun setTimeout suelto');
+di(modPods.indexOf('requestAnimationFrame') < 0, 'subcronometro · no se pide un frame que nadie cancela');
+/* Los sueltos no los manda el bloque: los enciende el usuario. */
+dentro('circPodsGrupos', 'fase.tipo !== "trabajo"', 'subcronometro · fuera del bloque de trabajo no se enciende nada');
+di(fn('circPodsGrupos').indexOf('circPodsSueltos') < 0, 'subcronometro · y los Pods sueltos nunca entran solos');
 
-/* La vista de quien recibe el enlace no edita nada. */
-dentro('blzVistaHtml', 'lectura: true', 'compartido · el lienzo va en modo lectura');
-di(fn('blzVistaHtml').indexOf('onclick') < 0 && fn('blzVistaHtml').indexOf('oninput') < 0, 'compartido · sin controles que editen');
-dentro('blzLienzoHtml', 'opts.lectura ? \' tabindex="-1" disabled\' : \'\'', 'compartido · en lectura los Pods no se pueden tocar');
-di(fn('showCircuitoView').indexOf('blzVistaHtml(c.blazePlan)') >= 0, 'compartido · la vista del enlace pinta el esquema');
-di(fn('showCircuitoView').indexOf('blzSimPlay') < 0, 'compartido · abrir el enlace NO arranca la simulación sola');
-di(fn('circShareData').indexOf('if (blzActivo(c)) d.circuito.blazePlan = blzNormalizar(c.blazePlan);') >= 0,
-   'compartido · el enlace lleva la planificación');
+/* --- el Pod se enciende con SU color -------------------------------------
+   `colores` va en paralelo a `pods` POR POSICION y guarda el id del color,
+   no su hex. Leerlo por el numero del Pod, o meter el id en la variable CSS,
+   deja el Pod encendido del color de reposo. Las dos cosas pasaron. */
+const vivo = new Function('_circPods', '_live',
+  codigo + '\n' + fn('circPodsT') + '\n' + fn('circPodsEstado')
+  + '\nfunction circLiveFase(){ return _live.plan[_live.i]; }'
+  + '\nreturn circPodsEstado();');
+const planPods = m.blzNormalizar(conLogica({ modo: 'random', duracion: 30, intervalo: 3, semilla: 'pods' }, planDemo()));
+const evPods = m.blzGenerar(planPods);
+const idsPods = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+function encendidos(t) {
+  return vivo({ dur: 30, runners: [{ estacionId: 'e1', ids: idsPods, cfg: {}, plan: planPods, eventos: evPods, toques: 0, ultimo: -2 }], sueltos: null },
+              { c: null, plan: [{ tipo: 'trabajo', dur: 30 }], i: 0, restante: 30 - t });
+}
+const est0 = encendidos(0.5);
+const ev0 = evPods[m.blzSimEnT(evPods, 0.5)];
+di(Object.keys(est0.on).length === ev0.pods.length, 'en vivo · se encienden tantos Pods como dice el estimulo');
+di(Object.keys(est0.on).every(k => /^#[0-9a-fA-F]{3,8}$/.test(est0.on[k])),
+   'en vivo · cada Pod recibe un HEX, no el nombre del color (' + JSON.stringify(est0.on) + ')');
+di(ev0.pods.every((n, k) => est0.on[idsPods[n - 1]] === m.blzColorPorId(planPods, ev0.colores[k]).hex),
+   'en vivo · y es el color que le toca a ESE Pod, leido por posicion');
+/* Dos Pods a la vez con colores distintos: es donde se ve el fallo del indice. */
+const planDos = m.blzNormalizar(conLogica({ modo: 'random', duracion: 30, intervalo: 3, semilla: 'dos', simultaneos: 2, sinRepetir: false }, planDemo()));
+const evDos = m.blzGenerar(planDos);
+const dosOn = vivo({ dur: 30, runners: [{ estacionId: 'e1', ids: idsPods, cfg: {}, plan: planDos, eventos: evDos, toques: 0, ultimo: -2 }], sueltos: null },
+                   { c: null, plan: [{ tipo: 'trabajo', dur: 30 }], i: 0, restante: 29.5 });
+const evD = evDos[m.blzSimEnT(evDos, 0.5)];
+di(evD.pods.length === 2, 'en vivo · con simultaneos 2 se encienden dos');
+di(evD.pods.every((n, k) => dosOn.on[idsPods[n - 1]] === m.blzColorPorId(planDos, evD.colores[k]).hex),
+   'en vivo · cada uno con el suyo, aunque sean distintos');
+/* Fuera del bloque de trabajo no se enciende nada, pase lo que pase. */
+const fuera = vivo({ dur: 30, runners: [{ estacionId: 'e1', ids: idsPods, cfg: {}, plan: planPods, eventos: evPods, toques: 0, ultimo: -2 }], sueltos: null },
+                   { c: null, plan: [{ tipo: 'descanso', dur: 30 }], i: 0, restante: 15 });
+igual('en vivo · en un descanso no hay ningun Pod encendido', Object.keys(fuera.on).length, 0);
+/* Y sin corredores, tampoco: es lo que ve la pantalla antes de empezar. */
+igual('en vivo · sin corredores no hay nada encendido', Object.keys(vivo(null, null).on).length, 0);
+/* Y el corredor de verdad lo monta circPodsArrancar: si no le pasara el plan,
+   no habria paleta que consultar y el Pod se encenderia sin color. */
+dentro('circPodsArrancar', 'plan: q.plan', 'en vivo · el corredor de cada grupo lleva su plan');
+di(win('circPodsSueltosToggle').indexOf('plan: q.plan') >= 0, 'en vivo · y el de los Pods sueltos, tambien');
+/* Los sueltos son la excepcion a la regla de arriba a proposito: no los manda
+   el bloque, los enciende el usuario, y llevan su propio reloj. */
+const sueltosOn = vivo({ dur: 30, runners: [], sueltos: { estacionId: null, ids: idsPods, cfg: {}, plan: planPods, eventos: evPods, toques: 0, ultimo: -2, t0: Date.now() - 500 } },
+                       { c: null, plan: [{ tipo: 'descanso', dur: 30 }], i: 0, restante: 15 });
+di(Object.keys(sueltosOn.on).length > 0, 'en vivo · los Pods sueltos siguen corriendo en el descanso: los manda el usuario');
 
-/* Respaldo, importación y sincronización mueven el circuito ENTERO. */
+/* --- escapado: todo lo que escribe Diego pasa por escapeHtml --- */
+dentro('circPodsHtml', 'escapeHtml(pod.etiqueta)', 'escapado · la etiqueta del Pod en el plano');
+dentro('circPodsHtml', 'escapeAttr(pod.id)', 'escapado · y su identificador, que viaja en un atributo');
+dentro('circPodsHtml', 'escapeAttr(pod.etiqueta)', 'escapado · la etiqueta tambien dentro del aria-label');
+dentro('circElementosHtml', 'escapeHtml(a.etiqueta)', 'escapado · la etiqueta de un elemento del plano');
+dentro('circSelPodHtml', 'escapeAttr(pod.etiqueta || "")', 'escapado · la etiqueta en el campo de edicion');
+dentro('circMapaHtml', 'escapeHtml(circEstacionNombre(s))', 'escapado · el nombre de la estacion');
+dentro('circLivePodsHud', 'escapeHtml(f.consigna)', 'escapado · la consigna que se ve durante el bloque');
+dentro('circLivePodsHud', 'escapeHtml(donde)', 'escapado · y el nombre del grupo que la recibe');
+
+/* --- lo que recibe quien abre el enlace no edita ni arranca nada --- */
+dentro('circPodsHtml', "opts.lectura ? ' tabindex=\"-1\" disabled' : ''", 'compartido · en lectura los Pods no se pueden tocar');
+dentro('circMapaHtml', "opts.lectura ? ' lectura' : ''", 'compartido · el plano se pinta en modo lectura');
+di(fn('circElementosHtml').indexOf('!opts.lectura') >= 0, 'compartido · y en lectura no sale el tirador de las lineas');
+di(fn('showCircuitoView').indexOf('circMapaHtml(c, { lectura: true') >= 0, 'compartido · la vista del enlace pinta el plano en lectura');
+di(fn('showCircuitoView').indexOf('circPodsArrancar') < 0, 'compartido · abrir el enlace NO enciende Pods');
+di(fn('circShareData').indexOf('pods:') >= 0 && fn('circShareData').indexOf('elementos:') >= 0 && fn('circShareData').indexOf('podsConfig:') >= 0,
+   'compartido · el enlace lleva los Pods, los elementos y su configuracion');
+
+/* --- respaldo, importacion y sincronizacion mueven el circuito ENTERO --- */
 igual('respaldo · exportar y subir copian state.circuitos completo', src.split('circuitos: state.circuitos || [],').length - 1, 2);
 igual('respaldo · importar y bajar lo devuelven completo', src.split('if (Array.isArray(data.circuitos)) state.circuitos = data.circuitos;').length - 1, 2);
 di(src.indexOf('state.circuitos = Array.isArray(parsed.circuitos) ? parsed.circuitos : [];') >= 0, 'respaldo · cargar del disco, igual');
-/* Y el viaje de ida y vuelta conserva el plan tal cual. */
-const circuito = { id: 'c9', nombre: 'Prueba', estaciones: [], blazePlan: m.blzNormalizar(planDemo()) };
+/* Y el viaje de ida y vuelta conserva el plano tal cual. */
+const circuito = { id: 'c9', nombre: 'Prueba', estaciones: [{ id: 'e1', nombre: 'Sentadilla', podsConfig: { modo: 'focus' } }],
+                   espacio: { plantilla: 'gym', anchoM: 10, largoM: 4.5 },
+                   pods: [{ id: 'p1', n: 1, x: 0.3, y: 0.4, estacionId: 'e1', color: 'verde' }, { id: 'p2', n: 2, x: 0.6, y: 0.5, estacionId: null }],
+                   elementos: [{ id: 'a1', tipo: 'cono', x: 0.5, y: 0.5 }] };
 const ida = JSON.parse(JSON.stringify({ circuitos: [circuito] }));
-di(!!ida.circuitos[0].blazePlan, 'respaldo · el plan sobrevive al viaje de ida y vuelta');
-igual('respaldo · y llega idéntico', JSON.stringify(ida.circuitos[0].blazePlan), JSON.stringify(circuito.blazePlan));
-igual('respaldo · con todos sus Pods', ida.circuitos[0].blazePlan.pods.length, 6);
+igual('respaldo · el plano llega identico', JSON.stringify(ida.circuitos[0]), JSON.stringify(circuito));
+igual('respaldo · con sus dos Pods', ida.circuitos[0].pods.length, 2);
+di(ida.circuitos[0].estaciones[0].podsConfig.modo === 'focus', 'respaldo · y con la configuracion de luz de la estacion');
 
-/* Movimiento reducido. */
-di(src.indexOf('.blz-pod.pulso{animation:none') >= 0, 'movimiento · con «reducir movimiento» el Pod no late');
-dentro('blzSimPintar', 'sinAnim = blzReducirMovimiento()', 'movimiento · el pintado consulta la preferencia del sistema');
-dentro('blzSimPintar', 'blzColorPorId(S.plan, e.colores[k])', 'simulación · el color sale de la paleta del plan');
-dentro('blzSimPintar', 'enc[e.pods[k]] = c ? c.hex', 'simulación · y el Pod se enciende con ESE color, no con uno fijo');
-dentro('blzSimPintar', 'el.classList.toggle("on", !!hex)', 'simulación · el Pod apagado se queda apagado');
-dentro('blzReducirMovimiento', 'prefers-reduced-motion: reduce', 'movimiento · se lee la media query del sistema');
-di(src.indexOf('onclick="blzSimPaso(-1)"') >= 0 && src.indexOf('onclick="blzSimPaso(1)"') >= 0, 'movimiento · siempre hay avance por pasos, sin animación');
+/* --- movil y accesibilidad --- */
+di(src.indexOf('.cm-pod{position:absolute;width:40px;height:40px') >= 0, 'movil · el Pod mide 40 px en el plano');
+di(src.indexOf('.cm-pod{width:44px;height:44px;}') >= 0, 'movil · y 44 px en pantalla estrecha, que es lo minimo comodo con el dedo');
+di(src.indexOf('touch-action:none') >= 0, 'movil · arrastrar un Pod no arrastra la pagina');
+dentro('circPodsHtml', "aria-label=\"Pod '", 'accesibilidad · cada Pod se anuncia con su numero');
+dentro('circPodsHtml', "', siempre '", 'accesibilidad · y dice en voz alta si lleva color fijo');
+dentro('circSelPodHtml', "onclick=\"circPodMover(", 'accesibilidad · hay flechas ademas del arrastre');
 
-/* Móvil y accesibilidad. */
-di(src.indexOf('.blz-lienzo{position:relative') >= 0 && src.indexOf('touch-action:none') >= 0, 'móvil · el lienzo no arrastra la página al mover un Pod');
-di(src.indexOf('.blz-pod{position:absolute;width:44px;height:44px') >= 0, 'móvil · los Pods miden 44 px, que es lo mínimo cómodo con el dedo');
-dentro('blzSelHtml', 'aria-label="Mover a la izquierda"', 'accesibilidad · hay botones de dirección además del arrastre');
-dentro('blzLienzoHtml', 'aria-label="Pod ', 'accesibilidad · cada Pod se anuncia con su número');
-di(src.indexOf('@media (max-width:640px){\n  .blz-pod{width:40px') >= 0, 'móvil · hay reglas propias para pantalla estrecha');
-di(fn('blzEditorHtml').indexOf('<details class="blz-sec"') >= 0, 'móvil · el editor va por secciones plegables');
-
-/* Seguridad y encaje con la casa. */
-di(modulo.indexOf('eval(') < 0 && modulo.indexOf('new Function') < 0, 'seguridad · ni eval ni Function: la CSP no se toca');
-di(modulo.indexOf('http://') < 0 && modulo.indexOf('https://') < 0, 'seguridad · ningún recurso remoto: los símbolos son HTML y CSS propios');
-di(modulo.indexOf('innerHTML = blzMontajeTexto') < 0, 'seguridad · el texto plano del montaje no se inyecta como HTML');
-igual('encaje · el aviso de que esto no controla los Pods está escrito una sola vez', src.split('var BLZ_AVISO = ').length - 1, 1);
+/* --- seguridad y encaje con la casa --- */
+di(motor.indexOf('eval(') < 0 && motor.indexOf('new Function') < 0, 'seguridad · ni eval ni Function en el motor: la CSP no se toca');
+di(motor.indexOf('http://') < 0 && motor.indexOf('https://') < 0, 'seguridad · ningun recurso remoto');
+igual('encaje · el aviso de que esto no controla los Pods esta escrito una sola vez', src.split('var BLZ_AVISO = ').length - 1, 1);
 di(src.indexOf('Configura esta actividad manualmente en la aplicación oficial de BlazePod') >= 0,
    'encaje · la app dice que la actividad se configura a mano en la app oficial');
-di(modulo.indexOf('Bluetooth') < 0 && modulo.indexOf('bluetooth') < 0, 'encaje · no se menciona ninguna conexión que no existe');
-di(fn('blzEditorHtml').indexOf('blz-aviso') >= 0, 'encaje · el aviso se ve en el editor, activado o no');
+dentro('circLivePodsHud', 'escapeHtml(BLZ_AVISO)', 'encaje · y el aviso se lee durante el bloque, que es cuando importa');
+di(modPods.indexOf('Bluetooth') < 0 && modPods.indexOf('bluetooth') < 0, 'encaje · no se menciona ninguna conexion que no existe');
 
-/* La colisión que costó la tarde del 18-sep: en un <script> clásico
-   `function blzPodBase(plan)` y `window.blzPodBase = function(n, on)` son LA
-   MISMA propiedad de window. La acción de la interfaz pisaba al motor,
-   blzMontaje llamaba a la acción, la acción repintaba, el repintado llamaba a
-   blzMontaje — pila llena. No lo ve validar_bloques (solo cuenta `function X(`)
-   ni una suite que evalúe el motor aislado: hace falta mirar los dos a la vez. */
-const declaradas = {};
-let md;
-const reDecl = /\nfunction (blz[A-Za-z0-9_]*)\(/g;
-while ((md = reDecl.exec(modulo)) !== null) declaradas[md[1]] = (declaradas[md[1]] || 0) + 1;
-const colisiones = [];
-let mw;
-const reWin = /\nwindow\.(blz[A-Za-z0-9_]*) = function/g;
-while ((mw = reWin.exec(modulo)) !== null) if (declaradas[mw[1]]) colisiones.push(mw[1]);
-di(Object.keys(declaradas).length > 30, 'colisiones · se encontraron las funciones del módulo (' + Object.keys(declaradas).length + ')');
-di(colisiones.length === 0, 'colisiones · ninguna acción de window pisa una función del motor (' + colisiones.join(', ') + ')');
-di(Object.keys(declaradas).every(n => declaradas[n] === 1), 'colisiones · ninguna función del módulo está declarada dos veces');
-di(modulo.indexOf('window.blzPodMarcarBase = function') >= 0, 'colisiones · la acción de marcar base lleva nombre propio');
-di(modulo.indexOf('window.blzPodBase = function') < 0, 'colisiones · y ya no pisa al motor');
+/* --- la colision que costo la tarde del 18-sep, ahora sobre el modulo nuevo
+   En un <script> clasico `function circPodBase(c)` y `window.circPodBase =`
+   son LA MISMA propiedad de window: la accion pisa a la funcion y la pila se
+   llena. No lo ve validar_bloques (solo cuenta `function X(`) ni una suite que
+   evalue el motor aislado: hay que mirar los dos a la vez. */
+const modCirc = tramo('/* --- Día de rutina ↔ circuito --- */', '/* --- BlazePod --- */', 'el modulo de circuitos');
+function colisiones(texto, prefijo) {
+  const decl = {};
+  let md; const reDecl = new RegExp('\\nfunction (' + prefijo + '[A-Za-z0-9_]*)\\(', 'g');
+  while ((md = reDecl.exec(texto)) !== null) decl[md[1]] = (decl[md[1]] || 0) + 1;
+  const choca = []; let mw;
+  const reWin = new RegExp('\\nwindow\\.(' + prefijo + '[A-Za-z0-9_]*) = function', 'g');
+  while ((mw = reWin.exec(texto)) !== null) if (decl[mw[1]]) choca.push(mw[1]);
+  return { decl: decl, choca: choca };
+}
+const colBlz = colisiones(motor, 'blz'), colCirc = colisiones(modCirc, 'circ');
+di(Object.keys(colBlz.decl).length > 25, 'colisiones · se encontraron las funciones del motor (' + Object.keys(colBlz.decl).length + ')');
+di(Object.keys(colCirc.decl).length > 40, 'colisiones · y las de circuitos (' + Object.keys(colCirc.decl).length + ')');
+di(colBlz.choca.length === 0, 'colisiones · ninguna accion de window pisa una funcion del motor (' + colBlz.choca.join(', ') + ')');
+di(colCirc.choca.length === 0, 'colisiones · ni una de circuitos (' + colCirc.choca.join(', ') + ')');
+di(Object.keys(colBlz.decl).every(n => colBlz.decl[n] === 1), 'colisiones · ninguna funcion del motor esta declarada dos veces');
+di(Object.keys(colCirc.decl).every(n => colCirc.decl[n] === 1), 'colisiones · ni una de circuitos');
+
+/* --- el editor viejo se fue entero: ni una llamada colgando --- */
+[
+  'blzEditorHtml', 'blzLienzoHtml', 'blzSelHtml', 'blzVistaHtml', 'blzMontajeHtml', 'blzImprimirHtml',
+  'blzPaso1Html', 'blzPaso2Html', 'blzPaso3Html', 'blzCirculoHtml', 'blzPaletaHtml', 'blzSegHtml',
+  'blzContadorHtml', 'blzPodColorHtml', 'blzSimParar', 'blzSimPlay', 'blzSimPintar', 'blzSimPaso',
+  'blzMontaje', 'blzActivo', 'blzPlanDe', 'blzDuracion', 'blzDistancias', 'blzHuerfanos', 'blzPosAuto'
+].forEach(n => {
+  di(src.indexOf(n) < 0, 'retirada · no queda rastro de ' + n);
+});
+di(src.indexOf('CIRC_BLZ_VIEJO') < 0, 'retirada · y la bandera que lo encendia tampoco');
+di(src.indexOf('blazePlan') > 0, 'retirada · pero blazePlan se sigue leyendo: los circuitos guardados migran solos');
+di(fn('circMigrarUno').indexOf('c.blazePlan') >= 0, 'retirada · y quien lo lee es la migracion');
 
 /* Que el circuito de toda la vida no haya cambiado. */
 di(fn('circGrupoEn').indexOf('blz') < 0, 'circuito · el reparto de grupos no sabe nada de BlazePod');
-di(fn('circPlan').indexOf('blz') < 0, 'circuito · el plan del cronómetro tampoco');
-di(fn('circDuracion').indexOf('blz') < 0, 'circuito · ni la duración');
-di(fn('circTrabajoDe').indexOf('blz') < 0, 'circuito · ni el tiempo por estación');
+di(fn('circPlan').indexOf('blz') < 0, 'circuito · el plan del cronometro tampoco');
+di(fn('circDuracion').indexOf('blz') < 0, 'circuito · ni la duracion');
+di(fn('circTrabajoDe').indexOf('blz') < 0, 'circuito · ni el tiempo por estacion');
 di(fn('circNuevo').indexOf('blazePlan') < 0, 'circuito · un circuito nuevo nace sin plan BlazePod, como antes');
 
-/* ================= 10. la v2: la forma de la app oficial ================= */
-/* Diez capturas del teléfono de Diego, 18-sep-2026. Su app es un asistente de
-   tres pasos y el color se toca encima del Pod. Esto vigila que lo que se
-   añadió para parecerse a ella siga funcionando. */
+/* ================= 10. la v2: la forma de la app oficial =================
+   Diez capturas del telefono de Diego, 18-sep-2026. El editor que copiaba sus
+   tres pasos ya no esta, pero el MOTOR que hay debajo es el mismo y sigue
+   siendo el que corre en la vista en vivo: esto lo vigila. */
 
 /* --- retardo de luz («Light Delay Time») --- */
 const sinRet = m.blzEstimulos(planDemo(), 1);
@@ -407,6 +473,9 @@ const lHb = m.blzEstimulos(hb, 1);
 di(lHb.filter((e, i) => i % 2 === 0).every(e => e.colores[0] === 'blanco'), 'home base · la base se enciende SIEMPRE de su color');
 di(lHb.filter((e, i) => i % 2 === 1).every(e => e.colores[0] === 'rojo'), 'home base · las esquinas, del suyo');
 di(lHb.every(e => e.colores.length === e.pods.length), 'home base · un color por Pod encendido');
+/* Y la base sale del Pod marcado en el plano, que es lo unico que se toca hoy. */
+dentro('circPodsPlan', 'base: p.base', 'home base · el Pod marcado como base viaja al motor');
+dentro('circSelPodHtml', 'circPodBase(', 'home base · y se marca desde el panel del Pod');
 
 /* --- los campos nuevos, y que un plan de la v1 siga abriendo --- */
 const v1 = m.blzNormalizar(planDemo());
@@ -427,49 +496,9 @@ di(raro.montaje.estaciones === 1 && raro.fin.por === 'tiempo' && raro.logica.ret
 di(m.blzNormalizar({ logica: { retardo: { tipo: 'aleatorio', min: 5, max: 1 } } }).logica.retardo.max >= 5,
    'v2 · un máximo menor que el mínimo se corrige, no se queda al revés');
 
-/* --- las tres pantallas existen y hacen lo que dicen --- */
-['blzPaso1Html', 'blzPaso2Html', 'blzPaso3Html'].forEach(f => {
-  di(src.indexOf('function ' + f + '(') >= 0, 'pantallas · existe ' + f);
-});
-dentro('blzEditorHtml', 'blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p)', 'pantallas · el editor pinta los tres pasos en orden');
-dentro('blzPaso1Html', 'montaje.podsPorEstacion', 'paso 1 · el contador de Pods es el de la app');
-dentro('blzPaso1Html', 'montaje.estaciones', 'paso 1 · y el de estaciones');
-dentro('blzPaso2Html', 'blzCirculoHtml(destino, paso.color', 'paso 2 · cada paso lleva su círculo de color al lado');
-dentro('blzPaso2Html', "blzCirculoHtml('foco:obj:'", 'paso 2 · en foco, los círculos de los colores objetivo');
-dentro('blzPaso2Html', "blzCirculoHtml('base:base'", 'paso 2 · en home base, el círculo de la base');
-dentro('blzPaso2Html', 'logica.retardo.tipo', 'paso 2 · el retardo de luz se elige aquí');
-dentro('blzPaso3Html', 'fin.por', 'paso 3 · la duración tiene sus tres formas');
-dentro('blzPaso3Html', "'Ciclos', 'veces que se repite entera', 'series'", 'paso 3 · los ciclos se llaman ciclos, como en la app');
-di(fn('blzPaso3Html').indexOf('strikeout') >= 0, 'paso 3 · el strikeout de foco está');
-
-/* --- tocar el color: es lo que pidió Diego --- */
-dentro('blzCirculoHtml', "onclick=\"blzPaleta(", 'color · tocar el círculo abre la paleta');
-dentro('blzPaletaHtml', "onclick=\"blzColorPoner(", 'color · y elegir uno lo aplica');
-dentro('blzPaletaHtml', 'if (_blzPaleta !== destino) return', 'color · la paleta solo sale bajo el círculo que tocaste');
-di(src.indexOf('window.blzColorPoner = function(destino, colorId)') >= 0, 'color · la acción existe');
-di(src.split('if (!blzColorPorId(p, ref.id)) p.colores.push(').length - 1 === 2,
-   'color \u00b7 un color elegido entra en la paleta, en los DOS sitios donde se elige');
-dentro('blzSegHtml', 'onclick="blzElegir(', 'controles · los segmentados escriben con blzElegir');
-di(src.indexOf('window.blzElegir = function(campo, valor)') >= 0, 'controles · y esa acción existe');
-di(src.indexOf('window.blzSeg = function') < 0, 'controles · blzSeg sigue siendo SOLO el formateador de segundos');
-igual('controles · los ocho colores están en la paleta', m.BLZ_COLORES.length, 8);
-
-/* --- escapado y accesibilidad de lo nuevo --- */
-dentro('blzPaso2Html', 'escapeHtml(pod.etiqueta)', 'escapado · la etiqueta del Pod en el selector del paso');
-dentro('blzContadorHtml', 'escapeHtml(titulo)', 'escapado · el título de cada contador');
-dentro('blzSegHtml', 'escapeHtml(o.nombre)', 'escapado · el texto de cada botón del segmentado');
-dentro('blzCirculoHtml', 'aria-label=', 'accesibilidad · el círculo de color se anuncia');
-dentro('blzContadorHtml', 'aria-label="Quitar uno"', 'accesibilidad · los ± tienen nombre');
-dentro('blzSegHtml', 'aria-pressed=', 'accesibilidad · el segmentado dice cuál está elegido');
-di(src.indexOf('.blz-cnt-b{width:40px;height:40px') >= 0, 'móvil · los ± miden 40 px');
-di(src.indexOf('.blz-circ{width:38px;height:38px') >= 0, 'móvil · los círculos de color, 38 px');
-
 /* ================= 11. Foco con varios Pods encendidos =================
    Diego, 18-sep por la noche: «la idea es poder colocar mas distracciones, no
-   que solo 1 pod se prenda; si lo configuro asi que se enciendan 4 pods». El
-   contador de distractores del paso 1 se guardaba y nadie lo leia, y aunque
-   se encendieran varios todos salian del MISMO color, que no es un foco sino
-   cuatro luces iguales. */
+   que solo 1 pod se prenda; si lo configuro asi que se enciendan 4 pods». */
 function planFoco(distractores) {
   const p = conLogica({ modo: 'focus', duracion: 30, intervalo: 3, semilla: 'foco' }, planDemo());
   p.objetivo = ['verde'];
@@ -498,7 +527,6 @@ igual('foco · y sigue siendo repetible con la misma semilla',
 const fTope = m.blzEstimulos(planFoco(20), 1);
 di(fTope.every(e => e.pods.length <= 6), 'foco · nunca se encienden mas Pods de los que hay en el lienzo');
 dentro('blzElegirPods', 'plan.montaje ? plan.montaje.distractores : 0', 'foco · el contador de distractores es el que manda');
-dentro('blzPaso3Html', 'uno objetivo y', 'foco · la pantalla dice cuantos se encienden y desde donde se cambia');
 
 /* ================= 12. Varios colores y color fijo por Pod =================
    Diego: «si quiero escoger mas de un color a la vez, para que sean
@@ -524,15 +552,11 @@ tresDis.forEach(e => e.colores.forEach(c => { vistos[c] = 1; }));
 di(['rojo', 'azul', 'amarillo'].filter(c => vistos[c]).length >= 2,
    'colores · con tres colores de trampa salen varios, no siempre el mismo');
 /* El color fijo de un Pod manda sobre lo que decida el modo. */
-/* El color fijo tiene que estar en la paleta: la interfaz lo mete sola al
-   elegirlo, y si no esta el motor lo ignora en vez de encender en blanco. */
 const fijoCol = m.blzEstimulos(planColores(['verde'], ['rojo', 'azul', 'amarillo'], { 3: 'amarillo' }), 1);
 const conP3 = fijoCol.filter(e => e.pods.indexOf(3) >= 0);
 di(conP3.length > 0, 'colores · el Pod 3 se enciende alguna vez (' + conP3.length + ')');
 di(conP3.every(e => e.colores[e.pods.indexOf(3)] === 'amarillo'),
    'colores · y SIEMPRE con su color fijo, mande lo que mande el modo');
-di(fijoCol.every(e => e.pods.every((n, i) => n === 3 || e.colores[i] !== 'amarillo' || true)),
-   'colores · los demás Pods siguen tomando el color del modo');
 /* Un color fijo que no esta en la paleta se ignora en vez de encender en blanco. */
 const raroCol = planColores(['verde'], ['rojo']);
 raroCol.pods[0].color = 'no-existe';
@@ -546,16 +570,20 @@ di(m.blzNormalizar({ pods: [{ n: 1, color: 'verde' }] }).pods[0].color === 'verd
    'colores · el color del Pod sobrevive a normalizar');
 di(m.blzNormalizar({ pods: [{ n: 1, color: 'inventado' }] }).pods[0].color === '',
    'colores · y uno inventado se limpia');
-dentro('blzPaso2Html', "blzFocoLista(p, 'obj')", 'pantalla · la fila de colores objetivo sale de la lista');
-dentro('blzPaso2Html', "blzFocoAnadir(", 'pantalla · y se pueden añadir más');
-dentro('blzSelHtml', "blzPodColorHtml(p, pod)", 'pantalla \u00b7 el Pod seleccionado ensena sus colores');
-di(src.indexOf('window.blzPodColorQuitar = function(n)') >= 0, 'pantalla · y quitárselo');
-dentro('blzPodColorHtml', "blzColorPoner(\\'pod:", 'pantalla \u00b7 y tocar uno se lo pone, sin abrir nada antes');
+/* Y el color fijo se elige tocando el Pod en el plano, que es lo que pidio:
+   «cuando selecciones el puntero poder escojer el color que se encendera». */
+dentro('circSelPodHtml', 'BLZ_COLORES.map(', 'pod · en el panel salen los OCHO colores, no una muestra');
+dentro('circSelPodHtml', "circPodColor(\\'' + id + '\\',\\'\\')", 'pod · y el «—» lo devuelve a lo que mande el grupo');
+di(src.indexOf('window.circPodColor = function(id, colorId)') >= 0, 'pod · con su accion');
+dentro('circPodsPlan', 'color: p.color', 'pod · el color fijo viaja del plano al motor');
+dentro('circPodsHtml', 'blzColorRef(pod.color)', 'pod · y en el plano se ve su aro de ese color');
 
 /* ================= 13. Lo que decide Diego, no yo =================
-   «Que sea variable, que todo eso sea configurable». Habia dos constantes
-   mias decidiendo cosas del entrenamiento: cada cuanto sale el objetivo y
-   que todos los Pods salieran igual de a menudo. */
+   «Que sea variable, que todo eso sea configurable». El motor sigue leyendo
+   estos dos numeros del plan, y el subcronometro le pasa el peso de cada Pod.
+   OJO: al retirar el editor viejo se quedaron SIN pantalla que los toque —
+   probObjetivo, el peso del Pod, los distractores y el retardo corren hoy con
+   su valor por defecto. Esta escrito en la entrega de la fase 10. */
 
 /* --- cada cuanto sale el objetivo --- */
 function planProb(prob) {
@@ -602,34 +630,22 @@ di(m.blzNormalizar({ pods: [{ n: 1, peso: 0 }] }).pods[0].peso >= 1, 'pesos · y
 igual('pesos · con todos a 1, la serie es la de siempre',
       JSON.stringify(m.blzEstimulos(planPeso({}), 1)),
       JSON.stringify(m.blzEstimulos(conLogica({ modo: 'random', duracion: 600, intervalo: 3, semilla: 'peso', sinRepetir: false }, planDemo()), 1)));
+dentro('circPodsPlan', 'peso: p.peso', 'pesos · el peso del Pod llega al motor desde el plano');
 
-dentro('blzPaso3Html', 'logica.probObjetivo', 'pantalla · la probabilidad se toca en el paso 3');
-dentro('blzSelHtml', 'blzPodPeso(', 'pantalla · y el peso, en el Pod seleccionado');
-di(src.indexOf('window.blzPodPeso = function(n, v)') >= 0, 'pantalla · con su accion');
-dentro('blzMontaje', 'Salen m\u00e1s a menudo', 'montaje · el papel dice que Pods salen mas');
-dentro('blzMontaje', 'siempre ', 'montaje · y cuales llevan color fijo');
-
-/* ================= 14. El color se elige tocando el Pod =================
-   Diego: «cuando selecciones el puntero poder escojer el color que se
-   encendera». El color fijo existia desde el 18-sep pero vivia detras de un
-   «+» dentro de la caja de seleccion y habia que saber que estaba ahi. */
-const cuerpoPodCol = (function () {
-  const i = src.indexOf('function blzPodColorHtml(');
-  const j = src.indexOf('\n}\n', i);
-  return (i >= 0 && j > i) ? src.slice(i, j) : '';
-})();
-di(cuerpoPodCol.length > 0, 'pod \u00b7 la fila de colores del Pod existe');
-di(cuerpoPodCol.indexOf('BLZ_COLORES.map(') >= 0, 'pod \u00b7 salen los OCHO colores, no una muestra');
-di(cuerpoPodCol.indexOf('blzPodColorQuitar(') >= 0, 'pod \u00b7 y «El que toque» lo devuelve a lo que mande el modo');
-di(cuerpoPodCol.indexOf("class=\"blz-sw' + (puesto ? ' on' : '')") >= 0, 'pod \u00b7 el color puesto se ve marcado');
-di(cuerpoPodCol.indexOf('aria-pressed=') >= 0, 'pod \u00b7 y un lector de pantalla sabe cual esta elegido');
-di(cuerpoPodCol.indexOf('escapeHtml(pie)') >= 0, 'pod \u00b7 el pie explica en cristiano que va a pasar');
-di(cuerpoPodCol.indexOf('esFoco') >= 0 && cuerpoPodCol.indexOf('SIEMPRE trampa') >= 0,
-   'pod \u00b7 en Foco avisa de que ese Pod queda fijo de bueno o de trampa');
-di(fn('blzSelHtml').indexOf('blz-circ') < 0,
-   'pod \u00b7 ya no hay ningun bot\u00f3n escondido que haya que descubrir');
-dentro('blzLienzoHtml', 'blzColorPorId(p, pod.color)', 'lienzo \u00b7 el Pod con color fijo lleva su aro de ese color');
-dentro('blzLienzoHtml', "', siempre '", 'lienzo \u00b7 y lo dice en voz alta para quien no ve el color');
+/* ================= 14. la configuracion del grupo =================
+   Hoy la logica de luz vive en `podsConfig` (una por estacion) y en
+   `podsSueltos`. Esto vigila que lo que se guarda llegue entero al motor: es
+   el camino por el que la pantalla que falta tendra que entrar. */
+const cfgIda = ['modo', 'intervalo', 'luz', 'disparo', 'simultaneos', 'semilla', 'sonido', 'tiempoRespuestaMs', 'aleatorio', 'colores'];
+cfgIda.forEach(k => {
+  di(fn('circPodsConfigNueva').indexOf(k) >= 0 || fn('circPodsConfig').indexOf(k) >= 0, 'configuracion · «' + k + '» esta en la del grupo');
+});
+dentro('circPodsPlan', 'plan.logica.modo = cfg.modo', 'configuracion · el modo llega al motor');
+dentro('circPodsPlan', 'plan.logica.intervalo = cfg.intervalo', 'configuracion · el intervalo tambien');
+dentro('circPodsPlan', 'plan.logica.simultaneos = cfg.simultaneos', 'configuracion · y cuantos se encienden a la vez');
+dentro('circPodsPlan', 'plan.logica.semilla = cfg.semilla', 'configuracion · la semilla, que es lo que hace repetible la serie');
+dentro('circPodsPlan', 'plan.logica.preparacion = 0', 'configuracion · el subcronometro no mete preparacion: eso lo lleva el reloj global');
+dentro('circPodsPlan', 'plan.series = 1', 'configuracion · ni series: el bloque es uno');
 
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');

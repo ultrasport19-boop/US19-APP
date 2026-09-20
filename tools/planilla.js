@@ -41,7 +41,7 @@ const codigo = [
   fn('circPodsDe'), fn('circPodsSueltos'), fn('circHuerfanos'), fn('circPodsRenumerar'),
   fn('circPodsConfigNueva'), fn('circPodsConfig'), fn('circPodsConfigDe'), fn('circPodsConfigPoner'),
   fn('circPodsConfigDeLogica'), fn('circMigrarUno'),
-  fn('circPosAuto'), fn('circPos'),
+  fn('circMediaTarjeta'), fn('circMediaTarjetaMedida'), fn('circRadioY'), fn('circPosAuto'), fn('circPos'),
   uno('CIRC_LIM'), fn('circClampXY'), fn('circEstacionCerca'), fn('circMoverEstacion'), fn('circAutoLayout'),
   fn('circMaterial'), fn('circPodsTexto'),
 ].join('\n');
@@ -51,6 +51,7 @@ const exporta = ['circEspacio', 'circEspacioRef', 'circEspacioPorMedida', 'circR
   'circPodPorId', 'circElementoPorId', 'circEstacionPorId', 'circEstacionPorNombre', 'circEstacionIdx',
   'circPodsConfig', 'circPodsConfigNueva', 'circPodsConfigDe', 'circPodsConfigPoner', 'circPodsConfigDeLogica',
   'circClampXY', 'circEstacionCerca', 'circMoverEstacion', 'circAutoLayout', 'circPos', 'circPosAuto',
+  'circMediaTarjeta', 'circRadioY',
   'circMaterial', 'circPodsTexto',
   'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS', 'CIRC_LIM'];
 
@@ -150,7 +151,10 @@ function viejoSinPods(ratio) {
   const c = m.circMigrarUno(viejoConPods());
   es('queda migrado', c.pv, m.CIRC_PV);
   falso('no queda en solo lectura', c._ro);
-  cierto('blazePlan NO se borra', !!c.blazePlan);
+  /* El plan viejo se LEE y despues se borra: el editor que lo usaba ya no
+     existe. La migracion sigue entendiendolo, que es por donde entran los
+     circuitos de un respaldo viejo o de la sincronizacion. */
+  falso('blazePlan se borra una vez traducido', !!c.blazePlan);
   es('los dos Pods llegan', m.circPods(c).length, 2);
   es('los dos elementos llegan', m.circElementos(c).length, 2);
 
@@ -413,8 +417,11 @@ function viejoSinPods(ratio) {
   c.pods.push({ id: 'libre', n: 3, x: 0.20, y: 0.20, estacionId: null, color: '', etiqueta: '', base: false, peso: 1 });
   const elAntes = m.circElementos(c).map(function (x) { return [x.x, x.y]; });
 
+  /* circAutoLayout pasa la proporcion del espacio; la referencia tiene que
+     pasarla tambien o se comparan dos circulos distintos. */
+  const esp = m.circEspacio(c), ratio = esp.anchoM / esp.largoM;
   m.circAutoLayout(c, 'filas');
-  const nuevo3 = m.circPosAuto(2, 6, 'filas');
+  const nuevo3 = m.circPosAuto(2, 6, 'filas', ratio);
   es('la estacion 3 va a su sitio en filas', [c.estaciones[2].x, c.estaciones[2].y], [nuevo3.x, nuevo3.y]);
   casi('su Pod la sigue conservando el desfase en x', pods[0].x - nuevo3.x, 0.06, 1e-9);
   casi('y en y', pods[0].y - nuevo3.y, 0.03, 1e-9);
@@ -423,7 +430,7 @@ function viejoSinPods(ratio) {
 
   /* Y en circulo, lo mismo. */
   m.circAutoLayout(c, 'circulo');
-  const circ3 = m.circPosAuto(2, 6, 'circulo');
+  const circ3 = m.circPosAuto(2, 6, 'circulo', ratio);
   es('en circulo tambien', [c.estaciones[2].x, c.estaciones[2].y], [circ3.x, circ3.y]);
   casi('y el Pod sigue pegado', pods[0].x - circ3.x, 0.06, 1e-9);
 
@@ -467,6 +474,34 @@ function viejoSinPods(ratio) {
   /* Sin base, no se inventa la coletilla. */
   c.pods.forEach(function (p) { p.base = false; });
   falso('sin base no lo dice', /con base/.test(m.circPodsTexto(c, 'e3')));
+}
+
+/* --- 17. el radio del circulo se adapta a la forma del espacio ---------- */
+{
+  /* La tarjeta mide un 14 % del ANCHO. En fraccion del ALTO eso es
+     0,14 x proporcion, asi que cuanto mas apaisado el espacio mas alto ocupa y
+     antes se salia por arriba y por abajo. */
+  const formas = { 'sala 16:9': 16 / 9, 'cancha 20x15': 20 / 15, 'gym 10x4,5': 10 / 4.5, 'cardio 4,5x5': 4.5 / 5 };
+  Object.keys(formas).forEach(function (k) {
+    const r = formas[k], media = m.circMediaTarjeta(r);
+    const arriba = m.circPosAuto(0, 6, 'circulo', r);
+    const abajo = m.circPosAuto(3, 6, 'circulo', r);
+    cierto(k + ': la tarjeta de arriba entra entera', arriba.y - media >= -0.001);
+    cierto(k + ': la de abajo tambien', abajo.y + media <= 1.001);
+  });
+  /* Cuanto mas apaisado, mas pequeno el radio. */
+  cierto('un gym apaisado aprieta mas el circulo que una sala 16:9',
+         m.circRadioY(10 / 4.5) < m.circRadioY(16 / 9));
+  cierto('y una sala casi cuadrada lo deja mas ancho',
+         m.circRadioY(4.5 / 5) > m.circRadioY(16 / 9));
+  /* Con topes: ni una raya ni mas de lo que era. */
+  es('el radio no pasa del 0,36 de siempre', m.circRadioY(0.2), 0.36);
+  cierto('y no se queda en una raya por apaisado que sea', m.circRadioY(50) >= 0.16);
+  es('sin proporcion se asume 16:9', m.circRadioY(), m.circRadioY(16 / 9));
+
+  /* Las filas no dependen del radio, pero tampoco se pueden salir. */
+  const f = m.circPosAuto(0, 8, 'filas', 16 / 9);
+  cierto('en filas la primera tambien entra', f.y - m.circMediaTarjeta(16 / 9) >= -0.06);
 }
 
 /* --- salida -------------------------------------------------------------- */

@@ -14,34 +14,9 @@
       "a": "  var a = 1;"
     },
     {
-      "nombre": "el respaldo tira la planificacion BlazePod",
-      "de": "    circuitos: state.circuitos || [],\n    series: state.series || [],\n    deudas: state.deudas || null,\n    reports:",
-      "a": "    circuitos: (state.circuitos || []).map(function(c){ var o = JSON.parse(JSON.stringify(c)); delete o.blazePlan; return o; }),\n    series: state.series || [],\n    deudas: state.deudas || null,\n    reports:"
-    },
-    {
-      "nombre": "al cerrar la vista el reloj de la simulacion se queda vivo",
-      "de": "  if (_blzSim.timer){ clearInterval(_blzSim.timer); _blzSim.timer = null; }",
-      "a": "  if (_blzSim.timer){ _blzSim.timer = null; }"
-    },
-    {
-      "nombre": "repintar la vista de circuitos ya no apaga la simulacion",
-      "de": "  blzSimParar();   /* al repintar la vista no puede quedar vivo el reloj de la simulacion */",
-      "a": "  /* al repintar la vista no puede quedar vivo el reloj de la simulacion */"
-    },
-    {
       "nombre": "se enciende un Pod que ya se habia borrado",
       "de": "      var nums = u19Arr(paso.pods).filter(function(n){ return blzPodPorN(p, n); });",
       "a": "      var nums = u19Arr(paso.pods);"
-    },
-    {
-      "nombre": "la instruccion del montaje se pinta sin escapar",
-      "de": "\n    html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>';",
-      "a": "\n    html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + x.v + '</dd>';"
-    },
-    {
-      "nombre": "la vista compartida pinta la instruccion sin escapar",
-      "de": "  blzMontaje(p).forEach(function(x){ html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>'; });",
-      "a": "  blzMontaje(p).forEach(function(x){ html += '<dt>' + x.k + '</dt><dd>' + x.v + '</dd>'; });"
     },
     {
       "nombre": "la base deja de alternar con la periferia",
@@ -57,11 +32,6 @@
       "nombre": "el enlace compartido deja tocar los Pods",
       "de": "(opts.lectura ? ' tabindex=\"-1\" disabled' : '')",
       "a": "('')"
-    },
-    {
-      "nombre": "el enlace compartido pierde la planificacion",
-      "de": "  if (blzActivo(c)) d.circuito.blazePlan = blzNormalizar(c.blazePlan);",
-      "a": "  if (false) d.circuito.blazePlan = blzNormalizar(c.blazePlan);"
     },
     {
       "nombre": "en modo foco todo se marca como objetivo",
@@ -94,11 +64,6 @@
       "a": "  p.pods = u19Arr(p.pods).map(function(pod, i){"
     },
     {
-      "nombre": "la simulacion ignora la preferencia de reducir movimiento",
-      "de": "  var enc = {}, sinAnim = blzReducirMovimiento();",
-      "a": "  var enc = {}, sinAnim = false;"
-    },
-    {
       "nombre": "se cuela un descanso despues de la ultima serie",
       "de": "    if (s < series && desc > 0){",
       "a": "    if (desc > 0){"
@@ -107,16 +72,6 @@
       "nombre": "un plan corrupto se recorre letra a letra en vez de quedar vacio",
       "de": "  p.pods = u19Arr(p.pods).slice(0, BLZ_MAX_PODS)",
       "a": "  p.pods = (p.pods || []).slice(0, BLZ_MAX_PODS)"
-    },
-    {
-      "nombre": "la accion de la interfaz vuelve a pisar al motor (colision de nombres)",
-      "de": "window.blzPodMarcarBase = function(n, on){",
-      "a": "window.blzPodBase = function(n, on){"
-    },
-    {
-      "nombre": "la simulacion pierde el color del estimulo",
-      "de": "      enc[e.pods[k]] = c ? c.hex : \"#ffffff\";",
-      "a": "      enc[e.pods[k]] = \"#ffffff\";"
     },
     {
       "nombre": "sale un estimulo de mas en cada serie",
@@ -142,21 +97,6 @@
       "nombre": "en home base el color vuelve a decidirlo el azar",
       "de": "    if (L.modo === \"base\") col.ids = blzColorBase_(p, elegidos, col.ids);",
       "a": "    if (false) col.ids = blzColorBase_(p, elegidos, col.ids);"
-    },
-    {
-      "nombre": "la accion del segmentado vuelve a pisar al formateador de segundos",
-      "de": "window.blzElegir = function(campo, valor){",
-      "a": "window.blzSeg = function(campo, valor){"
-    },
-    {
-      "nombre": "un color elegido no entra en la paleta y el Pod se encenderia en blanco",
-      "de": "     encuentra y el Pod se encendería en blanco. */\n  if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });",
-      "a": "     encuentra y el Pod se encendería en blanco. */\n  if (false) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });"
-    },
-    {
-      "nombre": "el editor deja de pintar el paso 2, donde se tocan los colores",
-      "de": "  html += blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p);",
-      "a": "  html += blzPaso1Html(c, p) + blzPaso3Html(p);"
     },
     {
       "nombre": "el contador de distractores vuelve a no hacer nada",
@@ -185,8 +125,8 @@
     },
     {
       "nombre": "el color del Pod no sobrevive a normalizar",
-      "de": "             color: blzColorRef(pod && pod.color) ? pod.color : \"\",",
-      "a": "             color: \"\","
+      "de": "\n             color: blzColorRef(pod && pod.color) ? pod.color : \"\",",
+      "a": "\n             color: \"\","
     },
     {
       "nombre": "la probabilidad del objetivo vuelve a estar escrita a fuego",
@@ -204,19 +144,89 @@
       "a": "             peso: 1 };"
     },
     {
-      "nombre": "al seleccionar un Pod ya no salen los colores",
-      "de": "    + blzPodColorHtml(p, pod);",
-      "a": "    + \"\";"
+      "nombre": "el corredor pierde su paleta y el Pod se enciende sin color",
+      "de": "ids: q.ids, cfg: q.cfg, plan: q.plan, eventos: blzGenerar(q.plan), toques: 0, ultimo: -2 };",
+      "a": "ids: q.ids, cfg: q.cfg, eventos: blzGenerar(q.plan), toques: 0, ultimo: -2 };"
     },
     {
-      "nombre": "tocar un color no se lo pone al Pod",
-      "de": "          + ' onclick=\"blzColorPoner(\\'pod:' + pod.n + '\\',\\'' + escapeAttr(col.id) + '\\')\"'",
-      "a": "          + ''"
+      "nombre": "el color se lee por el numero del Pod y no por su posicion",
+      "de": "var ref = blzColorPorId(r.plan, u19Arr(activo.colores)[k]);",
+      "a": "var ref = blzColorPorId(r.plan, u19Arr(activo.colores)[n]);"
     },
     {
-      "nombre": "el lienzo deja de ensenar el color fijo del Pod",
-      "de": "    var fijo = pod.color ? blzColorPorId(p, pod.color) : null;",
-      "a": "    var fijo = null;"
+      "nombre": "al Pod se le manda el nombre del color en vez de su hex",
+      "de": "        out.on[id] = ref ? ref.hex : \"\";",
+      "a": "        out.on[id] = ref ? ref.id : \"\";"
+    },
+    {
+      "nombre": "los Pods siguen encendidos en el descanso",
+      "de": "  if (fase && fase.tipo === \"trabajo\") u19Arr(_circPods.runners).forEach(function(r){ mirar(r, t); });",
+      "a": "  u19Arr(_circPods.runners).forEach(function(r){ mirar(r, t); });"
+    },
+    {
+      "nombre": "parar el subcronometro no suelta el estado",
+      "de": "  if (!_circPods) return;\n  _circPods = null;\n  circLivePodsApagar();",
+      "a": "  if (!_circPods) return;\n  circLivePodsApagar();"
+    },
+    {
+      "nombre": "parar el subcronometro deja los Pods encendidos en pantalla",
+      "de": "  _circPods = null;\n  circLivePodsApagar();\n}",
+      "a": "  _circPods = null;\n}"
+    },
+    {
+      "nombre": "arrancar no apaga lo anterior: dos relojes de Pods a la vez",
+      "de": "  var L = _live; if (!L) return;\n  circPodsParar();\n  var p = circLiveFase(), grupos = circPodsGrupos(L.c, p);",
+      "a": "  var L = _live; if (!L) return;\n  var p = circLiveFase(), grupos = circPodsGrupos(L.c, p);"
+    },
+    {
+      "nombre": "al acabar el bloque los Pods se quedan encendidos",
+      "de": "  circPodsParar();\n  L.hecho += p.dur;",
+      "a": "  L.hecho += p.dur;"
+    },
+    {
+      "nombre": "salir de la vista en vivo deja los Pods encendidos",
+      "de": "  clearInterval(L.timer); circWakeOff();\n  circPodsParar();",
+      "a": "  clearInterval(L.timer); circWakeOff();"
+    },
+    {
+      "nombre": "los Pods se encienden tambien fuera del bloque de trabajo",
+      "de": "  if (!c || !fase || fase.tipo !== \"trabajo\") return l;",
+      "a": "  if (!c || !fase) return l;"
+    },
+    {
+      "nombre": "los Pods sueltos los manda el bloque y no el usuario",
+      "de": "    u19Arr(c.estaciones).forEach(function(st){ if (circPodsDe(c, st.id).length) l.push(st.id); });",
+      "a": "    u19Arr(c.estaciones).forEach(function(st){ if (circPodsDe(c, st.id).length) l.push(st.id); });\n    if (circPodsSueltos(c).length) l.push(null);"
+    },
+    {
+      "nombre": "el subcronometro se come segundos del bloque con su preparacion",
+      "de": "  plan.logica.preparacion = 0;",
+      "a": "  plan.logica.preparacion = 5;"
+    },
+    {
+      "nombre": "la configuracion del grupo pierde cuantos Pods se encienden a la vez",
+      "de": "  plan.logica.simultaneos = cfg.simultaneos;",
+      "a": "  plan.logica.simultaneos = 1;"
+    },
+    {
+      "nombre": "la etiqueta del Pod se pinta en el plano sin escapar",
+      "de": "+ escapeHtml(pod.etiqueta) + '</span>' : '');",
+      "a": "+ pod.etiqueta + '</span>' : '');"
+    },
+    {
+      "nombre": "el Pod deja de decir en voz alta que lleva color fijo",
+      "de": "        + (fijo ? ', siempre ' + escapeAttr(String(fijo.nombre || fijo.id).toLowerCase()) : '')",
+      "a": "        + ''"
+    },
+    {
+      "nombre": "el enlace compartido pierde la configuracion de luz de cada estacion",
+      "de": "      podsConfig: u19Arr(c.estaciones).map(function(st){",
+      "a": "      podsConfigNo: u19Arr(c.estaciones).map(function(st){"
+    },
+    {
+      "nombre": "en pantalla estrecha el Pod encoge por debajo del dedo",
+      "de": "  .cm-pod{width:44px;height:44px;}",
+      "a": "  .cm-pod{width:30px;height:30px;}"
     }
   ]
 }

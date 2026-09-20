@@ -17519,19 +17519,21 @@ window.pizarraCircuitoObj = function(c){
   Object.keys(cuentaEl).sort().forEach(function(k){
     extra.push({ nombre: k + (cuentaEl[k] > 1 ? " ×" + cuentaEl[k] : ""), gif: "", detalle: "", nota: "" });
   });
-  if (extra.length) secciones.push({ nombre: "Montaje", items: extra });
-  /* La pizarra ensena medios en movimiento: del plan BlazePod muestra lo que
-     se dice en voz alta, una consigna por color, mas la cabecera del montaje. */
-  if (blzActivo(c)){
-    var bp = blzNormalizar(c.blazePlan);
-    var bitems = u19Arr(bp.colores).map(function(col){
-      var ref = blzColorRef(col.id);
-      return { nombre: (ref ? ref.nombre : col.id) + " · " + (col.consigna || "sin consigna"), gif: "",
-               detalle: (u19Arr(bp.objetivo).indexOf(col.id) >= 0 && bp.logica.modo === "focus") ? "Color objetivo" : "", nota: "" };
-    });
-    bitems.unshift({ nombre: blzResumenCorto(c.blazePlan), gif: "", detalle: (blzModo(bp.logica.modo) || BLZ_MODOS[0]).ayuda, nota: bp.notas || "" });
-    secciones.push({ nombre: "BlazePod", items: bitems });
+  /* Las consignas de color del grupo que tenga Pods: es lo que se dice en voz
+     alta, y por eso va en la pizarra. Sale de podsConfig, no del plan viejo. */
+  var grupos = u19Arr(c.estaciones).filter(function(st){ return circPodsDe(c, st.id).length; }).map(function(st){ return st.id; });
+  if (circPodsSueltos(c).length) grupos.push(null);
+  var cols = [];
+  grupos.forEach(function(id){
+    circPodsConfigDe(c, id).colores.forEach(function(cid){ if (cols.indexOf(cid) < 0) cols.push(cid); });
+  });
+  if (cols.length){
+    secciones.push({ nombre: "Consignas de color", items: cols.map(function(cid){
+      var ref = blzColorRef(cid);
+      return { nombre: (ref ? ref.nombre : cid) + " · " + ((ref && ref.consigna) || "sin consigna"), gif: "", detalle: "", nota: "" };
+    }) });
   }
+  if (extra.length) secciones.push({ nombre: "Montaje", items: extra });
   pizarraAbrir({ titulo: c.nombre || "Circuito", subtitulo: c.grupo || "", secciones: secciones });
 };
 window.pizarraCircuito = function(id){ pizarraCircuitoObj(circGet(id)); };
@@ -17924,12 +17926,12 @@ function circGrupoEn(c, s, t){
    Las dos lineas y las dos flechas (`flecha`, `pase`) llevan ademas x2,y2: una
    rotacion sola no puede decir ADONDE va un pase, hacen falta dos puntos.
 
-   `c.blazePlan` NO se borra. La migracion lee de el y escribe en los campos
-   nuevos, y el editor de antes sigue accesible detras de CIRC_BLZ_VIEJO hasta
-   que Diego valide esta planilla. Un circuito que no se pueda migrar se marca
-   `_ro` y se abre en solo lectura avisando en pantalla, en vez de descartarse. */
+   `c.blazePlan` es de la version de antes. La migracion SIGUE leyendolo -por ahi
+   entran los circuitos de un respaldo viejo o de la sincronizacion- y despues lo
+   borra del circuito, porque el editor que lo usaba ya no existe. Un circuito
+   que no se pueda migrar se marca `_ro` y se abre en solo lectura avisando en
+   pantalla, en vez de descartarse. */
 var CIRC_PV = 2;              /* version de la planilla: pv < 2 es de antes */
-var CIRC_BLZ_VIEJO = false;   /* true reabre el editor BlazePod de antes */
 var CIRC_MAX_PODS = 12;       /* el mismo tope que BLZ_MAX_PODS */
 var CIRC_MAX_ELEM = 40;
 var CIRC_RADIO_POD = 0.085;   /* fraccion del ancho: cerca de una estacion */
@@ -18105,8 +18107,8 @@ function circPodsConfigDeLogica(bp){
 
 /* ---------- migracion: de los dos lienzos a uno ---------- */
 /* Lee `blazePlan` y escribe `espacio`, `pods` y `elementos`. NO borra
-   `blazePlan`: mientras CIRC_BLZ_VIEJO exista, el editor de antes tiene que
-   seguir abriendo lo mismo que abria. Es idempotente y solo rellena lo que
+   `blazePlan`: es lo que deja volver atras si algo saliera mal, y lo que hace
+   que un respaldo viejo siga abriendo. Es idempotente y solo rellena lo que
    falta, asi que un circuito que ya venia con Pods nuevos no se pisa. */
 function circMigrarUno(c){
   if (!c || typeof c !== "object") return c;
@@ -18154,6 +18156,10 @@ function circMigrarUno(c){
     if (c.disposicion !== "filas" && c.disposicion !== "libre") c.disposicion = "circulo";
     circHuerfanos(c);
     circPodsRenumerar(c);
+    /* Ya esta traducido a pods/elementos/espacio: el plan viejo se va. Se borra
+       al final y solo si todo lo anterior salio bien, para que un fallo a mitad
+       no deje el circuito sin el original. */
+    if (c.blazePlan) delete c.blazePlan;
     c.pv = CIRC_PV;
     if (c._ro) delete c._ro;
   } catch(err){
@@ -18178,25 +18184,59 @@ function circRatio(c){
   var e = circEspacio(c);
   return e.anchoM / e.largoM;
 }
-function circPosAuto(i, N, forma){
+/* Cuanto ocupa media tarjeta de estacion, en fraccion del ALTO del plano. La
+   tarjeta mide un 14 % del ANCHO (.cm-est), su imagen es cuadrada y debajo van
+   el nombre y la nota. Por eso en un espacio apaisado ocupa mas alto: con el
+   16:9 de siempre las de arriba y abajo ya se recortaban, y con Gym US19
+   (2,22) se salen del plano. */
+function circMediaTarjeta(ratio){
+  return 0.14 * (ratio || 16 / 9) * 0.5 + 0.085;
+}
+/* Lo de arriba es un modelo, y se queda corto cuando manda el min-width de
+   .cm-est: en un plano estrecho el 14 % del ancho son menos de 84 px, asi que
+   la tarjeta es mas ancha -y mas alta- de lo que el modelo supone. Si hay algo
+   pintado, se mide. Si no lo hay -el banco de pruebas, o antes del primer
+   pintado- vale el modelo. */
+function circMediaTarjetaMedida(ratio){
+  try {
+    var mapa = document.querySelector("#circ-mapa-box .circ-mapa");
+    var card = mapa && mapa.querySelector(".cm-est");
+    if (mapa && card){
+      var h = mapa.getBoundingClientRect().height, ch = card.getBoundingClientRect().height;
+      if (h > 20 && ch > 0) return Math.min(0.34, (ch / 2) / h);
+    }
+  } catch(e){}
+  return circMediaTarjeta(ratio);
+}
+/* El radio vertical del circulo, para que la tarjeta entre entera. Con tope
+   arriba —no tiene sentido pasar del 0,36 de siempre— y suelo abajo, porque en
+   un espacio muy apaisado el circulo no puede quedar en una raya. */
+function circRadioY(ratio, media){
+  var mt = (typeof media === "number") ? media : circMediaTarjeta(ratio);
+  return Math.max(0.16, Math.min(0.36, 0.5 - mt - 0.01));
+}
+function circPosAuto(i, N, forma, ratio, media){
   if (forma === "filas"){
     var cols = Math.min(N, 4), filas = Math.ceil(N / cols), col = i % cols, fila = Math.floor(i / cols);
     return { x: (col + 0.5) / cols * 0.84 + 0.08, y: filas === 1 ? 0.5 : (fila + 0.5) / filas * 0.76 + 0.12 };
   }
   var a = -Math.PI / 2 + 2 * Math.PI * i / Math.max(1, N);
-  return { x: 0.5 + 0.40 * Math.cos(a), y: 0.5 + 0.36 * Math.sin(a) };
+  return { x: 0.5 + 0.40 * Math.cos(a), y: 0.5 + circRadioY(ratio, media) * Math.sin(a) };
 }
 function circPos(c, i){
   var s = c.estaciones[i];
   if (s && typeof s.x === "number" && typeof s.y === "number") return { x: s.x, y: s.y };
-  return circPosAuto(i, c.estaciones.length, "circulo");
+  var e = circEspacio(c);
+  return circPosAuto(i, c.estaciones.length, "circulo", e.anchoM / e.largoM);
 }
 /* Reordenar mueve las estaciones y arrastra con ellas los Pods que tienen
    atados, manteniendo el desfase relativo de cada uno. Los Pods sueltos y los
    elementos del espacio NO se mueven: un cono esta donde esta. */
 function circAutoLayout(c, forma){
+  var esp = circEspacio(c), ratio = esp.anchoM / esp.largoM;
+  var media = circMediaTarjetaMedida(ratio);
   u19Arr(c.estaciones).forEach(function(s, i){
-    var antes = circPos(c, i), p = circPosAuto(i, u19Arr(c.estaciones).length, forma);
+    var antes = circPos(c, i), p = circPosAuto(i, u19Arr(c.estaciones).length, forma, ratio, media);
     var dx = p.x - antes.x, dy = p.y - antes.y;
     s.x = p.x; s.y = p.y;
     circPodsDe(c, s.id).forEach(function(pod){
@@ -18207,7 +18247,8 @@ function circAutoLayout(c, forma){
 }
 function circColocarNueva(c){
   var i = c.estaciones.length - 1; if (i < 0) return;
-  var p = circPosAuto(i, c.estaciones.length, "circulo");
+  var e = circEspacio(c), r = e.anchoM / e.largoM;
+  var p = circPosAuto(i, c.estaciones.length, "circulo", r, circMediaTarjetaMedida(r));
   c.estaciones[i].x = p.x; c.estaciones[i].y = p.y;
 }
 function circNorm(s){
@@ -18309,6 +18350,9 @@ function circPodsHtml(c, opts){
       + ' style="' + estilo + '"'
       + ' aria-label="Pod ' + pod.n + (pod.base ? ', base' : '')
         + (i >= 0 ? ', de la estación ' + (i + 1) : ', suelto')
+        /* El color fijo se dice en voz alta: quien no distingue el aro tiene
+           que poder saber que ese Pod va siempre de ese color. */
+        + (fijo ? ', siempre ' + escapeAttr(String(fijo.nombre || fijo.id).toLowerCase()) : '')
         + (pod.etiqueta ? ', ' + escapeAttr(pod.etiqueta) : '') + '">'
       + '<span class="cm-pod-n">' + pod.n + '</span>'
       + (pod.base ? '<span class="cm-pod-b">base</span>' : '')
@@ -18470,6 +18514,9 @@ function circMapaMontar(box){
       arr.pieza.style.left = (p.x * 100).toFixed(2) + "%";
       arr.pieza.style.top = (p.y * 100).toFixed(2) + "%";
     } else if (arr.i >= 0){
+      /* Lo ha colocado el profesor: a partir de aqui manda el, y cambiar de
+         espacio ya no le recoloca las estaciones. */
+      c.disposicion = "libre";
       circMoverEstacion(c, arr.i, fx, fy);
       var st = c.estaciones[arr.i];
       arr.pieza.style.left = (st.x * 100).toFixed(2) + "%";
@@ -18648,6 +18695,13 @@ window.circEspacioCambiar = function(id){
                         cuadricula: ant.cuadricula, medidas: ref.medidas };
   circPintarTools();
   circPintarMapa();
+  /* Cambiar de espacio cambia la FORMA del plano, y el circulo que cabia en el
+     anterior puede no caber en este. Si la disposicion era automatica, se
+     rehace; si el profesor habia colocado a mano («libre»), no se le toca. */
+  if (_circEdit.disposicion === "circulo" || _circEdit.disposicion === "filas"){
+    circAutoLayout(_circEdit, _circEdit.disposicion);
+    circPintarMapa();
+  }
 };
 window.circEspacioMedida = function(campo, valor){
   if (!_circEdit) return;
@@ -18942,9 +18996,6 @@ function circShareData(c){
         if (g && g.indexOf("data:") !== 0) o.gif = g;
         return o;
       }) } };
-  /* La planificacion BlazePod viaja en modo lectura: quien abre el enlace ve
-     el esquema y el montaje, pero no edita ni arranca nada solo. */
-  if (blzActivo(c)) d.circuito.blazePlan = blzNormalizar(c.blazePlan);
   return d;
 }
 window.openCircShareModal = function(id){
@@ -19048,9 +19099,6 @@ function showCircuitoView(data){
           + circPodsDe(c, null).length + " sueltos") + '</div>'
       + '<div class="text-xs text-muted" style="margin-top:.3rem;line-height:1.5;">' + escapeHtml(BLZ_AVISO) + '.</div></div></div>';
   }
-  /* El plan de antes solo se ensena si esta encendida la bandera: la planilla
-     nueva ya muestra lo mismo, y dos veces confunde. */
-  if (CIRC_BLZ_VIEJO && c.blazePlan) html += blzVistaHtml(c.blazePlan);
   html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">📍 Estaciones · ' + circNum(c.trabajo, 40) + ' s de trabajo · ' + circNum(c.cambio, 15) + ' s de cambio</div>';
   c.estaciones.forEach(function(s, i){
     var g = circGifDe(s);
@@ -19087,7 +19135,8 @@ function circCardHtml(c){
         + '<span>⏱ ' + circFmt(dur) + '</span>'
         + '<span class="badge teal">' + (c.modo === "secuencia" ? "Secuencia" : "Rotación por grupos") + '</span>'
         + (circSesiones(c).length ? '<span class="badge muted">📒 ' + circSesiones(c).length + ' clase' + (circSesiones(c).length === 1 ? '' : 's') + '</span>' : '')
-        + (blzActivo(c) ? '<span class="badge teal">🔵 ' + escapeHtml(blzResumenCorto(c.blazePlan)) + '</span>' : '')
+        + (circPods(c).length ? '<span class="badge teal">🔵 ' + circPods(c).length + ' Pod' + (circPods(c).length === 1 ? '' : 's') + '</span>' : '')
+        + (circElementos(c).length ? '<span class="badge muted">🔺 ' + circElementos(c).length + '</span>' : '')
       + '</div>'
     + '</div>'
     + '<div class="card-actions">'
@@ -19105,7 +19154,6 @@ function circCardHtml(c){
 function renderCircuitos(){
   var v = document.getElementById("view-circuitos");
   if (!v) return;
-  blzSimParar();   /* al repintar la vista no puede quedar vivo el reloj de la simulacion */
   if (_circEdit){ v.innerHTML = circEditorHtml(); circEditorMontar(); return; }
   var l = circLista().slice().sort(function(a, b){ return (b.updatedAt || 0) - (a.updatedAt || 0); });
   var html = '<div class="section-head"><h1 class="section-title">CIRCUITOS <span class="accent">/ CLASES</span></h1>'
@@ -19256,8 +19304,7 @@ function circHayCambios(){
 }
 window.circVolver = function(){
   if (circHayCambios() && !window.confirm("Tienes cambios sin guardar en este circuito.\n\n¿Salir sin guardar?")) return;
-  blzSimParar();
-  _circEdit = null; _blzSel = 0; _blzSelAd = ""; renderCircuitos();
+  _circEdit = null; _circSelPod = ""; _circSelEl = ""; renderCircuitos();
 };
 function circEditorHtml(){
   var c = _circEdit;
@@ -19319,11 +19366,6 @@ function circEditorHtml(){
     + '<div id="circ-resumen" class="circ-resumen"></div>'
     + '<div id="circ-rot" class="circ-rot"></div>'
     + '</div></div>';
-  /* El editor BlazePod de antes sigue entero y accesible, pero apagado: la
-     planilla nueva es la que manda. Se enciende poniendo CIRC_BLZ_VIEJO en
-     true, y ahi se ve lo mismo que veia antes, porque c.blazePlan no se ha
-     tocado. No se borra nada en este cambio. */
-  if (CIRC_BLZ_VIEJO) html += '<div id="blz-box">' + blzEditorHtml(c) + '</div>';
   html += circSesionesHtml(c);
   return html;
 }
@@ -19334,7 +19376,6 @@ function circEditorMontar(){
   circMapaMontar(document.getElementById("circ-mapa-box"));
   circPintarEstaciones();
   circBuscar("");
-  if (CIRC_BLZ_VIEJO) blzEditorMontar();
 }
 function circCampo(ev){
   var el = ev.target, k = el.getAttribute("data-k");
@@ -19437,7 +19478,8 @@ window.circDuplicarEst = function(i){
   var s = JSON.parse(JSON.stringify(_circEdit.estaciones[i])); s.id = genId(); delete s.x; delete s.y;
   _circEdit.estaciones.splice(i + 1, 0, s);
   circColocarNueva(_circEdit);
-  var p = circPosAuto(i + 1, _circEdit.estaciones.length, "circulo"); s.x = p.x; s.y = p.y;
+  var esp = circEspacio(_circEdit), r2 = esp.anchoM / esp.largoM;
+  var p = circPosAuto(i + 1, _circEdit.estaciones.length, "circulo", r2, circMediaTarjetaMedida(r2)); s.x = p.x; s.y = p.y;
   circPintarEstaciones();
 };
 /* Foto para una estación libre: se reduce a 360 px y se guarda como imagen pequeña
@@ -19557,7 +19599,6 @@ window.circImprimirObj = function(c){
     }
     doc += '</tbody></table><p style="color:#444;font-size:11px">Cada fila es un turno de ' + circNum(c.trabajo, 40) + ' s; al pitido, cada grupo pasa a la estación siguiente.</p>';
   }
-  if (c.blazePlan) doc += blzImprimirHtml(c.blazePlan);
   doc += '<div class="firma"><div>Profesor/a</div><div>Observaciones de la sesión</div></div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
   var w = window.open("", "_blank");
@@ -19639,7 +19680,7 @@ function circPodsArrancar(){
   if (!grupos.length) return;
   _circPods = { dur: p.dur, runners: grupos.map(function(id){
       var q = circPodsPlan(L.c, id, p.dur);
-      return { estacionId: id, ids: q.ids, cfg: q.cfg, eventos: blzGenerar(q.plan), toques: 0, ultimo: -2 };
+      return { estacionId: id, ids: q.ids, cfg: q.cfg, plan: q.plan, eventos: blzGenerar(q.plan), toques: 0, ultimo: -2 };
     }), sueltos: null };
 }
 /* Los Pods sueltos: su propio origen, porque no los manda el bloque sino el
@@ -19651,7 +19692,7 @@ window.circPodsSueltosToggle = function(){
   var c = L.c;
   if (!circPodsSueltos(c).length) return;
   var q = circPodsPlan(c, null, 3600);
-  _circPods.sueltos = { estacionId: null, ids: q.ids, cfg: q.cfg, eventos: blzGenerar(q.plan),
+  _circPods.sueltos = { estacionId: null, ids: q.ids, cfg: q.cfg, plan: q.plan, eventos: blzGenerar(q.plan),
                         toques: 0, ultimo: -2, t0: Date.now() };
   circLivePodsPintar();
 };
@@ -19677,9 +19718,15 @@ function circPodsEstado(){
     var ev = (i >= 0) ? r.eventos[i] : null;
     var activo = (ev && ev.tipo === "estimulo" && tt >= ev.t && tt < ev.t + ev.dur) ? ev : null;
     if (activo){
-      u19Arr(activo.pods).forEach(function(n){
+      /* `colores` va en paralelo a `pods` POR POSICION: colores[k] es el color
+         de pods[k], no el del Pod numero k. Y lo que guarda es el id del color
+         ("verde"), no su hex: --cm-pod-on necesita el hex o el navegador se
+         come la regla y el Pod se enciende del color de reposo. */
+      u19Arr(activo.pods).forEach(function(n, k){
         var id = r.ids[n - 1];
-        if (id) out.on[id] = (activo.colores && activo.colores[n]) || "";
+        if (!id) return;
+        var ref = blzColorPorId(r.plan, u19Arr(activo.colores)[k]);
+        out.on[id] = ref ? ref.hex : "";
       });
     }
     out.hud.push({ estacionId: r.estacionId, cfg: r.cfg, toques: r.toques,
@@ -19688,8 +19735,11 @@ function circPodsEstado(){
     r.ultimo = activo ? activo.paso : -1;
   };
   /* Pausado o no, se pinta: si el global esta en pausa, t no se mueve y lo que
-     se ve es el estado congelado, que es justo lo que se quiere. */
-  u19Arr(_circPods.runners).forEach(function(r){ mirar(r, t); });
+     se ve es el estado congelado, que es justo lo que se quiere. Fuera del
+     bloque de trabajo no se enciende nada: circPodsT devuelve 0 ahi, y un 0
+     sin esta guarda pinta el primer estimulo como si acabara de empezar. */
+  var fase = circLiveFase();
+  if (fase && fase.tipo === "trabajo") u19Arr(_circPods.runners).forEach(function(r){ mirar(r, t); });
   if (_circPods.sueltos) mirar(_circPods.sueltos, (Date.now() - _circPods.sueltos.t0) / 1000);
   return out;
 }
@@ -20093,12 +20143,12 @@ function circDashHTML(){
    en este repositorio, así que la app no puede encenderlos ni leer los toques,
    y lo dice en pantalla en vez de insinuar lo contrario.
 
-   El plan vive colgado del circuito, en `c.blazePlan`, y por eso viaja solo en
-   los seis caminos de state.circuitos (carga, semilla, respaldo, sincronización
-   y borrado): son los circuitos enteros los que se copian, no campo a campo.
-   Un circuito antiguo sin blazePlan carga igual: todo lo que lee pasa por
-   blzNormalizar, que rellena lo que falte sobre una copia y nunca tira un
-   campo que no conozca.
+   Aqui abajo queda SOLO el motor. La pantalla que lo editaba se retiro el
+   19-sep-2026 al unificar la planilla: los Pods son piezas del plano
+   (`c.pods`) y su logica de luz vive por grupo, en `s.podsConfig` y en
+   `c.podsSueltos`. Quien arma un plan para el motor es circPodsPlan, y quien
+   lo hace correr es el subcronometro de la vista en vivo. `c.blazePlan` ya no
+   lo escribe nadie: circMigrarUno lo lee para traer los circuitos de antes.
 
    El motor (blzEstimulos / blzGenerar) es puro: misma semilla, misma serie.
    Eso es lo que permite repetir en cancha la actividad que se vio en pantalla,
@@ -20189,7 +20239,6 @@ var BLZ_FIN_SEC = [
   { id: "una_vez",       nombre: "Una vez",       ayuda: "La secuencia se recorre entera una sola vez." },
   { id: "repeticiones",  nombre: "Repeticiones",  ayuda: "La secuencia se repite el número de veces que digas." }
 ];
-function blzApaga(id){ for (var i = 0; i < BLZ_APAGA.length; i++) if (BLZ_APAGA[i].id === id) return BLZ_APAGA[i]; return null; }
 function blzRetardoRef(id){ for (var i = 0; i < BLZ_RETARDOS.length; i++) if (BLZ_RETARDOS[i].id === id) return BLZ_RETARDOS[i]; return null; }
 function blzFinRef(id, esSec){
   var l = esSec ? BLZ_FIN_SEC : BLZ_FIN;
@@ -20217,15 +20266,6 @@ function blzColorBase_(p, pods, ids){
   var cid = esBase ? p.homebase.base : p.homebase.esquinas;
   if (!blzColorPorId(p, cid)) return ids;
   return l.map(function(){ return cid; });
-}
-/* Qué opción de «se apaga con» hay que iluminar. Un plan de la v1 guarda
-   «intervalo» o «manual», que en la app no existen: se traducen al vuelo en
-   vez de dejar los tres botones apagados y al usuario sin saber qué pasa. */
-function blzApagaActual(p){
-  var d = p && p.logica ? p.logica.disparo : "";
-  if (d === "intervalo") return "tiempo";
-  if (d === "manual") return "toque";
-  return d;
 }
 
 /* ---------- utilidades puras ---------- */
@@ -20309,14 +20349,6 @@ function blzPlanNuevo(){
     colores: BLZ_COLORES.slice(0, 6).map(function(c){ return { id: c.id, hex: c.hex, consigna: c.consigna }; }),
     objetivo: ["verde"], secuencia: [], series: 1, descanso: 30, notas: ""
   };
-}
-function blzPlanDe(c){
-  if (!c) return null;
-  return (c.blazePlan && typeof c.blazePlan === "object") ? c.blazePlan : null;
-}
-function blzActivo(c){
-  var p = blzPlanDe(c);
-  return !!(p && p.activo && u19Arr(p.pods).length);
 }
 /* Rellena lo que falte SOBRE UNA COPIA y no toca lo que no conoce: un plan
    guardado por una versión más nueva no pierde campos al pasar por aquí. */
@@ -20428,37 +20460,7 @@ function blzPodBase(plan){
   for (var i = 0; i < l.length; i++) if (l[i].base) return l[i].n;
   return null;
 }
-/* Pasos de la línea temporal que apuntan a un Pod que ya no existe. Quitar un
-   Pod no borra pasos a escondidas: se avisa y Diego decide. */
-function blzHuerfanos(plan){
-  var out = [];
-  u19Arr(plan && plan.secuencia).forEach(function(paso, i){
-    var faltan = u19Arr(paso.pods).filter(function(n){ return !blzPodPorN(plan, n); });
-    if (faltan.length) out.push({ paso: i + 1, pods: faltan });
-  });
-  return out;
-}
 
-/* ---------- colocación automática ---------- */
-function blzPosAuto(i, N, forma){
-  var a;
-  if (forma === "linea") return { x: N === 1 ? 0.5 : 0.08 + 0.84 * i / (N - 1), y: 0.5 };
-  if (forma === "abanico"){
-    a = -Math.PI + Math.PI * (N === 1 ? 0.5 : i / (N - 1));
-    return { x: 0.5 + 0.40 * Math.cos(a), y: 0.86 + 0.62 * Math.sin(a) };
-  }
-  if (forma === "circulo"){
-    a = -Math.PI / 2 + 2 * Math.PI * i / Math.max(1, N);
-    return { x: 0.5 + 0.38 * Math.cos(a), y: 0.5 + 0.36 * Math.sin(a) };
-  }
-  a = Math.PI + Math.PI * (N === 1 ? 0.5 : i / (N - 1));
-  return { x: 0.5 + 0.40 * Math.cos(a), y: 0.78 + 0.56 * Math.sin(a) };
-}
-function blzColocar(plan, forma){
-  var N = u19Arr(plan.pods).length;
-  plan.pods.forEach(function(p, i){ var q = blzPosAuto(i, N, forma); p.x = q.x; p.y = q.y; });
-  return plan;
-}
 
 /* ---------- el motor ---------- */
 /* Qué Pods se encienden en el estímulo i. prev son los del estímulo anterior
@@ -20621,10 +20623,6 @@ function blzGenerar(plan){
   out.push({ tipo: "fin", t: t, dur: 0, serie: series, paso: 0, pods: [], colores: [], consigna: "", objetivo: true });
   return out;
 }
-function blzDuracion(plan){
-  var g = blzGenerar(plan);
-  return g.length ? g[g.length - 1].t : 0;
-}
 /* Índice del suceso vivo en el segundo t. -1 cuando ya terminó. */
 function blzSimEnT(eventos, t){
   var l = u19Arr(eventos);
@@ -20640,30 +20638,6 @@ function blzSimTotal(eventos){
   return l.length ? l[l.length - 1].t : 0;
 }
 
-/* ---------- distancias y montaje ---------- */
-function blzDistancia(plan, a, b){
-  var p = blzNormalizar(plan), W = p.superficie.anchoM, H = p.superficie.altoM;
-  var dx = (a.x - b.x) * W, dy = (a.y - b.y) * H;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-/* Separación mínima, máxima y media entre Pods: lo que hace falta para pisar
-   la cancha con la cinta métrica. */
-function blzDistancias(plan){
-  var p = blzNormalizar(plan), pods = u19Arr(p.pods), out = { min: 0, max: 0, media: 0, pares: 0 };
-  if (pods.length < 2) return out;
-  var suma = 0, min = Infinity, max = 0, n = 0;
-  for (var i = 0; i < pods.length; i++){
-    for (var j = i + 1; j < pods.length; j++){
-      var d = blzDistancia(p, pods[i], pods[j]);
-      suma += d; n++;
-      if (d < min) min = d;
-      if (d > max) max = d;
-    }
-  }
-  out.min = Math.round(min * 10) / 10; out.max = Math.round(max * 10) / 10;
-  out.media = Math.round((suma / n) * 10) / 10; out.pares = n;
-  return out;
-}
 function blzM(x){ return (Math.round(x * 10) / 10).toString().replace(".", ",") + " m"; }
 function blzSeg(x){
   var s = Math.round(blzNum(x, 0, 0, 999999));
@@ -20671,1258 +20645,20 @@ function blzSeg(x){
   var m = Math.floor(s / 60), r = s % 60;
   return m + " min" + (r ? " " + r + " s" : "");
 }
-/* «Cómo montarlo en cancha»: pares etiqueta/valor, texto plano. Quien lo
-   pinta escapa; quien lo copia al portapapeles lo usa tal cual. */
-function blzMontaje(plan){
-  var p = blzNormalizar(plan), pods = u19Arr(p.pods), out = [];
-  var modo = blzModo(p.logica.modo) || BLZ_MODOS[0];
-  var sup = blzSuperficie(p.superficie.tipo) || BLZ_SUPERFICIES[0];
-  var d = blzDistancias(p), base = blzPodBase(p);
-  var est = blzEstimulos(p, 1);
-  out.push({ k: "Pods", v: pods.length + (pods.length === 1 ? " Pod" : " Pods") + " sobre " + sup.nombre.toLowerCase() + " de " + blzM(p.superficie.anchoM) + " × " + blzM(p.superficie.altoM) });
-  if (pods.length > 1) out.push({ k: "Distancias", v: "entre " + blzM(d.min) + " y " + blzM(d.max) + " entre Pods (media " + blzM(d.media) + ")" });
-  out.push({ k: "Pod base", v: base == null ? "sin base: todos son periféricos" : ("P" + base + " es la base; se vuelve a él entre estímulos") });
-  var pesados = pods.filter(function(x){ return blzPeso(x.peso) > 1; });
-  if (pesados.length) out.push({ k: "Salen más a menudo", v: pesados.map(function(x){ return "P" + x.n + " ×" + blzPeso(x.peso); }).join(" · ") });
-  var fijos = pods.filter(function(x){ return x.color && blzColorPorId(p, x.color); });
-  if (fijos.length) out.push({ k: "Color fijo", v: fijos.map(function(x){
-    var r = blzColorRef(x.color);
-    return "P" + x.n + " siempre " + String((r ? r.nombre : x.color)).toLowerCase();
-  }).join(" · ") });
-  if (p.logica.modo === "focus") out.push({ k: "Objetivo", v: "sale el " + p.logica.probObjetivo + " % de las veces; el resto son solo trampas y no se toca nada" });
-  out.push({ k: "Colocación", v: pods.map(function(x){
-    return "P" + x.n + (x.etiqueta ? " (" + x.etiqueta + ")" : "") + " a " + blzM(x.x * p.superficie.anchoM) + " del lateral izquierdo y " + blzM(x.y * p.superficie.altoM) + " del fondo";
-  }).join(" · ") || "sin Pods" });
-  out.push({ k: "Colores", v: u19Arr(p.colores).map(function(c){
-    var ref = blzColorRef(c.id);
-    return (ref ? ref.nombre : c.id) + ": " + (c.consigna || "sin consigna") + (u19Arr(p.objetivo).indexOf(c.id) >= 0 && p.logica.modo === "focus" ? " [objetivo]" : "");
-  }).join(" · ") });
-  out.push({ k: "Modalidad", v: modo.nombre + " — " + modo.ayuda });
-  out.push({ k: "Ritmo", v: "estímulo cada " + blzSeg(p.logica.intervalo) + ", luz " + blzSeg(p.logica.luz) + ", " + (blzDisparo(p.logica.disparo) || BLZ_DISPAROS[0]).nombre.toLowerCase()
-    + (p.logica.simultaneos > 1 ? ", " + p.logica.simultaneos + " Pods a la vez" : "") + (p.logica.sinRepetir ? ", sin repetir el mismo Pod seguido" : "") });
-  out.push({ k: "Series", v: p.series + (p.series === 1 ? " serie de " : " series de ") + blzSeg(blzSerieDur(p, est)) + (p.series > 1 ? " con " + blzSeg(p.descanso) + " de descanso" : "")
-    + (p.logica.preparacion ? " · " + blzSeg(p.logica.preparacion) + " de preparación" : "") });
-  out.push({ k: "Duración total", v: blzSeg(blzDuracion(p)) });
-  if (p.logica.modo === "secuencia" || p.logica.modo === "libre"){
-    out.push({ k: "Secuencia", v: est.map(function(e){
-      var ref = blzColorPorId(p, e.colores[0]), rn = ref ? (blzColorRef(ref.id) || {}).nombre : "";
-      return "P" + e.pods.join("+P") + " " + String(rn || "").toLowerCase() + " " + blzSeg(e.dur) + (e.consigna ? " (" + e.consigna + ")" : "");
-    }).join(" → ") || "sin pasos" });
-  } else {
-    out.push({ k: "Activación", v: est.length + " estímulos por serie, semilla «" + p.logica.semilla + "» (misma semilla, misma serie)"
-      + (p.logica.retardo.tipo !== "ninguno" ? " · retardo de luz " + (blzRetardoRef(p.logica.retardo.tipo) || {}).nombre.toLowerCase() : "") });
-  }
-  var ad = {};
-  u19Arr(p.adornos).forEach(function(a){ var r = blzAdorno(a.tipo); if (r) ad[r.nombre] = (ad[r.nombre] || 0) + 1; });
-  var mat = Object.keys(ad).map(function(k){ return k + (ad[k] > 1 ? " ×" + ad[k] : ""); }).join(", ");
-  out.push({ k: "Material", v: (pods.length + " Pods") + (mat ? ", " + mat : "") });
-  out.push({ k: "Acción del deportista", v: u19Arr(p.colores).map(function(c){ return c.consigna; }).filter(Boolean).join(" · ") || "definir la consigna de cada color" });
-  out.push({ k: "Seguridad", v: "Revisa que el suelo esté libre y seco, deja al menos " + blzM(Math.max(1.5, d.min / 2 || 1.5)) + " de frenado alrededor de cada Pod y ajusta el ritmo a la persona que tienes delante." });
-  if (p.notas) out.push({ k: "Notas", v: p.notas });
-  out.push({ k: "Aviso", v: BLZ_AVISO });
-  return out;
-}
-function blzMontajeTexto(plan){
-  return blzMontaje(plan).map(function(x){ return x.k + ": " + x.v; }).join("\n");
-}
 
-/* ---------- plantillas de actividad ---------- */
-/* Puntos de partida editables. No tocan un circuito existente: crean o pisan
-   SOLO el blazePlan del circuito abierto, y siempre preguntando. */
-var BLZ_PLANTILLAS = [
-  { id: "f-reaccion", g: "Fútbol", nombre: "Reacción y cambio de dirección", pods: 4, forma: "abanico", sup: "media",
-    logica: { modo: "random", duracion: 30, intervalo: 3, simultaneos: 1, sinRepetir: true },
-    cols: ["rojo", "verde"], notas: "Parte en el centro. Al color, sal, toca y vuelve al centro." },
-  { id: "f-escaneo", g: "Fútbol", nombre: "Escaneo antes de recibir", pods: 4, forma: "circulo", sup: "media",
-    logica: { modo: "focus", duracion: 40, intervalo: 4, simultaneos: 1, sinRepetir: true },
-    cols: ["verde", "rojo", "azul"], objetivo: ["verde"], notas: "Mira antes de recibir: solo sales al color objetivo." },
-  { id: "f-conduccion", g: "Fútbol", nombre: "Conducción aleatoria", pods: 6, forma: "circulo", sup: "cancha",
-    logica: { modo: "random", duracion: 60, intervalo: 5, simultaneos: 1, sinRepetir: true },
-    cols: ["verde"], adornos: ["balon", "inicio"], notas: "Conduce el balón hasta el Pod encendido y vuelve." },
-  { id: "f-pase", g: "Fútbol", nombre: "Pase según color", pods: 4, forma: "linea", sup: "media",
-    logica: { modo: "todos", duracion: 40, intervalo: 4, simultaneos: 2 },
-    cols: ["azul", "amarillo"], adornos: ["balon"], notas: "Azul: pase al pie. Amarillo: pase al espacio." },
-  { id: "f-slalom", g: "Fútbol", nombre: "Slalom y remate", pods: 5, forma: "linea", sup: "cancha",
-    logica: { modo: "secuencia", intervalo: 3, simultaneos: 1 },
-    cols: ["verde", "amarillo"], adornos: ["cono", "cono", "arco", "balon"], sec: true, notas: "Slalom entre conos; al llegar al último Pod, remate." },
-  { id: "f-base", g: "Fútbol", nombre: "Base y periferia", pods: 5, forma: "abanico", sup: "media",
-    logica: { modo: "base", duracion: 40, intervalo: 2.5, simultaneos: 1, sinRepetir: true }, base: 1,
-    cols: ["blanco", "rojo"], notas: "Vuelve siempre a la base antes del siguiente estímulo." },
-  { id: "f-duelo", g: "Fútbol", nombre: "Competencia entre dos jugadores", pods: 6, forma: "circulo", sup: "media",
-    logica: { modo: "random", duracion: 45, intervalo: 2, simultaneos: 2, sinRepetir: true },
-    cols: ["verde", "azul"], notas: "Un jugador por color. Gana quien llegue antes a su Pod." },
-  { id: "k-alcance", g: "Control motor y reacción", nombre: "Alcance multidireccional", pods: 5, forma: "abanico", sup: "kine",
-    logica: { modo: "random", duracion: 40, intervalo: 4, simultaneos: 1, sinRepetir: true },
-    cols: ["azul"], adornos: ["inicio"], notas: "De pie en el centro, alcanza sin mover los pies del punto de inicio." },
-  { id: "k-peso", g: "Control motor y reacción", nombre: "Transferencia de peso", pods: 2, forma: "linea", sup: "kine",
-    logica: { modo: "random", duracion: 40, intervalo: 3, simultaneos: 1, sinRepetir: true },
-    cols: ["verde", "azul"], notas: "Pasa el peso de un lado al otro sin despegar los pies." },
-  { id: "k-marcha", g: "Control motor y reacción", nombre: "Marcha y reacción", pods: 4, forma: "linea", sup: "gimnasio",
-    logica: { modo: "random", duracion: 60, intervalo: 5, simultaneos: 1, sinRepetir: true },
-    cols: ["verde", "rojo"], notas: "Camina en línea; al color, para o cambia de dirección." },
-  { id: "k-unipodal", g: "Control motor y reacción", nombre: "Apoyo unipodal con estímulo", pods: 3, forma: "abanico", sup: "kine",
-    logica: { modo: "base", duracion: 30, intervalo: 4, simultaneos: 1 }, base: 1,
-    cols: ["blanco", "azul"], notas: "Sobre una pierna. Toca con la mano libre y vuelve a la base." },
-  { id: "k-brazo", g: "Control motor y reacción", nombre: "Reacción con el brazo", pods: 4, forma: "abanico", sup: "kine",
-    logica: { modo: "random", duracion: 30, intervalo: 2, simultaneos: 1, sinRepetir: true },
-    cols: ["azul", "amarillo"], notas: "Sentado o de pie, solo brazo. Sin compensar con el tronco." },
-  { id: "k-decision", g: "Control motor y reacción", nombre: "Toma de decisiones con baja carga", pods: 4, forma: "circulo", sup: "kine",
-    logica: { modo: "focus", duracion: 45, intervalo: 4, simultaneos: 1, sinRepetir: true },
-    cols: ["verde", "rojo", "azul"], objetivo: ["verde"], notas: "Ritmo cómodo. Solo se responde al color objetivo." }
-];
-function blzPlantilla(id){
-  for (var i = 0; i < BLZ_PLANTILLAS.length; i++) if (BLZ_PLANTILLAS[i].id === id) return BLZ_PLANTILLAS[i];
-  return null;
-}
-function blzDesdePlantilla(t){
-  var p = blzPlanNuevo(), i;
-  var sup = blzSuperficie(t.sup) || BLZ_SUPERFICIES[0];
-  p.superficie = { tipo: sup.id, anchoM: sup.ancho, altoM: sup.alto, rejilla: true };
-  p.contexto = (t.g === "Fútbol") ? "futbol" : "kine";
-  p.pods = [];
-  for (i = 0; i < t.pods; i++) p.pods.push({ id: "p" + (i + 1), n: i + 1, x: 0.5, y: 0.5, etiqueta: "", base: t.base === (i + 1) });
-  blzColocar(p, t.forma);
-  p.adornos = u19Arr(t.adornos).map(function(tipo, k){
-    var q = blzPosAuto(k, Math.max(1, u19Arr(t.adornos).length), "linea");
-    return { id: "a" + (k + 1), tipo: tipo, x: q.x, y: 0.12 + 0.06 * k, etiqueta: "" };
-  });
-  p.colores = u19Arr(t.cols).map(function(id){
-    var ref = blzColorRef(id) || BLZ_COLORES[0];
-    return { id: ref.id, hex: ref.hex, consigna: ref.consigna };
-  });
-  if (!p.colores.length) p.colores = blzPlanNuevo().colores;
-  p.objetivo = u19Arr(t.objetivo).slice();
-  for (var k2 in t.logica) if (Object.prototype.hasOwnProperty.call(t.logica, k2)) p.logica[k2] = t.logica[k2];
-  p.logica.luz = p.logica.intervalo;
-  p.logica.semilla = t.id;
-  p.notas = t.notas || "";
-  if (t.sec){
-    p.secuencia = [];
-    for (i = 0; i < t.pods; i++){
-      p.secuencia.push({ id: "s" + (i + 1), pods: [i + 1], color: p.colores[i === t.pods - 1 && p.colores[1] ? 1 : 0].id,
-                         dur: p.logica.intervalo, condicion: "toque", consigna: (i === t.pods - 1) ? "Remate" : "Paso " + (i + 1) });
-    }
-  }
-  p.activo = true;
-  return blzNormalizar(p);
-}
+/* ===BLZ_MOTOR_FIN=== */
+/* Hasta aqui el motor de Pods: puro, sin pantalla y sin temporizadores. Lo que
+   habia debajo —el editor, su lienzo, la simulacion con reloj propio y las
+   vistas de solo lectura— se fue el 19-sep-2026 al unificar la planilla. Quien
+   dibuja y quien cronometra ahora es el codigo de circuitos: circMapaHtml para
+   el plano y circPodsArrancar para el subcronometro, que no tiene reloj propio
+   sino que cuelga del global.
 
-/* ---------- el lienzo ---------- */
-/* Símbolos con HTML, CSS y SVG propios: ni una imagen remota, ni un recurso
-   de terceros. Las marcas de la cancha son cuatro líneas, no un escudo. */
-function blzSuperficieSvg(p, H){
-  var t = p.superficie.tipo, s = '';
-  var W = 1000;
-  if (t === "cancha" || t === "media"){
-    s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-    if (t === "cancha"){
-      s += '<line x1="' + (W / 2) + '" y1="8" x2="' + (W / 2) + '" y2="' + (H - 8) + '" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-      s += '<circle cx="' + (W / 2) + '" cy="' + (H / 2) + '" r="' + (H * 0.17).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-      s += '<rect x="8" y="' + (H * 0.28).toFixed(0) + '" width="' + (W * 0.11).toFixed(0) + '" height="' + (H * 0.44).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-      s += '<rect x="' + (W - 8 - W * 0.11).toFixed(0) + '" y="' + (H * 0.28).toFixed(0) + '" width="' + (W * 0.11).toFixed(0) + '" height="' + (H * 0.44).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-    } else {
-      s += '<rect x="8" y="' + (H * 0.24).toFixed(0) + '" width="' + (W * 0.14).toFixed(0) + '" height="' + (H * 0.52).toFixed(0) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".5"/>';
-      s += '<path d="M8 ' + (H / 2) + ' A ' + (H * 0.3).toFixed(0) + ' ' + (H * 0.3).toFixed(0) + ' 0 0 1 8 ' + (H / 2) + '" fill="none" stroke="currentColor" stroke-width="3" opacity=".3"/>';
-    }
-  } else if (t === "gimnasio"){
-    s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" rx="18" fill="none" stroke="currentColor" stroke-width="3" opacity=".4"/>';
-  } else if (t === "kine"){
-    s += '<rect x="8" y="8" width="' + (W - 16) + '" height="' + (H - 16) + '" rx="18" fill="none" stroke="currentColor" stroke-width="3" opacity=".4" stroke-dasharray="14 10"/>';
-  }
-  return s;
-}
-function blzAdornosSvg(p, H){
-  var s = '<defs><marker id="blz-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>';
-  u19Arr(p.adornos).forEach(function(a){
-    if (a.tipo !== "flecha" && a.tipo !== "pase") return;
-    s += '<line x1="' + (a.x * 1000).toFixed(1) + '" y1="' + (a.y * H).toFixed(1) + '" x2="' + (blzNum(a.x2, a.x, 0, 1) * 1000).toFixed(1) + '" y2="' + (blzNum(a.y2, a.y, 0, 1) * H).toFixed(1)
-      + '" stroke="currentColor" stroke-width="4"' + (a.tipo === "pase" ? ' stroke-dasharray="12 9"' : '') + ' marker-end="url(#blz-arr)" opacity=".8"/>';
-  });
-  return s;
-}
-function blzLienzoHtml(plan, opts){
-  opts = opts || {};
-  var p = blzNormalizar(plan);
-  var W = p.superficie.anchoM, Hm = p.superficie.altoM, ratio = W / Hm, H = Math.round(1000 / ratio);
-  var activos = u19Arr(opts.activos), colores = opts.colores || {};
-  var html = '<div class="blz-lienzo' + (opts.clase ? ' ' + opts.clase : '') + (p.superficie.rejilla ? ' rejilla' : '') + (opts.lectura ? ' lectura' : '')
-    + '" style="aspect-ratio:' + ratio.toFixed(3) + ';max-width:min(100%, calc(' + (opts.alto || 62) + 'vh * ' + ratio.toFixed(3) + '));">'
-    + '<svg class="blz-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">' + blzSuperficieSvg(p, H) + blzAdornosSvg(p, H) + '</svg>';
-  u19Arr(p.adornos).forEach(function(a, i){
-    var ref = blzAdorno(a.tipo); if (!ref) return;
-    var esLinea = (a.tipo === "flecha" || a.tipo === "pase");
-    html += '<div class="blz-ad' + (esLinea ? ' linea' : '') + (opts.selAd === a.id ? ' sel' : '') + '" data-ad="' + escapeAttr(a.id) + '" data-punta="1"'
-      + ' style="left:' + (a.x * 100).toFixed(2) + '%;top:' + (a.y * 100).toFixed(2) + '%;" title="' + escapeAttr(ref.nombre) + '">'
-      + '<span class="blz-ad-i">' + ref.icono + '</span>'
-      + (a.etiqueta ? '<span class="blz-ad-e">' + escapeHtml(a.etiqueta) + '</span>' : '') + '</div>';
-    if (esLinea && !opts.lectura){
-      html += '<div class="blz-ad punta" data-ad="' + escapeAttr(a.id) + '" data-punta="2" style="left:' + (blzNum(a.x2, a.x, 0, 1) * 100).toFixed(2) + '%;top:' + (blzNum(a.y2, a.y, 0, 1) * 100).toFixed(2) + '%;" title="Punta de la flecha"><span class="blz-ad-i">•</span></div>';
-    }
-  });
-  u19Arr(p.pods).forEach(function(pod){
-    var on = activos.indexOf(pod.n) >= 0, hex = colores[pod.n] || "";
-    /* Un Pod con color fijo lleva su aro de ese color tambien apagado: asi se
-       ve cual esta amarrado sin tener que seleccionarlo uno por uno. */
-    var fijo = pod.color ? blzColorPorId(p, pod.color) : null;
-    html += '<button type="button" class="blz-pod' + (on ? ' on' : '') + (pod.base ? ' base' : '') + (opts.sel === pod.n ? ' sel' : '') + '"'
-      + ' id="' + (opts.idPrefijo || "blz-pod-") + pod.n + '" data-n="' + pod.n + '"' + (opts.lectura ? ' tabindex="-1" disabled' : '')
-      + ' style="left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;'
-        + (on && hex ? 'background:' + escapeAttr(hex) + ';border-color:' + escapeAttr(hex) + ';'
-                     : (fijo ? 'border-color:' + escapeAttr(fijo.hex) + ';' : '')) + '"'
-      + ' aria-label="Pod ' + pod.n + (pod.base ? ', base' : '') + (fijo ? ', siempre ' + escapeAttr(String(blzColorRef(fijo.id) ? blzColorRef(fijo.id).nombre : fijo.id).toLowerCase()) : '') + (pod.etiqueta ? ', ' + escapeAttr(pod.etiqueta) : '') + '">'
-      + '<span class="blz-pod-n">' + pod.n + '</span>'
-      + (pod.base ? '<span class="blz-pod-b">base</span>' : '')
-      + '</button>'
-      + (pod.etiqueta ? '<span class="blz-pod-e" data-n="' + pod.n + '" style="left:' + (pod.x * 100).toFixed(2) + '%;top:' + (pod.y * 100).toFixed(2) + '%;">' + escapeHtml(pod.etiqueta) + '</span>' : '');
-  });
-  if (!u19Arr(p.pods).length) html += '<div class="blz-vacio">Sin Pods. Añade el primero con «+ Pod»: aparecerá aquí y lo puedes arrastrar hasta donde va en la cancha.</div>';
-  html += '<div class="blz-escala"><span class="blz-escala-b"></span>' + blzM(W / 4) + '</div>';
-  return html + '</div>';
-}
-
-/* ---------- editor dentro del circuito ---------- */
-var _blzSel = 0, _blzSelAd = "", _blzPaleta = "";
-function blzEd(){
-  if (!_circEdit) return null;
-  if (!_circEdit.blazePlan) return null;
-  return _circEdit.blazePlan;
-}
-function blzEdNorm(){
-  if (!_circEdit) return null;
-  _circEdit.blazePlan = blzNormalizar(_circEdit.blazePlan || blzPlanNuevo());
-  return _circEdit.blazePlan;
-}
-function blzEditorHtml(c){
-  var p = blzPlanDe(c), on = !!(p && p.activo);
-  var html = '<div class="card blz-card" style="margin-top:1rem;"><div class="card-main">'
-    + '<div class="card-title" style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;">🔵 Planificador BlazePod'
-    + '<label class="blz-sw"><input type="checkbox" id="blz-on"' + (on ? ' checked' : '') + ' onchange="blzToggle(this.checked)"> <span>Usar BlazePod</span></label>'
-    + '</div>';
-  if (!on){
-    html += '<p class="text-sm text-muted" style="margin:.4rem 0 0;line-height:1.5;">Dibuja la actividad con Pods sobre una cancha: dónde va cada uno, de qué color se enciende, en qué orden y a qué ritmo. '
-      + 'Luego la reproduces en pantalla y te da las instrucciones para montarla igual en la cancha o en la sala. '
-      + 'El circuito sigue funcionando exactamente igual si no lo activas.</p>'
-      + '<p class="blz-aviso" style="margin-top:.6rem;">⚠ ' + escapeHtml(BLZ_AVISO) + '.</p>'
-      + '</div></div>';
-    return html;
-  }
-  p = blzNormalizar(p);
-  var L = p.logica, modo = blzModo(L.modo) || BLZ_MODOS[0];
-  var esSec = (L.modo === "secuencia" || L.modo === "libre");
-  var huer = blzHuerfanos(p);
-  html += '<p class="blz-aviso">⚠ ' + escapeHtml(BLZ_AVISO) + '.</p>';
-  if (huer.length){
-    html += '<p class="blz-alerta">Hay ' + huer.length + ' paso' + (huer.length === 1 ? '' : 's') + ' de la secuencia que apunta' + (huer.length === 1 ? '' : 'n') + ' a un Pod que ya no existe ('
-      + escapeHtml(huer.map(function(h){ return "paso " + h.paso + " → P" + h.pods.join(", P"); }).join(" · ")) + '). Arréglalos o bórralos: en la simulación se saltan.</p>';
-  }
-
-  /* --- los tres pasos, como en la app oficial --- */
-  html += blzPaso1Html(c, p) + blzPaso2Html(p) + blzPaso3Html(p);
-
-  /* --- simulación --- */
-  html += '<details class="blz-sec" open><summary>▶ Simulación</summary><div class="blz-secc">' + blzSimHtml(p) + '</div></details>';
-
-  /* --- montaje --- */
-  html += '<details class="blz-sec"><summary>📋 Cómo montarlo en cancha</summary><div class="blz-secc">' + blzMontajeHtml(p) + '</div></details>';
-
-  /* --- plantillas --- */
-  html += '<details class="blz-sec"><summary>✨ Plantillas de actividad</summary><div class="blz-secc">'
-    + '<p class="text-xs text-muted" style="margin:.1rem 0 .5rem;">Un punto de partida editable. Cambia solo la parte BlazePod de este circuito: las estaciones y los tiempos del circuito no se tocan.</p>'
-    + '<div class="blz-plt">' + BLZ_PLANTILLAS.map(function(t){
-        return '<button class="btn btn-ghost btn-sm" onclick="blzPlantillaAplicar(\'' + escapeAttr(t.id) + '\')" title="' + escapeAttr(t.notas || "") + '"><b>' + escapeHtml(t.g) + '</b> · ' + escapeHtml(t.nombre) + '</button>';
-      }).join("") + '</div></div></details>';
-
-  return html + '</div></div>';
-}
-function blzSelHtml(p){
-  var pod = _blzSel ? blzPodPorN(p, _blzSel) : null;
-  if (!pod){
-    return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Arrastra los Pods hasta donde van. Toca uno para seleccionarlo: podrás moverlo con las flechas, ponerle etiqueta, marcarlo como base, duplicarlo o borrarlo.</p>';
-  }
-  return '<div class="blz-sel-box">'
-    + '<span class="blz-sel-t">P' + pod.n + '</span>'
-    + '<input type="text" maxlength="24" placeholder="Etiqueta (opcional)" value="' + escapeAttr(pod.etiqueta) + '" oninput="blzPodEtiqueta(' + pod.n + ',this.value)">'
-    + '<label class="blz-mini"><input type="checkbox"' + (pod.base ? ' checked' : '') + ' onchange="blzPodMarcarBase(' + pod.n + ',this.checked)"> Base</label>'
-    + '<label class="blz-mini" title="Cuántas veces sale este Pod respecto a los demás: con 3 sale el triple que uno con 1">Sale ×<input type="number" min="1" max="5" style="width:56px;" value="' + blzPeso(pod.peso) + '" oninput="blzPodPeso(' + pod.n + ',this.value)"></label>'
-    + '<span class="blz-dpad" role="group" aria-label="Mover el Pod ' + pod.n + '">'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',-1,0)" aria-label="Mover a la izquierda">◀</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',0,-1)" aria-label="Mover arriba">▲</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',0,1)" aria-label="Mover abajo">▼</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodMover(' + pod.n + ',1,0)" aria-label="Mover a la derecha">▶</button></span>'
-    + ((p.logica.modo === "secuencia" || p.logica.modo === "libre")
-        ? '<button class="btn btn-secondary btn-sm" onclick="blzPasoDeEstePod(' + pod.n + ')" title="Añadir un paso de la secuencia que encienda este Pod">+ Paso</button>' : '')
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodDup(' + pod.n + ')" title="Duplicar">⎘</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzPodBorrar(' + pod.n + ')" title="Quitar">×</button>'
-    + '</div>'
-    /* Los colores van AQUI, debajo de la caja y siempre a la vista: tocas el
-       Pod y eliges con que se enciende, sin abrir nada antes. */
-    + blzPodColorHtml(p, pod);
-}
-/* Con que color se enciende ESTE Pod. Los ocho a la vista y a un toque; «El
-   que toque» lo devuelve a lo que mande el modo, que es como viene de fabrica. */
-function blzPodColorHtml(p, pod){
-  var fijo = pod.color ? blzColorRef(pod.color) : null;
-  var esFoco = (p.logica.modo === "focus");
-  var esObj = fijo && u19Arr(p.objetivo).indexOf(fijo.id) >= 0;
-  var pie = !fijo
-    ? "Ahora mismo lo decide el modo: cada vez se enciende con el color que toque."
-    : (esFoco
-        ? ("Siempre " + fijo.nombre.toLowerCase() + ": en Foco este Pod es " + (esObj ? "SIEMPRE el bueno, hay que tocarlo" : "SIEMPRE trampa, no se toca") + ".")
-        : ("Siempre " + fijo.nombre.toLowerCase() + " — " + fijo.consigna.toLowerCase() + "."));
-  return '<div class="blz-podcol"><span class="blz-podcol-t">P' + pod.n + ' se enciende en</span>'
-    + '<button type="button" class="blz-auto' + (fijo ? '' : ' on') + '" onclick="blzPodColorQuitar(' + pod.n + ')"'
-    + ' title="Que tome el color que le toque por el modo" aria-pressed="' + (fijo ? 'false' : 'true') + '">El que toque</button>'
-    + BLZ_COLORES.map(function(col){
-        var puesto = (fijo && fijo.id === col.id);
-        return '<button type="button" class="blz-sw' + (puesto ? ' on' : '') + '" style="background:' + col.hex + ';"'
-          + ' onclick="blzColorPoner(\'pod:' + pod.n + '\',\'' + escapeAttr(col.id) + '\')"'
-          + ' title="' + escapeAttr(col.nombre + " \u2014 " + col.consigna) + '"'
-          + ' aria-pressed="' + (puesto ? 'true' : 'false') + '"'
-          + ' aria-label="' + escapeAttr("Pod " + pod.n + " siempre " + col.nombre) + '"></button>';
-      }).join("")
-    + '<span class="blz-podcol-q">' + escapeHtml(pie) + '</span></div>';
-}
-function blzReloj(s){
-  s = Math.max(0, Math.round(blzNum(s, 0, 0, 999999)));
-  var m = Math.floor(s / 60), r = s % 60;
-  return (m < 10 ? "0" : "") + m + ":" + (r < 10 ? "0" : "") + r;
-}
-function blzSimHtml(p){
-  var ev = blzGenerar(p), tot = blzSimTotal(ev);
-  return '<div class="blz-sim-ctrl">'
-    + '<button class="btn btn-primary btn-sm" id="blz-play" onclick="blzSimPlay()">▶ Reproducir</button>'
-    + '<button class="btn btn-secondary btn-sm" onclick="blzSimReiniciar()">⟲ Reiniciar</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzSimPaso(-1)" title="Un paso atrás">⏮</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzSimPaso(1)" title="Un paso adelante">⏭</button>'
-    + '<label class="blz-mini"><input type="checkbox" id="blz-rep" onchange="blzSimRepetir(this.checked)"> Repetir</label>'
-    + '<span class="blz-vel">' + [0.5, 1, 2, 4].map(function(v){
-        return '<button class="btn btn-ghost btn-sm' + (v === 1 ? ' on' : '') + '" data-vel="' + v + '" onclick="blzSimVel(' + v + ')">' + String(v).replace(".", ",") + '×</button>';
-      }).join("") + '</span>'
-    + '<label class="blz-mini"><input type="checkbox" id="blz-tl" checked onchange="blzSimLinea(this.checked)"> Línea temporal</label>'
-    + '</div>'
-    + '<div id="blz-sim-lienzo">' + blzLienzoHtml(p, { clase: "sim", lectura: true, idPrefijo: "blz-sim-pod-" }) + '</div>'
-    + '<div class="blz-hud" id="blz-hud">' + blzHudHtml(p, ev, 0) + '</div>'
-    + '<div class="blz-tl" id="blz-tl">' + blzLineaHtml(ev, tot, 0) + '</div>';
-}
-function blzHudHtml(p, ev, t){
-  var i = blzSimEnT(ev, t), e = (i >= 0) ? ev[i] : ev[ev.length - 1];
-  var sig = null;
-  for (var k = (i >= 0 ? i + 1 : ev.length); k < ev.length; k++){ if (ev[k].tipo === "estimulo"){ sig = ev[k]; break; } }
-  var tot = blzSimTotal(ev);
-  return '<span class="blz-hud-t">' + escapeHtml(blzReloj(t)) + ' / ' + escapeHtml(blzReloj(tot)) + '</span>'
-    + '<span class="badge teal">Serie ' + e.serie + ' de ' + p.series + '</span>'
-    + '<span class="badge teal">' + (e.tipo === "estimulo" ? "Paso " + e.paso : escapeHtml(blzEtiquetaFase(e.tipo))) + '</span>'
-    + (e.tipo === "estimulo" ? '<span class="badge' + (e.objetivo ? ' teal' : ' muted') + '">' + (e.objetivo ? "P" + e.pods.join(" + P") : "distractor") + '</span>' : '')
-    + '<span class="blz-hud-c">' + escapeHtml(e.consigna || "") + '</span>'
-    + '<span class="text-xs text-muted">' + (sig ? "Siguiente: P" + sig.pods.join(" + P") + " en " + escapeHtml(blzSeg(Math.max(0, sig.t - t))) : "Sin más estímulos") + '</span>';
-}
-function blzEtiquetaFase(t){
-  return { preparacion: "Preparación", descanso: "Descanso", fin: "Fin", estimulo: "Estímulo" }[t] || t;
-}
-function blzLineaHtml(ev, tot, t){
-  if (!tot) return "";
-  var html = '<div class="blz-tl-barra">';
-  u19Arr(ev).forEach(function(e){
-    if (e.tipo === "fin") return;
-    var izq = (e.t / tot) * 100, an = Math.max(0.4, (e.dur / tot) * 100);
-    html += '<span class="blz-tl-b ' + escapeAttr(e.tipo) + '" style="left:' + izq.toFixed(2) + '%;width:calc(' + an.toFixed(2) + '% - 2px);" title="' + escapeAttr(blzEtiquetaFase(e.tipo) + (e.pods.length ? " P" + e.pods.join("+P") : "") + " · " + blzReloj(e.t)) + '"></span>';
-  });
-  html += '<span class="blz-tl-cursor" id="blz-tl-cursor" style="left:' + ((t / tot) * 100).toFixed(2) + '%;"></span>';
-  return html + '</div>';
-}
-function blzMontajeHtml(p){
-  var html = '<div class="blz-tools">'
-    + '<button class="btn btn-secondary btn-sm" onclick="blzCopiarMontaje()">📋 Copiar instrucciones</button>'
-    + '<button class="btn btn-secondary btn-sm" onclick="blzGuardarYImprimir()">🖨 Imprimir planificación</button>'
-    + '<button class="btn btn-ghost btn-sm" onclick="blzDuplicarPlan()" title="Crea un circuito nuevo con esta misma planificación">⎘ Duplicar planificación</button>'
-    + '</div><dl class="blz-montaje">';
-  blzMontaje(p).forEach(function(x){
-    html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>';
-  });
-  return html + '</dl>';
-}
-
-/* ---------- montaje del editor y acciones ---------- */
-function blzRepintar(){
-  blzSimParar();
-  var box = document.getElementById("blz-box");
-  if (!box || !_circEdit) return;
-  box.innerHTML = blzEditorHtml(_circEdit);
-  blzEditorMontar();
-}
-function blzPintarLienzo(){
-  var box = document.getElementById("blz-lienzo-box"), p = blzEd();
-  if (!box || !p) return;
-  var np = blzNormalizar(p);
-  box.innerHTML = blzLienzoHtml(np, { sel: _blzSel, selAd: _blzSelAd });
-  box._montado = false;
-  blzLienzoMontar(box);
-  var sel = document.getElementById("blz-sel-box");
-  if (sel) sel.innerHTML = blzSelHtml(np);
-}
-function blzEditorMontar(){
-  var box = document.getElementById("blz-box");
-  if (!box) return;
-  box.addEventListener("change", blzCampo);
-  box.addEventListener("input", blzCampo);
-  blzLienzoMontar(document.getElementById("blz-lienzo-box"));
-}
-/* Arrastre de Pods y elementos, con ratón y con dedo. Mismo patrón que el mapa
-   de estaciones: puntero capturado, nada de listeners globales. */
-function blzLienzoMontar(box){
-  if (!box || box._montado) return;
-  box._montado = true;
-  var arr = null;
-  box.addEventListener("pointerdown", function(ev){
-    var p = blzEd(); if (!p) return;
-    var el = ev.target && ev.target.closest ? ev.target.closest(".blz-pod, .blz-ad") : null;
-    if (!el) return;
-    var lienzo = el.parentNode, r = lienzo.getBoundingClientRect();
-    arr = { el: el, r: r, lienzo: lienzo, movio: false,
-            n: el.classList.contains("blz-pod") ? parseInt(el.getAttribute("data-n"), 10) : 0,
-            ad: el.getAttribute("data-ad") || "", punta: el.getAttribute("data-punta") === "2" };
-    try { el.setPointerCapture(ev.pointerId); } catch(e){}
-    el.classList.add("drag");
-    ev.preventDefault();
-  });
-  box.addEventListener("pointermove", function(ev){
-    if (!arr) return;
-    var p = blzEd(); if (!p) return;
-    var x = Math.min(0.97, Math.max(0.03, (ev.clientX - arr.r.left) / arr.r.width));
-    var y = Math.min(0.95, Math.max(0.05, (ev.clientY - arr.r.top) / arr.r.height));
-    if (arr.n){
-      var pod = blzPodPorN(p, arr.n); if (!pod) return;
-      pod.x = x; pod.y = y;
-    } else if (arr.ad){
-      var a = blzAdornoPorId(p, arr.ad); if (!a) return;
-      if (arr.punta){ a.x2 = x; a.y2 = y; }
-      else {
-        if (a.x2 != null){ a.x2 = Math.min(0.98, Math.max(0.02, a.x2 + (x - a.x))); a.y2 = Math.min(0.98, Math.max(0.02, a.y2 + (y - a.y))); }
-        a.x = x; a.y = y;
-      }
-    } else return;
-    arr.el.style.left = (x * 100).toFixed(2) + "%";
-    arr.el.style.top = (y * 100).toFixed(2) + "%";
-    arr.movio = true;
-    var svg = arr.lienzo.querySelector("svg.blz-svg");
-    if (svg) svg.innerHTML = blzSuperficieSvg(p, Math.round(1000 / (blzNum(p.superficie.anchoM, 20, 1, 200) / blzNum(p.superficie.altoM, 15, 1, 200)))) + blzAdornosSvg(p, Math.round(1000 / (blzNum(p.superficie.anchoM, 20, 1, 200) / blzNum(p.superficie.altoM, 15, 1, 200))));
-    var et = arr.lienzo.querySelector('.blz-pod-e[data-n="' + arr.n + '"]');
-    if (et){ et.style.left = arr.el.style.left; et.style.top = arr.el.style.top; }
-  });
-  var fin = function(ev){
-    if (!arr) return;
-    arr.el.classList.remove("drag");
-    var movio = arr.movio, n = arr.n, ad = arr.ad, punta = arr.punta;
-    arr = null;
-    if (!movio){
-      if (n){ _blzSel = (_blzSel === n) ? 0 : n; _blzSelAd = ""; }
-      else if (ad && !punta){ _blzSelAd = (_blzSelAd === ad) ? "" : ad; _blzSel = 0; }
-      blzRepintar();
-      return;
-    }
-    blzTocado();
-  };
-  box.addEventListener("pointerup", fin);
-  box.addEventListener("pointercancel", fin);
-}
-function blzAdornoPorId(plan, id){
-  var l = u19Arr(plan && plan.adornos);
-  for (var i = 0; i < l.length; i++) if (l[i].id === id) return l[i];
-  return null;
-}
-/* Algo cambió: la simulación que había en pantalla ya no es la de este plan. */
-function blzTocado(){
-  blzSimParar();
-  var sim = document.getElementById("blz-sim-lienzo"), p = blzEd();
-  if (sim && p) sim.innerHTML = blzLienzoHtml(p, { clase: "sim", lectura: true, idPrefijo: "blz-sim-pod-" });
-  blzRefrescarHud();
-}
-function blzRefrescarHud(){
-  var p = blzEd(); if (!p) return;
-  var np = blzNormalizar(p), ev = blzGenerar(np);
-  var hud = document.getElementById("blz-hud");
-  if (hud) hud.innerHTML = blzHudHtml(np, ev, 0);
-  var tl = document.getElementById("blz-tl");
-  if (tl) tl.innerHTML = blzLineaHtml(ev, blzSimTotal(ev), 0);
-}
-/* Un campo con data-blz="a.b" escribe en plan.a.b y nada más. */
-function blzCampo(ev){
-  var el = ev.target, k = el.getAttribute ? el.getAttribute("data-blz") : null;
-  if (!k) return;
-  var p = blzEdNorm(); if (!p) return;
-  var val;
-  if (el.type === "checkbox") val = el.checked;
-  else if (el.type === "number") val = blzNum(el.value, 0);
-  else val = el.value;
-  var partes = k.split("."), obj = p;
-  for (var i = 0; i < partes.length - 1; i++){
-    if (!obj[partes[i]] || typeof obj[partes[i]] !== "object") obj[partes[i]] = {};
-    obj = obj[partes[i]];
-  }
-  obj[partes[partes.length - 1]] = val;
-  _circEdit.blazePlan = blzNormalizar(p);
-  if (k === "logica.modo" || k === "alcance") blzRepintar();
-  else if (k.indexOf("superficie") === 0){ blzPintarLienzo(); blzTocado(); }
-  else blzTocado();
-}
-window.blzToggle = function(on){
-  if (!_circEdit) return;
-  if (on){
-    if (!_circEdit.blazePlan) _circEdit.blazePlan = blzPlanNuevo();
-    _circEdit.blazePlan = blzNormalizar(_circEdit.blazePlan);
-    _circEdit.blazePlan.activo = true;
-    if (!u19Arr(_circEdit.blazePlan.pods).length){
-      for (var i = 0; i < 4; i++) _circEdit.blazePlan.pods.push({ id: genId(), n: i + 1, x: 0.5, y: 0.5, etiqueta: "", base: false });
-      blzColocar(_circEdit.blazePlan, "semicirculo");
-    }
-  } else if (_circEdit.blazePlan){
-    _circEdit.blazePlan.activo = false;
-  }
-  _blzSel = 0; _blzSelAd = "";
-  blzRepintar();
-};
-window.blzAddPod = function(){
-  var p = blzEdNorm(); if (!p) return;
-  if (u19Arr(p.pods).length >= BLZ_MAX_PODS){ toast("El máximo son " + BLZ_MAX_PODS + " Pods", "warn"); return; }
-  var n = p.pods.length + 1, q = blzPosAuto(n - 1, n, "semicirculo");
-  p.pods.push({ id: genId(), n: n, x: q.x, y: q.y, etiqueta: "", base: false });
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzSel = n; _blzSelAd = "";
-  blzRepintar();
-};
-window.blzPodMover = function(n, dx, dy){
-  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
-  pod.x = blzNum(pod.x + dx * 0.02, 0.5, 0.03, 0.97);
-  pod.y = blzNum(pod.y + dy * 0.02, 0.5, 0.05, 0.95);
-  blzPintarLienzo(); blzTocado();
-};
-window.blzPodEtiqueta = function(n, v){
-  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
-  pod.etiqueta = blzTexto(v, 24);
-  blzPintarLienzo(); blzTocado();
-};
-/* Se llama blzPodMarcarBase y no blzPodBase A PROPOSITO: el motor ya tiene
-   una function blzPodBase(plan) y en un <script> clasico las dos serian la
-   misma propiedad de window. La accion pisaba al motor y blzMontaje acababa
-   repintando sin fin. tools/blazepod.js vigila que no vuelva a pasar. */
-window.blzPodMarcarBase = function(n, on){
-  var p = blzEdNorm(); if (!p) return;
-  u19Arr(p.pods).forEach(function(x){ x.base = on && x.n === n; });
-  blzRepintar();
-};
-window.blzPodDup = function(n){
-  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
-  if (u19Arr(p.pods).length >= BLZ_MAX_PODS){ toast("El máximo son " + BLZ_MAX_PODS + " Pods", "warn"); return; }
-  p.pods.push({ id: genId(), n: p.pods.length + 1, x: blzNum(pod.x + 0.06, 0.5, 0.03, 0.97), y: blzNum(pod.y + 0.06, 0.5, 0.05, 0.95), etiqueta: pod.etiqueta, base: false });
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzSel = p.pods.length;
-  blzRepintar();
-};
-/* Quitar un Pod renumera. Si algún paso de la secuencia lo nombraba, se avisa
-   ANTES: perder un paso en silencio es peor que no borrar. */
-window.blzPodBorrar = function(n){
-  var p = blzEdNorm(); if (!p) return;
-  var usados = u19Arr(p.secuencia).filter(function(paso){ return u19Arr(paso.pods).indexOf(n) >= 0; }).length;
-  if (usados && !window.confirm("El Pod P" + n + " aparece en " + usados + " paso" + (usados === 1 ? "" : "s") + " de la secuencia.\n\nSi lo quitas, esos pasos se quedan sin ese Pod.\n\n¿Quitarlo igual?")) return;
-  p.pods = u19Arr(p.pods).filter(function(x){ return x.n !== n; });
-  p.pods.forEach(function(x, i){ x.n = i + 1; });
-  p.secuencia = u19Arr(p.secuencia).map(function(paso){
-    paso.pods = u19Arr(paso.pods).filter(function(m){ return m !== n; }).map(function(m){ return m > n ? m - 1 : m; });
-    return paso;
-  });
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzSel = 0;
-  blzRepintar();
-};
-window.blzOrdenar = function(forma){
-  if (!forma) return;
-  var p = blzEdNorm(); if (!p) return;
-  blzColocar(p, forma);
-  blzPintarLienzo(); blzTocado();
-};
-window.blzSuperficieCambiar = function(id){
-  var p = blzEdNorm(), s = blzSuperficie(id); if (!p || !s) return;
-  p.superficie.tipo = s.id; p.superficie.anchoM = s.ancho; p.superficie.altoM = s.alto;
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-window.blzAddAdorno = function(tipo){
-  if (!tipo) return;
-  var p = blzEdNorm(), ref = blzAdorno(tipo); if (!p || !ref) return;
-  if (u19Arr(p.adornos).length >= 40){ toast("Demasiados elementos en el lienzo", "warn"); return; }
-  var a = { id: genId(), tipo: tipo, x: 0.5, y: 0.15, etiqueta: "" };
-  if (tipo === "flecha" || tipo === "pase"){ a.x = 0.3; a.y = 0.5; a.x2 = 0.55; a.y2 = 0.5; }
-  p.adornos.push(a);
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzSelAd = a.id; _blzSel = 0;
-  blzRepintar();
-};
-window.blzAdBorrar = function(id){
-  var p = blzEdNorm(); if (!p) return;
-  p.adornos = u19Arr(p.adornos).filter(function(a){ return a.id !== id; });
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzSelAd = "";
-  blzRepintar();
-};
-window.blzColorUsar = function(id, on){
-  var p = blzEdNorm(), ref = blzColorRef(id); if (!p || !ref) return;
-  if (on){
-    if (!blzColorPorId(p, id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });
-  } else {
-    if (u19Arr(p.colores).length <= 1){ toast("Deja al menos un color", "warn"); blzRepintar(); return; }
-    p.colores = u19Arr(p.colores).filter(function(c){ return c.id !== id; });
-    p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== id; });
-    p.secuencia = u19Arr(p.secuencia).map(function(paso){ if (paso.color === id) paso.color = p.colores[0].id; return paso; });
-  }
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-window.blzColorConsigna = function(id, v){
-  var p = blzEdNorm(), c = blzColorPorId(p, id); if (!c) return;
-  c.consigna = blzTexto(v, 60);
-  blzTocado();
-};
-window.blzObjetivo = function(id, on){
-  var p = blzEdNorm(); if (!p) return;
-  var l = u19Arr(p.objetivo).filter(function(x){ return x !== id; });
-  if (on) l.push(id);
-  p.objetivo = l;
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzTocado();
-};
-window.blzPasoAdd = function(){
-  var p = blzEdNorm(); if (!p) return;
-  var ultimo = u19Arr(p.secuencia)[p.secuencia.length - 1];
-  var n = u19Arr(p.pods).length ? ((ultimo && u19Arr(ultimo.pods)[0] ? (u19Arr(ultimo.pods)[0] % p.pods.length) + 1 : 1)) : 0;
-  p.secuencia.push({ id: genId(), pods: n ? [n] : [], color: p.colores[0].id, dur: p.logica.luz, condicion: p.logica.disparo, consigna: "" });
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-window.blzPasoCampo = function(i, k, v){
-  var p = blzEdNorm(), paso = u19Arr(p.secuencia)[i]; if (!paso) return;
-  if (k === "pods") paso.pods = String(v).split(/[^0-9]+/).map(function(x){ return parseInt(x, 10); }).filter(function(x){ return !isNaN(x) && x > 0; });
-  else if (k === "dur") paso.dur = blzNum(v, p.logica.luz, 0.2, 600);
-  else paso[k] = blzTexto(v, 60);
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzTocado();
-};
-window.blzPasoMover = function(i, d){
-  var p = blzEdNorm(), l = u19Arr(p.secuencia), j = i + d;
-  if (j < 0 || j >= l.length) return;
-  var t = l[i]; l[i] = l[j]; l[j] = t;
-  blzRepintar();
-};
-window.blzPasoDup = function(i){
-  var p = blzEdNorm(), l = u19Arr(p.secuencia), paso = l[i]; if (!paso) return;
-  var copia = JSON.parse(JSON.stringify(paso)); copia.id = genId();
-  l.splice(i + 1, 0, copia);
-  blzRepintar();
-};
-window.blzPasoBorrar = function(i){
-  var p = blzEdNorm(), l = u19Arr(p.secuencia);
-  if (i < 0 || i >= l.length) return;
-  l.splice(i, 1);
-  blzRepintar();
-};
-window.blzPlantillaAplicar = function(id){
-  var t = blzPlantilla(id); if (!t || !_circEdit) return;
-  if (blzActivo(_circEdit) && !window.confirm("Vas a reemplazar la planificación BlazePod de este circuito por «" + t.nombre + "».\n\nLas estaciones y los tiempos del circuito NO se tocan.\n\n¿Seguir?")) return;
-  _circEdit.blazePlan = blzDesdePlantilla(t);
-  _blzSel = 0; _blzSelAd = "";
-  blzRepintar();
-  toast("Plantilla «" + t.nombre + "» aplicada", "success");
-};
-window.blzCopiarMontaje = function(){
-  var p = blzEd(); if (!p) return;
-  copyToClipboard(blzMontajeTexto(blzNormalizar(p)));
-};
-window.blzGuardarYImprimir = function(){ if (typeof circGuardarYImprimir === "function") circGuardarYImprimir(); };
-window.blzDuplicarPlan = function(){
-  if (!_circEdit) return;
-  var c = circGuardar(true); if (!c) return;
-  var copia = JSON.parse(JSON.stringify(c));
-  copia.id = genId(); copia.nombre = (c.nombre || "Circuito") + " (copia)";
-  copia.createdAt = Date.now(); copia.updatedAt = Date.now();
-  copia.sesiones = [];
-  circLista().push(copia);
-  saveState();
-  toast("Planificación duplicada en «" + copia.nombre + "»", "success");
-};
-
-/* ---------- controles con la forma de la app oficial ---------- */
-/* Un grupo de botones donde solo uno manda, como los «Hit / Timeout / Hit or
-   Timeout» del teléfono. Se toca, no se despliega: en cancha, con el móvil en
-   una mano, un <select> es un enemigo. */
-function blzSegHtml(campo, lista, valor){
-  return '<div class="blz-seg" role="group">' + lista.map(function(o){
-    return '<button type="button" class="blz-seg-b' + (o.id === valor ? ' on' : '') + '"'
-      + ' onclick="blzElegir(\'' + escapeAttr(campo) + '\',\'' + escapeAttr(o.id) + '\')"'
-      + (o.ayuda ? ' title="' + escapeAttr(o.ayuda) + '"' : '')
-      + ' aria-pressed="' + (o.id === valor ? 'true' : 'false') + '">' + escapeHtml(o.nombre) + '</button>';
-  }).join("") + '</div>';
-}
-/* La fila con − valor +, igual que «Stations», «Pods» o «Cycles». */
-function blzContadorHtml(icono, titulo, sub, campo, valor, min, max){
-  return '<div class="blz-cnt">'
-    + '<span class="blz-cnt-i">' + icono + '</span>'
-    + '<span class="blz-cnt-t">' + escapeHtml(titulo) + (sub ? '<span class="blz-cnt-s">' + escapeHtml(sub) + '</span>' : '') + '</span>'
-    + '<span class="blz-cnt-c">'
-    + '<button type="button" class="blz-cnt-b" onclick="blzContador(\'' + escapeAttr(campo) + '\',-1,' + min + ',' + max + ')"' + (valor <= min ? ' disabled' : '') + ' aria-label="Quitar uno">−</button>'
-    + '<span class="blz-cnt-v">' + escapeHtml(String(valor)) + '</span>'
-    + '<button type="button" class="blz-cnt-b" onclick="blzContador(\'' + escapeAttr(campo) + '\',1,' + min + ',' + max + ')"' + (valor >= max ? ' disabled' : '') + ' aria-label="Añadir uno">+</button>'
-    + '</span></div>';
-}
-/* El círculo de color. Esto es lo que Diego pidió: se toca encima y se elige.
-   `destino` dice a qué se le pone el color: un paso, un rol o un Pod. */
-function blzCirculoHtml(destino, colorId, titulo){
-  var c = blzColorRef(colorId) || BLZ_COLORES[0];
-  return '<button type="button" class="blz-circ' + (_blzPaleta === destino ? ' abierto' : '') + '"'
-    + ' style="background:' + c.hex + ';" onclick="blzPaleta(\'' + escapeAttr(destino) + '\')"'
-    + ' title="' + escapeAttr((titulo ? titulo + ': ' : '') + c.nombre + ' — tócalo para cambiarlo') + '"'
-    + ' aria-label="' + escapeAttr((titulo ? titulo + ', ' : '') + 'color ' + c.nombre) + '"></button>';
-}
-/* La paleta, que aparece justo debajo del círculo que tocaste. */
-function blzPaletaHtml(destino){
-  if (_blzPaleta !== destino) return '';
-  return '<div class="blz-paleta">' + BLZ_COLORES.map(function(c){
-    return '<button type="button" class="blz-sw" style="background:' + c.hex + ';"'
-      + ' onclick="blzColorPoner(\'' + escapeAttr(destino) + '\',\'' + escapeAttr(c.id) + '\')"'
-      + ' title="' + escapeAttr(c.nombre) + '" aria-label="' + escapeAttr(c.nombre) + '"></button>';
-  }).join("") + '</div>';
-}
-
-/* ---------- paso 1 · montaje ---------- */
-function blzPaso1Html(c, p){
-  var L = p.logica, N = u19Arr(p.pods).length, esFoco = (L.modo === "focus"), esBase = (L.modo === "base");
-  var html = '<details class="blz-sec" open><summary>1 · Montaje</summary><div class="blz-secc">'
-    + '<div class="blz-modos">' + BLZ_MODOS.map(function(m){
-        return '<button type="button" class="blz-modo' + (L.modo === m.id ? ' on' : '') + '" onclick="blzElegir(\'logica.modo\',\'' + escapeAttr(m.id) + '\')" title="' + escapeAttr(m.ayuda) + '">' + escapeHtml(m.nombre) + '</button>';
-      }).join("") + '</div>'
-    + blzContadorHtml('🏁', 'Estaciones', 'puestos en paralelo', 'montaje.estaciones', p.montaje.estaciones, 1, 8)
-    + blzContadorHtml('🔵', 'Pods', 'por estación', 'montaje.podsPorEstacion', N, 1, BLZ_MAX_PODS)
-    + (esFoco ? blzContadorHtml('🚫', 'Distractores', 'Pods que no hay que tocar', 'montaje.distractores', p.montaje.distractores, 0, Math.max(0, N - 1)) : '')
-    + (esBase ? blzContadorHtml('◐', 'Colores', 'por jugador', 'montaje.coloresPorJugador', p.montaje.coloresPorJugador, 1, 4) : '')
-    + '<p class="text-xs text-muted" style="margin:.5rem 0 .2rem;line-height:1.5;">' + escapeHtml((blzModo(L.modo) || BLZ_MODOS[0]).ayuda) + '</p>'
-    + '<div class="blz-tools" style="margin-top:.6rem;">'
-    + '<select onchange="blzAddAdorno(this.value);this.selectedIndex=0;" title="Añadir un elemento al lienzo"><option value="">+ Elemento…</option>'
-    + BLZ_ADORNOS.map(function(a){ return '<option value="' + escapeAttr(a.id) + '">' + a.icono + ' ' + escapeHtml(a.nombre) + '</option>'; }).join("") + '</select>'
-    + '<select onchange="blzOrdenar(this.value);this.selectedIndex=0;" title="Colocar los Pods solos"><option value="">Colocar…</option>'
-    + '<option value="semicirculo">Semicírculo</option><option value="circulo">Círculo</option><option value="linea">En línea</option><option value="abanico">Abanico</option></select>'
-    + '<select data-blz="superficie.tipo" onchange="blzSuperficieCambiar(this.value)" title="Tipo de superficie">'
-    + BLZ_SUPERFICIES.map(function(s){ return '<option value="' + escapeAttr(s.id) + '"' + (p.superficie.tipo === s.id ? ' selected' : '') + '>' + escapeHtml(s.nombre) + '</option>'; }).join("") + '</select>'
-    + '<label class="blz-mini">Ancho <input type="number" min="1" max="200" step="0.5" data-blz="superficie.anchoM" value="' + p.superficie.anchoM + '"> m</label>'
-    + '<label class="blz-mini">Largo <input type="number" min="1" max="200" step="0.5" data-blz="superficie.altoM" value="' + p.superficie.altoM + '"> m</label>'
-    + '<label class="blz-mini"><input type="checkbox" data-blz="superficie.rejilla"' + (p.superficie.rejilla ? ' checked' : '') + '> Cuadrícula</label>'
-    + '</div>'
-    + '<div id="blz-lienzo-box">' + blzLienzoHtml(p, { sel: _blzSel, selAd: _blzSelAd }) + '</div>'
-    + '<div id="blz-sel-box">' + blzSelHtml(p) + '</div>'
-    + '</div></details>';
-  return html;
-}
-
-/* ---------- paso 2 · colores y reglas de luz ---------- */
-function blzPaso2Html(p){
-  var L = p.logica, esSec = (L.modo === "secuencia" || L.modo === "libre");
-  var html = '<details class="blz-sec" open><summary>2 · Colores y reglas de luz</summary><div class="blz-secc">';
-
-  if (esSec){
-    /* La pantalla «Steps and Light Rules»: un renglón por paso, con el Pod y
-       su color al lado. Tal cual el teléfono. */
-    var pasos = u19Arr(p.secuencia);
-    html += blzContadorHtml('⇄', 'Pasos', '', 'pasos', pasos.length, 1, 40);
-    pasos.forEach(function(paso, i){
-      var n = u19Arr(paso.pods)[0] || 1, destino = 'paso:' + i;
-      html += '<div class="blz-fila">'
-        + '<span class="blz-fila-n">Paso ' + (i + 1) + '</span>'
-        + '<select class="blz-pod-sel" onchange="blzPasoCampo(' + i + ',\'pods\',this.value)" title="Qué Pod se enciende en este paso">'
-        + u19Arr(p.pods).map(function(pod){
-            return '<option value="' + pod.n + '"' + (pod.n === n ? ' selected' : '') + '>Pod #' + pod.n + (pod.etiqueta ? ' · ' + escapeHtml(pod.etiqueta) : '') + '</option>';
-          }).join("") + '</select>'
-        + '<input type="text" class="blz-fila-c" maxlength="60" value="' + escapeAttr(paso.consigna) + '" placeholder="Consigna (opcional)" oninput="blzPasoCampo(' + i + ',\'consigna\',this.value)">'
-        + '<span class="blz-fila-acc">'
-        + '<button class="btn btn-ghost btn-sm" onclick="blzPasoMover(' + i + ',-1)" title="Subir"' + (i === 0 ? ' disabled' : '') + '>↑</button>'
-        + '<button class="btn btn-ghost btn-sm" onclick="blzPasoMover(' + i + ',1)" title="Bajar"' + (i === pasos.length - 1 ? ' disabled' : '') + '>↓</button>'
-        + '<button class="btn btn-ghost btn-sm" onclick="blzPasoBorrar(' + i + ')" title="Quitar">×</button></span>'
-        + blzCirculoHtml(destino, paso.color, 'Paso ' + (i + 1))
-        + '</div>' + blzPaletaHtml(destino);
-    });
-    if (!pasos.length) html += '<p class="text-sm text-muted" style="margin:.4rem 0;">Sin pasos. Sube el contador de arriba y aparecerán.</p>';
-
-  } else if (L.modo === "focus"){
-    /* «Colors and Light Rules» de Foco: el color al que se responde arriba y,
-       bajo la línea, los distractores. */
-    /* Dos filas de circulos, como los contadores «Colors per player» y
-       «Distracting colors» del telefono: se tocan y se eligen, y con + y -
-       se ponen tantos como haga falta. */
-    var objs = blzFocoLista(p, 'obj'), diss = blzFocoLista(p, 'dis');
-    html += '<div class="blz-estacion"><div class="blz-est-t">Colores a los que SÍ hay que responder</div>'
-      + '<div class="blz-rol-fila">'
-      + objs.map(function(id, i){ return blzCirculoHtml('foco:obj:' + i, id, 'Objetivo ' + (i + 1)); }).join('')
-      + '<button type="button" class="blz-circ mas" onclick="blzFocoAnadir(\'obj\')" title="Añadir otro color objetivo" aria-label="Añadir color objetivo">+</button>'
-      + (objs.length > 1 ? '<button type="button" class="blz-circ menos" onclick="blzFocoQuitar(\'obj\')" title="Quitar el último" aria-label="Quitar color objetivo">−</button>' : '')
-      + '</div>'
-      + objs.map(function(id, i){ return blzPaletaHtml('foco:obj:' + i); }).join('')
-      + '<div class="blz-rol-sep">Colores de trampa: se encienden y NO se tocan</div>'
-      + '<div class="blz-rol-fila">'
-      + diss.map(function(id, i){ return blzCirculoHtml('foco:dis:' + i, id, 'Distractor ' + (i + 1)); }).join('')
-      + '<button type="button" class="blz-circ mas" onclick="blzFocoAnadir(\'dis\')" title="Añadir otro color de trampa" aria-label="Añadir color distractor">+</button>'
-      + (diss.length > 1 ? '<button type="button" class="blz-circ menos" onclick="blzFocoQuitar(\'dis\')" title="Quitar el último" aria-label="Quitar color distractor">−</button>' : '')
-      + '</div>'
-      + diss.map(function(id, i){ return blzPaletaHtml('foco:dis:' + i); }).join('')
-      + (diss.length ? '' : '<p class="blz-alerta">Sin colores de trampa no hay foco que entrenar: añade al menos uno.</p>')
-      + '</div>';
-
-  } else if (L.modo === "base"){
-    /* «Pod Light Rules» de Home Base: dos bloques, base y esquinas. */
-    html += '<div class="blz-estacion"><div class="blz-est-t">Pods de la base</div>'
-      + '<div class="blz-rol"><span>Color de la base</span>' + blzCirculoHtml('base:base', p.homebase.base, 'Base') + '</div>'
-      + blzPaletaHtml('base:base') + '</div>'
-      + '<div class="blz-estacion"><div class="blz-est-t">Pods de las esquinas</div>'
-      + '<div class="blz-rol"><span>Color de las esquinas</span>' + blzCirculoHtml('base:esquinas', p.homebase.esquinas, 'Esquinas') + '</div>'
-      + blzPaletaHtml('base:esquinas') + '</div>';
-
-  } else {
-    /* Aleatorio y todos a la vez: una paleta de la que se va tirando. */
-    html += '<div class="blz-estacion"><div class="blz-est-t">Colores que pueden salir</div><div class="blz-rol-fila">'
-      + u19Arr(p.colores).map(function(col, i){
-          return blzCirculoHtml('lista:' + i, col.id, 'Color ' + (i + 1));
-        }).join("")
-      + '<button type="button" class="blz-circ mas" onclick="blzColorAnadir()" title="Añadir un color a la paleta" aria-label="Añadir color">+</button>'
-      + (u19Arr(p.colores).length > 1 ? '<button type="button" class="blz-circ menos" onclick="blzColorQuitar()" title="Quitar el último color" aria-label="Quitar color">−</button>' : '')
-      + '</div>'
-      + u19Arr(p.colores).map(function(col, i){ return blzPaletaHtml('lista:' + i); }).join("")
-      + '</div>';
-  }
-
-  /* Consignas: qué significa cada color cuando se lo dices al deportista. */
-  html += '<div class="blz-cons"><div class="blz-est-t">Qué significa cada color</div>'
-    + u19Arr(p.colores).map(function(col){
-        var ref = blzColorRef(col.id) || BLZ_COLORES[0];
-        return '<div class="blz-cons-f"><span class="blz-chip" style="background:' + ref.hex + ';"></span>'
-          + '<span class="blz-cons-n">' + escapeHtml(ref.nombre) + '</span>'
-          + '<input type="text" maxlength="60" value="' + escapeAttr(col.consigna || "") + '" placeholder="Ej: conducir el balón" oninput="blzColorConsigna(\'' + escapeAttr(col.id) + '\',this.value)"></div>';
-      }).join("") + '</div>';
-
-  /* Lights Out y Light Delay Time, con los nombres de la app. */
-  html += '<div class="blz-regla"><div class="blz-regla-t">💡 La luz se apaga con</div>' + blzSegHtml('logica.disparo', blzApagaDe(p), blzApagaActual(p)) + '</div>'
-    + '<div class="blz-regla"><div class="blz-regla-t">⏱ Retardo de la luz</div>' + blzSegHtml('logica.retardo.tipo', BLZ_RETARDOS, p.logica.retardo.tipo) + blzRetardoCamposHtml(p) + '</div>';
-
-  if (L.modo !== "todos" && !esSec){
-    html += '<div class="blz-checks"><label><input type="checkbox" data-blz="logica.sinRepetir"' + (L.sinRepetir ? ' checked' : '') + '> No repetir el mismo Pod dos veces seguidas</label></div>';
-  }
-  return html + '</div></details>';
-}
-/* En Home Base los Pods de la base no aceptan «toque o tiempo»: la app solo
-   ofrece dos. Se respeta para que lo que se ve aquí se pueda montar allí. */
-function blzApagaDe(p){
-  if (p && p.logica && p.logica.modo === "base") return BLZ_APAGA.slice(0, 2);
-  return BLZ_APAGA;
-}
-function blzRetardoCamposHtml(p){
-  var r = p.logica.retardo;
-  if (r.tipo === "fijo"){
-    return '<div class="blz-regla-x"><label class="blz-mini">Hueco <input type="number" min="0" max="60" step="0.1" data-blz="logica.retardo.seg" value="' + r.seg + '"> s</label></div>';
-  }
-  if (r.tipo === "aleatorio"){
-    return '<div class="blz-regla-x"><label class="blz-mini">Entre <input type="number" min="0" max="60" step="0.1" data-blz="logica.retardo.min" value="' + r.min + '"> s</label>'
-      + '<label class="blz-mini">y <input type="number" min="0" max="60" step="0.1" data-blz="logica.retardo.max" value="' + r.max + '"> s</label></div>';
-  }
-  return '';
-}
-/* Los colores de cada rol en Foco. La paleta es la union de los dos: objetivo
-   es la lista `p.objetivo` y trampa es todo lo demas que haya en la paleta.
-   Asi no hace falta una segunda lista que mantener en sitio. */
-function blzFocoLista(p, rol){
-  var obj = u19Arr(p.objetivo), l = u19Arr(p.colores), out = [];
-  l.forEach(function(c){
-    var esObj = obj.indexOf(c.id) >= 0;
-    if ((rol === "obj") === esObj) out.push(c.id);
-  });
-  if (rol === "obj" && !out.length && l.length) out.push(l[0].id);
-  return out;
-}
-/* Un color libre de la paleta de la casa que no este ya puesto. */
-function blzColorLibre(p){
-  for (var i = 0; i < BLZ_COLORES.length; i++) if (!blzColorPorId(p, BLZ_COLORES[i].id)) return BLZ_COLORES[i];
-  return null;
-}
-
-/* ---------- paso 3 · cerrar la actividad ---------- */
-function blzPaso3Html(p){
-  var L = p.logica, esSec = (L.modo === "secuencia" || L.modo === "libre");
-  var html = '<details class="blz-sec" open><summary>3 · Cerrar la actividad</summary><div class="blz-secc">';
-  if (L.modo === "focus"){
-    html += '<div class="blz-regla"><div class="blz-regla-t">✖ Strikeout <span class="text-xs text-muted">— si tocar un distractor termina la serie</span></div>'
-      + blzSegHtml('strikeout', [{ id: "no", nombre: "No" }, { id: "si", nombre: "Sí" }], p.strikeout ? "si" : "no") + '</div>'
-      + '<div class="blz-regla"><div class="blz-regla-t">🎯 Cada cuánto sale el objetivo</div>'
-      + '<div class="blz-regla-x">'
-      + '<label class="blz-mini"><input type="number" min="0" max="100" step="5" data-blz="logica.probObjetivo" value="' + L.probObjetivo + '"> % de las veces</label>'
-      + '<span class="text-xs text-muted">Al ' + (100 - L.probObjetivo) + ' % restante se encienden solo trampas y NO hay que tocar nada: eso es lo que entrena aguantarse.</span>'
-      + '</div></div>';
-  }
-  html += '<div class="blz-regla"><div class="blz-regla-t">⏳ Duración</div>'
-    + blzSegHtml('fin.por', esSec ? BLZ_FIN_SEC : BLZ_FIN, p.fin.por)
-    + '<div class="blz-regla-x">'
-    + ((p.fin.por === "toques") ? '' : '<label class="blz-mini">Tiempo <input type="number" min="1" max="3600" data-blz="logica.duracion" value="' + L.duracion + '"> s <span class="blz-reloj">' + escapeHtml(blzReloj(L.duracion)) + '</span></label>')
-    + ((p.fin.por === "toques" || p.fin.por === "ambos") ? '<label class="blz-mini">Toques <input type="number" min="1" max="999" data-blz="fin.toques" value="' + p.fin.toques + '"></label>' : '')
-    + ((p.fin.por === "repeticiones") ? '<label class="blz-mini">Repeticiones <input type="number" min="1" max="99" data-blz="fin.repeticiones" value="' + p.fin.repeticiones + '"></label>' : '')
-    + '</div></div>'
-    + blzContadorHtml('🔁', 'Ciclos', 'veces que se repite entera', 'series', p.series, 1, 50)
-    + '<div class="blz-regla"><div class="blz-regla-x">'
-    + '<label class="blz-mini">Descanso entre ciclos <input type="number" min="0" max="3600" data-blz="descanso" value="' + p.descanso + '"> s</label>'
-    + '<label class="blz-mini">Preparación <input type="number" min="0" max="600" data-blz="logica.preparacion" value="' + L.preparacion + '"> s</label>'
-    + (esSec ? '' : '<label class="blz-mini">Cada estímulo dura <input type="number" min="0.2" max="600" step="0.1" data-blz="logica.intervalo" value="' + L.intervalo + '"> s</label>')
-    + '<label class="blz-mini">La luz se queda <input type="number" min="0.2" max="600" step="0.1" data-blz="logica.luz" value="' + L.luz + '"> s</label>'
-    + (L.modo === "todos" || L.modo === "random" ? '<label class="blz-mini">Pods a la vez <input type="number" min="0" max="' + BLZ_MAX_PODS + '" data-blz="logica.simultaneos" value="' + L.simultaneos + '"></label>' : '')
-    + (L.modo === "focus" ? '<span class="blz-mini">Se encienden ' + (1 + p.montaje.distractores) + ': uno objetivo y ' + p.montaje.distractores + ' de trampa \u00b7 se cambia en el paso 1</span>' : '')
-    + '</div></div>'
-    + '<div class="blz-regla"><div class="blz-regla-x">'
-    + '<label class="blz-mini">Semilla <input type="text" maxlength="40" data-blz="logica.semilla" value="' + escapeAttr(L.semilla) + '" title="Con la misma semilla la simulación repite exactamente la misma serie"></label>'
-    + '<label class="blz-mini"><input type="checkbox" data-blz="logica.sonido"' + (L.sonido ? ' checked' : '') + '> Sonido</label>'
-    + '</div></div>'
-    + '<div class="blz-regla"><div class="blz-regla-x">'
-    + '<label class="blz-mini" style="flex:1 1 100%;">Notas <input type="text" maxlength="400" data-blz="notas" value="' + escapeAttr(p.notas) + '" placeholder="Objetivo, adaptaciones, material extra"></label>'
-    + '</div></div>';
-  return html + '</div></details>';
-}
-
-/* ---------- acciones de los controles nuevos ---------- */
-/* Escribe plan.a.b = valor sin tocar nada más. Es el mismo camino que usa
-   blzCampo para los <input>, sacado aparte para que lo usen los botones. */
-function blzPoner(p, ruta, valor){
-  var partes = String(ruta).split("."), obj = p;
-  for (var i = 0; i < partes.length - 1; i++){
-    if (!obj[partes[i]] || typeof obj[partes[i]] !== "object") obj[partes[i]] = {};
-    obj = obj[partes[i]];
-  }
-  obj[partes[partes.length - 1]] = valor;
-  return p;
-}
-/* Se llama blzElegir y no blzSeg A PROPOSITO: el motor ya tiene
-   blzSeg(segundos), el que escribe «1 min 30 s». Dos cosas con el mismo
-   nombre son la misma propiedad de window, y la accion se comeria al
-   formateador. Es la segunda colision del modulo; por eso hay prueba. */
-window.blzElegir = function(campo, valor){
-  var p = blzEdNorm(); if (!p) return;
-  if (campo === "strikeout") blzPoner(p, campo, valor === "si");
-  else blzPoner(p, campo, valor);
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzPaleta = "";
-  blzRepintar();
-};
-/* El ± de las filas. Tres de ellos no escriben un número: cambian cuántos
-   Pods o cuántos pasos hay, y eso es crear y borrar cosas. */
-window.blzContador = function(campo, d, min, max){
-  var p = blzEdNorm(); if (!p) return;
-  if (campo === "montaje.podsPorEstacion"){
-    if (d > 0) { blzAddPod(); return; }
-    var l = u19Arr(p.pods);
-    if (l.length <= 1){ toast("Deja al menos un Pod", "warn"); return; }
-    blzPodBorrar(l[l.length - 1].n);
-    return;
-  }
-  if (campo === "pasos"){
-    if (d > 0) { blzPasoAdd(); return; }
-    var s = u19Arr(p.secuencia);
-    if (!s.length) return;
-    blzPasoBorrar(s.length - 1);
-    return;
-  }
-  var partes = campo.split("."), obj = p;
-  for (var i = 0; i < partes.length - 1; i++) obj = obj[partes[i]] || (obj[partes[i]] = {});
-  var actual = blzNum(obj[partes[partes.length - 1]], min, min, max);
-  blzPoner(p, campo, Math.min(max, Math.max(min, actual + d)));
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-/* Tocar un círculo abre la paleta justo debajo; tocarlo otra vez la cierra. */
-window.blzPaleta = function(destino){
-  _blzPaleta = (_blzPaleta === destino) ? "" : String(destino || "");
-  blzRepintar();
-};
-/* Y elegir un color la cierra y lo aplica a donde tocaba. */
-window.blzColorPoner = function(destino, colorId){
-  var p = blzEdNorm(), ref = blzColorRef(colorId); if (!p || !ref) return;
-  var partes = String(destino).split(":"), que = partes[0], cual = partes[1];
-  /* Un color que se usa tiene que estar en la paleta: si no, el motor no lo
-     encuentra y el Pod se encendería en blanco. */
-  if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });
-
-  if (que === "paso"){
-    var paso = u19Arr(p.secuencia)[parseInt(cual, 10)];
-    if (paso) paso.color = ref.id;
-  } else if (que === "foco"){
-    /* destino = foco:obj:<i> o foco:dis:<i>. Cambiar el color de una casilla
-       es cambiar ESE color de la paleta y recolocarlo en su rol. */
-    var rol = partes[1], idx = parseInt(partes[2], 10);
-    var lista = blzFocoLista(p, rol), viejoId = lista[idx];
-    var otros = blzFocoLista(p, rol === "obj" ? "dis" : "obj");
-    if (otros.indexOf(ref.id) >= 0){
-      toast(rol === "obj" ? "Ese color ya es de trampa: quítalo de ahí primero" : "Ese color ya es objetivo: quítalo de ahí primero", "warn");
-      _blzPaleta = ""; blzRepintar(); return;
-    }
-    if (viejoId && viejoId !== ref.id){
-      /* El color viejo sale de la paleta si no lo usa nadie mas. */
-      p.colores = u19Arr(p.colores).filter(function(c){ return c.id !== viejoId; });
-      p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== viejoId; });
-      u19Arr(p.pods).forEach(function(pod){ if (pod.color === viejoId) pod.color = ""; });
-      u19Arr(p.secuencia).forEach(function(paso){ if (paso.color === viejoId) paso.color = ref.id; });
-      if (!blzColorPorId(p, ref.id)) p.colores.push({ id: ref.id, hex: ref.hex, consigna: ref.consigna });
-    }
-    p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== ref.id; });
-    if (rol === "obj") p.objetivo.push(ref.id);
-  } else if (que === "base"){
-    p.homebase[cual === "base" ? "base" : "esquinas"] = ref.id;
-  } else if (que === "lista"){
-    var i = parseInt(cual, 10), l = u19Arr(p.colores);
-    if (l[i]) { l[i] = { id: ref.id, hex: ref.hex, consigna: l[i].consigna || ref.consigna }; }
-  } else if (que === "pod"){
-    var pod = blzPodPorN(p, parseInt(cual, 10));
-    if (pod) pod.color = ref.id;
-  }
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzPaleta = "";
-  blzRepintar();
-};
-window.blzColorAnadir = function(){
-  var p = blzEdNorm(); if (!p) return;
-  if (u19Arr(p.colores).length >= BLZ_COLORES.length){ toast("Ya están los ocho colores", "warn"); return; }
-  for (var i = 0; i < BLZ_COLORES.length; i++){
-    if (!blzColorPorId(p, BLZ_COLORES[i].id)){
-      p.colores.push({ id: BLZ_COLORES[i].id, hex: BLZ_COLORES[i].hex, consigna: BLZ_COLORES[i].consigna });
-      break;
-    }
-  }
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-window.blzColorQuitar = function(){
-  var p = blzEdNorm(); if (!p) return;
-  var l = u19Arr(p.colores);
-  if (l.length <= 1){ toast("Deja al menos un color", "warn"); return; }
-  var fuera = l[l.length - 1].id;
-  p.colores = l.slice(0, l.length - 1);
-  p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== fuera; });
-  p.secuencia = u19Arr(p.secuencia).map(function(paso){ if (paso.color === fuera) paso.color = p.colores[0].id; return paso; });
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-/* Un color mas para el rol que sea: se saca de la paleta de la casa. */
-window.blzFocoAnadir = function(rol){
-  var p = blzEdNorm(); if (!p) return;
-  var libre = blzColorLibre(p);
-  if (!libre){ toast("Ya están los ocho colores puestos", "warn"); return; }
-  p.colores.push({ id: libre.id, hex: libre.hex, consigna: libre.consigna });
-  if (rol === "obj") p.objetivo = u19Arr(p.objetivo).concat([libre.id]);
-  _circEdit.blazePlan = blzNormalizar(p);
-  _blzPaleta = "";
-  blzRepintar();
-};
-window.blzFocoQuitar = function(rol){
-  var p = blzEdNorm(); if (!p) return;
-  var lista = blzFocoLista(p, rol);
-  if (lista.length <= 1){ toast(rol === "obj" ? "Deja al menos un color objetivo" : "Deja al menos un color de trampa", "warn"); return; }
-  var fuera = lista[lista.length - 1];
-  p.colores = u19Arr(p.colores).filter(function(c){ return c.id !== fuera; });
-  p.objetivo = u19Arr(p.objetivo).filter(function(x){ return x !== fuera; });
-  u19Arr(p.pods).forEach(function(pod){ if (pod.color === fuera) pod.color = ""; });
-  u19Arr(p.secuencia).forEach(function(paso){ if (paso.color === fuera) paso.color = (u19Arr(p.colores)[0] || BLZ_COLORES[0]).id; });
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-/* Cuantas veces sale este Pod respecto a los demas. */
-window.blzPodPeso = function(n, v){
-  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
-  pod.peso = blzEnt(v, 1, 1, 5);
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzTocado();
-};
-/* El Pod vuelve a tomar el color que le toque por el modo. */
-window.blzPodColorQuitar = function(n){
-  var p = blzEdNorm(), pod = blzPodPorN(p, n); if (!pod) return;
-  pod.color = "";
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-};
-
-/* Añade un paso que use justo el Pod que está seleccionado en el lienzo. */
-window.blzPasoDeEstePod = function(n){
-  var p = blzEdNorm(); if (!p) return;
-  p.secuencia.push({ id: genId(), pods: [n], color: (u19Arr(p.colores)[0] || BLZ_COLORES[0]).id, dur: p.logica.luz, condicion: p.logica.disparo, consigna: "" });
-  _circEdit.blazePlan = blzNormalizar(p);
-  blzRepintar();
-  toast("Paso " + p.secuencia.length + " con el Pod " + n, "success");
-};
-
-/* ---------- simulación ---------- */
-/* Un solo intervalo, con marcas de tiempo reales (no cuenta ticks). Se apaga
-   al salir del editor, al cambiar el plan y al esconder la pestaña: nada de
-   temporizadores vivos en segundo plano. */
-var _blzSim = null;
-function blzReducirMovimiento(){
-  try { return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches); } catch(e){ return false; }
-}
-function blzSimParar(){
-  if (!_blzSim) return;
-  if (_blzSim.timer){ clearInterval(_blzSim.timer); _blzSim.timer = null; }
-  try { document.removeEventListener("visibilitychange", blzSimVisible); } catch(e){}
-  _blzSim.corriendo = false;
-  var b = document.getElementById("blz-play");
-  if (b) b.innerHTML = "▶ Reproducir";
-  _blzSim = null;
-}
-function blzSimVisible(){
-  if (_blzSim && _blzSim.corriendo && document.hidden) blzSimPausar();
-}
-function blzSimArrancarEstado(){
-  var p = blzEd(); if (!p) return null;
-  var np = blzNormalizar(p);
-  if (!u19Arr(np.pods).length){ toast("Añade Pods antes de reproducir", "warn"); return null; }
-  if (!_blzSim || _blzSim.firma !== JSON.stringify(np)){
-    if (_blzSim && _blzSim.timer) clearInterval(_blzSim.timer);
-    _blzSim = { plan: np, ev: blzGenerar(np), t: 0, vel: (_blzSim ? _blzSim.vel : 1), repetir: (_blzSim ? _blzSim.repetir : false),
-                corriendo: false, timer: null, ultimo: 0, firma: JSON.stringify(np), ultimoPaso: -1 };
-  }
-  return _blzSim;
-}
-window.blzSimPlay = function(){
-  var S = blzSimArrancarEstado(); if (!S) return;
-  if (S.corriendo){ blzSimPausar(); return; }
-  if (S.t >= blzSimTotal(S.ev)) S.t = 0;
-  S.corriendo = true; S.ultimo = Date.now();
-  if (S.timer) clearInterval(S.timer);
-  S.timer = setInterval(blzSimTick, 100);
-  try { document.addEventListener("visibilitychange", blzSimVisible); } catch(e){}
-  var b = document.getElementById("blz-play");
-  if (b) b.innerHTML = "⏸ Pausa";
-  blzSimPintar();
-};
-function blzSimPausar(){
-  var S = _blzSim; if (!S) return;
-  S.corriendo = false;
-  if (S.timer){ clearInterval(S.timer); S.timer = null; }
-  var b = document.getElementById("blz-play");
-  if (b) b.innerHTML = "▶ Reproducir";
-}
-window.blzSimReiniciar = function(){
-  var S = blzSimArrancarEstado(); if (!S) return;
-  blzSimPausar();
-  S.t = 0; S.ultimoPaso = -1;
-  blzSimPintar();
-};
-window.blzSimPaso = function(d){
-  var S = blzSimArrancarEstado(); if (!S) return;
-  blzSimPausar();
-  var i = blzSimEnT(S.ev, S.t);
-  if (i < 0) i = S.ev.length - 1;
-  var j = Math.min(S.ev.length - 1, Math.max(0, i + d));
-  S.t = S.ev[j].t;
-  blzSimPintar();
-};
-window.blzSimVel = function(v){
-  var S = blzSimArrancarEstado(); if (!S) return;
-  S.vel = blzNum(v, 1, 0.25, 8);
-  var box = document.querySelector(".blz-vel");
-  if (box){
-    var bs = box.querySelectorAll("button");
-    for (var i = 0; i < bs.length; i++) bs[i].classList.toggle("on", parseFloat(bs[i].getAttribute("data-vel")) === S.vel);
-  }
-};
-window.blzSimRepetir = function(on){
-  var S = blzSimArrancarEstado(); if (!S) return;
-  S.repetir = !!on;
-};
-window.blzSimLinea = function(on){
-  var tl = document.getElementById("blz-tl");
-  if (tl) tl.style.display = on ? "" : "none";
-};
-function blzSimTick(){
-  var S = _blzSim;
-  if (!S || !S.corriendo){ return; }
-  var ahora = Date.now(), dt = (ahora - S.ultimo) / 1000;
-  S.ultimo = ahora;
-  S.t += dt * S.vel;
-  var tot = blzSimTotal(S.ev);
-  if (S.t >= tot){
-    if (S.repetir){ S.t = 0; S.ultimoPaso = -1; }
-    else { S.t = tot; blzSimPausar(); }
-  }
-  blzSimPintar();
-}
-/* Solo toca los Pods de la simulación, el HUD y el cursor: no repinta la app. */
-function blzSimPintar(){
-  var S = _blzSim; if (!S) return;
-  var i = blzSimEnT(S.ev, S.t), e = (i >= 0) ? S.ev[i] : S.ev[S.ev.length - 1];
-  var enc = {}, sinAnim = blzReducirMovimiento();
-  if (e.tipo === "estimulo"){
-    for (var k = 0; k < e.pods.length; k++){
-      var c = blzColorPorId(S.plan, e.colores[k]);
-      enc[e.pods[k]] = c ? c.hex : "#ffffff";
-    }
-  }
-  u19Arr(S.plan.pods).forEach(function(pod){
-    var el = document.getElementById("blz-sim-pod-" + pod.n);
-    if (!el) return;
-    var hex = enc[pod.n];
-    el.classList.toggle("on", !!hex);
-    el.classList.toggle("pulso", !!hex && !sinAnim);
-    el.style.background = hex || "";
-    el.style.borderColor = hex || "";
-  });
-  var hud = document.getElementById("blz-hud");
-  if (hud) hud.innerHTML = blzHudHtml(S.plan, S.ev, S.t);
-  var cur = document.getElementById("blz-tl-cursor"), tot = blzSimTotal(S.ev);
-  if (cur && tot) cur.style.left = ((S.t / tot) * 100).toFixed(2) + "%";
-  if (S.plan.logica.sonido && e.tipo === "estimulo" && e.paso !== S.ultimoPaso && typeof circBeep === "function"){
-    try { circBeep(e.objetivo ? 880 : 420, 0.08, 0.05); } catch(err){}
-  }
-  if (e.tipo === "estimulo") S.ultimoPaso = e.paso;
-}
-
-/* ---------- vistas de solo lectura ---------- */
-/* El esquema para la hoja impresa: SVG plano, sin fondos de color (el
-   conversor los ignora) y sin controles. */
-function blzImprimirHtml(plan){
-  var p = blzNormalizar(plan);
-  if (!p.activo || !u19Arr(p.pods).length) return "";
-  var W = p.superficie.anchoM, Hm = p.superficie.altoM, ratio = W / Hm, H = Math.round(1000 / ratio);
-  var svg = '<svg viewBox="0 0 1000 ' + H + '" width="100%" style="border:1px solid #bbb;border-radius:8px;color:#666;display:block;">'
-    + blzSuperficieSvg(p, H) + blzAdornosSvg(p, H);
-  u19Arr(p.adornos).forEach(function(a){
-    var ref = blzAdorno(a.tipo); if (!ref || a.tipo === "flecha" || a.tipo === "pase") return;
-    svg += '<text x="' + (a.x * 1000).toFixed(0) + '" y="' + (a.y * H + 8).toFixed(0) + '" text-anchor="middle" font-size="26" font-family="Arial">' + ref.icono + '</text>';
-  });
-  u19Arr(p.pods).forEach(function(pod){
-    var x = pod.x * 1000, y = pod.y * H;
-    svg += '<g><circle cx="' + x.toFixed(0) + '" cy="' + y.toFixed(0) + '" r="26" fill="#fff" stroke="#111" stroke-width="3"/>'
-      + '<text x="' + x.toFixed(0) + '" y="' + (y + 7).toFixed(0) + '" text-anchor="middle" font-size="22" font-weight="bold" font-family="Arial" fill="#111">' + pod.n + '</text>'
-      + (pod.base ? '<text x="' + x.toFixed(0) + '" y="' + (y + 44).toFixed(0) + '" text-anchor="middle" font-size="12" font-family="Arial" fill="#111">BASE</text>' : '')
-      + (pod.etiqueta ? '<text x="' + x.toFixed(0) + '" y="' + (y - 34).toFixed(0) + '" text-anchor="middle" font-size="12" font-family="Arial" fill="#333">' + escapeHtml(pod.etiqueta.slice(0, 18)) + '</text>' : '')
-      + '</g>';
-  });
-  svg += '</svg>';
-  var filas = blzMontaje(p).map(function(x){ return '<tr><th style="width:26%">' + escapeHtml(x.k) + '</th><td>' + escapeHtml(x.v) + '</td></tr>'; }).join("");
-  return '<h2>Planificación BlazePod</h2>' + svg + '<table>' + filas + '</table>';
-}
-/* Lo que ve quien abre el enlace: el esquema, la secuencia y el montaje, sin
-   editar nada y sin que la simulación arranque sola. */
-function blzVistaHtml(plan){
-  var p = blzNormalizar(plan);
-  if (!p.activo || !u19Arr(p.pods).length) return "";
-  var html = '<div class="card" style="margin-bottom:1rem;"><div class="card-main">'
-    + '<div class="card-title">🔵 Planificación BlazePod</div>'
-    + '<p class="blz-aviso">⚠ ' + escapeHtml(BLZ_AVISO) + '.</p>'
-    + blzLienzoHtml(p, { lectura: true, idPrefijo: "blz-ver-pod-" })
-    + '<dl class="blz-montaje">';
-  blzMontaje(p).forEach(function(x){ html += '<dt>' + escapeHtml(x.k) + '</dt><dd>' + escapeHtml(x.v) + '</dd>'; });
-  return html + '</dl></div></div>';
-}
-function blzResumenCorto(plan){
-  var p = blzNormalizar(plan);
-  if (!p.activo || !u19Arr(p.pods).length) return "";
-  var modo = blzModo(p.logica.modo) || BLZ_MODOS[0];
-  return p.pods.length + " Pods · " + modo.nombre.toLowerCase() + " · " + blzSeg(blzDuracion(p));
-}
+   Lo que queda aqui arriba lo usa esa planilla: blzNormalizar y blzPlanNuevo
+   para armar el plan de un grupo, blzGenerar y blzSimEnT para saber que Pod
+   esta encendido en el segundo t, los catalogos BLZ_* y los ayudantes de
+   numeros. Misma semilla, misma serie: es lo que permite repetir en cancha lo
+   que se vio en pantalla. */
 
 /* --- Plantillas --- */
 /* Plantillas de la casa: rutinas completas por objetivo. Las fichas que usan

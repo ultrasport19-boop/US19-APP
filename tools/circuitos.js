@@ -29,7 +29,7 @@ const codigo = [
   fn('u19Arr'),
   fn('musNorm'),
   tramo('/* --- Búsqueda --- */', '/* --- Pizarra --- */', 'el motor de búsqueda'),
-  fn('circNum'), fn('circFmt'), fn('circRatio'), fn('circPosAuto'), fn('circGruposNombres'), fn('circNombreGrupo'),
+  fn('circNum'), fn('circFmt'), fn('circRatio'), fn('circMediaTarjeta'), fn('circRadioY'), fn('circPosAuto'), fn('circGruposNombres'), fn('circNombreGrupo'),
   fn('circGrupoEn'), fn('circTrabajoDe'), fn('circDuracion'), fn('circPlan'),
 ].join('\n');
 
@@ -37,7 +37,7 @@ let m;
 try {
   m = new Function('var getExercise = function(){ return null; };\n' + codigo
     + '\nreturn { busqRaiz: busqRaiz, busqCoincide: busqCoincide, busqPuntua: busqPuntua, musNorm: musNorm, circFmt: circFmt, circPosAuto: circPosAuto,'
-    + ' circNombreGrupo: circNombreGrupo, circGrupoEn: circGrupoEn, circTrabajoDe: circTrabajoDe, circDuracion: circDuracion, circPlan: circPlan };')();
+    + ' circNombreGrupo: circNombreGrupo, circGrupoEn: circGrupoEn, circTrabajoDe: circTrabajoDe, circDuracion: circDuracion, circPlan: circPlan, circMediaTarjeta: circMediaTarjeta, circRadioY: circRadioY };')();
 } catch (e) {
   console.error('circuitos: el código no evalúa aislado: ' + e.message);
   process.exit(1);
@@ -81,8 +81,20 @@ const plan = m.circPlan({ modo: 'rotacion', rondas: 2, trabajo: 5, cambio: 2, de
 di(plan.map(p => p.tipo).join(',') === 'listos,trabajo,cambio,trabajo,descanso,trabajo,cambio,trabajo,fin', 'plan de fases: listos · trabajo · cambio · … · descanso entre vueltas · fin (da ' + plan.map(p => p.tipo).join(',') + ')');
 di(plan.filter(p => p.tipo === 'trabajo').map(p => p.turno).join(',') === '0,1,2,3', 'los turnos se numeran seguidos entre vueltas');
 di(plan.reduce((a, p) => a + p.dur, 0) === 5 + 4 * 5 + 2 * 2 + 3, 'la suma de fases cuadra con la duración más los 5 s de «listos»');
-const p0 = m.circPosAuto(0, 4, 'circulo'), p1 = m.circPosAuto(1, 4, 'circulo');
-di(p0.y < 0.2 && Math.abs(p0.x - 0.5) < 0.01 && p1.x > 0.85, 'en círculo: la estación 1 arriba y la 2 a la derecha (sentido horario)');
+const cuatro = [0, 1, 2, 3].map(i => m.circPosAuto(i, 4, 'circulo'));
+const p0 = cuatro[0], p1 = cuatro[1];
+/* La propiedad, no un numero: la 1 es la mas alta y la 2 la mas a la derecha.
+   El umbral de antes (y < 0,2) estaba atado al radio fijo de 0,36 y se rompio
+   al hacerlo depender de la forma del espacio, que es lo correcto. */
+di(cuatro.every(p => p.y >= p0.y) && Math.abs(p0.x - 0.5) < 0.01, 'en círculo: la estación 1 arriba del todo');
+di(cuatro.every(p => p.x <= p1.x) && p1.x > 0.85, 'en círculo: la estación 2 a la derecha (sentido horario)');
+/* Y lo que arregla el radio adaptado: la tarjeta de arriba tiene que caber. En
+   un espacio apaisado la tarjeta ocupa mas fraccion del alto, y antes se salia. */
+[16 / 9, 20 / 15, 10 / 4.5, 4.5 / 5, 40 / 25].forEach(function (r) {
+  const arriba = m.circPosAuto(0, 6, 'circulo', r);
+  di(arriba.y - m.circMediaTarjeta(r) >= -0.001,
+    'con proporción ' + r.toFixed(2) + ' la tarjeta de arriba entra entera (borde en ' + (arriba.y - m.circMediaTarjeta(r)).toFixed(3) + ')');
+});
 di(m.circFmt(65) === '1:05' && m.circFmt(0) === '0:00', 'formato de tiempo m:ss');
 
 /* Los dos bordes de abajo salieron el 10-sep-2026 al escribir los mutantes:
