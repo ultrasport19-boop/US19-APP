@@ -89,6 +89,9 @@ dos filas y los campos se envuelven.
 ## Lo que sigue sin panel
 
 El **peso por Pod** y el **retardo de luz**: el motor los entiende, nadie los toca
-desde la app y **no están pedidos**. Y sigue pendiente de confirmar que las medidas de
-Gym US19 (10 × 4,5 m) y Sala cardio (4,5 × 5 m) sean reales: salieron del briefing, no
-de una medición, y el plano las enseña en metros.
+desde la app y **no están pedidos**.
+
+De las dos plantillas de la casa, **Gym US19 (10 × 4,5 m) está confirmado** por Diego
+el mismo 21-sep. **Sala cardio (4,5 × 5 m) sigue saliendo del briefing**, no de una
+medición, y el plano lo enseña en metros: hasta que se mida, la escala de esa sala es
+aproximada.
