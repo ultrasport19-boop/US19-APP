@@ -773,6 +773,21 @@ comprobar('movil - showTrainerUI remide la cabecera al aparecer',
   /document\.getElementById\("tab-bar"\)\.style\.display = "";[\s\S]{0,400}?medirAppTop\(\);/.test(src),
   'con el candado cerrado no hay pestanas y el alto oculto vale 0: si no se remide al entrar, la cabecera se queda pegada entera');
 
+/* 21-sep-2026 · «Esperando tu visto bueno» */
+comprobar('visto bueno - la casilla no se estira (input{width:100%} la dejaba en media tarjeta)',
+  /onchange="u19AccTotal\(\\'' \+ escapeAttr\(tipo\) \+ '\\'\)" style="margin-top:\.15rem;width:auto;min-width:0;flex:0 0 auto;/.test(src),
+  'la regla global de los input estira cualquier casilla que no diga su ancho');
+comprobar('visto bueno - hay con qué descartar una propuesta, y solo en reactivación',
+  /tipo === 'reactivacion'[\s\S]{0,160}u19AccDescartar\(/.test(src) && /window\.u19AccDescartar = function\(tipo\)\{/.test(src));
+comprobar('visto bueno - descartar va al tipo que el asistente conoce',
+  src.indexOf('u19DashUrl("descartar_reactivacion")') > 0);
+comprobar('visto bueno - un {status:"ok"} de un asistente viejo NO cuenta como descartado',
+  /window\.u19AccDescartar[\s\S]{0,2500}if \(!u19RespuestaValida\(res, "hechos"\)\)\{ di\(sinPublicar/.test(src));
+comprobar('visto bueno - una señal débil del asistente se enseña junto al nombre, antes de aprobar',
+  src.indexOf("(c.aviso ? '<br><span style=\"color:var(--warn);\">⚠ Ojo: ' + escapeHtml(c.aviso) + '</span>' : '')") > 0);
+comprobar('visto bueno - se dice cuántas propuestas no se muestran porque ya vienen, y por qué',
+  /h \+= u19AccRetiradasHTML\(d\);/.test(src) && /function u19AccRetiradasHTML\(d\)\{/.test(src));
+
 console.log('archivo: ' + ruta);
 console.log('');
 avisos.forEach(function (a) { console.log('  · ' + a); });

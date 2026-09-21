@@ -26342,11 +26342,17 @@ function u19AccListaHTML(tipo, titulo, items, tarifa, nota){
     h += '<label class="text-xs" style="display:flex;gap:.45rem;align-items:flex-start;'
       + (_antigua ? 'opacity:.55;' : '') + '">'
       + '<input type="checkbox" data-acc="' + escapeAttr(tipo) + '" data-acc-id="' + escapeAttr(c.id) + '"'
-      + ' data-acc-nombre="' + escapeAttr(c.nombre || '') + '" onchange="u19AccTotal(\'' + escapeAttr(tipo) + '\')" style="margin-top:.15rem;">'
+      /* width:auto y flex fijo: la regla global input{width:100%} estiraba la
+         casilla hasta ocupar media tarjeta y dejaba el texto en una columna
+         estrecha a la derecha (captura de Diego, 21-sep-2026). */
+      + ' data-acc-nombre="' + escapeAttr(c.nombre || '') + '" onchange="u19AccTotal(\'' + escapeAttr(tipo) + '\')" style="margin-top:.15rem;width:auto;min-width:0;flex:0 0 auto;padding:0;">'
       + '<span style="flex:1;"><b>' + escapeHtml(c.nombre || '—') + '</b>'
       + (c.ult ? ' <span class="text-muted">· última reserva ' + escapeHtml(c.ult)
           + (_dUlt !== null ? ' (hace ' + _dUlt + ' d)' : '') + '</span>' : '')
       + (_antigua ? ' <span class="badge muted" title="Lleva más de 30 días sin reservar; la propuesta es de entonces">antigua</span>' : '')
+      /* Una señal débil de que podría estar viniendo (21-sep-2026): no basta
+         para sacarlo de la lista, pero Diego tiene que verla antes de aprobar. */
+      + (c.aviso ? '<br><span style="color:var(--warn);">⚠ Ojo: ' + escapeHtml(c.aviso) + '</span>' : '')
       + (c.plan ? ' <span class="text-muted">· ' + escapeHtml(c.plan) + '</span>' : '')
       + (c.medio ? ' <span class="text-muted">· ' + escapeHtml(c.medio) + '</span>' : '')
       + (c.mensaje ? '<br><span class="text-muted" style="font-style:italic;">«' + escapeHtml(c.mensaje) + '»</span>' : '')
@@ -26357,6 +26363,10 @@ function u19AccListaHTML(tipo, titulo, items, tarifa, nota){
     + '<button class="btn btn-secondary btn-sm" type="button" onclick="u19AccTodos(\'' + escapeAttr(tipo) + '\',true)">Todos</button>'
     + '<button class="btn btn-secondary btn-sm" type="button" onclick="u19AccTodos(\'' + escapeAttr(tipo) + '\',false)">Ninguno</button>'
     + '<button class="btn btn-primary btn-sm" type="button" onclick="u19AccAprobar(\'' + escapeAttr(tipo) + '\',' + (tarifa || 0) + ')">Aprobar</button>'
+    + (tipo === 'reactivacion'
+        ? '<button class="btn btn-secondary btn-sm" type="button" onclick="u19AccDescartar(\'' + escapeAttr(tipo) + '\')"'
+          + ' title="Para quien sí viene: la propuesta se borra y no se le envía nada">Descartar: sí viene</button>'
+        : '')
     + '<span id="acc-total-' + escapeAttr(tipo) + '" class="text-xs text-muted">ninguno</span></div>';
   h += '<div id="acc-msg-' + escapeAttr(tipo) + '" style="font-size:.78rem;margin-top:.4rem;"></div>';
   h += '</div>';
@@ -26485,15 +26495,81 @@ window.u19AccAprobar = function(tipo, tarifa){
   });
 };
 
+/* Lo que el bot ya NO enseña porque esa persona viene (21-sep-2026). Se dice
+   igual: una lista que se acorta sola sin explicar por qué parece un fallo.
+   Solo lo manda un asistente publicado después del 21-sep; con uno anterior,
+   `retiradas` no viene y aquí no sale nada. */
+function u19AccRetiradasHTML(d){
+  var r = u19Lista(d && d.retiradas).filter(function(x){ return x && x.nombre; });
+  var h = '';
+  if (r.length){
+    h += '<details class="text-xs" style="margin-top:.6rem;border:1px dashed var(--rule);border-radius:6px;padding:.5rem .7rem;">'
+      + '<summary style="cursor:pointer;color:var(--success);">✓ ' + r.length + ' propuesta(s) que no te muestro: esas personas ya vienen</summary>'
+      + '<ul style="margin:.4rem 0 0 1rem;padding:0;line-height:1.6;">'
+      + r.map(function(x){
+          return '<li><b>' + escapeHtml(x.nombre) + '</b> <span class="text-muted">· ' + escapeHtml(x.motivo || '') + '</span></li>';
+        }).join('')
+      + '</ul><p class="text-muted" style="margin:.4rem 0 0;">El bot las cierra solo en su pasada de las 8:00. No hay que hacer nada.</p></details>';
+  }
+  if (d && d.verificado === false && u19Lista(d.reactivacion).length){
+    h += '<p class="text-xs" style="margin:.5rem 0 0;color:var(--warn);">⚠ Hoy no pude revisar la agenda ni pasar lista: '
+      + 'alguno de la lista podría estar viniendo. Míralo antes de aprobar.</p>';
+  }
+  return h;
+}
+
+/* «Descartar: sí viene» (21-sep-2026). La tarjeta decía «congeladas hasta que
+   apruebes o descartes» y no había con qué descartar: había que ir a Notion.
+   Deja la propuesta en blanco (el bot no vuelve a proponerla antes de tres
+   semanas) y NO envía nada. El asistente solo toca las que siguen en
+   «Propuesto». */
+window.u19AccDescartar = function(tipo){
+  var msg = document.getElementById('acc-msg-' + tipo);
+  function di(t, col){ if (msg) msg.innerHTML = '<span style="color:' + col + ';">' + escapeHtml(t) + '</span>'; }
+  var sel = u19AccSel(tipo);
+  if (!sel.length){ di("Marca a quién descartar.", "var(--warn)"); return; }
+  var aviso = "Descartar " + sel.length + " propuesta(s). No se les envía nada.\n\n"
+    + sel.slice(0, 15).map(function(c){ return "  · " + c.nombre; }).join("\n")
+    + (sel.length > 15 ? "\n  … y " + (sel.length - 15) + " más" : "")
+    + "\n\n¿Sigo?";
+  if (!window.confirm(aviso)){ di("Cancelado. No se tocó nada.", "var(--muted)"); return; }
+  var url = u19DashUrl("descartar_reactivacion");
+  if (!url){ di("Falta configurar el puente.", "var(--danger)"); return; }
+  di("Descartando en Notion…", "var(--muted)");
+  fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ clave: (settings.dashClave || "").trim(), k: (settings.dashClave || "").trim(),
+                           ids: sel.map(function(c){ return c.id; }) })
+  }).then(function(r){ return r.json(); }).then(function(res){
+    var sinPublicar = "Falta publicar el asistente para descartar desde aquí. Mientras, en Notion: deja vacío «Estado reactivación».";
+    if (res && res.error){ di(/desconocid/i.test(String(res.error)) ? sinPublicar : res.error, "var(--danger)"); return; }
+    /* Un asistente viejo contesta {status:"ok"} a lo que no conoce: eso NO es
+       un descarte. Sin `hechos`, no se hizo nada. */
+    if (!u19RespuestaValida(res, "hechos")){ di(sinPublicar, "var(--danger)"); return; }
+    var ok = u19Lista(res.hechos).length, mal = u19Lista(res.errores).length;
+    di(ok + " descartada(s)" + (mal ? " · " + mal + " no" : "") + ". No se envía nada.", mal ? "var(--warn)" : "var(--success)");
+    if (mal && msg){
+      msg.innerHTML += '<br>' + u19Lista(res.errores).map(function(x){
+        return '<span class="text-xs" style="color:var(--danger);">'
+          + escapeHtml((x && typeof x === 'object') ? ((x.nombre || x.id || '?') + ': ' + (x.por || '')) : String(x || '')) + '</span>'; }).join('<br>');
+    }
+    try { localStorage.removeItem(ACC_KEY); } catch (e){}
+    if (typeof u19AccLeer === "function") setTimeout(function(){ u19AccLeer(true); }, 400);
+  }).catch(function(e){ di("No se pudo: " + (e && e.message ? e.message : e), "var(--danger)"); });
+};
+
 function u19AccCuerpoHTML(d){
   d = d || {};
   var h = '';
   h += u19AccListaHTML('reactivacion', 'Propuestas del bot (congeladas hasta que apruebes o descartes)', d.reactivacion,
         (d.tarifas && d.tarifas.marketing) || 78,
         'Cada día a las 8:00 el bot cruza Calendly con Notion y propone (hasta 20 por día) a quien lleva '
-        + 'más de 7 días sin agendar y no tiene hora tomada, sea cual sea su plan, incluidos los que se les '
-        + 'venció el plan hace 60 días o menos. Marca y aprueba: los envía él dentro de la hora, entre 9:00 y 21:00. '
-        + 'Un nombre sale de aquí cuando lo apruebas o vuelve a agendar. Es categoría Marketing: el más caro de los dos.');
+        + 'más de 7 días sin agendar y no tiene hora tomada, sea cual sea su plan. Solo socios activos: a quien ya '
+        + 'no es socio no se le propone nada. Marca y aprueba: los envía él dentro de la hora, entre 9:00 y 21:00. '
+        + 'Un nombre sale de aquí cuando lo apruebas, lo descartas o da una señal de que viene: hora tomada, «vino» en '
+        + 'pasar lista o una hora a un nombre parecido. Es categoría Marketing: el más caro de los dos.');
+  h += u19AccRetiradasHTML(d);
   h += u19AccListaHTML('ingreso', 'Altas por aprobar', d.ingreso,
         (d.tarifas && d.tarifas.utility) || 14,
         'Al aprobar, el bot manda la bienvenida con los datos de pago.');
