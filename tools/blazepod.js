@@ -636,7 +636,7 @@ dentro('circPodsPlan', 'peso: p.peso', 'pesos · el peso del Pod llega al motor 
    Hoy la logica de luz vive en `podsConfig` (una por estacion) y en
    `podsSueltos`. Esto vigila que lo que se guarda llegue entero al motor: es
    el camino por el que la pantalla que falta tendra que entrar. */
-const cfgIda = ['modo', 'intervalo', 'luz', 'disparo', 'simultaneos', 'semilla', 'sonido', 'tiempoRespuestaMs', 'aleatorio', 'colores'];
+const cfgIda = ['modo', 'intervalo', 'luz', 'disparo', 'simultaneos', 'semilla', 'sonido', 'tiempoRespuestaMs', 'aleatorio', 'colores', 'objetivo', 'probObjetivo', 'secuencia'];
 cfgIda.forEach(k => {
   di(fn('circPodsConfigNueva').indexOf(k) >= 0 || fn('circPodsConfig').indexOf(k) >= 0, 'configuracion · «' + k + '» esta en la del grupo');
 });
@@ -646,6 +646,24 @@ dentro('circPodsPlan', 'plan.logica.simultaneos = cfg.simultaneos', 'configuraci
 dentro('circPodsPlan', 'plan.logica.semilla = cfg.semilla', 'configuracion · la semilla, que es lo que hace repetible la serie');
 dentro('circPodsPlan', 'plan.logica.preparacion = 0', 'configuracion · el subcronometro no mete preparacion: eso lo lleva el reloj global');
 dentro('circPodsPlan', 'plan.series = 1', 'configuracion · ni series: el bloque es uno');
+dentro('circPodsPlan', 'plan.objetivo = u19Arr(cfg.objetivo)', 'configuracion · el color objetivo de «Foco» llega al motor');
+dentro('circPodsPlan', 'plan.logica.probObjetivo = cfg.probObjetivo', 'configuracion · y cada cuanto sale en vez de un distractor');
+dentro('circPodsPlan', 'plan.secuencia = u19Arr(cfg.secuencia)', 'configuracion · los pasos de la secuencia, tambien');
+
+/* Un grupo en «Secuencia» sin pasos no enciende NADA, y no da error: el
+   motor devuelve la lista vacia y los Pods se quedan apagados toda la clase.
+   Por eso los pasos viajan en la configuracion del grupo y el panel avisa
+   cuando faltan. */
+const seqVacia = conLogica({ modo: 'secuencia', duracion: 30 }, planDemo());
+seqVacia.secuencia = [];
+igual('secuencia · sin pasos no hay un solo estimulo', m.blzEstimulos(seqVacia, 1).length, 0);
+const seqLlena = conLogica({ modo: 'secuencia', duracion: 30 }, planDemo());
+seqLlena.secuencia = [{ id: 's1', pods: [1, 2], color: 'verde', dur: 1.5 },
+                      { id: 's2', pods: [3], color: 'rojo', dur: 2 }];
+const estSeq = m.blzEstimulos(seqLlena, 1);
+igual('secuencia · con pasos, un estimulo por paso', estSeq.length, 2);
+igual('secuencia · el primero enciende los dos Pods que dice', estSeq[0].pods.length, 2);
+igual('secuencia · y el segundo empieza cuando acaba el primero', estSeq[1].t, 1.5);
 
 /* --- resultado --- */
 console.log('\nUS19-APP · planificador BlazePod');

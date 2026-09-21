@@ -224,6 +224,21 @@
       "a": "      podsConfigNo: u19Arr(c.estaciones).map(function(st){"
     },
     {
+      "nombre": "el color objetivo de Foco no llega al motor",
+      "de": "  plan.objetivo = u19Arr(cfg.objetivo).slice();",
+      "a": "  plan.objetivo = [];"
+    },
+    {
+      "nombre": "los pasos de la secuencia se quedan en el editor y no llegan al motor",
+      "de": "  plan.secuencia = u19Arr(cfg.secuencia).map(function(p){",
+      "a": "  plan.secuenciaNo = u19Arr(cfg.secuencia).map(function(p){"
+    },
+    {
+      "nombre": "todos los pasos de la secuencia arrancan en el segundo cero",
+      "de": "      t += paso.dur;",
+      "a": "      t += 0;"
+    },
+    {
       "nombre": "en pantalla estrecha el Pod encoge por debajo del dedo",
       "de": "  .cm-pod{width:44px;height:44px;}",
       "a": "  .cm-pod{width:30px;height:30px;}"

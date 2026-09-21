@@ -1444,6 +1444,12 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .circ-flechas{display:inline-flex;gap:.15rem;}
 .circ-col{width:24px;height:24px;min-width:24px;border-radius:50%;border:2px solid var(--border);background:var(--surface-2);color:var(--muted);padding:0;cursor:pointer;font-size:.7rem;line-height:1;}
 .circ-col.on{border-color:var(--accent);outline:2px solid var(--accent);outline-offset:1px;}
+.circ-luz{margin-top:.55rem;border-top:1px dashed var(--border);padding-top:.5rem;}
+.circ-luz-t{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-weight:700;color:var(--text);}
+.circ-luz-pasos{margin-top:.5rem;}
+.circ-paso{display:flex;gap:.3rem;align-items:center;flex-wrap:wrap;margin-top:.35rem;}
+.circ-paso .circ-n{font-family:var(--font-display);font-size:1rem;color:var(--muted);min-width:1.2rem;text-align:center;}
+.circ-paso .blz-seg-b{border:1px solid var(--border);min-height:28px;padding:.2rem .5rem;}
 /* El subcronometro de Pods, dentro de la pantalla en vivo. */
 .cl-pods{margin:.5rem auto 0;max-width:760px;background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:.5rem .7rem;}
 .cl-pod-fila{display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;padding:.15rem 0;}
@@ -17934,6 +17940,7 @@ function circGrupoEn(c, s, t){
 var CIRC_PV = 2;              /* version de la planilla: pv < 2 es de antes */
 var CIRC_MAX_PODS = 12;       /* el mismo tope que BLZ_MAX_PODS */
 var CIRC_MAX_ELEM = 40;
+var CIRC_MAX_PASOS = 60;      /* pasos de una secuencia, por grupo */
 var CIRC_RADIO_POD = 0.085;   /* fraccion del ancho: cerca de una estacion */
 
 /* `medidas` arranca en la plantilla pero se guarda, no se deriva: en cuanto
@@ -18061,22 +18068,40 @@ function circPodsRenumerar(c){
 function circPodsConfigNueva(){
   return { modo: "random", tiempoRespuestaMs: 3000, aleatorio: true,
            colores: BLZ_COLORES.slice(0, 4).map(function(x){ return x.id; }),
-           intervalo: 3, luz: 3, disparo: "intervalo", simultaneos: 1, semilla: "us19", sonido: true };
+           intervalo: 3, luz: 3, disparo: "intervalo", simultaneos: 1, semilla: "us19", sonido: true,
+           objetivo: [BLZ_COLORES[0].id], probObjetivo: 70, secuencia: [] };
 }
 function circPodsConfig(o){
   var d = circPodsConfigNueva(), q = (o && typeof o === "object") ? o : {};
   var cols = u19Arr(q.colores).filter(function(id){ return !!blzColorRef(id); });
   var iv = circMedida(q.intervalo, d.intervalo, 0.2, 600);
+  var pal = cols.length ? cols.slice(0, BLZ_COLORES.length) : d.colores.slice();
+  var luz = circMedida(q.luz, iv, 0.2, 600);
+  /* El objetivo de «Foco» y el color de cada paso solo pueden ser colores de
+     la paleta del grupo: blzNormalizar tira los que no estan en `plan.colores`
+     y el modo se quedaria sin objetivo sin decir nada. */
+  var obj = u19Arr(q.objetivo).filter(function(id){ return pal.indexOf(id) >= 0; });
   return { modo: blzModo(q.modo) ? q.modo : d.modo,
            tiempoRespuestaMs: Math.round(circMedida(q.tiempoRespuestaMs, d.tiempoRespuestaMs, 200, 600000)),
            aleatorio: q.aleatorio !== false,
-           colores: cols.length ? cols.slice(0, BLZ_COLORES.length) : d.colores.slice(),
+           colores: pal,
            intervalo: iv,
-           luz: circMedida(q.luz, iv, 0.2, 600),
+           luz: luz,
            disparo: blzDisparo(q.disparo) ? q.disparo : d.disparo,
            simultaneos: blzEnt(q.simultaneos, 1, 1, CIRC_MAX_PODS),
            semilla: blzTexto(q.semilla, 40) || d.semilla,
-           sonido: q.sonido !== false };
+           sonido: q.sonido !== false,
+           objetivo: obj.length ? obj : [pal[0]],
+           probObjetivo: blzEnt(q.probObjetivo, d.probObjetivo, 0, 100),
+           /* Los numeros de un paso son POSICIONES dentro del grupo (1..N), no
+              el numero que lleva pintado el Pod en el plano. */
+           secuencia: u19Arr(q.secuencia).slice(0, CIRC_MAX_PASOS).map(function(p, i){
+             return { id: blzTexto(p && p.id, 40) || ("s" + (i + 1)),
+                      pods: u19Arr(p && p.pods).map(function(n){ return blzEnt(n, 0, 0, CIRC_MAX_PODS); })
+                              .filter(function(n){ return n > 0; }),
+                      color: (pal.indexOf(p && p.color) >= 0) ? p.color : pal[0],
+                      dur: circMedida(p && p.dur, luz, 0.2, 600) };
+           }) };
 }
 /* La configuracion de un grupo, siempre normalizada y sin escribir en el
    circuito: quien quiera guardarla usa circPodsConfigPoner. */
@@ -18102,7 +18127,12 @@ function circPodsConfigDeLogica(bp){
                           tiempoRespuestaMs: Math.round(blzNum(L.respuesta, 3, 0.2, 600) * 1000),
                           aleatorio: (L.modo !== "secuencia" && L.modo !== "libre"),
                           colores: cols, intervalo: L.intervalo, luz: L.luz, disparo: L.disparo,
-                          simultaneos: L.simultaneos, semilla: L.semilla, sonido: L.sonido });
+                          simultaneos: L.simultaneos, semilla: L.semilla, sonido: L.sonido,
+                          /* El plan viejo numeraba sus Pods 1..N y la migracion los
+                             copia EN ORDEN a un solo grupo: los pasos siguen
+                             apuntando a donde apuntaban. */
+                          objetivo: u19Arr(bp && bp.objetivo), probObjetivo: L.probObjetivo,
+                          secuencia: u19Arr(bp && bp.secuencia) });
 }
 
 /* ---------- migracion: de los dos lienzos a uno ---------- */
@@ -18584,8 +18614,14 @@ function circPintarMapa(){
   if (_circSelPod && !circPodPorId(_circEdit, _circSelPod)) _circSelPod = "";
   if (_circSelEl && !circElementoPorId(_circEdit, _circSelEl)) _circSelEl = "";
   box.innerHTML = circMapaHtml(_circEdit, { selPod: _circSelPod, selEl: _circSelEl, lectura: !!_circEdit._ro });
+  circPintarSel();
+}
+/* Cambiar la logica de luz no mueve nada del plano: se repinta solo el panel.
+   Repintar el plano entero cada vez que se toca un mando le quitaria el foco
+   al campo que se esta escribiendo. */
+function circPintarSel(){
   var sel = document.getElementById("circ-sel-box");
-  if (sel) sel.innerHTML = circSelHtml(_circEdit);
+  if (sel && _circEdit) sel.innerHTML = circSelHtml(_circEdit);
 }
 function circPintarTools(){
   var box = document.getElementById("circ-mapa-tools");
@@ -18628,7 +18664,7 @@ function circSelHtml(c){
   var sueltos = circPodsSueltos(c).length;
   return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">' + nP + ' Pod' + (nP === 1 ? '' : 's') + ' en el plano, '
     + (sueltos ? sueltos + ' suelto' + (sueltos === 1 ? '' : 's') : 'todos atados a una estación')
-    + '. Toca una pieza del plano para moverla con las flechas, etiquetarla o borrarla.</p>';
+    + '. Toca un Pod para moverlo, etiquetarlo y ajustar la luz de su grupo: modo, colores y tiempos.</p>';
 }
 function circSelPodHtml(c, pod){
   var i = pod.estacionId ? circEstacionIdx(c, pod.estacionId) : -1;
@@ -18658,7 +18694,9 @@ function circSelPodHtml(c, pod){
     + (i >= 0 ? '<button class="btn btn-ghost btn-sm" onclick="circPodSoltar(\'' + id + '\')" title="Dejarlo suelto sin arrastrarlo">Soltar de la estación</button>' : '')
     + '<button class="btn btn-ghost btn-sm" onclick="circPodDup(\'' + id + '\')">Duplicar</button>'
     + '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circPodBorrar(\'' + id + '\')">Borrar</button>'
-    + '</div></div>';
+    + '</div>'
+    + circPodsPanelHtml(c, pod.estacionId || "")
+    + '</div>';
 }
 function circSelElHtml(c, el){
   var ref = blzAdorno(el.tipo) || BLZ_ADORNOS[0];
@@ -18682,6 +18720,197 @@ function circSelElHtml(c, el){
     + '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circElBorrar(\'' + id + '\')">Borrar</button>'
     + '</div></div>';
 }
+
+/* ---------- los mandos de la luz, por grupo ------------------------------
+   El motor entiende la configuracion de cada grupo desde que existe la
+   planilla, pero no habia donde tocarla: modo, colores, tiempos y pasos
+   corrian con el valor de fabrica. Esto son los mandos. Salen al tocar un Pod
+   porque el grupo ES el del Pod, y `g` es el id de su estacion — o "" para el
+   monton de los sueltos, que es un grupo mas. */
+function circLuzGrupo(g){ return g ? g : null; }
+function circLuzCfg(c, g){ return circPodsConfigDe(c, circLuzGrupo(g)); }
+function circLuzPoner(g, cfg){
+  if (!_circEdit) return null;
+  var n = circPodsConfigPoner(_circEdit, circLuzGrupo(g), cfg);
+  circPintarSel();
+  return n;
+}
+/* `g` llega ya escapado: es quien pinta el panel el que lo escapa una vez. */
+function circLuzNumHtml(g, campo, etiqueta, valor, paso, min, max, ayuda){
+  return '<label class="blz-mini" title="' + escapeAttr(ayuda || "") + '">' + escapeHtml(etiqueta)
+    + ' <input type="number" min="' + min + '" max="' + max + '" step="' + paso + '" value="' + valor
+    + '" onchange="circLuzCampo(\'' + g + '\',\'' + campo + '\', this.value)"></label>';
+}
+function circPodsPanelHtml(c, g){
+  if (!c || c._ro) return "";
+  var cfg = circLuzCfg(c, g), grupo = circPodsDe(c, circLuzGrupo(g)), ga = escapeAttr(g || "");
+  var i = g ? circEstacionIdx(c, g) : -1;
+  var donde = (i >= 0) ? ("la estación " + (i + 1)) : "los Pods sueltos";
+  var modo = blzModo(cfg.modo) || BLZ_MODOS[0];
+  var seq = (cfg.modo === "secuencia" || cfg.modo === "libre");
+  var h = '<div class="circ-luz">'
+    + '<div class="circ-luz-t">💡 Luz de ' + escapeHtml(donde)
+      + ' <span class="text-xs text-muted">' + grupo.length + ' Pod' + (grupo.length === 1 ? '' : 's')
+      + ' · manda sobre todo el grupo</span></div>'
+    + '<div class="blz-seg" style="margin-top:.4rem;">'
+    + BLZ_MODOS.map(function(x){
+        return '<button type="button" class="blz-seg-b' + (cfg.modo === x.id ? ' on' : '')
+          + '" title="' + escapeAttr(x.ayuda) + '" onclick="circLuzCampo(\'' + ga + '\',\'modo\',\'' + escapeAttr(x.id) + '\')">'
+          + escapeHtml(x.nombre) + '</button>';
+      }).join("")
+    + '</div>'
+    + '<p class="text-xs text-muted" style="margin:.35rem 0 0;">' + escapeHtml(modo.ayuda) + '</p>'
+    + '<div class="circ-selp-f">'
+    + (seq ? '' : circLuzNumHtml(ga, "intervalo", "Cada", cfg.intervalo, "0.5", "0.2", "600", "Segundos entre un estímulo y el siguiente"))
+    + (seq ? '' : circLuzNumHtml(ga, "luz", "Encendido", cfg.luz, "0.5", "0.2", "600", "Cuántos segundos se queda encendido el Pod"))
+    + circLuzNumHtml(ga, "respuesta", "Respuesta", Math.round(cfg.tiempoRespuestaMs / 100) / 10, "0.1", "0.2", "600", "El tiempo que se le da para llegar, en segundos")
+    + (seq ? '' : circLuzNumHtml(ga, "simultaneos", "A la vez", cfg.simultaneos, "1", "1", CIRC_MAX_PODS, "Cuántos Pods se encienden en cada estímulo"))
+    + '</div>'
+    + '<div class="circ-selp-f">'
+    + (seq ? '' : '<label class="blz-mini">Cambia con <select onchange="circLuzCampo(\'' + ga + '\',\'disparo\', this.value)">'
+        + BLZ_DISPAROS.map(function(x){
+            return '<option value="' + escapeAttr(x.id) + '"' + (cfg.disparo === x.id ? ' selected' : '') + '>' + escapeHtml(x.nombre) + '</option>';
+          }).join("") + '</select></label>')
+    + (seq ? '' : '<label class="blz-mini" title="No repetir el mismo Pod dos veces seguidas"><input type="checkbox"' + (cfg.aleatorio ? ' checked' : '')
+        + ' onchange="circLuzCampo(\'' + ga + '\',\'aleatorio\', this.checked)"> Sin repetir Pod</label>')
+    + '<label class="blz-mini"><input type="checkbox"' + (cfg.sonido ? ' checked' : '')
+      + ' onchange="circLuzCampo(\'' + ga + '\',\'sonido\', this.checked)"> Sonido</label>'
+    + '<label class="blz-mini" title="La misma semilla repite exactamente la misma serie: lo que se ve en pantalla es lo que sale en cancha">Semilla '
+      + '<input type="text" maxlength="40" value="' + escapeAttr(cfg.semilla) + '" onchange="circLuzCampo(\'' + ga + '\',\'semilla\', this.value)"></label>'
+    + '</div>'
+    + '<div class="circ-selp-f"><span class="text-xs text-muted">Colores del grupo:</span>'
+    + BLZ_COLORES.map(function(col){
+        return '<button type="button" class="circ-col' + (cfg.colores.indexOf(col.id) >= 0 ? ' on' : '')
+          + '" style="background:' + col.hex + ';" title="' + escapeAttr(col.nombre + " · " + col.consigna)
+          + '" onclick="circLuzColor(\'' + ga + '\',\'' + escapeAttr(col.id) + '\')"></button>';
+      }).join("")
+    + '</div>';
+  /* «Foco» sin objetivo no es «Foco»: se elige de la paleta del grupo. */
+  if (cfg.modo === "focus"){
+    h += '<div class="circ-selp-f"><span class="text-xs text-muted">Color objetivo:</span>'
+      + cfg.colores.map(function(id){
+          var col = blzColorRef(id) || BLZ_COLORES[0];
+          return '<button type="button" class="circ-col' + (cfg.objetivo.indexOf(id) >= 0 ? ' on' : '')
+            + '" style="background:' + col.hex + ';" title="' + escapeAttr(col.nombre)
+            + '" onclick="circLuzObjetivo(\'' + ga + '\',\'' + escapeAttr(id) + '\')"></button>';
+        }).join("")
+      + circLuzNumHtml(ga, "probObjetivo", "sale el", cfg.probObjetivo, "5", "0", "100", "Cada cuánto sale el objetivo en vez de un distractor")
+      + '<span class="text-xs text-muted">% de las veces</span></div>';
+  }
+  if (seq) h += circLuzPasosHtml(ga, cfg, grupo);
+  h += '<div class="circ-selp-f"><button class="btn btn-ghost btn-sm" onclick="circLuzFabrica(\'' + ga + '\')"'
+    + ' title="Devuelve la luz de este grupo a los valores de fábrica">↺ Valores de fábrica</button></div>';
+  return h + '</div>';
+}
+/* Los pasos de «Secuencia» y «Personalizado». Sin pasos el motor no enciende
+   NADA — blzEstimulos devuelve la lista vacia—, asi que se avisa en pantalla
+   en vez de dejar un modo que no hace nada. */
+function circLuzPasosHtml(ga, cfg, grupo){
+  var h = '<div class="circ-luz-pasos"><span class="text-xs text-muted">Los pasos, en orden: qué Pods se encienden, de qué color y cuántos segundos. La serie se repite hasta acabar el bloque.</span>';
+  if (!cfg.secuencia.length) h += '<p class="text-xs" style="color:var(--warn);margin:.3rem 0 0;">Sin pasos no se enciende nada. Añade el primero.</p>';
+  cfg.secuencia.forEach(function(p, i){
+    h += '<div class="circ-paso"><span class="circ-n">' + (i + 1) + '</span>'
+      /* El numero que se pinta es el del Pod en el plano; lo que se guarda es
+         su POSICION en el grupo. No tienen por que coincidir. */
+      + grupo.map(function(pod, k){
+          return '<button type="button" class="blz-seg-b' + (p.pods.indexOf(k + 1) >= 0 ? ' on' : '')
+            + '" title="Pod ' + pod.n + '" onclick="circLuzPasoPod(\'' + ga + '\',' + i + ',' + (k + 1) + ')">' + pod.n + '</button>';
+        }).join("")
+      + cfg.colores.map(function(id){
+          var col = blzColorRef(id) || BLZ_COLORES[0];
+          return '<button type="button" class="circ-col' + (p.color === id ? ' on' : '') + '" style="background:' + col.hex
+            + ';" title="' + escapeAttr(col.nombre) + '" onclick="circLuzPasoColor(\'' + ga + '\',' + i + ',\'' + escapeAttr(id) + '\')"></button>';
+        }).join("")
+      + '<label class="blz-mini"><input type="number" min="0.2" max="600" step="0.5" value="' + p.dur
+        + '" onchange="circLuzPasoDur(\'' + ga + '\',' + i + ', this.value)"> s</label>'
+      + '<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circLuzPasoQuitar(\'' + ga + '\',' + i + ')" title="Quitar el paso">×</button>'
+      + '</div>';
+  });
+  return h + '<div class="circ-selp-f"><button class="btn btn-secondary btn-sm" onclick="circLuzPasoAdd(\'' + ga + '\')">+ Paso</button></div></div>';
+}
+window.circLuzCampo = function(g, campo, v){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g);
+  if (campo === "modo"){ if (!blzModo(v)) return; cfg.modo = v; }
+  else if (campo === "disparo"){ if (!blzDisparo(v)) return; cfg.disparo = v; }
+  else if (campo === "semilla") cfg.semilla = blzTexto(v, 40) || cfg.semilla;
+  else if (campo === "aleatorio") cfg.aleatorio = !!v;
+  else if (campo === "sonido") cfg.sonido = !!v;
+  else if (campo === "respuesta") cfg.tiempoRespuestaMs = Math.round(circMedida(v, cfg.tiempoRespuestaMs / 1000, 0.2, 600) * 1000);
+  else if (campo === "simultaneos") cfg.simultaneos = blzEnt(v, cfg.simultaneos, 1, CIRC_MAX_PODS);
+  else if (campo === "probObjetivo") cfg.probObjetivo = blzEnt(v, cfg.probObjetivo, 0, 100);
+  else if (campo === "intervalo" || campo === "luz") cfg[campo] = circMedida(v, cfg[campo], 0.2, 600);
+  else return;
+  circLuzPoner(g, cfg);
+};
+window.circLuzColor = function(g, id){
+  if (!_circEdit || !blzColorRef(id)) return;
+  var cfg = circLuzCfg(_circEdit, g), k = cfg.colores.indexOf(id);
+  if (k >= 0){
+    /* Un grupo sin colores deja al motor sin con que encender. */
+    if (cfg.colores.length <= 1){ toast("El grupo necesita al menos un color", "warn"); return; }
+    cfg.colores.splice(k, 1);
+  } else cfg.colores.push(id);
+  circLuzPoner(g, cfg);
+};
+window.circLuzObjetivo = function(g, id){
+  if (!_circEdit || !blzColorRef(id)) return;
+  var cfg = circLuzCfg(_circEdit, g), k = cfg.objetivo.indexOf(id);
+  if (k >= 0){
+    if (cfg.objetivo.length <= 1){ toast("Foco necesita un color objetivo", "warn"); return; }
+    cfg.objetivo.splice(k, 1);
+  } else cfg.objetivo.push(id);
+  circLuzPoner(g, cfg);
+};
+window.circLuzFabrica = function(g){
+  if (!_circEdit) return;
+  circLuzPoner(g, circPodsConfigNueva());
+  toast("Luz del grupo a valores de fábrica", "success");
+};
+window.circLuzPasoAdd = function(g){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g), grupo = circPodsDe(_circEdit, circLuzGrupo(g));
+  if (!grupo.length){ toast("Este grupo no tiene Pods", "warn"); return; }
+  if (cfg.secuencia.length >= CIRC_MAX_PASOS){ toast("El tope son " + CIRC_MAX_PASOS + " pasos", "warn"); return; }
+  /* El paso nace con el Pod que se esta mirando; si el seleccionado no es de
+     este grupo, con el primero. */
+  var k = 0;
+  grupo.forEach(function(p, j){ if (p.id === _circSelPod) k = j; });
+  cfg.secuencia.push({ id: "s" + genId(), pods: [k + 1], color: cfg.colores[0], dur: cfg.luz });
+  circLuzPoner(g, cfg);
+};
+window.circLuzPasoQuitar = function(g, i){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g);
+  if (!cfg.secuencia[i]) return;
+  cfg.secuencia.splice(i, 1);
+  circLuzPoner(g, cfg);
+};
+window.circLuzPasoPod = function(g, i, n){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g), p = cfg.secuencia[i];
+  if (!p) return;
+  var k = p.pods.indexOf(n);
+  if (k >= 0){
+    if (p.pods.length <= 1){ toast("Cada paso enciende al menos un Pod", "warn"); return; }
+    p.pods.splice(k, 1);
+  } else p.pods.push(n);
+  circLuzPoner(g, cfg);
+};
+window.circLuzPasoColor = function(g, i, id){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g), p = cfg.secuencia[i];
+  if (!p || cfg.colores.indexOf(id) < 0) return;
+  p.color = id;
+  circLuzPoner(g, cfg);
+};
+window.circLuzPasoDur = function(g, i, v){
+  if (!_circEdit) return;
+  var cfg = circLuzCfg(_circEdit, g), p = cfg.secuencia[i];
+  if (!p) return;
+  p.dur = circMedida(v, p.dur, 0.2, 600);
+  circLuzPoner(g, cfg);
+};
 
 /* ---------- lo que hacen los botones ---------- */
 window.circSelLimpiar = function(){ _circSelPod = ""; _circSelEl = ""; circPintarMapa(); };
@@ -19650,6 +19879,14 @@ function circPodsPlan(c, estacionId, duracionSeg){
   plan.logica.sinRepetir = !!cfg.aleatorio;
   plan.logica.semilla = cfg.semilla;
   plan.logica.sonido = cfg.sonido;
+  plan.logica.probObjetivo = cfg.probObjetivo;
+  plan.objetivo = u19Arr(cfg.objetivo).slice();
+  /* Las posiciones del paso son las mismas que acaban de escribirse en
+     `plan.pods`, que se renumera 1..N por grupo. La condicion de cada paso es
+     la del grupo: aqui no hay pasos con regla propia. */
+  plan.secuencia = u19Arr(cfg.secuencia).map(function(p){
+    return { id: p.id, pods: u19Arr(p.pods).slice(), color: p.color, dur: p.dur, condicion: cfg.disparo };
+  });
   /* El calentamiento, las vueltas y el descanso los lleva el cronometro global:
      el subcronometro solo rellena el bloque de trabajo, ni un segundo mas. */
   plan.logica.preparacion = 0;

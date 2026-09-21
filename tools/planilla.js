@@ -32,7 +32,7 @@ const codigo = [
   fn('genId'), fn('u19Arr'),
   lista('BLZ_COLORES'), lista('BLZ_MODOS'), lista('BLZ_DISPAROS'), lista('BLZ_ADORNOS'),
   fn('blzNum'), fn('blzEnt'), fn('blzTexto'), fn('blzColorRef'), fn('blzModo'), fn('blzDisparo'), fn('blzAdorno'),
-  uno('CIRC_PV'), uno('CIRC_MAX_PODS'), uno('CIRC_MAX_ELEM'), uno('CIRC_RADIO_POD'),
+  uno('CIRC_PV'), uno('CIRC_MAX_PODS'), uno('CIRC_MAX_PASOS'), uno('CIRC_MAX_ELEM'), uno('CIRC_RADIO_POD'),
   lista('CIRC_ESPACIOS'), uno('CIRC_RATIO_LEGADO'),
   fn('circNorm'), fn('circEstacionNombre'),
   fn('circEspacioRef'), fn('circMedida'), fn('circEspacioPorMedida'), fn('circEspacio'), fn('circRatio'),
@@ -53,7 +53,7 @@ const exporta = ['circEspacio', 'circEspacioRef', 'circEspacioPorMedida', 'circR
   'circClampXY', 'circEstacionCerca', 'circMoverEstacion', 'circAutoLayout', 'circPos', 'circPosAuto',
   'circMediaTarjeta', 'circRadioY',
   'circMaterial', 'circPodsTexto',
-  'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS', 'CIRC_LIM'];
+  'CIRC_PV', 'CIRC_ESPACIOS', 'CIRC_MAX_PODS', 'CIRC_MAX_PASOS', 'CIRC_LIM'];
 
 let m;
 try {
@@ -502,6 +502,81 @@ function viejoSinPods(ratio) {
   /* Las filas no dependen del radio, pero tampoco se pueden salir. */
   const f = m.circPosAuto(0, 8, 'filas', 16 / 9);
   cierto('en filas la primera tambien entra', f.y - m.circMediaTarjeta(16 / 9) >= -0.06);
+}
+
+/* --- 18. la logica de luz tiene donde tocarse (fase 11) ----------------- */
+{
+  const d = m.circPodsConfigNueva();
+  es('el objetivo por defecto es el primer color', d.objetivo, ['verde']);
+  es('y sale 7 de cada 10 veces', d.probObjetivo, 70);
+  es('sin pasos de serie', d.secuencia, []);
+
+  /* El objetivo tiene que estar en la paleta del grupo: blzNormalizar tira lo
+     que no este en `plan.colores` y «Foco» se quedaria sin objetivo. */
+  const a = m.circPodsConfig({ colores: ['rojo', 'azul'], objetivo: ['verde'] });
+  es('un objetivo fuera de la paleta cae en el primero de ella', a.objetivo, ['rojo']);
+  const b = m.circPodsConfig({ colores: ['rojo', 'azul'], objetivo: ['azul'] });
+  es('y uno que si esta se respeta', b.objetivo, ['azul']);
+  es('la probabilidad se acota', m.circPodsConfig({ probObjetivo: 500 }).probObjetivo, 100);
+  es('un 0 es un 0, no el defecto', m.circPodsConfig({ probObjetivo: 0 }).probObjetivo, 0);
+
+  /* Los pasos de «Secuencia»: sin ellos el motor no enciende nada. */
+  const c = m.circPodsConfig({ colores: ['rojo', 'azul'], luz: 2,
+    secuencia: [{ pods: [1, 2], color: 'azul', dur: 1.5 },
+                { pods: [0, -3, 2], color: 'verde' },
+                { pods: [] }] });
+  es('el paso guarda sus Pods, su color y sus segundos',
+     [c.secuencia[0].pods, c.secuencia[0].color, c.secuencia[0].dur], [[1, 2], 'azul', 1.5]);
+  es('los numeros que no son Pod se caen', c.secuencia[1].pods, [2]);
+  es('un color fuera de la paleta cae en el primero', c.secuencia[1].color, 'rojo');
+  es('sin segundos, los del encendido', c.secuencia[1].dur, 2);
+  cierto('cada paso lleva su id', !!c.secuencia[2].id);
+  const muchos = [];
+  for (let i = 0; i < m.CIRC_MAX_PASOS + 20; i++) muchos.push({ pods: [1] });
+  es('la serie se acota al tope', m.circPodsConfig({ secuencia: muchos }).secuencia.length, m.CIRC_MAX_PASOS);
+
+  /* Cada grupo con la suya, sin pisarse: es lo que hace la planilla unica. */
+  const cc = m.circMigrarUno(viejoConPods());
+  m.circPodsConfigPoner(cc, 'e3', { modo: 'focus', colores: ['rojo', 'azul'], objetivo: ['azul'] });
+  m.circPodsConfigPoner(cc, null, { modo: 'random', colores: ['verde'] });
+  es('el objetivo es del grupo', m.circPodsConfigDe(cc, 'e3').objetivo, ['azul']);
+  es('y el de los sueltos es el suyo', m.circPodsConfigDe(cc, null).objetivo, ['verde']);
+
+  /* Lo que venia del editor viejo no se queda por el camino. */
+  const bp = { logica: { modo: 'secuencia', probObjetivo: 40, respuesta: 2 },
+               colores: [{ id: 'rojo' }, { id: 'azul' }],
+               objetivo: ['azul'],
+               secuencia: [{ pods: [1, 2], color: 'azul', dur: 1 }] };
+  const v = m.circPodsConfigDeLogica(bp);
+  es('la migracion trae el objetivo del plan viejo', v.objetivo, ['azul']);
+  es('su probabilidad', v.probObjetivo, 40);
+  es('y sus pasos, con los Pods intactos', [v.secuencia.length, v.secuencia[0].pods], [1, [1, 2]]);
+}
+
+/* --- 19. y la pantalla existe de verdad (fase 11) ----------------------- */
+{
+  /* Si nadie lo llama, vuelve a no haber pantalla: que es justo lo que
+     pasaba con circPodsConfigPoner hasta hoy. */
+  cierto('el panel se pinta desde el Pod seleccionado', /circPodsPanelHtml\(c, pod\.estacionId/.test(src));
+  cierto('y no se pinta en un circuito de solo lectura',
+         /function circPodsPanelHtml[\s\S]{0,140}c\._ro/.test(src));
+  /* La trampa de blzPodBase: una accion `window.X` que se llama igual que una
+     funcion del modulo la pisa, y no lo ve ningun validador. */
+  const acciones = (src.match(/window\.(circLuz[A-Za-z]*)\s*=/g) || [])
+    .map(function (t) { return t.replace(/window\.|\s*=$/g, '').trim(); });
+  cierto('hay mandos de luz de verdad', acciones.length >= 8);
+  acciones.forEach(function (n) {
+    falso('la accion «' + n + '» no pisa a ninguna funcion del modulo', src.indexOf('function ' + n + '(') >= 0);
+  });
+  /* Los seis modos se ofrecen, y los dos de secuencia esconden los tiempos
+     generales porque ahi los lleva cada paso. */
+  cierto('los seis modos se ofrecen', /BLZ_MODOS\.map\(function\(x\)\{[\s\S]{0,300}circLuzCampo/.test(src));
+  cierto('secuencia y personalizado van por pasos',
+         src.indexOf('var seq = (cfg.modo === "secuencia" || cfg.modo === "libre")') >= 0);
+  cierto('y sin pasos se avisa en pantalla', src.indexOf('Sin pasos no se enciende nada') >= 0);
+  /* El grupo nunca se queda sin con que encender. */
+  cierto('no se puede quitar el ultimo color', src.indexOf('El grupo necesita al menos un color') >= 0);
+  cierto('ni dejar un paso sin Pods', src.indexOf('Cada paso enciende al menos un Pod') >= 0);
 }
 
 /* --- salida -------------------------------------------------------------- */

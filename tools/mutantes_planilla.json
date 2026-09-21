@@ -1,0 +1,47 @@
+{
+  "suite": "tools/planilla.js",
+  "fuente": "index.html",
+  "acompana": [],
+  "mutantes": [
+    {
+      "nombre": "el objetivo de Foco deja de comprobarse contra la paleta del grupo",
+      "de": "  var obj = u19Arr(q.objetivo).filter(function(id){ return pal.indexOf(id) >= 0; });",
+      "a": "  var obj = u19Arr(q.objetivo);"
+    },
+    {
+      "nombre": "el color de un paso puede ser uno que el grupo no tiene",
+      "de": "                      color: (pal.indexOf(p && p.color) >= 0) ? p.color : pal[0],",
+      "a": "                      color: (p && p.color) || pal[0],"
+    },
+    {
+      "nombre": "una secuencia sin tope: 5.000 pasos en un circuito",
+      "de": "           secuencia: u19Arr(q.secuencia).slice(0, CIRC_MAX_PASOS).map(function(p, i){",
+      "a": "           secuencia: u19Arr(q.secuencia).slice(0).map(function(p, i){"
+    },
+    {
+      "nombre": "la migracion pierde los pasos que traia el editor viejo",
+      "de": "                          secuencia: u19Arr(bp && bp.secuencia) });",
+      "a": "                          secuencia: [] });"
+    },
+    {
+      "nombre": "el panel de luz vuelve a no pintarse: la logica se queda sin pantalla",
+      "de": "    + circPodsPanelHtml(c, pod.estacionId || \"\")",
+      "a": "    + \"\""
+    },
+    {
+      "nombre": "el panel sale tambien en un circuito de solo lectura",
+      "de": "  if (!c || c._ro) return \"\";",
+      "a": "  if (!c) return \"\";"
+    },
+    {
+      "nombre": "se puede quitar el ultimo color y el grupo se queda sin con que encender",
+      "de": "    if (cfg.colores.length <= 1){ toast(\"El grupo necesita al menos un color\", \"warn\"); return; }",
+      "a": "    if (false){ return; }"
+    },
+    {
+      "nombre": "un paso se queda sin Pods y no enciende nada, sin avisar",
+      "de": "    if (p.pods.length <= 1){ toast(\"Cada paso enciende al menos un Pod\", \"warn\"); return; }",
+      "a": "    if (false){ return; }"
+    }
+  ]
+}
