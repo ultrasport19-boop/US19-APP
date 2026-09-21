@@ -1409,9 +1409,13 @@ body.circ-live-open .modal-overlay{z-index:9500;}
    El orden de z es el orden de pintado y tambien el del closest() al
    arrastrar: elementos (el suelo) < estaciones < Pods. Asi un Pod se coge
    aunque quede encima de una tarjeta de estacion. */
-.circ-mapa .cm-capa-el{position:absolute;inset:0;z-index:2;}
+/* Las dos capas cubren el plano entero y son TRANSPARENTES AL TOQUE: solo la
+   pieza lo recibe. Sin esto, en cuanto habia un Pod su capa tapaba todas las
+   tarjetas y los conos, y no se podia mover nada mas (Diego, 21-sep-2026). */
+.circ-mapa .cm-capa-el{position:absolute;inset:0;z-index:2;pointer-events:none;}
 .circ-mapa .cm-est{z-index:3;}
-.circ-mapa .cm-capa-pod{position:absolute;inset:0;z-index:4;}
+.circ-mapa .cm-capa-pod{position:absolute;inset:0;z-index:4;pointer-events:none;}
+.circ-mapa .cm-capa-el .cm-el,.circ-mapa .cm-capa-pod .cm-pod{pointer-events:auto;}
 .cm-el{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;cursor:grab;touch-action:none;font-size:1.3rem;line-height:1;}
 .cm-el.drag{cursor:grabbing;z-index:5;}
 .cm-el.sel{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px;}

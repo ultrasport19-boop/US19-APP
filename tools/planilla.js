@@ -579,6 +579,21 @@ function viejoSinPods(ratio) {
   cierto('ni dejar un paso sin Pods', src.indexOf('Cada paso enciende al menos un Pod') >= 0);
 }
 
+/* --- 20. las capas dejan pasar el toque (21-sep) ------------------------ */
+{
+  /* Las capas de elementos y de Pods son rectangulos del tamano del plano.
+     Si reciben el toque, la de los Pods (z 4) tapa las tarjetas (z 3) y los
+     conos (z 2): con un solo Pod en el plano ya no se movia nada mas. */
+  const regla = function (sel) {
+    const i = src.indexOf('\n' + sel + '{');
+    return i < 0 ? '' : src.slice(i, src.indexOf('}', i));
+  };
+  cierto('la capa de los Pods no recibe el toque', /pointer-events:none/.test(regla('.circ-mapa .cm-capa-pod')));
+  cierto('la de los elementos tampoco', /pointer-events:none/.test(regla('.circ-mapa .cm-capa-el')));
+  cierto('pero el Pod y el elemento si',
+         /\.circ-mapa \.cm-capa-el \.cm-el,\.circ-mapa \.cm-capa-pod \.cm-pod\{pointer-events:auto;\}/.test(src));
+}
+
 /* --- salida -------------------------------------------------------------- */
 console.log('\nUS19-APP · planilla única (espacio, Pods y elementos)');
 console.log('archivo: ' + ruta);

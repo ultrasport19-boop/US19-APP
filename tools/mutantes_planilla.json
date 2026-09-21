@@ -42,6 +42,16 @@
       "nombre": "un paso se queda sin Pods y no enciende nada, sin avisar",
       "de": "    if (p.pods.length <= 1){ toast(\"Cada paso enciende al menos un Pod\", \"warn\"); return; }",
       "a": "    if (false){ return; }"
+    },
+    {
+      "nombre": "la capa de los Pods vuelve a tapar las tarjetas y los conos",
+      "de": ".circ-mapa .cm-capa-pod{position:absolute;inset:0;z-index:4;pointer-events:none;}",
+      "a": ".circ-mapa .cm-capa-pod{position:absolute;inset:0;z-index:4;}"
+    },
+    {
+      "nombre": "el Pod deja de recibir el toque junto con su capa",
+      "de": ".circ-mapa .cm-capa-el .cm-el,.circ-mapa .cm-capa-pod .cm-pod{pointer-events:auto;}",
+      "a": ""
     }
   ]
 }
