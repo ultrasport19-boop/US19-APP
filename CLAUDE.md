@@ -11,7 +11,7 @@ PWA de un solo archivo. Sin build, sin dependencias, sin servidor.
 > node -e "console.log(JSON.parse(require('fs').readFileSync('us19_catalogo.json','utf8')).length)"
 > node tools/validar_bloques.js index.html # los bloques, con sus líneas
 > ```
-> Al 19-sep-2026: 39.331 líneas · 10 aperturas · **3 bloques reales** · 2.377 fichas.
+> Al 21-sep-2026: 39.605 líneas · 10 aperturas · **3 bloques reales** · 2.377 fichas.
 
 > **Los mutantes se aplican sobre una COPIA, nunca sobre `index.html`.** El 8-sep un script
 > que mutaba el archivo de verdad tardó más de dos minutos, se fue a segundo plano y siguió
