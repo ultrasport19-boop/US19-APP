@@ -16433,6 +16433,7 @@ function mergeNotionClients(notionClients) {
 }
 
 var _notionData = null;
+var _notionSoloLista = []; // 22-sep-2026: fichas «Solo en Notion» de la última pintada; el botón lleva solo el índice
 var _notionFetchedAt = 0;
 var NOTION_TTL = 10 * 60 * 1000;
 
@@ -16498,10 +16499,16 @@ function buildNotionSyncHtml() {
 
       if (merged.notionOnly.length) {
         html += '<div style="font-weight:700;font-size:.8rem;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;margin:.75rem 0 .5rem;">🟡 Solo en Notion (' + merged.notionOnly.length + ')</div>';
-        merged.notionOnly.forEach(function(n) {
+        /* 22-sep-2026 (auditoría de seguridad): el objeto entero de Notion iba
+           serializado dentro del onclick. Un nombre o una nota con una comilla
+           simple o con &quot; rompía el atributo y ejecutaba lo que trajera, en
+           este navegador, el del entrenador, con los tokens a mano. Ahora la
+           lista queda en _notionSoloLista y el botón solo lleva el índice. */
+        _notionSoloLista = merged.notionOnly;
+        merged.notionOnly.forEach(function(n, i) {
           html += '<div style="display:flex;align-items:center;gap:.75rem;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:.5rem 1rem;margin-bottom:.4rem;font-size:.85rem;">';
           html += '<div style="flex:1;">' + escapeHtml(n.name) + (n.plan ? ' <span style="color:var(--muted);">· ' + escapeHtml(n.plan) + '</span>' : '') + (n.membershipStatus === 'Inactivo' ? ' <span style="color:var(--danger);font-size:.75rem;">INACTIVO</span>' : '') + '</div>';
-          html += '<button class="btn btn-secondary btn-sm" onclick="importarClienteNotion(' + JSON.stringify(n).replace(/"/g,"'") + ')">+ Importar</button>';
+          html += '<button class="btn btn-secondary btn-sm" onclick="importarClienteNotionIdx(' + i + ')">+ Importar</button>';
           html += '<a href="' + escapeHtml(u19Href(n.notionUrl)) + '" target="_blank" rel="noopener noreferrer" style="font-size:.75rem;color:var(--muted);">Notion ↗</a>';
           html += '</div>';
         });
@@ -16554,6 +16561,11 @@ function notionSyncTrigger() {
     });
 }
 
+function importarClienteNotionIdx(i) {
+  var nc = _notionSoloLista[Number(i)];
+  if (!nc) { toast('No encuentro esa ficha: vuelve a abrir el panel de Notion', 'error'); return; }
+  importarClienteNotion(nc);
+}
 function importarClienteNotion(nc) {
   if (!confirm('Importar "' + nc.name + '" desde Notion a la app?')) return;
   var newClient = {
