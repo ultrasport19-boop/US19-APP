@@ -33933,7 +33933,7 @@ function u19RndPane(id, actual, inner){
   return '<div class="fin-pane rnd-pane' + (id === actual ? ' active' : '') + '" data-pane="' + id + '" role="tabpanel">' + inner + '</div>';
 }
 
-/* GUÍA DE USO · Active Force (21-sep-2026).
+/* GUÍA DE USO de Active Force (21-sep-2026).
    La biblioteca de evaluaciones del aparato (colocación, instrucciones y
    accesorio de cada prueba, con sus dibujos) está copiada tal cual en una
    página PRIVADA de Notion: este repositorio es público y ese texto no es
@@ -33945,7 +33945,7 @@ function u19GuiaAfHTML(){
     ? '<a class="btn btn-primary btn-sm" href="' + escapeHtml(U19_GUIA_AF_URL) + '" target="_blank" rel="noopener">📘 Abrir la guía en Notion</a>'
     : '<p class="text-xs" style="color:var(--warn,#b45309);">La página de la guía todavía no está enlazada.</p>';
   var regla = function(t, d){ return '<li style="margin:.35rem 0;"><b>' + t + '</b> ' + d + '</li>'; };
-  return '<div class="card"><div class="card-main"><div class="card-title">📘 Biblioteca de evaluaciones · Active Force</div>'
+  return '<div class="card"><div class="card-main"><div class="card-title">📘 Biblioteca de evaluaciones de Active Force</div>'
     + '<p class="text-xs text-muted" style="line-height:1.55;">Cada prueba del aparato, con su dibujo, dónde se coloca, cómo se hace y qué accesorio lleva, '
     + 'copiada tal cual de la app de Active Force. Está en una página privada de Notion: ábrela en el teléfono antes de medir.</p>'
     + enlace + '</div></div>'
