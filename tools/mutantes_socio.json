@@ -102,6 +102,11 @@
       "nombre": "vuelve «Diagnostico kinesico» a la ficha, en un repositorio publico",
       "de": "{ k:\"dx\", lb:\"Hipótesis principal\", t:\"area\",",
       "a": "{ k:\"dx\", lb:\"Diagnóstico kinésico\", t:\"area\","
+    },
+    {
+      "nombre": "vuelve «no constituye diagnóstico» al pie de un informe del socio",
+      "de": "Este informe describe el progreso; no reemplaza la consulta con un profesional de la salud.</p>",
+      "a": "Este informe describe el progreso; no constituye diagnóstico.</p>"
     }
   ]
 }

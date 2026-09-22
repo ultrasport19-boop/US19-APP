@@ -31531,7 +31531,7 @@ function infObs(e1,e2,bD,cD){
     indices: idx.length?idx.join(". ")+".":"Sin datos suficientes para describir los índices.",
     circunferencias: circ,
     segmentario: seg.length?("Masa muscular por segmento — "+seg.join("; ")+"."):"Sin datos segmentarios disponibles.",
-    cierre: "Se sugiere mantener seguimiento periódico cada 8–12 semanas y registrar la evolución de las medidas antropométricas. Este informe es descriptivo de seguimiento físico; no constituye diagnóstico médico."
+    cierre: "Se sugiere mantener seguimiento periódico cada 8–12 semanas y registrar la evolución de las medidas antropométricas. Este informe es descriptivo de seguimiento físico; no reemplaza la consulta con un profesional de la salud."
   };
 }
 function infValidate(d){
@@ -31840,7 +31840,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
   const esMenor = c.edad != null && Number(c.edad) < 18;
   const noteHtml = `
     <div class="pr-note">
-      <b>Nota:</b> Este informe tiene carácter descriptivo de seguimiento del progreso físico. No constituye diagnóstico médico ni prescripción clínica. Datos obtenidos mediante bioimpedanciometría (Fitdays) y mediciones antropométricas. Para diagnóstico clínico consulte a un profesional de salud habilitado.${esMenor ? ' Al tratarse de un evaluado menor de edad, se recomienda la supervisión de un profesional de salud y/o tutor.' : ''}
+      <b>Nota:</b> Este informe tiene carácter descriptivo de seguimiento del progreso físico. No reemplaza la consulta con un profesional de la salud. Datos obtenidos mediante bioimpedanciometría (Fitdays) y mediciones antropométricas. Para diagnóstico clínico consulte a un profesional de salud habilitado.${esMenor ? ' Al tratarse de un evaluado menor de edad, se recomienda la supervisión de un profesional de salud y/o tutor.' : ''}
     </div>`;
 
   // ---------- E) FIRMAS ----------
@@ -32081,7 +32081,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
     </div>
     ${rbItems.length ? `<div class="pr-rb-wrap">${rbItems.join('')}</div>` : '<div class="pr-note">Sin datos suficientes para clasificación por rangos.</div>'}
     ${sinSexo ? '<div class="pr-rb-hint">Algunos rangos (grasa y agua corporal) dependen del sexo del evaluado; especifícalo en los datos del cliente para incluirlos.</div>' : ''}
-    <div class="pr-rb-hint">Rangos referenciales: IMC según OMS · grasa corporal según ACE · grasa visceral escala Tanita/Omron · índices cintura-estatura (WHtR) y cintura-cadera (OMS). Clasificación de carácter descriptivo, no constituye diagnóstico clínico.</div>`;
+    <div class="pr-rb-hint">Rangos referenciales: IMC según OMS · grasa corporal según ACE · grasa visceral escala Tanita/Omron · índices cintura-estatura (WHtR) y cintura-cadera (OMS). Clasificación de carácter descriptivo, no reemplaza la consulta con un profesional de la salud.</div>`;
 
   // ---------- LECTURA AUTOMÁTICA DEL PROGRESO (narrativa por reglas) ----------
   const dGP = bDelta.grasa_pct, dMK = bDelta.musculo_kg, dPK = bDelta.peso_kg, dVis = bDelta.grasa_visceral_grado, dPunt = bDelta.puntuacion_corporal;
@@ -32245,7 +32245,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
       <div class="pr-secttl"><h2>Análisis segmentario · simetría izquierda / derecha</h2><p>Evaluación actual · asimetrías sobre el umbral sugieren trabajo unilateral compensatorio</p></div>
     </div>
     <div class="pr-seg">${rows}</div>
-    <div class="pr-refnote">Umbral orientativo: masa muscular ≥8% (revisar) / ≥16% (alta) · perímetros ≥4% / ≥8%. Carácter descriptivo, no constituye diagnóstico clínico.</div>`;
+    <div class="pr-refnote">Umbral orientativo: masa muscular ≥8% (revisar) / ≥16% (alta) · perímetros ≥4% / ≥8%. Carácter descriptivo, no reemplaza la consulta con un profesional de la salud.</div>`;
   })();
 
   const metasBlock = (() => {
@@ -32420,7 +32420,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
           <p><b>Índice cintura-estatura (WHtR):</b> perímetro de cintura dividido por la estatura. Referencia de distribución central de la masa corporal.</p>
           <p><b>TMB (tasa metabólica basal):</b> energía estimada que el cuerpo consume en reposo absoluto, expresada en kcal/día.</p>
           <p><b>Asimetría izquierda/derecha:</b> diferencia porcentual entre ambos lados del cuerpo en masa muscular o perímetros; valores mayores pueden orientar el trabajo unilateral en el entrenamiento.</p>
-          <p><b>Nota:</b> todos los valores son estimaciones del equipo de medición y pueden variar según hidratación, hora del día y comidas previas. Este informe describe el progreso; no constituye diagnóstico.</p>
+          <p><b>Nota:</b> todos los valores son estimaciones del equipo de medición y pueden variar según hidratación, hora del día y comidas previas. Este informe describe el progreso; no reemplaza la consulta con un profesional de la salud.</p>
         </div>
       </div>
       ${pageFooter}
@@ -32707,7 +32707,7 @@ function infReporteDocLegacy(p){
     + (circRows?('<div class="sec">Circunferencias</div><table><tr><th>Medida</th><th style="text-align:right">Inicial</th><th style="text-align:right">Actual</th><th style="text-align:right">Δ</th></tr>'+circRows+'</table>'):"")
     + '<div class="sec">Observaciones</div><div class="obs"><b>Composición:</b> '+escapeHtml(o.composicion)+'<br><b>Índices:</b> '+escapeHtml(o.indices)+(o.circunferencias?('<br><b>Circunferencias:</b> '+escapeHtml(o.circunferencias)):"")+'<br><b>Segmentario:</b> '+escapeHtml(o.segmentario)+'</div>'
     + '<div class="obs" style="margin-top:6px;">'+escapeHtml(o.cierre)+'</div>'
-    + '<div class="foot">Ultra-Sport 19 · Pencahue, Maule · Datos por bioimpedanciometría (Fitdays) y antropometría. Informe descriptivo de seguimiento; no constituye diagnóstico médico. Generado '+new Date(p.generadoEl).toLocaleString("es-CL")+'.</div>'
+    + '<div class="foot">Ultra-Sport 19 · Pencahue, Maule · Datos por bioimpedanciometría (Fitdays) y antropometría. Informe descriptivo de seguimiento; no reemplaza la consulta con un profesional de la salud. Generado '+new Date(p.generadoEl).toLocaleString("es-CL")+'.</div>'
     + '</body></html>';
   return html;
 }
@@ -34818,7 +34818,7 @@ function rndReportBlocks(m, cli, opts){
         +'<span class="pr-lg"><span class="pr-dot" style="background:#d97706"></span>10–15% vigilancia</span>'
         +'<span class="pr-lg"><span class="pr-dot bad"></span>&gt;15% asimetría marcada</span>'
         +'<span class="pr-lg-note">criterio LSI de retorno deportivo</span></div>'
-        +'<div class="pr-refnote">En tiempo de reacción, un valor menor es mejor. Carácter descriptivo: no constituye diagnóstico clínico.</div>';
+        +'<div class="pr-refnote">En tiempo de reacción, un valor menor es mejor. Carácter descriptivo: no reemplaza la consulta con un profesional de la salud.</div>';
     }
     if(peor){
       gaugeBlock='<div class="pr-sec"><div class="pr-letter">A</div><div class="pr-secttl"><h2>Índice de asimetría</h2>'
@@ -34889,7 +34889,7 @@ function rndReportBlocks(m, cli, opts){
   var nota='<div class="pr-note"><b>Sobre la interpretación.</b> Estas mediciones no cuentan con valores normativos poblacionales validados para este '
     +'dispositivo y protocolo: la referencia es <b>el propio evaluado</b>. Su valor está en la comparación entre extremidades (simetría) y en la '
     +'evolución medida con el mismo montaje: igual número de pods, distancia, altura, duración y consigna. Un cambio de setup invalida la comparación. '
-    +'Documento de seguimiento del entrenamiento; no constituye diagnóstico ni reemplaza una evaluación clínica presencial.</div>';
+    +'Documento de seguimiento del entrenamiento; no reemplaza la consulta con un profesional de la salud.</div>';
 
   var glosario='<div class="pr-sec"><div class="pr-letter">ℹ</div><div class="pr-secttl"><h2>Cómo leer este informe</h2>'
     +'<p>Glosario de los términos empleados</p></div></div>'

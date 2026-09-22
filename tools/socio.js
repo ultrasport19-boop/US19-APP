@@ -234,6 +234,12 @@ const sinEtiquetas = h => String(h).replace(/<[^>]*>/g, ' ');
      el 11-sep en una etiqueta del formulario de la ficha. */
   const m = src.match(/kin[eé]sic[oa]s?/gi) || [];
   comprobar('publico · ni «kinésico» ni «kinésica» en el archivo', m.length === 0, m.length + ' vez/veces: ' + m.join(', '));
+  /* 22-sep-2026 (auditoria de seguridad): los avisos al pie de los informes
+     que recibe el socio decian «no constituye diagnóstico». Aunque sea para
+     negarlo, la palabra llega al socio; la formula de la casa es la del bot. */
+  const d = src.match(/constituye diagn[oó]stico/gi) || [];
+  comprobar('publico · ningun informe del socio dice «no constituye diagnóstico»', d.length === 0, d.length + ' vez/veces');
+  comprobar('publico · y el aviso de la casa esta en su sitio', (src.match(/no reemplaza la consulta con un profesional de la salud/gi) || []).length >= 8);
 }
 
 console.log('\nUS19-APP · lo que ve el socio de la readaptación');
