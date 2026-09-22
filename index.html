@@ -33886,7 +33886,8 @@ function rndReporteDoc(m, cli, opts){
 var RND_TABS = [
   { id: "plantel", t: "Plantel",          s: "quién está medido y cómo viene" },
   { id: "eval",    t: "Nueva evaluación", s: "BlazePod · ActiveForce · informe" },
-  { id: "rt",      t: "Test de reacción", s: "protocolo US19-RT, calculadora y ruido" }
+  { id: "rt",      t: "Test de reacción", s: "protocolo US19-RT, calculadora y ruido" },
+  { id: "guia",    t: "Guía de uso",      s: "Active Force: cómo medir y nombrar" }
 ];
 /* La pestaña elegida vive solo en la sesión: cada carga abre en «Nueva
    evaluación», que es a lo que se entra casi siempre. */
@@ -33907,7 +33908,17 @@ window.u19RndTab = function(id){
     btns[j].classList.toggle("active", es);
     btns[j].setAttribute("aria-selected", es ? "true" : "false");
   }
+  u19RndSegCentrar();
 };
+/* Con cuatro pestañas la barra no cabe en el teléfono y se desplaza de lado:
+   la activa se deja a la vista, o «Guía de uso» nace fuera de la pantalla. */
+function u19RndSegCentrar(){
+  var host = document.getElementById("view-rendimiento"); if (!host) return;
+  var b = host.querySelector(".fin-seg button.active"); if (!b || !b.parentNode) return;
+  var seg = b.parentNode;
+  /* Es un ajuste de vista: si falla (un DOM sin medidas), no puede tumbar la pestaña. */
+  try { seg.scrollLeft += (b.getBoundingClientRect().left - seg.getBoundingClientRect().left) - 16; } catch (e) {}
+}
 function u19RndSegHTML(actual){
   var h = '<div class="fin-seg" role="tablist" aria-label="Secciones de Rendimiento">';
   RND_TABS.forEach(function(t){
@@ -33920,6 +33931,40 @@ function u19RndSegHTML(actual){
 }
 function u19RndPane(id, actual, inner){
   return '<div class="fin-pane rnd-pane' + (id === actual ? ' active' : '') + '" data-pane="' + id + '" role="tabpanel">' + inner + '</div>';
+}
+
+/* GUÍA DE USO · Active Force (21-sep-2026).
+   La biblioteca de evaluaciones del aparato (colocación, instrucciones y
+   accesorio de cada prueba, con sus dibujos) está copiada tal cual en una
+   página PRIVADA de Notion: este repositorio es público y ese texto no es
+   nuestro. Aquí solo va el enlace y lo propio: cómo nombrar las pruebas para
+   que el informe por WhatsApp compare bien, y cómo llega ese informe. */
+var U19_GUIA_AF_URL = "https://www.notion.so/3e33c26e4b788124afbec51cfbbe262c";
+function u19GuiaAfHTML(){
+  var enlace = U19_GUIA_AF_URL
+    ? '<a class="btn btn-primary btn-sm" href="' + escapeHtml(U19_GUIA_AF_URL) + '" target="_blank" rel="noopener">📘 Abrir la guía en Notion</a>'
+    : '<p class="text-xs" style="color:var(--warn,#b45309);">La página de la guía todavía no está enlazada.</p>';
+  var regla = function(t, d){ return '<li style="margin:.35rem 0;"><b>' + t + '</b> ' + d + '</li>'; };
+  return '<div class="card"><div class="card-main"><div class="card-title">📘 Biblioteca de evaluaciones · Active Force</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.55;">Cada prueba del aparato, con su dibujo, dónde se coloca, cómo se hace y qué accesorio lleva, '
+    + 'copiada tal cual de la app de Active Force. Está en una página privada de Notion: ábrela en el teléfono antes de medir.</p>'
+    + enlace + '</div></div>'
+    + '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Antes de medir: cómo nombrar las pruebas</div>'
+    + '<p class="text-xs text-muted" style="line-height:1.55;margin:.2rem 0 .4rem;">El informe que arma el bot compara por el nombre y por el lado. Si la app los tiene bien, el informe sale bien.</p>'
+    + '<ol class="text-sm" style="line-height:1.5;padding-left:1.2rem;margin:0;">'
+    + regla('Usa el nombre de la biblioteca,', 'por ejemplo «Rodilla Extensión Sentado», y siempre el mismo para la misma prueba.')
+    + regla('Los dos lados con el mismo nombre', 'y la etiqueta <b>Derecha</b> o <b>Izquierda</b> marcada: solo así el informe los pone lado a lado.')
+    + regla('No dejes «Prueba 2».', 'Es el nombre que pone la app por defecto: con él, la próxima medición no tiene con qué compararse.')
+    + regla('La app en kilos.', 'Una fuerza en libras o en newtons el bot no la mezcla con las de antes: la rechaza.')
+    + regla('Registra a cada persona con su nombre real.', 'Su ficha en la app lleva el nombre arriba y el bot lo compara con el de Notion: si no coincide, no guarda nada.')
+    + '</ol></div></div>'
+    + '<div class="card" style="margin-top:1rem;"><div class="card-main"><div class="card-title">Cómo llega el informe</div>'
+    + '<ol class="text-sm" style="line-height:1.5;padding-left:1.2rem;margin:0;">'
+    + '<li style="margin:.35rem 0;">Al terminar, captura la <b>Visión general</b> o la ficha de la persona.</li>'
+    + '<li style="margin:.35rem 0;">Mándala por WhatsApp <b>como archivo</b> con el texto <code>active Nombre Apellido</code>. Si la evaluación fue otro día: <code>active Nombre / 20-09-2026</code>.</li>'
+    + '<li style="margin:.35rem 0;">Si son varias capturas del mismo día, mándalas todas: se juntan en un solo informe.</li>'
+    + '<li style="margin:.35rem 0;">Llega el borrador: <code>SI ACTIVE</code> lo aprueba (sale a las 20:00) y <code>NO ACTIVE</code> lo descarta.</li>'
+    + '</ol></div></div>';
 }
 
 function renderRendimiento(){
@@ -34046,8 +34091,10 @@ function renderRendimiento(){
 
   html += u19RndPane('plantel', actual, plantel)
     + u19RndPane('eval', actual, evalHtml)
-    + u19RndPane('rt', actual, u19RtPanelHTML());
+    + u19RndPane('rt', actual, u19RtPanelHTML())
+    + u19RndPane('guia', actual, u19GuiaAfHTML());
   document.getElementById("view-rendimiento").innerHTML=html;
+  u19RndSegCentrar();
 
   var dom=document.getElementById("rnd-dominante");
   dom.value=_rndState.dominante||"derecho";
