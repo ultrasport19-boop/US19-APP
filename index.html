@@ -1462,6 +1462,51 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .cl-pod-c{font-size:.78rem;color:#f1f5f9;font-weight:700;}
 .cl-pod-aviso{font-size:.62rem;color:#94a3b8;margin-top:.3rem;line-height:1.4;}
 .cm-ro{background:rgba(234,179,8,.10);border:1px solid rgba(234,179,8,.35);border-radius:10px;padding:.5rem .7rem;margin-bottom:.6rem;font-size:.8rem;color:var(--warn);line-height:1.45;}
+/* --- Secuencias: cadenas a mano (Fase 14, 22-sep-2026) ---
+   La capa de las flechas va DEBAJO de las tarjetas, los conos y los Pods, y
+   nace transparente al toque: solo la zona de cada flecha lo recibe. Asi no
+   se repite lo del 21-sep, cuando la capa de Pods tapaba todo el plano. */
+.circ-mapa .cm-capa-sec{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;}
+.circ-mapa .cm-capa-sec .cm-sec-hit{pointer-events:stroke;cursor:pointer;}
+.cm-sec-tmp{pointer-events:none;}
+.cm-num.sec{width:auto;min-width:26px;padding:0 .32rem;border-radius:13px;font-size:.95rem;}
+.cm-est.sel{outline:3px solid var(--accent);outline-offset:3px;}
+.cm-est.enlazando{outline:3px dashed var(--accent);outline-offset:4px;animation:csl-pulso 1.1s ease-in-out infinite;}
+@keyframes csl-pulso{0%,100%{outline-color:var(--accent);}50%{outline-color:transparent;}}
+.cm-puerto{position:absolute;right:-12px;top:50%;width:22px;height:22px;margin-top:-11px;border-radius:50%;background:var(--surface-1);border:3px solid var(--cm-sec-col,var(--accent));cursor:crosshair;touch-action:none;box-shadow:var(--shadow);}
+.cm-puerto::after{content:"";position:absolute;inset:-9px;border-radius:50%;}
+.csl{margin-top:.8rem;border-top:1px dashed var(--border);padding-top:.6rem;}
+.csl-cab{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;}
+.csl-cab .csl-plant{margin-left:auto;max-width:100%;}
+.csl-lista{list-style:none;margin:.5rem 0 0;padding:0;display:flex;flex-direction:column;gap:.45rem;}
+.csl-fila{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:.45rem;align-items:start;background:var(--surface-2);border:1px solid var(--border);border-left:5px solid var(--csl-col,var(--accent));border-radius:10px;padding:.45rem .5rem;}
+.csl-fila.drag{opacity:.55;}
+.csl-fila.csl-aqui{outline:2px dashed var(--accent);outline-offset:2px;}
+.csl-asa{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;font-size:1.25rem;line-height:1.5;color:var(--muted);min-width:28px;min-height:36px;text-align:center;}
+.csl-letra{font-family:var(--font-display);font-size:1.35rem;line-height:1.35;color:#0b1014;background:var(--csl-col,var(--accent));border-radius:8px;min-width:1.9rem;padding:0 .2rem;text-align:center;}
+.csl-cuerpo{min-width:0;}
+.csl-nodos{display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;}
+.csl-nodo{background:var(--surface-1);border:1px solid var(--border);border-radius:8px;padding:.2rem .5rem;font-size:.78rem;color:var(--text);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-height:32px;}
+.csl-nodo:hover,.csl-nodo:focus-visible{border-color:var(--accent);}
+.csl-fl{color:var(--muted);}
+.csl-par{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.35rem;}
+.csl-par input[type=number]{width:4.4rem;}
+.csl-par input[type=text]{width:9rem;}
+.csl-mover{display:flex;flex-direction:column;gap:.15rem;}
+.csl-texto{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem;font-size:.8rem;line-height:1.5;margin:.4rem 0 0;max-width:100%;color:var(--text);font-family:var(--font-body);}
+.csl-rot{display:inline-block;min-width:1.6rem;padding:0 .35rem;border-radius:12px;color:#0b1014;text-align:center;font-family:var(--font-display);}
+.csl-aviso{background:rgba(234,179,8,.10);border:1px solid rgba(234,179,8,.35);border-radius:10px;padding:.4rem .6rem;margin-top:.5rem;font-size:.78rem;color:var(--warn);}
+.csl-modo{border-color:var(--accent);font-size:.85rem;line-height:1.45;}
+.csl-dosis input[type=text]{flex:1 1 90px;min-width:80px;}
+.csl-dosis input[type=number]{width:4.4rem;}
+.cl-sec-rot{display:inline-block;background:var(--accent);color:#0b1014;border-radius:10px;padding:0 .45rem;margin-right:.2rem;}
+.cl-rep{font-size:.5em;letter-spacing:.02em;}
+@media (max-width:560px){
+  .csl-fila{grid-template-columns:auto auto minmax(0,1fr);}
+  .csl-mover{grid-column:1/-1;flex-direction:row;justify-content:flex-end;}
+}
+@media (pointer:coarse){ .cm-puerto{width:28px;height:28px;margin-top:-14px;right:-15px;} }
+@media (prefers-reduced-motion:reduce){ .cm-est.enlazando{animation:none;} }
 @media (max-width:560px){
   /* Con el dedo, 44 px es el minimo con el que se acierta un Pod. */
   .cm-pod{width:44px;height:44px;}
@@ -17518,7 +17563,7 @@ window.pizarraCircuitoObj = function(c){
              detalle: circTrabajoDe(c, i) + " s de trabajo · " + circNum(c.cambio, 15) + " s de cambio" + (pods ? " · 🔵 " + pods : ""),
              nota: s.nota || "" };
   });
-  var secciones = [{ nombre: "Estaciones", items: items }];
+  var secciones = circSecActivo(c) ? circSecPizarraSecciones(c) : [{ nombre: "Estaciones", items: items }];
   /* Los Pods sueltos y los elementos del espacio son parte del montaje: si no
      se dicen, en la sala no aparecen. */
   var extra = [];
@@ -17787,7 +17832,7 @@ window.rutinaDesdeCircuito = function(){
   var r = newEmptyRoutine();
   r.name = c.nombre || "Circuito";
   r.notes = c.grupo ? "Desde el circuito · " + c.grupo : "Desde el circuito";
-  r.days[0].exercises = con.map(function(s, i){
+  r.days[0].exercises = circSecActivo(c) ? circSecFilasRutina(c) : con.map(function(s, i){
     return { exerciseId: s.exerciseId, sets: String(Math.max(1, circNum(c.rondas, 1))), reps: circTrabajoDe(c, c.estaciones.indexOf(s)) + " s", weight: "", rest: circNum(c.cambio, 15) + "s", rir: "", notes: s.nota || "" };
   });
   state.routines.push(r); saveState();
@@ -18420,15 +18465,26 @@ function circMapaHtml(c, opts){
   var html = '<div class="circ-mapa' + (opts.clase ? ' ' + opts.clase : '') + (opts.lectura ? ' lectura' : '') + '" style="aspect-ratio:' + ratio.toFixed(3) + ';--cm-ratio:' + ratio.toFixed(3) + ';">'
     + '<svg class="cm-svg" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none">'
       + circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
-      + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, opts)
+      + circElementosSvg(c, H) + circMapaFlechasDe(c, H, opts)
     + '</svg>';
   if (nEl) html += circElementosHtml(c, opts);
+  /* Secuencias: el rotulo (A1) y el color son de la CADENA, no del orden de
+     la estacion. En circuito todo sale exactamente igual que antes. */
+  var sec = circSecActivo(c), num = sec ? circSecNumeracion(c) : null;
+  var edSec = sec && !opts.lectura && !opts.compacto;
+  if (edSec) html += circSecCapaHtml(c, opts);
   c.estaciones.forEach(function(s, i){
     var pos = circPos(c, i), gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
+    var rs = sec ? num.por[s.id] : null;
+    if (rs) col = rs.color;
     var g = (opts.turno != null) ? circGrupoEn(c, i, opts.turno) : null;
     var misPods = circPodsDe(c, s.id).length;
-    html += '<div class="cm-est' + (opts.activa === i ? ' on' : '') + (g != null && g < 0 ? ' libre' : '') + '" data-i="' + i + '" style="left:' + (pos.x * 100).toFixed(2) + '%;top:' + (pos.y * 100).toFixed(2) + '%;border-color:' + col + ';">'
-      + '<span class="cm-num" style="background:' + col + ';">' + (i + 1) + '</span>'
+    html += '<div class="cm-est' + (opts.activa === i ? ' on' : '') + (g != null && g < 0 ? ' libre' : '')
+      + (sec && opts.selSec === s.id ? ' sel' : '') + (sec && opts.origenSec === s.id ? ' enlazando' : '')
+      + '" data-i="' + i + '" style="left:' + (pos.x * 100).toFixed(2) + '%;top:' + (pos.y * 100).toFixed(2) + '%;border-color:' + col + ';' + (rs ? '--cm-sec-col:' + col + ';' : '') + '">'
+      + (rs ? '<span class="cm-num sec" style="background:' + col + ';">' + escapeHtml(rs.rotulo) + '</span>'
+            : '<span class="cm-num" style="background:' + col + ';">' + (i + 1) + '</span>')
+      + (edSec ? '<span class="cm-puerto" data-puerto="' + escapeAttr(s.id) + '" title="Arrastra hasta otra tarjeta para enlazar; o tócalo y después toca la otra"></span>' : '')
       + (gif ? mediaThumb(gif, 'class="cm-img" loading="lazy" alt="" draggable="false"') : '<div class="cm-img cm-vacio">📍</div>')
       + '<div class="cm-nom">' + escapeHtml(circEstacionNombre(s)) + '</div>'
       + (s.nota && !opts.compacto ? '<div class="cm-nota">' + escapeHtml(s.nota) + '</div>' : '')
@@ -18499,18 +18555,43 @@ function circMapaMontar(box){
     var svg = arr.mapa.querySelector("svg.cm-svg"); if (!svg) return;
     var c = _circEdit, e = circEspacio(c), H = Math.round(1000 / (e.anchoM / e.largoM));
     svg.innerHTML = circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
-      + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, {});
+      + circElementosSvg(c, H) + circMapaFlechasDe(c, H, { selFlecha: _circSecFlecha });
+    var capa = arr.mapa.querySelector(".cm-capa-sec");
+    if (capa){ var t = document.createElement("div"); t.innerHTML = circSecCapaHtml(c); if (t.firstChild) capa.parentNode.replaceChild(t.firstChild, capa); }
   };
   box.addEventListener("pointerdown", function(ev){
     if (!_circEdit || _circEdit._ro) return;
     if (!ev.target || !ev.target.closest) return;
+    /* Secuencias: el punto del borde de una tarjeta empieza una flecha, y la
+       zona de una flecha la elige. Van antes que la tarjeta porque el punto
+       esta DENTRO de ella. */
+    if (circSecActivo(_circEdit)){
+      var puerto = ev.target.closest(".cm-puerto"), hit = puerto ? null : ev.target.closest(".cm-sec-hit");
+      var mapaS = (puerto || hit) ? (puerto || hit).closest(".circ-mapa") : null;
+      if (mapaS){
+        arr = { mapa: mapaS, r: mapaS.getBoundingClientRect(), movio: false, i: -1, pod: "", el: "", punta: false,
+                pieza: puerto || hit, x0: ev.clientX, y0: ev.clientY,
+                enlace: puerto ? puerto.getAttribute("data-puerto") : "",
+                flecha: hit ? (hit.getAttribute("data-de") + ">" + hit.getAttribute("data-a")) : "" };
+        try { arr.pieza.setPointerCapture(ev.pointerId); } catch(e){}
+        ev.preventDefault();
+        return;
+      }
+    }
     /* Los Pods primero: son la capa de arriba y tienen que ganar aunque caigan
        encima de una tarjeta de estacion. */
     var pod = ev.target.closest(".cm-pod");
     var el  = pod ? null : ev.target.closest(".cm-el");
     var card = (pod || el) ? null : ev.target.closest(".cm-est");
     var pieza = pod || el || card;
-    if (!pieza) return;
+    if (!pieza){
+      /* Tocar el fondo en secuencias cancela la flecha empezada y la seleccion. */
+      if (circSecActivo(_circEdit) && ev.target.closest(".circ-mapa") && (_circSecOrigen || _circSecSel || _circSecFlecha || _circSecOferta)){
+        circSecSalirEnlace(); _circSecSel = ""; _circSecFlecha = ""; _circSecOferta = null;
+        circPintarMapa();
+      }
+      return;
+    }
     var mapa = pieza.closest(".circ-mapa"); if (!mapa) return;
     arr = { pieza: pieza, mapa: mapa, r: mapa.getBoundingClientRect(), movio: false,
             pod: pod ? pod.getAttribute("data-pod") : "",
@@ -18523,6 +18604,11 @@ function circMapaMontar(box){
   });
   box.addEventListener("pointermove", function(ev){
     if (!arr || !_circEdit) return;
+    if (arr.enlace || arr.flecha){
+      if (Math.abs(ev.clientX - arr.x0) + Math.abs(ev.clientY - arr.y0) > 6) arr.movio = true;
+      if (arr.enlace && arr.movio) circSecLineaTemporal(arr, ev);
+      return;
+    }
     var c = _circEdit;
     var fx = (ev.clientX - arr.r.left) / arr.r.width, fy = (ev.clientY - arr.r.top) / arr.r.height;
     if (arr.pod){
@@ -18566,18 +18652,53 @@ function circMapaMontar(box){
     arr.movio = true;
     svgVivo();
   });
-  var fin = function(){
+  var fin = function(ev){
     if (!arr) return;
+    if (arr.enlace || arr.flecha){
+      /* Secuencias: soltar el punto sobre otra tarjeta pone la flecha; tocarlo
+         sin arrastrar empieza el modo enlace; tocar una flecha la elige. */
+      var a2 = arr; arr = null;
+      var tmp = a2.mapa.querySelector(".cm-sec-tmp");
+      if (tmp && tmp.parentNode) tmp.parentNode.removeChild(tmp);
+      if (a2.enlace){
+        if (!a2.movio){ circSecEnlazarDesde(a2.enlace); return; }
+        var bajo = (ev && ev.type === "pointerup" && document.elementFromPoint) ? document.elementFromPoint(ev.clientX, ev.clientY) : null;
+        var dest = (bajo && bajo.closest) ? bajo.closest(".cm-est") : null;
+        var di = dest ? parseInt(dest.getAttribute("data-i"), 10) : -1;
+        var sd = (di >= 0 && _circEdit && _circEdit.estaciones[di]) ? _circEdit.estaciones[di].id : "";
+        if (sd && sd !== a2.enlace) circSecIntentar(a2.enlace, sd);
+        else circPintarMapa();
+        return;
+      }
+      if (!a2.movio){
+        _circSecFlecha = (_circSecFlecha === a2.flecha) ? "" : a2.flecha;
+        _circSecSel = ""; _circSecOferta = null; circSecSalirEnlace();
+        circPintarMapa();
+      }
+      return;
+    }
     arr.pieza.classList.remove("drag");
-    var movio = arr.movio, idPod = arr.pod, idEl = arr.el, punta = arr.punta, i = arr.i;
+    var movio = arr.movio, idPod = arr.pod, idEl = arr.el, punta = arr.punta, i = arr.i, rr = arr.r;
     arr = null;
     if (!movio){
       /* Un toque sin arrastre selecciona o deselecciona. */
       if (idPod){ _circSelPod = (_circSelPod === idPod) ? "" : idPod; _circSelEl = ""; }
       else if (idEl && !punta){ _circSelEl = (_circSelEl === idEl) ? "" : idEl; _circSelPod = ""; }
+      else if (i >= 0 && circSecActivo(_circEdit)){ circSecTocarTarjeta(i); return; }
       else return;
       circPintarMapa();
       return;
+    }
+    /* Secuencias: una tarjeta soltada encima de una flecha entra entre esos dos. */
+    if (i >= 0 && circSecActivo(_circEdit) && ev && ev.type === "pointerup" && rr && rr.width){
+      var st2 = _circEdit.estaciones[i];
+      var fl = st2 ? circSecFlechaCerca(_circEdit, (ev.clientX - rr.left) / rr.width, (ev.clientY - rr.top) / rr.height, rr.width, rr.height, 20, st2.id) : null;
+      if (fl && circSecInsertarEnFlecha(_circEdit, st2.id, fl.de, fl.a)){
+        _circSecSel = st2.id; _circSecFlecha = "";
+        toast("Metida entre las dos", "success");
+        circSecRepintar();
+        return;
+      }
     }
     if (idPod){
       /* Aqui se decide el vinculo, y es lo UNICO que lo decide: encima o dentro
@@ -18617,7 +18738,8 @@ function circPintarMapa(){
   if (!box || !_circEdit) return;
   if (_circSelPod && !circPodPorId(_circEdit, _circSelPod)) _circSelPod = "";
   if (_circSelEl && !circElementoPorId(_circEdit, _circSelEl)) _circSelEl = "";
-  box.innerHTML = circMapaHtml(_circEdit, { selPod: _circSelPod, selEl: _circSelEl, lectura: !!_circEdit._ro });
+  if (_circSecSel && circEstacionIdx(_circEdit, _circSecSel) < 0) _circSecSel = "";
+  box.innerHTML = circMapaHtml(_circEdit, circMapaOptsEditor(_circEdit));
   circPintarSel();
 }
 /* Cambiar la logica de luz no mueve nada del plano: se repinta solo el panel.
@@ -18635,7 +18757,9 @@ function circPintarTools(){
 /* ---------- la barra del plano ---------- */
 function circMapaToolsHtml(c){
   var e = circEspacio(c), nP = circPods(c).length, nE = circElementos(c).length;
-  return '<span class="text-xs text-muted">Arrastra cada pieza hasta donde va. Un Pod soltado sobre una estación queda atado a ella; fuera, queda suelto.</span>'
+  var sec = circSecActivo(c);
+  return (sec ? '<span class="text-xs text-muted">Arrastra desde el punto ● de una tarjeta hasta otra para enlazarlas, o toca una tarjeta y usa «Enlazar». Cada cadena lleva su letra.</span>'
+              : '<span class="text-xs text-muted">Arrastra cada pieza hasta donde va. Un Pod soltado sobre una estación queda atado a ella; fuera, queda suelto.</span>')
     + '<span style="margin-left:auto;display:flex;gap:.4rem;flex-wrap:wrap;align-items:center;">'
     + '<select id="circ-espacio" onchange="circEspacioCambiar(this.value)" title="El espacio real donde se hace la sesión">'
     + CIRC_ESPACIOS.map(function(x){
@@ -18649,6 +18773,7 @@ function circMapaToolsHtml(c){
     + BLZ_ADORNOS.map(function(a){ return '<option value="' + escapeAttr(a.id) + '">' + a.icono + ' ' + escapeHtml(a.nombre) + '</option>'; }).join("") + '</select>'
     + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'circulo\')" title="Reordena las estaciones en círculo. Los Pods atados las siguen; los sueltos y los elementos no se mueven">◯ En círculo</button>'
     + '<button class="btn btn-ghost btn-sm" onclick="circOrdenar(\'filas\')" title="Reordena las estaciones en filas. Los Pods atados las siguen; los sueltos y los elementos no se mueven">▦ En filas</button>'
+    + '<button class="btn btn-sm ' + (sec ? 'btn-primary' : 'btn-ghost') + '" onclick="circSecActivar()" aria-pressed="' + (sec ? 'true' : 'false') + '" title="Encadena ejercicios a mano: superseries y bloques, con tus flechas. No mueve nada del plano">⛓ ' + escapeHtml(CIRC_SEC_NOMBRE) + '</button>'
     + '</span>';
 }
 
@@ -18663,10 +18788,11 @@ function circSelHtml(c){
     var el = circElementoPorId(c, _circSelEl);
     if (el) return circSelElHtml(c, el);
   }
+  var secHtml = circSecActivo(c) ? circSecSelHtml(c) : "";
   var nP = circPods(c).length;
-  if (!nP) return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Sin Pods en el plano. Añade el primero con «+ Pod»: aparece abajo y lo arrastras hasta donde va.</p>';
+  if (!nP) return secHtml + '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Sin Pods en el plano. Añade el primero con «+ Pod»: aparece abajo y lo arrastras hasta donde va.</p>';
   var sueltos = circPodsSueltos(c).length;
-  return '<p class="text-xs text-muted" style="margin:.5rem 0 0;">' + nP + ' Pod' + (nP === 1 ? '' : 's') + ' en el plano, '
+  return secHtml + '<p class="text-xs text-muted" style="margin:.5rem 0 0;">' + nP + ' Pod' + (nP === 1 ? '' : 's') + ' en el plano, '
     + (sueltos ? sueltos + ' suelto' + (sueltos === 1 ? '' : 's') : 'todos atados a una estación')
     + '. Toca un Pod para moverlo, etiquetarlo y ajustar la luz de su grupo: modo, colores y tiempos.</p>';
 }
@@ -19093,6 +19219,11 @@ window.circOrdenar = function(forma){
   if (!_circEdit) return;
   circAutoLayout(_circEdit, forma);
   _circEdit.disposicion = (forma === "filas") ? "filas" : "circulo";
+  /* Volver a una de las dos miradas de circuito deja las cadenas guardadas:
+     solo cambia la que se dibuja y la que se ejecuta. */
+  var eraSec = circSecActivo(_circEdit);
+  if (_circEdit.planSec && typeof _circEdit.planSec === "object") _circEdit.planSec.modo = "circuito";
+  if (eraSec){ circSecLimpiarEstado(); circPintarTools(); circSecPintarLista(); circPintarResumen(); circSecPintarNumeros(); }
   circPintarMapa();
 };
 window.circRatioCambiar = function(v){
@@ -19157,7 +19288,8 @@ function circMapaSvgImprimir(c){
   var e = circEspacio(c), ratio = e.anchoM / e.largoM, H = Math.round(1000 / ratio);
   var svg = '<svg viewBox="0 0 1000 ' + H + '" width="100%" style="border:1px solid #bbb;border-radius:8px;background:#fafafa;color:#555;display:block;">'
     + circEspacioSvg(c, H) + circCuadriculaSvg(c, H) + circVinculosSvg(c, H)
-    + circElementosSvg(c, H) + circMapaFlechasSvg(c, H, {});
+    + circElementosSvg(c, H) + circMapaFlechasDe(c, H, {});
+  var numH = circSecActivo(c) ? circSecNumeracion(c) : null;
   /* Los elementos del espacio van debajo de las estaciones, como en pantalla. */
   circElementos(c).forEach(function(a){
     var ref = blzAdorno(a.tipo); if (!ref) return;
@@ -19169,10 +19301,12 @@ function circMapaSvgImprimir(c){
   });
   c.estaciones.forEach(function(s, i){
     var p = circPos(c, i), x = p.x * 1000, y = p.y * H, gif = circGifDe(s), col = CIRC_COLORES[i % CIRC_COLORES.length];
+    var rh = numH ? numH.por[s.id] : null;
+    if (rh) col = rh.color;
     var img = gif ? (typeof isVideoUrl === "function" && isVideoUrl(gif) && typeof posterUrl === "function" ? posterUrl(gif) : gif) : "";
     svg += '<g><rect x="' + (x - 65) + '" y="' + (y - 72) + '" width="130" height="144" rx="10" fill="#fff" stroke="' + col + '" stroke-width="3"/>'
       + (img ? '<image href="' + escapeAttr(img) + '" x="' + (x - 57) + '" y="' + (y - 64) + '" width="114" height="80" preserveAspectRatio="xMidYMid slice"/>' : '')
-      + '<circle cx="' + (x - 65) + '" cy="' + (y - 72) + '" r="16" fill="' + col + '" stroke="#333"/><text x="' + (x - 65) + '" y="' + (y - 66) + '" text-anchor="middle" font-size="17" font-weight="bold" font-family="Arial">' + (i + 1) + '</text>'
+      + '<circle cx="' + (x - 65) + '" cy="' + (y - 72) + '" r="' + (rh ? 19 : 16) + '" fill="' + col + '" stroke="#333"/><text x="' + (x - 65) + '" y="' + (y - 66) + '" text-anchor="middle" font-size="' + (rh ? 15 : 17) + '" font-weight="bold" font-family="Arial">' + (rh ? escapeHtml(rh.rotulo) : (i + 1)) + '</text>'
       + '<text x="' + x + '" y="' + (y + 36) + '" text-anchor="middle" font-size="13" font-weight="bold" font-family="Arial" fill="#111">' + escapeHtml(circEstacionNombre(s).slice(0, 22)) + '</text>'
       + (s.nota ? '<text x="' + x + '" y="' + (y + 56) + '" text-anchor="middle" font-size="10" font-family="Arial" fill="#444">' + escapeHtml(s.nota.slice(0, 32)) + '</text>' : '')
       + (circPodsDe(c, s.id).length ? '<circle cx="' + (x + 65) + '" cy="' + (y + 72) + '" r="14" fill="#fff" stroke="' + col + '" stroke-width="3"/>'
@@ -19227,8 +19361,15 @@ function circShareData(c){
       estaciones: u19Arr(c.estaciones).map(function(s){
         var g = circGifDe(s), o = { nombre: circEstacionNombre(s), nota: s.nota || "", x: s.x, y: s.y, trabajo: circNum(s.trabajo, 0) };
         if (g && g.indexOf("data:") !== 0) o.gif = g;
+        /* La dosis de secuencias, solo si hay algo: un enlace de circuito sale igual. */
+        if (s.rep) o.rep = s.rep;
+        if (s.carga) o.carga = s.carga;
+        if (s.tempo) o.tempo = s.tempo;
+        if (s.lado && s.lado !== "bilateral") o.lado = s.lado;
         return o;
       }) } };
+  var ps = circSecCompartir(c);
+  if (ps) d.circuito.planSec = ps;
   return d;
 }
 window.openCircShareModal = function(id){
@@ -19277,7 +19418,14 @@ function showCircuitoView(data){
   var src = data.circuito;
   var c = { id: "compartido", nombre: src.nombre || "Circuito", grupo: src.grupo || "", notas: src.notas || "", modo: src.modo || "rotacion", grupos: src.grupos, rondas: src.rondas,
             trabajo: src.trabajo, cambio: src.cambio, descansoRonda: src.descansoRonda, ratio: src.ratio || "16:9", nombresGrupos: src.nombresGrupos || "",
-            estaciones: u19Arr(src.estaciones).map(function(s){ return { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" }; }),
+            estaciones: u19Arr(src.estaciones).map(function(s){
+              var o = { id: genId(), exerciseId: "", nombre: s.nombre || "Estación", nota: s.nota || "", x: s.x, y: s.y, trabajo: s.trabajo || 0, gif: s.gif || "" };
+              if (s.rep) o.rep = blzTexto(s.rep, 20);
+              if (s.carga) o.carga = blzTexto(s.carga, 30);
+              if (s.tempo) o.tempo = blzTexto(s.tempo, 12);
+              if (s.lado) o.lado = circSecLado(s.lado).id;
+              return o;
+            }),
             disposicion: src.disposicion || "circulo",
             blazePlan: (src.blazePlan && typeof src.blazePlan === "object") ? src.blazePlan : null };
   /* El espacio, los Pods y los elementos del enlace. Un enlace de ANTES no los
@@ -19309,16 +19457,20 @@ function showCircuitoView(data){
     if (cfg && c.estaciones[i]) c.estaciones[i].podsConfig = circPodsConfig(cfg);
   });
   c.podsSueltos = circPodsConfig(src.podsSueltos);
+  /* Las cadenas, con los ids que se acaban de generar. Un enlace de antes no
+     las trae y se queda en circuito, como era. */
+  if (src.planSec) circSecRecibir(c, src.planSec);
   /* Ya viene en el modelo nuevo: no hay que volver a migrarlo desde blazePlan. */
   c.pv = CIRC_PV;
   _circCompartido = c;
   hideTrainerUI();
   showView("client");
-  var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1));
+  var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1)), sec = circSecActivo(c);
   var html = '<div class="client-hero"><div class="hero-logo"><img src="' + LOGO_DATA_URI + '" alt=""></div><div style="flex:1;min-width:0;">'
     + '<div class="hero-sub">CIRCUITO POR ESTACIONES · Ultra-Sport 19</div><h1>' + escapeHtml(c.nombre) + '</h1>'
     + (c.grupo ? '<div class="hero-meta">' + escapeHtml(c.grupo) + '</div>' : '')
-    + '<div class="text-sm text-muted" style="margin-top:.4rem;">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + ' · ' + circFmt(circDuracion(c)) + ' · ' + (c.modo === "secuencia" ? "una estación tras otra" : G + " grupos que rotan") + '</div>'
+    + (sec ? '<div class="text-sm text-muted" style="margin-top:.4rem;">' + escapeHtml(N + ' ejercicios en ' + circSecNumeracion(c).cadenas.length + ' cadenas, ' + circDuracionTexto(c)) + '</div>'
+           : '<div class="text-sm text-muted" style="margin-top:.4rem;">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + ' · ' + circFmt(circDuracion(c)) + ' · ' + (c.modo === "secuencia" ? "una estación tras otra" : G + " grupos que rotan") + '</div>')
     + '</div></div>';
   html += '<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem;">'
     + '<button class="btn btn-primary" onclick="circEnVivoObj(_circCompartido)">▶ En vivo</button>'
@@ -19331,6 +19483,11 @@ function showCircuitoView(data){
       + '<div class="text-sm">' + escapeHtml(circPods(c).length + " Pods en el plano · "
           + circPodsDe(c, null).length + " sueltos") + '</div>'
       + '<div class="text-xs text-muted" style="margin-top:.3rem;line-height:1.5;">' + escapeHtml(BLZ_AVISO) + '.</div></div></div>';
+  }
+  if (sec){
+    html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">⛓ La sesión, por cadenas</div><pre class="csl-texto">' + escapeHtml(circSecTexto(c)) + '</pre></div></div>';
+    document.getElementById("view-client").innerHTML = html;
+    return;
   }
   html += '<div class="card" style="margin-bottom:1rem;"><div class="card-main"><div class="card-title">📍 Estaciones · ' + circNum(c.trabajo, 40) + ' s de trabajo · ' + circNum(c.cambio, 15) + ' s de cambio</div>';
   c.estaciones.forEach(function(s, i){
@@ -19357,7 +19514,7 @@ function showCircuitoView(data){
 
 /* ---------- lista ---------- */
 function circCardHtml(c){
-  var N = u19Arr(c.estaciones).length, dur = circDuracion(c);
+  var N = u19Arr(c.estaciones).length, sec = circSecActivo(c);
   return '<div class="card">'
     + '<div class="card-main">'
       + '<div class="card-title">' + escapeHtml(c.nombre || "Sin nombre") + '</div>'
@@ -19365,8 +19522,8 @@ function circCardHtml(c){
         + (c.grupo ? '<span>👥 ' + escapeHtml(c.grupo) + '</span>' : '<span class="text-muted">👥 Sin grupo</span>')
         + '<span>📍 ' + N + ' estaci' + (N === 1 ? 'ón' : 'ones') + '</span>'
         + '<span>🔁 ' + Math.max(1, circNum(c.rondas, 1)) + ' vuelta' + (circNum(c.rondas, 1) === 1 ? '' : 's') + '</span>'
-        + '<span>⏱ ' + circFmt(dur) + '</span>'
-        + '<span class="badge teal">' + (c.modo === "secuencia" ? "Secuencia" : "Rotación por grupos") + '</span>'
+        + '<span>⏱ ' + circDuracionTexto(c) + '</span>'
+        + '<span class="badge teal">' + (sec ? "⛓ " + escapeHtml(CIRC_SEC_NOMBRE) : (c.modo === "secuencia" ? "Secuencia" : "Rotación por grupos")) + '</span>'
         + (circSesiones(c).length ? '<span class="badge muted">📒 ' + circSesiones(c).length + ' clase' + (circSesiones(c).length === 1 ? '' : 's') + '</span>' : '')
         + (circPods(c).length ? '<span class="badge teal">🔵 ' + circPods(c).length + ' Pod' + (circPods(c).length === 1 ? '' : 's') + '</span>' : '')
         + (circElementos(c).length ? '<span class="badge muted">🔺 ' + circElementos(c).length + '</span>' : '')
@@ -19495,10 +19652,9 @@ function circSesionesHtml(c){
 }
 window.circDuplicar = function(id){
   var c = circGet(id); if (!c) return;
-  var copia = JSON.parse(JSON.stringify(c));
-  copia.id = genId(); copia.nombre = (c.nombre || "Circuito") + " (copia)";
+  var copia = circCopiaConIdsNuevos(c);
+  copia.nombre = (c.nombre || "Circuito") + " (copia)";
   copia.createdAt = Date.now(); copia.updatedAt = Date.now();
-  copia.estaciones.forEach(function(s){ s.id = genId(); });
   circLista().push(copia); saveState(); renderCircuitos(); toast("Circuito duplicado", "success");
 };
 window.circBorrar = function(id){
@@ -19525,6 +19681,8 @@ window.circEditar = function(id){
   } else {
     _circEdit = circNuevo(); _circEditNuevo = true;
   }
+  circSecLimpiarEstado();
+  _circSecTiradas = circSecNormalizar(_circEdit);
   showView("circuitos");
 };
 function circHayCambios(){
@@ -19537,7 +19695,7 @@ function circHayCambios(){
 }
 window.circVolver = function(){
   if (circHayCambios() && !window.confirm("Tienes cambios sin guardar en este circuito.\n\n¿Salir sin guardar?")) return;
-  _circEdit = null; _circSelPod = ""; _circSelEl = ""; renderCircuitos();
+  _circEdit = null; _circSelPod = ""; _circSelEl = ""; circSecLimpiarEstado(); renderCircuitos();
 };
 function circEditorHtml(){
   var c = _circEdit;
@@ -19581,6 +19739,7 @@ function circEditorHtml(){
     + '<div class="circ-mapa-tools" id="circ-mapa-tools">' + circMapaToolsHtml(c) + '</div>'
     + '<div id="circ-mapa-box">' + circMapaHtml(c, { lectura: !!c._ro }) + '</div>'
     + '<div id="circ-sel-box">' + circSelHtml(c) + '</div>'
+    + '<div id="circ-sec-box"></div>'
     + '</div></div>';
   html += '<div class="card" style="margin-top:1rem;"><div class="card-main">'
     + '<div class="card-title">🔎 Añadir ejercicios</div>'
@@ -19608,6 +19767,7 @@ function circEditorMontar(){
   if (meta) meta.addEventListener("change", circCampo);
   circMapaMontar(document.getElementById("circ-mapa-box"));
   circPintarEstaciones();
+  circSecPintarLista();
   circBuscar("");
 }
 function circCampo(ev){
@@ -19622,14 +19782,14 @@ function circCampo(ev){
 function circPintarEstaciones(){
   var box = document.getElementById("circ-estaciones");
   if (!box || !_circEdit) return;
-  var c = _circEdit, html = "";
+  var c = _circEdit, html = "", numSec = circSecActivo(c) ? (circSecNormalizar(c), circSecNumeracion(c)) : null;
   if (!c.estaciones.length){
     html = '<p class="text-sm text-muted" style="margin:.5rem 0;">Sin estaciones. Añade ejercicios de la biblioteca (traen su imagen para la vista en vivo) o estaciones libres con el nombre que uses en clase.</p>';
   }
   c.estaciones.forEach(function(s, i){
     var gif = circGifDe(s);
     html += '<div class="circ-row" data-i="' + i + '">'
-      + '<div class="circ-n">' + (i + 1) + '</div>'
+      + '<div class="circ-n">' + (numSec ? escapeHtml(circNumEstacion(c, i, numSec)) : (i + 1)) + '</div>'
       + (gif ? mediaThumb(gif, 'class="circ-thumb" loading="lazy" alt=""') : '<div class="circ-thumb-vacio">📍</div>')
       + '<input type="text" data-i="' + i + '" data-k="nombre" value="' + escapeAttr(s.nombre || "") + '" placeholder="Nombre de la estación">'
       + '<input type="text" class="circ-nota" data-i="' + i + '" data-k="nota" value="' + escapeAttr(s.nota || "") + '" placeholder="Consigna corta (se ve en vivo y en la hoja)">'
@@ -19651,13 +19811,16 @@ function circPintarEstaciones(){
     _circEdit.estaciones[i][k] = (k === "trabajo") ? circNum(el.value, 0) : el.value;
     if (k === "nombre") circPintarMapa();
     if (k === "trabajo") circPintarResumen();
+    if (circSecActivo(_circEdit) && (k === "nombre" || k === "nota" || k === "trabajo")) circSecPintarLista();
   };
   circPintarMapa();
   circPintarResumen();
+  circSecPintarLista();
 }
 function circPintarResumen(){
   var c = _circEdit, r = document.getElementById("circ-resumen"), rot = document.getElementById("circ-rot");
   if (!c || !r) return;
+  if (circSecActivo(c)){ r.innerHTML = circSecResumenHtml(c); if (rot) rot.innerHTML = ""; return; }
   var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1));
   var dur = circDuracion(c);
   r.innerHTML = '<span class="badge teal">📍 ' + N + ' estaci' + (N === 1 ? 'ón' : 'ones') + '</span>'
@@ -19752,6 +19915,8 @@ window.circQuitar = function(i){
   /* Los Pods que eran de esa estacion NO se borran: se quedan en el plano,
      sueltos. Perderlos seria perder el montaje. */
   var n = circHuerfanos(_circEdit);
+  /* Y la cadena se cierra sola: los de los lados quedan unidos. */
+  circSecNormalizar(_circEdit);
   circPintarEstaciones();
   if (n) toast(n + " Pod" + (n === 1 ? " queda" : "s quedan") + " sueltos", "warn");
 };
@@ -19767,6 +19932,8 @@ function circGuardar(silencio){
      apunta a nada. */
   circHuerfanos(c);
   circPodsRenumerar(c);
+  /* Las cadenas, igual: nunca se guarda un enlace a una estacion que ya no esta. */
+  circSecNormalizar(c);
   c.updatedAt = Date.now();
   var l = circLista(), idx = -1;
   for (var i = 0; i < l.length; i++) if (l[i].id === c.id) idx = i;
@@ -19777,7 +19944,7 @@ function circGuardar(silencio){
   if (!silencio) toast("Circuito guardado", "success");
   return copia;
 }
-window.circGuardarBtn = function(){ if (circGuardar(false)){ _circEdit = null; renderCircuitos(); } };
+window.circGuardarBtn = function(){ if (circGuardar(false)){ _circEdit = null; circSecLimpiarEstado(); renderCircuitos(); } };
 window.circGuardarYVivo = function(){ var c = circGuardar(true); if (c){ renderCircuitos(); circEnVivo(c.id); } };
 window.circGuardarYCompartir = function(){ var c = circGuardar(true); if (c){ circPintarEstaciones(); openCircShareModal(c.id); } };
 window.circGuardarYImprimir = function(){ var c = circGuardar(true); if (c){ circPintarEstaciones(); circImprimir(c.id); } };
@@ -19786,7 +19953,7 @@ window.circGuardarYImprimir = function(){ var c = circGuardar(true); if (c){ cir
 window.circImprimir = function(id){ circImprimirObj(circGet(id)); };
 window.circImprimirObj = function(c){
   if (!c) return;
-  var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1));
+  var N = c.estaciones.length, R = Math.max(1, circNum(c.rondas, 1)), G = Math.max(1, circNum(c.grupos, N || 1)), secH = circSecActivo(c);
   var doc = '<!doctype html><html lang="es"><head><meta charset="utf-8"><title>' + escapeHtml(c.nombre || "Circuito") + '</title>'
     + '<style>body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:22px;font-size:13px}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:18px 0 6px;border-bottom:2px solid #a8d139;padding-bottom:3px}'
     + '.meta{color:#444;margin:0 0 10px}.kv{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}.kv span{border:1px solid #ccc;border-radius:6px;padding:4px 8px}'
@@ -19796,19 +19963,24 @@ window.circImprimirObj = function(c){
     + '<p class="meta">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + 'Fecha: ____ / ____ / ______ · Ultra-Sport 19</p>'
     + (c.notas ? '<p><b>Objetivo / notas:</b> ' + escapeHtml(c.notas) + '</p>' : '')
     + '<p><b>Material:</b> ' + escapeHtml(circMaterial(c) || "solo peso corporal") + (c.estaciones.some(function(s){ return !s.exerciseId; }) ? ' · estaciones libres: anotar aparte' : '') + '</p>'
+    + (secH ? '<div class="kv"><span>Modo: ' + escapeHtml(CIRC_SEC_NOMBRE.toLowerCase()) + ' (cadenas)</span><span>Ejercicios: ' + N + '</span><span>Cadenas: ' + circSecNumeracion(c).cadenas.length + '</span><span>Duración: ' + escapeHtml(circDuracionTexto(c)) + '</span></div>'
+        + '<h2>Plano de la sesión</h2>' + circMapaSvgImprimir(c) + circSecHojaHtml(c) + '<!--sec-->' : '')
     + '<div class="kv"><span>Modo: ' + (c.modo === "secuencia" ? "secuencia" : "rotación por grupos") + '</span><span>Estaciones: ' + N + '</span>'
     + (c.modo !== "secuencia" ? '<span>Grupos: ' + G + '</span>' : '')
     + '<span>Vueltas: ' + R + '</span><span>Trabajo: ' + circNum(c.trabajo, 40) + ' s</span><span>Cambio: ' + circNum(c.cambio, 15) + ' s</span>'
     + '<span>Descanso entre vueltas: ' + circNum(c.descansoRonda, 60) + ' s</span><span>Duración: ' + circFmt(circDuracion(c)) + '</span></div>'
     + '<h2>Plano de la sesión</h2>' + circMapaSvgImprimir(c)
     + '<h2>Estaciones</h2><table><thead><tr><th style="width:36px">#</th><th>Estación</th><th>Pods</th><th>Consigna</th><th style="width:20%">Observaciones</th></tr></thead><tbody>';
-  c.estaciones.forEach(function(s, i){
+  /* En secuencias la hoja ya lleva sus tablas por cadena: lo de circuito (la
+     tabla de estaciones y la rotacion) se corta aqui. */
+  if (secH) doc = doc.slice(0, doc.indexOf('<!--sec-->'));
+  if (!secH) c.estaciones.forEach(function(s, i){
     var tProp = (c.modo === "secuencia" && circNum(s.trabajo, 0) > 0) ? ' <span style="color:#444;font-weight:normal">· ' + circNum(s.trabajo, 0) + ' s</span>' : '';
     doc += '<tr><td>' + (i + 1) + '</td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b>' + tProp + '</td>'
       + '<td>' + escapeHtml(circPodsTexto(c, s.id) || "—") + '</td>'
       + '<td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
   });
-  doc += '</tbody></table>';
+  if (!secH) doc += '</tbody></table>';
   var sueltos = circPodsSueltos(c);
   if (sueltos.length){
     doc += '<p><b>Pods sueltos:</b> ' + escapeHtml(circPodsTexto(c, null))
@@ -19821,7 +19993,7 @@ window.circImprimirObj = function(c){
     doc += '<p><b>Elementos del espacio:</b> ' + escapeHtml(Object.keys(cuenta).sort().map(function(k){ return k + (cuenta[k] > 1 ? " ×" + cuenta[k] : ""); }).join(" · ")) + '</p>';
   }
   if (circPods(c).length) doc += '<p style="color:#444;font-size:11px">' + escapeHtml(BLZ_AVISO) + '.</p>';
-  if (c.modo !== "secuencia" && N){
+  if (!secH && c.modo !== "secuencia" && N){
     doc += '<h2>Rotación</h2><table class="rot"><thead><tr><th>Turno</th>';
     for (var s = 0; s < N; s++) doc += '<th>' + (s + 1) + '</th>';
     doc += '</tr></thead><tbody>';
@@ -19905,8 +20077,9 @@ function circPodsPlan(c, estacionId, duracionSeg){
    usuario a mano, como se pidio. */
 function circPodsGrupos(c, fase){
   var l = [];
-  if (!c || !fase || fase.tipo !== "trabajo") return l;
-  if (c.modo === "secuencia"){
+  if (!c || !fase || fase.tipo !== "trabajo" || fase.manual) return l;
+  /* En secuencias va un ejercicio cada vez, como en secuencia: solo su grupo. */
+  if (c.modo === "secuencia" || circSecActivo(c)){
     var st = u19Arr(c.estaciones)[fase.estacion];
     if (st && circPodsDe(c, st.id).length) l.push(st.id);
   } else {
@@ -20118,7 +20291,8 @@ window.circEnVivo = function(id){ circEnVivoObj(circGet(id)); };
 window.circEnVivoObj = function(c){
   if (!c) return;
   if (!c.estaciones.length){ toast("El circuito no tiene estaciones", "warn"); return; }
-  var plan = circPlan(c), total = 0;
+  /* Secuencias: su propio plan. El del circuito no se toca. */
+  var plan = circSecActivo(c) ? circPlanSec(c) : circPlan(c), total = 0;
   plan.forEach(function(p){ total += p.dur; });
   _live = { c: c, plan: plan, i: 0, fin: 0, restante: plan[0].dur, corriendo: false, sonido: circSonidoGuardado(), total: total, hecho: 0, ultimoSeg: -1, timer: null };
   var ov = document.getElementById("circ-live");
@@ -20144,20 +20318,23 @@ function circLiveTurnoVisible(){
 }
 function circLivePintar(){
   var L = _live; if (!L) return;
-  var ov = document.getElementById("circ-live"), c = L.c, p = circLiveFase(), N = c.estaciones.length;
+  var ov = document.getElementById("circ-live"), c = L.c, p = circLiveFase(), N = c.estaciones.length, sec = circSecActivo(c);
   ov.className = "circ-live f-" + p.tipo;
-  var etiqueta = { listos: "¿Listos?", trabajo: "¡A TRABAJAR!", cambio: "CAMBIO DE ESTACIÓN", descanso: "DESCANSO", fin: "¡CIRCUITO TERMINADO!" }[p.tipo];
+  var etiqueta = sec ? { listos: "¿Listos?", trabajo: "¡A TRABAJAR!", cambio: "DESCANSO", descanso: "DESCANSO", fin: "¡SESIÓN TERMINADA!" }[p.tipo]
+    : { listos: "¿Listos?", trabajo: "¡A TRABAJAR!", cambio: "CAMBIO DE ESTACIÓN", descanso: "DESCANSO", fin: "¡CIRCUITO TERMINADO!" }[p.tipo];
   var R = Math.max(1, circNum(c.rondas, 1));
-  var sub = p.tipo === "fin" ? "Tiempo total " + circFmt(L.total - 5)
-    : "Vuelta " + (p.ronda + 1) + " de " + R + " · turno " + (Math.min(circLiveTurnoVisible(), R * N - 1) + 1) + " de " + (R * N);
+  var sub = sec ? circLiveSecSub(c, p) : (p.tipo === "fin" ? "Tiempo total " + circFmt(L.total - 5)
+    : "Vuelta " + (p.ronda + 1) + " de " + R + " · turno " + (Math.min(circLiveTurnoVisible(), R * N - 1) + 1) + " de " + (R * N));
   var html = '<div class="cl-top"><span class="cl-nombre">' + escapeHtml(c.nombre || "Circuito") + '</span>'
     + (c.grupo ? '<span class="cl-grupo">' + escapeHtml(c.grupo) + '</span>' : '')
     + '<span class="cl-grupo">' + escapeHtml(sub) + '</span>'
     + '<button class="btn btn-ghost btn-sm cl-x" onclick="circLiveSalir()">✕ Salir</button></div>';
   html += '<div class="cl-main">'
     + '<div class="cl-fase">' + escapeHtml(etiqueta) + '</div>'
-    + '<div class="cl-timer" id="cl-timer">' + circFmt(L.restante) + '</div>';
-  if (p.tipo === "fin"){
+    + '<div class="cl-timer" id="cl-timer">' + (p.manual ? '<span class="cl-rep">' + escapeHtml(circSecRepTexto(p.rep) || "a tu ritmo") + '</span>' : circFmt(L.restante)) + '</div>';
+  if (sec){
+    html += circLiveSecHtml(c, p);
+  } else if (p.tipo === "fin"){
     html += '<div class="cl-est">' + escapeHtml(c.nombre || "") + '</div><div class="cl-sig">' + N + ' estaciones · ' + R + ' vuelta' + (R === 1 ? '' : 's') + '</div>'
       + circMapaHtml(c, { compacto: true, clase: "cl-mapa cl-mapa-min" });
   } else if (c.modo === "secuencia"){
@@ -20179,7 +20356,8 @@ function circLivePintar(){
     + '<button class="btn btn-secondary" onclick="circLiveSalto(-1)" title="Fase anterior">⏮</button>'
     + (p.tipo === "fin"
         ? '<button class="btn btn-primary big" onclick="circLiveReiniciar()">↺ Otra vez</button>' + (circGet(c.id) ? '<button class="btn btn-secondary" onclick="circRegistrarClase(\'' + c.id + '\')" title="Fecha, curso, asistencia y observaciones de esta clase">📝 Registrar clase</button>' : '')
-        : '<button class="btn btn-primary big" id="cl-play" onclick="circLiveToggle()">' + (L.corriendo ? "⏸ Pausa" : (L.i === 0 && L.restante === p.dur ? "▶ Empezar" : "▶ Seguir")) + '</button>')
+        : (p.manual ? '<button class="btn btn-primary big" id="cl-play" onclick="circLiveHecho()">✓ Hecho</button>'
+          : '<button class="btn btn-primary big" id="cl-play" onclick="circLiveToggle()">' + (L.corriendo ? "⏸ Pausa" : (L.i === 0 && L.restante === p.dur ? "▶ Empezar" : "▶ Seguir")) + '</button>'))
     + '<button class="btn btn-secondary" onclick="circLiveSalto(1)" title="Siguiente fase">⏭</button>'
     + '<button class="btn btn-ghost" onclick="circLiveSonido()" title="Sonido: pitido, silbato o nada">' + ({ pitido: "🔊 Pitido", silbato: "📯 Silbato", off: "🔇" }[L.sonido] || "🔊") + '</button>'
     + '<button class="btn btn-ghost" onclick="circLivePantalla()" title="Pantalla completa">⛶</button>'
@@ -20224,6 +20402,9 @@ window.circLiveToggle = function(){
 };
 function circLiveTick(){
   var L = _live; if (!L || !L.corriendo) return;
+  /* Una serie por repeticiones no cuenta: espera a «Hecho». Solo las trae el
+     plan de secuencias; el del circuito no tiene ninguna. */
+  if (L.plan[L.i] && L.plan[L.i].manual) return;
   L.restante = Math.max(0, (L.fin - Date.now()) / 1000);
   var seg = Math.ceil(L.restante);
   if (seg !== L.ultimoSeg){
@@ -20300,7 +20481,7 @@ window.circLiveSalir = function(){
 };
 function circLiveTeclas(ev){
   if (!_live) return;
-  if (ev.key === " " || ev.code === "Space"){ ev.preventDefault(); circLiveToggle(); }
+  if (ev.key === " " || ev.code === "Space"){ ev.preventDefault(); if (circLiveFase().manual) circLiveHecho(); else circLiveToggle(); }
   else if (ev.key === "ArrowRight"){ ev.preventDefault(); circLiveSalto(1); }
   else if (ev.key === "ArrowLeft"){ ev.preventDefault(); circLiveSalto(-1); }
   else if (ev.key === "Escape"){ circLiveSalir(); }
@@ -20370,12 +20551,1014 @@ function circDashHTML(){
   } else {
     l.forEach(function(c){
       html += '<div class="circ-dash-row"><span class="t">' + escapeHtml(c.nombre || "Sin nombre") + '</span>'
-        + '<span class="m">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + c.estaciones.length + ' est. · ' + circFmt(circDuracion(c)) + '</span>'
+        + '<span class="m">' + (c.grupo ? escapeHtml(c.grupo) + ' · ' : '') + c.estaciones.length + ' est. · ' + circDuracionTexto(c) + '</span>'
         + '<button class="btn btn-primary btn-sm" onclick="circEnVivo(\'' + c.id + '\')"' + (c.estaciones.length ? '' : ' disabled') + '>▶ En vivo</button>'
         + '<button class="btn btn-ghost btn-sm" onclick="circEditar(\'' + c.id + '\')">Editar</button></div>';
     });
   }
   return html + '</div></div>';
+}
+
+/* --- Secuencias: cadenas que se arman a mano (Fase 14, 22-sep-2026) --- */
+/* La tercera mirada del plano, al lado de «En circulo» y «En filas». Aquellas
+   dos ordenan TODO como un circuito: estacion 1, 2, 3... y los grupos rotan.
+   Esta deja decir «estos dos van juntos»: sentadilla sumo + remo posterior como
+   una superserie cerrada, y el jalon al pecho aparte, sin que la app meta los
+   cinco en la misma vuelta. Las flechas las pone Diego.
+
+     c.planSec = { modo: "secuencias" | "circuito", version: 1, notas,
+                   cadenas: [ { id, etiqueta, nombre, vueltas,
+                                descansoEntreEjerciciosSeg, descansoEntreVueltasSeg,
+                                nodos: [ idDeEstacion, ... ] } ] }
+
+   UNA SOLA VERDAD. Lo que manda es `cadenas[].nodos`, en orden: el enlace
+   A->B existe porque B va justo detras de A en la misma cadena. Las flechas no
+   se guardan aparte (salen de circSecEnlaces), y la letra y el numero tampoco
+   (salen del orden: circSecNumeracion). Guardar las tres cosas seria tener tres
+   verdades que se desacuerdan en cuanto una se toca a medias.
+
+   Lo de cada ejercicio vive en la ESTACION, no en la cadena, para que no se
+   pierda al desenganchar y volver a enganchar: s.rep, s.carga, s.tempo, s.lado
+   son nuevos; el tiempo es s.trabajo y la nota es s.nota, los que ya existian.
+   Un circuito sin planSec no se toca: nada se le anade hasta que se elige
+   «Secuencias», y volver a «En circulo» o «En filas» solo cambia `modo`, asi
+   que las cadenas siguen ahi para cuando se vuelva.
+
+   El nombre de la mirada va en una constante: «Secuencia» ya es un modo del
+   circuito (una estacion tras otra) y un modo de luz de BlazePod, y si Diego
+   prefiere otro se cambia en una linea. */
+var CIRC_SEC_NOMBRE = "Secuencias";
+var CIRC_SEC_VERSION = 1;
+var CIRC_SEC_ETIQUETAS = ["Superserie", "Biserie", "Serie compuesta", "Contraste", "Bloque", "Personalizado"];
+var CIRC_SEC_LADOS = [
+  { id: "bilateral", nombre: "Bilateral" },
+  { id: "derecho",   nombre: "Lado derecho" },
+  { id: "izquierdo", nombre: "Lado izquierdo" },
+  { id: "alternado", nombre: "Alternado" }
+];
+var CIRC_SEC_MAX_VUELTAS = 20;
+var CIRC_SEC_MAX_SEG = 900;
+/* Cinco de la casa, con lo que hay en la sala (sin cajon, sin bandas, sin
+   colchoneta): mancuernas, barra en el rack y peso corporal. Si un ejercicio
+   no esta en la biblioteca de este navegador, entra como estacion libre con
+   su nombre. Se pueden editar enteras despues: son cadenas normales. */
+var CIRC_SEC_PLANTILLAS = [
+  { id: "sup-empuje-traccion", nombre: "Superserie de empuje y tracción", etiqueta: "Superserie", vueltas: 3, dEj: 0, dVu: 90,
+    pasos: [ { ex: "us196407", nombre: "Press de banca con mancuernas", rep: "10" },
+             { ex: "us196582", nombre: "Remo con mancuernas", rep: "10" } ] },
+  { id: "bi-sentadilla", nombre: "Biserie de sentadilla", etiqueta: "Biserie", vueltas: 3, dEj: 0, dVu: 90,
+    pasos: [ { ex: "us191760", nombre: "Sentadilla goblet con mancuernas", rep: "10" },
+             { ex: "us196298", nombre: "Sentadilla búlgara con mancuernas", rep: "8", lado: "alternado" } ] },
+  { id: "contraste", nombre: "Contraste de fuerza y velocidad", etiqueta: "Contraste", vueltas: 3, dEj: 20, dVu: 120,
+    pasos: [ { ex: "us196218", nombre: "Sentadilla con barra", rep: "5" },
+             { ex: "us196277", nombre: "Sentadilla con salto", rep: "5" } ] },
+  { id: "control-motor", nombre: "Bloque de control motor", etiqueta: "Bloque", vueltas: 2, dEj: 15, dVu: 60,
+    pasos: [ { ex: "us190276", nombre: "Dead bug", rep: "8", lado: "alternado" },
+             { ex: "us196057", nombre: "Plancha", tiempo: 30 },
+             { ex: "us196526", nombre: "Superman", rep: "10" } ] },
+  { id: "movilidad", nombre: "Cadena de movilidad", etiqueta: "Bloque", vueltas: 2, dEj: 0, dVu: 30,
+    pasos: [ { ex: "us19f0128", nombre: "Gato y camello", rep: "8" },
+             { ex: "us193119", nombre: "Sentadilla profunda en cuclillas", tiempo: 30 },
+             { ex: "us19f0101", nombre: "Isquiotibiales 90/90", tiempo: 30, lado: "alternado" } ] }
+];
+
+/* ---------- el modelo ---------- */
+function circSecActivo(c){
+  return !!(c && c.planSec && typeof c.planSec === "object" && c.planSec.modo === "secuencias");
+}
+function circSecCadenaNueva(nodos, base){
+  base = (base && typeof base === "object") ? base : {};
+  return { id: "cad" + genId(),
+           etiqueta: CIRC_SEC_ETIQUETAS.indexOf(base.etiqueta) >= 0 ? base.etiqueta : "Bloque",
+           nombre: blzTexto(base.nombre, 40),
+           vueltas: blzEnt(base.vueltas, 3, 1, CIRC_SEC_MAX_VUELTAS),
+           descansoEntreEjerciciosSeg: blzEnt(base.descansoEntreEjerciciosSeg, 0, 0, CIRC_SEC_MAX_SEG),
+           descansoEntreVueltasSeg: blzEnt(base.descansoEntreVueltasSeg, 60, 0, CIRC_SEC_MAX_SEG),
+           nodos: u19Arr(nodos).slice() };
+}
+/* Sanea en su sitio: los campos que conoce los deja en rango y los demas no los
+   toca. Un dato raro de una version futura sobrevive a esta. */
+function circSecCadenaLimpia(k, nodos){
+  k.id = blzTexto(k.id, 40) || ("cad" + genId());
+  if (CIRC_SEC_ETIQUETAS.indexOf(k.etiqueta) < 0) k.etiqueta = "Bloque";
+  k.nombre = blzTexto(k.nombre, 40);
+  k.vueltas = blzEnt(k.vueltas, 3, 1, CIRC_SEC_MAX_VUELTAS);
+  k.descansoEntreEjerciciosSeg = blzEnt(k.descansoEntreEjerciciosSeg, 0, 0, CIRC_SEC_MAX_SEG);
+  k.descansoEntreVueltasSeg = blzEnt(k.descansoEntreVueltasSeg, 60, 0, CIRC_SEC_MAX_SEG);
+  k.nodos = nodos;
+  return k;
+}
+/* Deja planSec de acuerdo con las estaciones que hay AHORA: cada estacion en
+   una y solo una cadena, ningun id que ya no exista, ninguna cadena vacia, y
+   las estaciones nuevas al final como cadenas de uno. Es lo que hace que borrar
+   un ejercicio cierre el hueco sin dejar una flecha colgando: la flecha no
+   existe por su cuenta, sale de dos nodos seguidos. Devuelve cuantas
+   referencias tuvo que tirar, para poder decirlo. Si no hay planSec no crea
+   nada: un circuito de antes se queda como estaba. */
+function circSecNormalizar(c){
+  if (!c || !c.planSec || typeof c.planSec !== "object" || Array.isArray(c.planSec)) return 0;
+  var ps = c.planSec, hay = {}, orden = [], visto = {}, tiradas = 0, cadenas = [];
+  u19Arr(c.estaciones).forEach(function(s){ if (s && s.id && !hay[s.id]){ hay[s.id] = true; orden.push(s.id); } });
+  u19Arr(ps.cadenas).forEach(function(k){
+    if (!k || typeof k !== "object" || Array.isArray(k)) return;
+    var nodos = [];
+    u19Arr(k.nodos).forEach(function(id){
+      id = String(id == null ? "" : id);
+      if (!hay[id] || visto[id]){ tiradas++; return; }
+      visto[id] = true;
+      nodos.push(id);
+    });
+    if (nodos.length) cadenas.push(circSecCadenaLimpia(k, nodos));
+  });
+  orden.forEach(function(id){ if (!visto[id]) cadenas.push(circSecCadenaNueva([id])); });
+  ps.cadenas = cadenas;
+  ps.modo = (ps.modo === "secuencias") ? "secuencias" : "circuito";
+  ps.version = CIRC_SEC_VERSION;
+  ps.notas = blzTexto(ps.notas, 400);
+  if (tiradas){ try { console.warn("US19: secuencias, se descartaron " + tiradas + " enlaces a ejercicios que ya no estan en", c.id); } catch(e){} }
+  return tiradas;
+}
+function circSecLetra(k){
+  var s = ""; k = Math.max(0, Math.floor(k) || 0);
+  do { s = String.fromCharCode(65 + (k % 26)) + s; k = Math.floor(k / 26) - 1; } while (k >= 0);
+  return s;
+}
+/* Letra por cadena segun su ORDEN, numero por nodo segun su posicion. Lo que se
+   ve en pantalla sale de aqui y lo que ejecuta el cronometro tambien: no pueden
+   discrepar. */
+function circSecNumeracion(c){
+  var out = { cadenas: [], por: {} };
+  if (!c || !c.planSec) return out;
+  u19Arr(c.planSec.cadenas).forEach(function(k, i){
+    var letra = circSecLetra(i), color = CIRC_COLORES[i % CIRC_COLORES.length];
+    out.cadenas.push({ cadena: k, letra: letra, color: color, idx: i });
+    u19Arr(k.nodos).forEach(function(id, j){
+      out.por[id] = { letra: letra, pos: j + 1, rotulo: letra + (j + 1), color: color, cadena: i, total: k.nodos.length };
+    });
+  });
+  return out;
+}
+function circSecEnlaces(c){
+  var l = [];
+  if (!c || !c.planSec) return l;
+  u19Arr(c.planSec.cadenas).forEach(function(k, i){
+    var n = u19Arr(k.nodos);
+    for (var j = 0; j + 1 < n.length; j++) l.push({ de: n[j], a: n[j + 1], cadena: i });
+  });
+  return l;
+}
+function circSecDonde(c, id){
+  var ks = u19Arr(c && c.planSec && c.planSec.cadenas);
+  for (var i = 0; i < ks.length; i++){
+    var j = u19Arr(ks[i].nodos).indexOf(id);
+    if (j >= 0) return { k: i, j: j };
+  }
+  return null;
+}
+function circSecCadenaPorId(c, id){
+  var ks = u19Arr(c && c.planSec && c.planSec.cadenas);
+  for (var i = 0; i < ks.length; i++) if (ks[i].id === id) return { cadena: ks[i], idx: i };
+  return null;
+}
+
+/* ---------- las operaciones (todas sobre el modelo, sin pantalla) ---------- */
+/* Poner la flecha de `de` a `a`. La cadena es LINEAL: cada nodo tiene como
+   mucho un siguiente y un anterior, y no hay ciclos. Lo que no cabe en eso no
+   se crea a medias: vuelve con el motivo y, si tiene arreglo, con la oferta de
+   meter el nodo en medio en vez de ramificar. */
+function circSecEnlazar(c, de, a){
+  if (!c || !c.planSec) return { ok: false, motivo: "sin_plan" };
+  if (!de || !a || de === a) return { ok: false, motivo: "mismo" };
+  var A = circSecDonde(c, de), B = circSecDonde(c, a);
+  if (!A || !B) return { ok: false, motivo: "no_existe" };
+  var ks = c.planSec.cadenas, ka = ks[A.k], kb = ks[B.k];
+  if (A.k === B.k){
+    if (B.j === A.j + 1) return { ok: false, motivo: "ya" };
+    if (B.j < A.j) return { ok: false, motivo: "ciclo" };
+    return { ok: false, motivo: "bifurcacion", oferta: { tipo: "tras", nodo: a, ref: de } };
+  }
+  var origenConSiguiente = A.j < ka.nodos.length - 1, destinoConAnterior = B.j > 0;
+  if (origenConSiguiente) return { ok: false, motivo: "bifurcacion", oferta: { tipo: "tras", nodo: a, ref: de } };
+  if (destinoConAnterior) return { ok: false, motivo: "bifurcacion", oferta: { tipo: "antes", nodo: de, ref: a } };
+  /* El caso limpio: la cola de una cadena con la cabeza de otra. Se quedan los
+     parametros de la de delante, que es la que el profesor tenia armada. */
+  ka.nodos = ka.nodos.concat(kb.nodos);
+  ks.splice(B.k, 1);
+  return { ok: true };
+}
+/* Saca un nodo de su cadena y une los extremos. Si la cadena se queda vacia,
+   se va. */
+function circSecSacar(c, id){
+  var d = circSecDonde(c, id);
+  if (!d) return false;
+  var k = c.planSec.cadenas[d.k];
+  k.nodos.splice(d.j, 1);
+  if (!k.nodos.length) c.planSec.cadenas.splice(d.k, 1);
+  return true;
+}
+/* Meter `nodo` justo detras de `ref` (o justo delante): sale de donde estuviera,
+   y su cadena de antes se cierra sola. */
+function circSecInsertar(c, nodo, ref, delante){
+  if (!c || !c.planSec || !nodo || !ref || nodo === ref) return false;
+  if (!circSecDonde(c, nodo) || !circSecDonde(c, ref)) return false;
+  circSecSacar(c, nodo);
+  var D = circSecDonde(c, ref);
+  if (!D) return false;
+  c.planSec.cadenas[D.k].nodos.splice(delante ? D.j : D.j + 1, 0, nodo);
+  return true;
+}
+/* Soltar una tarjeta sobre una flecha: entra entre esos dos. */
+function circSecInsertarEnFlecha(c, nodo, de, a){
+  var A = circSecDonde(c, de);
+  if (!A || nodo === de || nodo === a) return false;
+  if (c.planSec.cadenas[A.k].nodos[A.j + 1] !== a) return false;
+  return circSecInsertar(c, nodo, de, false);
+}
+/* Quitar una flecha parte la cadena en dos. La de detras hereda vueltas y
+   descansos; el rotulo solo si sigue siendo de mas de un ejercicio. */
+function circSecQuitarEnlace(c, de, a){
+  var A = circSecDonde(c, de);
+  if (!A) return false;
+  var k = c.planSec.cadenas[A.k];
+  if (k.nodos[A.j + 1] !== a) return false;
+  var resto = k.nodos.splice(A.j + 1);
+  var nueva = circSecCadenaNueva(resto, k);
+  if (resto.length < 2) nueva.etiqueta = "Bloque";
+  c.planSec.cadenas.splice(A.k + 1, 0, nueva);
+  return true;
+}
+/* Desencadenar: el nodo sale y se queda solo, justo detras de su cadena; los
+   de los lados se unen. */
+function circSecDesencadenar(c, id){
+  var d = circSecDonde(c, id);
+  if (!d) return false;
+  var k = c.planSec.cadenas[d.k];
+  if (k.nodos.length < 2) return false;
+  k.nodos.splice(d.j, 1);
+  var sola = circSecCadenaNueva([id], k);
+  sola.etiqueta = "Bloque";
+  c.planSec.cadenas.splice(d.k + 1, 0, sola);
+  return true;
+}
+/* Cambiar el orden de las cadenas. Se mueve UNA: las letras de las demas solo
+   cambian si quedan entre medias, que es lo minimo que puede cambiar. */
+function circSecMoverCadena(c, desde, hasta){
+  var ks = u19Arr(c && c.planSec && c.planSec.cadenas);
+  if (desde < 0 || desde >= ks.length) return false;
+  hasta = Math.max(0, Math.min(ks.length - 1, hasta));
+  if (hasta === desde) return false;
+  var k = ks.splice(desde, 1)[0];
+  ks.splice(hasta, 0, k);
+  return true;
+}
+/* El texto del motivo, para decirlo en una linea. */
+function circSecMotivoTexto(c, r, de, a){
+  var num = circSecNumeracion(c), rd = num.por[de], ra = num.por[a];
+  var nd = rd ? rd.rotulo : "el origen", na = ra ? ra.rotulo : "el destino";
+  if (r.motivo === "ciclo") return na + " ya va antes que " + nd + " en la misma cadena: la flecha cerraría un círculo.";
+  if (r.motivo === "ya") return nd + " y " + na + " ya están enlazadas.";
+  if (r.motivo === "mismo") return "Una tarjeta no se enlaza consigo misma.";
+  if (r.motivo === "bifurcacion"){
+    if (r.oferta && r.oferta.tipo === "antes") return na + " ya tiene una flecha que le llega: la cadena no se ramifica.";
+    return nd + " ya tiene una flecha de salida: la cadena no se ramifica.";
+  }
+  return "No se pudo enlazar.";
+}
+
+/* ---------- dosis, texto y duracion ---------- */
+function circSecLado(id){
+  for (var i = 0; i < CIRC_SEC_LADOS.length; i++) if (CIRC_SEC_LADOS[i].id === id) return CIRC_SEC_LADOS[i];
+  return CIRC_SEC_LADOS[0];
+}
+function circSecNodoTiempo(s){ var t = circNum(s && s.trabajo, 0); return t > 0 ? t : 0; }
+function circSecNodoRep(s){ return blzTexto(s && s.rep, 20).trim(); }
+/* «10» se lee como «10 rep»; «8 por lado» o «AMRAP» se dejan como estan. */
+function circSecRepTexto(rep){
+  rep = String(rep || "").trim();
+  return /^\d+(\s*[-–a]\s*\d+)?$/.test(rep) ? rep + " rep" : rep;
+}
+function circSecDosis(s){
+  var p = [], t = circSecNodoTiempo(s), rep = circSecNodoRep(s);
+  if (rep) p.push(circSecRepTexto(rep));
+  if (t) p.push(t + " s");
+  if (s && String(s.carga || "").trim()) p.push(blzTexto(s.carga, 30).trim());
+  if (s && String(s.tempo || "").trim()) p.push("tempo " + blzTexto(s.tempo, 12).trim());
+  if (s && s.lado && s.lado !== "bilateral") p.push(circSecLado(s.lado).nombre.toLowerCase());
+  return p.join(", ");
+}
+function circSecRotuloCadena(k){
+  return (k.etiqueta === "Personalizado" && String(k.nombre || "").trim()) ? String(k.nombre).trim() : k.etiqueta;
+}
+/* La lectura de la sesion, en texto: la que se copia, se pega en un WhatsApp o
+   se imprime. Sale del mismo modelo que el cronometro. */
+function circSecTexto(c){
+  circSecNormalizar(c);
+  var num = circSecNumeracion(c), L = [];
+  num.cadenas.forEach(function(x){
+    var k = x.cadena, V = k.vueltas, dVu = k.descansoEntreVueltasSeg, dEj = k.descansoEntreEjerciciosSeg;
+    L.push(x.letra + " — " + circSecRotuloCadena(k) + ", " + V + " vuelta" + (V === 1 ? "" : "s")
+      + (V > 1 ? ", " + (dVu ? dVu + " s entre vueltas" : "sin descanso entre vueltas") : ""));
+    k.nodos.forEach(function(id, j){
+      var i = circEstacionIdx(c, id); if (i < 0) return;
+      var s = c.estaciones[i], dosis = circSecDosis(s);
+      L.push("  " + x.letra + (j + 1) + " " + circEstacionNombre(s) + (dosis ? ": " + dosis : "")
+        + (String(s.nota || "").trim() ? " (" + String(s.nota).trim() + ")" : ""));
+    });
+    if (k.nodos.length > 1){
+      L.push("  " + (dEj ? dEj + " s de descanso entre ejercicios" : "Sin descanso entre " + x.letra + "1 y " + x.letra + k.nodos.length));
+    }
+    L.push("");
+  });
+  var d = circSecDuracion(c);
+  if (num.cadenas.length) L.push("Duración aproximada: " + circFmt(d.seg) + (d.manuales ? ", más " + d.manuales + " serie" + (d.manuales === 1 ? "" : "s") + " por repeticiones" : ""));
+  if (String(c.planSec && c.planSec.notas || "").trim()) L.push("Notas: " + String(c.planSec.notas).trim());
+  return L.join("\n").replace(/\n+$/, "");
+}
+
+/* ---------- el recorrido en vivo ---------- */
+/* El plan del cronometro para las cadenas, en una funcion propia: circPlan
+   sigue siendo el del circuito y no se toca. Mismas fases, mismo motor:
+   listos → cada ejercicio de la cadena → (descanso entre ejercicios) → ... →
+   descanso entre vueltas → la vuelta siguiente → la cadena siguiente → fin.
+
+   Un ejercicio por repeticiones es una fase MANUAL (dur 0, manual: true): no
+   cuenta, espera a que se marque hecho. Por tiempo, cuenta sola. Sin ninguna de
+   las dos, tambien manual: no se le inventa un tiempo. Entre la ultima vuelta
+   de una cadena y la siguiente se descansa lo de la cadena que acaba. */
+function circPlanSec(c){
+  circSecNormalizar(c);
+  var num = circSecNumeracion(c), plan = [], turno = 0;
+  var ks = u19Arr(c.planSec && c.planSec.cadenas);
+  var primero = (ks.length && ks[0].nodos.length) ? circEstacionIdx(c, ks[0].nodos[0]) : 0;
+  plan.push({ tipo: "listos", dur: 5, turno: -1, ronda: 0, estacion: Math.max(0, primero), cadena: 0, paso: 0 });
+  ks.forEach(function(k, ki){
+    var V = k.vueltas, dEj = k.descansoEntreEjerciciosSeg, dVu = k.descansoEntreVueltasSeg, nodos = k.nodos;
+    for (var v = 0; v < V; v++){
+      for (var j = 0; j < nodos.length; j++){
+        var i = circEstacionIdx(c, nodos[j]); if (i < 0) continue;
+        var s = c.estaciones[i], t = circSecNodoTiempo(s);
+        plan.push({ tipo: "trabajo", dur: t, manual: !t, rep: circSecNodoRep(s), turno: turno++, ronda: v, vueltas: V,
+                    estacion: i, cadena: ki, paso: j, rotulo: num.por[nodos[j]] ? num.por[nodos[j]].rotulo : "" });
+        if (j < nodos.length - 1 && dEj > 0) plan.push({ tipo: "cambio", dur: dEj, turno: turno, ronda: v, vueltas: V, estacion: i, cadena: ki, paso: j });
+      }
+      var ultima = (ki === ks.length - 1 && v === V - 1);
+      if (!ultima && dVu > 0){
+        var fin = circEstacionIdx(c, nodos[nodos.length - 1]);
+        plan.push({ tipo: "descanso", dur: dVu, turno: turno, ronda: v, vueltas: V, estacion: Math.max(0, fin), cadena: ki, paso: nodos.length - 1, cierraCadena: v === V - 1 });
+      }
+    }
+  });
+  var ult = plan[plan.length - 1];
+  plan.push({ tipo: "fin", dur: 0, turno: turno, ronda: ult.ronda || 0, estacion: ult.estacion || 0, cadena: Math.max(0, ks.length - 1), paso: 0 });
+  return plan;
+}
+function circSecDuracion(c){
+  var seg = 0, manuales = 0;
+  circPlanSec(c).forEach(function(p){
+    if (p.tipo === "listos") return;
+    if (p.manual) manuales++; else seg += p.dur || 0;
+  });
+  return { seg: seg, manuales: manuales };
+}
+/* La duracion que se ENSENA. En circuito es la de siempre, al segundo. */
+function circDuracionTexto(c){
+  if (!circSecActivo(c)) return circFmt(circDuracion(c));
+  var d = circSecDuracion(c);
+  return circFmt(d.seg) + (d.manuales ? " + " + d.manuales + " por rep." : "");
+}
+/* El numero de una estacion donde se ensena: en circuito, su orden; en
+   secuencias, su rotulo (A1, B2...). */
+function circNumEstacion(c, i, num){
+  if (!circSecActivo(c)) return String(i + 1);
+  var s = u19Arr(c.estaciones)[i];
+  num = num || circSecNumeracion(c);
+  var r = s ? num.por[s.id] : null;
+  return r ? r.rotulo : String(i + 1);
+}
+
+/* ---------- el plano en secuencias ---------- */
+/* Las flechas de Diego, del color de su cadena. No se mezclan con las de
+   rotacion: en esta mirada aquellas no se dibujan, porque dirian otro orden. */
+function circSecFlechasSvg(c, H, opts){
+  opts = opts || {};
+  circSecNormalizar(c);
+  var svg = '<defs>', i;
+  for (i = 0; i < CIRC_COLORES.length; i++){
+    svg += '<marker id="cm-sarr' + i + '" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="' + CIRC_COLORES[i] + '"/></marker>';
+  }
+  svg += '</defs>';
+  circSecEnlaces(c).forEach(function(e){
+    var g = circSecSegmento(c, e.de, e.a, H);
+    if (!g) return;
+    var col = e.cadena % CIRC_COLORES.length, sel = (opts.selFlecha === e.de + ">" + e.a);
+    svg += '<line class="cm-sec-l" x1="' + g.x1.toFixed(1) + '" y1="' + g.y1.toFixed(1) + '" x2="' + g.x2.toFixed(1) + '" y2="' + g.y2.toFixed(1)
+      + '" stroke="' + CIRC_COLORES[col] + '" stroke-width="' + (sel ? 8 : 5) + '" stroke-linecap="round" marker-end="url(#cm-sarr' + col + ')"'
+      + (sel ? '' : ' opacity=".92"') + '/>';
+  });
+  return svg;
+}
+/* El tramo visible de una flecha: de borde a borde de las tarjetas, igual que
+   las de rotacion. null si estan tan juntas que no cabe. */
+function circSecSegmento(c, de, a, H){
+  var i = circEstacionIdx(c, de), j = circEstacionIdx(c, a);
+  if (i < 0 || j < 0) return null;
+  var p = circPos(c, i), q = circPos(c, j);
+  var x1 = p.x * 1000, y1 = p.y * H, x2 = q.x * 1000, y2 = q.y * H, dx = x2 - x1, dy = y2 - y1, L = Math.sqrt(dx * dx + dy * dy) || 1;
+  var r = 78; if (L < r * 2 + 10) r = Math.max(0, (L - 10) / 2);
+  var ux = dx / L, uy = dy / L;
+  return { x1: x1 + ux * r, y1: y1 + uy * r, x2: x2 - ux * r, y2: y2 - uy * r };
+}
+/* La zona sensible de cada flecha: una linea transparente de 48 px en pantalla
+   (24 a cada lado), en su propia capa, por DEBAJO de las tarjetas, los conos no
+   y los Pods. La capa no recibe el toque; solo cada linea, y solo en su trazo. */
+function circSecCapaHtml(c, opts){
+  opts = opts || {};
+  var e = circEspacio(c), H = Math.round(1000 / (e.anchoM / e.largoM));
+  var html = '<svg class="cm-capa-sec" viewBox="0 0 1000 ' + H + '" preserveAspectRatio="none" aria-hidden="true">';
+  circSecEnlaces(c).forEach(function(en){
+    var g = circSecSegmento(c, en.de, en.a, H);
+    if (!g) return;
+    html += '<line class="cm-sec-hit" data-de="' + escapeAttr(en.de) + '" data-a="' + escapeAttr(en.a) + '" x1="' + g.x1.toFixed(1) + '" y1="' + g.y1.toFixed(1)
+      + '" x2="' + g.x2.toFixed(1) + '" y2="' + g.y2.toFixed(1) + '" stroke="transparent" stroke-width="48" vector-effect="non-scaling-stroke"/>';
+  });
+  return html + '</svg>';
+}
+/* La flecha que queda a menos de `radioPx` de un punto de la pantalla, sin
+   contar las que salen o llegan a `excepto`. Para soltar una tarjeta encima. */
+function circSecFlechaCerca(c, fx, fy, wPx, hPx, radioPx, excepto){
+  var e = circEspacio(c), H = Math.round(1000 / (e.anchoM / e.largoM)), mejor = null, mejorD = Infinity;
+  circSecEnlaces(c).forEach(function(en){
+    if (en.de === excepto || en.a === excepto) return;
+    var g = circSecSegmento(c, en.de, en.a, H); if (!g) return;
+    var ax = g.x1 / 1000 * wPx, ay = g.y1 / H * hPx, bx = g.x2 / 1000 * wPx, by = g.y2 / H * hPx, px = fx * wPx, py = fy * hPx;
+    var vx = bx - ax, vy = by - ay, L2 = vx * vx + vy * vy; if (!L2) return;
+    var t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / L2));
+    var dx = px - (ax + t * vx), dy = py - (ay + t * vy), d = Math.sqrt(dx * dx + dy * dy);
+    if (d <= radioPx && d < mejorD){ mejorD = d; mejor = en; }
+  });
+  return mejor;
+}
+/* Las capas del SVG del plano, con las flechas que tocan segun la mirada. Una
+   sola funcion para el editor, el arrastre, la vista en vivo y la hoja. */
+function circMapaFlechasDe(c, H, opts){
+  return circSecActivo(c) ? circSecFlechasSvg(c, H, opts) : circMapaFlechasSvg(c, H, opts);
+}
+
+/* ---------- el editor: estado de paso (nunca se guarda) ---------- */
+var _circSecSel = "";        // estacion elegida en secuencias
+var _circSecFlecha = "";     // flecha elegida, "de>a"
+var _circSecOrigen = null;   // modo enlace: { de } o { de, a, insertar: true }
+var _circSecOferta = null;   // { tipo: "tras"|"antes", nodo, ref, texto }
+var _circSecTiradas = 0;     // enlaces descartados al abrir, para decirlo una vez
+function circSecTeclas(ev){
+  if (ev.key === "Escape" && _circSecOrigen){ ev.preventDefault(); circSecCancelar(); }
+}
+function circSecEntrarEnlace(o){
+  _circSecOrigen = o; _circSecOferta = null; _circSecFlecha = "";
+  document.removeEventListener("keydown", circSecTeclas);
+  document.addEventListener("keydown", circSecTeclas);
+}
+/* Sale del modo enlace y suelta la tecla. Se llama tambien al salir del
+   editor: un oyente vivo sin editor delante no hace nada bueno. */
+function circSecSalirEnlace(){
+  _circSecOrigen = null;
+  document.removeEventListener("keydown", circSecTeclas);
+}
+function circSecLimpiarEstado(){
+  circSecSalirEnlace();
+  _circSecSel = ""; _circSecFlecha = ""; _circSecOferta = null; _circSecTiradas = 0;
+}
+function circSecRepintar(){
+  circPintarMapa();
+  circPintarTools();
+  circSecPintarLista();
+  circPintarResumen();
+  circSecPintarNumeros();
+}
+/* Solo el numero de cada fila de la lista de estaciones: repintar la lista
+   entera le quitaria el foco a un campo que se esta escribiendo. */
+function circSecPintarNumeros(){
+  var c = _circEdit; if (!c) return;
+  var num = circSecActivo(c) ? circSecNumeracion(c) : null;
+  var filas = document.querySelectorAll("#circ-estaciones .circ-row");
+  for (var i = 0; i < filas.length; i++){
+    var n = filas[i].querySelector(".circ-n"), k = parseInt(filas[i].getAttribute("data-i"), 10);
+    if (n && !isNaN(k)) n.textContent = circNumEstacion(c, k, num);
+  }
+}
+/* Intentar la flecha, decir el motivo si no, y ofrecer el arreglo. */
+function circSecIntentar(de, a){
+  var c = _circEdit; if (!c) return;
+  var r = circSecEnlazar(c, de, a);
+  if (r.ok){
+    var num = circSecNumeracion(c), x = num.por[a];
+    toast("Enlazadas: " + (num.por[de] ? num.por[de].rotulo : "") + " → " + (x ? x.rotulo : ""), "success");
+    _circSecSel = a; _circSecOferta = null;
+  } else if (r.oferta){
+    _circSecOferta = { tipo: r.oferta.tipo, nodo: r.oferta.nodo, ref: r.oferta.ref, texto: circSecMotivoTexto(c, r, de, a) };
+  } else if (r.motivo !== "mismo"){
+    toast(circSecMotivoTexto(c, r, de, a), "warn");
+  }
+  circSecSalirEnlace();
+  circSecRepintar();
+}
+
+/* Un toque en una tarjeta, en secuencias: si hay flecha empezada, es su
+   destino; si no, la elige. El segundo toque en el origen cancela. */
+function circSecTocarTarjeta(i){
+  var c = _circEdit, s = c && u19Arr(c.estaciones)[i];
+  if (!s) return;
+  if (_circSecOrigen){
+    var o = _circSecOrigen;
+    if (o.insertar){
+      circSecSalirEnlace();
+      if (s.id !== o.de && s.id !== o.a && circSecInsertarEnFlecha(c, s.id, o.de, o.a)){
+        _circSecSel = s.id; _circSecFlecha = "";
+        toast("Metida entre las dos", "success");
+      }
+      circSecRepintar();
+      return;
+    }
+    if (s.id === o.de){ circSecCancelar(); return; }
+    circSecIntentar(o.de, s.id);
+    return;
+  }
+  _circSecSel = (_circSecSel === s.id) ? "" : s.id;
+  _circSecFlecha = ""; _circSecOferta = null; _circSelPod = ""; _circSelEl = "";
+  circPintarMapa();
+}
+/* La flecha provisional mientras se arrastra desde el punto: una linea
+   discontinua en el SVG del plano, que se quita al soltar. */
+function circSecLineaTemporal(arr, ev){
+  var c = _circEdit, svg = arr.mapa.querySelector("svg.cm-svg");
+  if (!c || !svg) return;
+  var i = circEstacionIdx(c, arr.enlace); if (i < 0) return;
+  var e = circEspacio(c), H = Math.round(1000 / (e.anchoM / e.largoM)), p = circPos(c, i);
+  var fx = (ev.clientX - arr.r.left) / arr.r.width, fy = (ev.clientY - arr.r.top) / arr.r.height;
+  var l = svg.querySelector(".cm-sec-tmp");
+  if (!l){
+    l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("class", "cm-sec-tmp");
+    l.setAttribute("stroke", "currentColor"); l.setAttribute("stroke-width", "4"); l.setAttribute("stroke-dasharray", "10 7");
+    svg.appendChild(l);
+  }
+  l.setAttribute("x1", (p.x * 1000).toFixed(1)); l.setAttribute("y1", (p.y * H).toFixed(1));
+  l.setAttribute("x2", (fx * 1000).toFixed(1)); l.setAttribute("y2", (fy * H).toFixed(1));
+}
+function circSecResumenHtml(c){
+  var num = circSecNumeracion(c), N = u19Arr(c.estaciones).length, d = circSecDuracion(c);
+  return '<span class="badge teal">⛓ ' + num.cadenas.length + ' cadena' + (num.cadenas.length === 1 ? '' : 's') + ', ' + N + ' ejercicio' + (N === 1 ? '' : 's') + '</span>'
+    + '<span class="badge teal">⏱ ' + circFmt(d.seg) + (d.manuales ? ' + ' + d.manuales + ' series por repeticiones' : '') + '</span>'
+    + (N ? '<span class="badge muted" title="Sale de los ejercicios de la biblioteca; las estaciones libres no lo saben">🧰 ' + escapeHtml(circMaterial(c) || "solo peso corporal") + '</span>' : '');
+}
+
+/* ---------- el panel de la seleccion, en secuencias ---------- */
+function circSecSelHtml(c){
+  var num = circSecNumeracion(c), h = "";
+  if (_circSecTiradas){
+    h += '<div class="csl-aviso">Se quitaron ' + _circSecTiradas + ' enlace' + (_circSecTiradas === 1 ? '' : 's') + ' a ejercicios que ya no están en esta sesión.</div>';
+  }
+  if (_circSecOrigen){
+    var ro = num.por[_circSecOrigen.de];
+    var txt = _circSecOrigen.insertar
+      ? 'Toca la tarjeta que va entre ' + escapeHtml(ro ? ro.rotulo : "") + ' y ' + escapeHtml(num.por[_circSecOrigen.a] ? num.por[_circSecOrigen.a].rotulo : "") + '.'
+      : 'Toca la tarjeta a la que va la flecha desde ' + escapeHtml(ro ? ro.rotulo : "") + '.';
+    return h + '<div class="circ-selp csl-modo" role="status">' + txt
+      + ' <span class="text-xs text-muted">Escape, tocar el fondo o volver a tocar ' + escapeHtml(ro ? ro.rotulo : "el origen") + ' cancela.</span>'
+      + ' <button class="btn btn-ghost btn-sm" onclick="circSecCancelar()">Cancelar</button></div>';
+  }
+  if (_circSecOferta){
+    var o = _circSecOferta, rn = num.por[o.nodo], rr = num.por[o.ref];
+    var d = circSecDonde(c, o.ref), vecino = "";
+    if (d){
+      var k = c.planSec.cadenas[d.k];
+      var v = (o.tipo === "tras") ? k.nodos[d.j + 1] : k.nodos[d.j - 1];
+      if (v && num.por[v]) vecino = num.por[v].rotulo;
+    }
+    var entre = (o.tipo === "tras") ? (rr ? rr.rotulo : "") + (vecino ? ' y ' + vecino : '') : (vecino ? vecino + ' y ' : '') + (rr ? rr.rotulo : "");
+    return h + '<div class="circ-selp csl-modo" role="alert">' + escapeHtml(o.texto)
+      + ' <button class="btn btn-secondary btn-sm" onclick="circSecAceptarOferta()">Meter ' + escapeHtml(rn ? rn.rotulo : "") + ' entre ' + escapeHtml(entre) + '</button>'
+      + ' <button class="btn btn-ghost btn-sm" onclick="circSecDescartarOferta()">Dejarlo como estaba</button></div>';
+  }
+  if (_circSecFlecha){
+    var p = _circSecFlecha.split(">"), fd = num.por[p[0]], fa = num.por[p[1]];
+    if (fd && fa){
+      var de = escapeAttr(p[0]), a = escapeAttr(p[1]);
+      return h + '<div class="circ-selp"><div class="circ-selp-t">⛓ Flecha ' + escapeHtml(fd.rotulo) + ' → ' + escapeHtml(fa.rotulo)
+        + '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="circSecSelLimpiar()" title="Quitar la selección" aria-label="Quitar la selección">✕</button></div>'
+        + '<div class="circ-selp-f"><button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="circSecQuitarFlecha(\'' + de + '\',\'' + a + '\')">Quitar la flecha</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="circSecInsertarAqui(\'' + de + '\',\'' + a + '\')">Meter otra tarjeta aquí</button></div>'
+        + '<p class="text-xs text-muted" style="margin:.35rem 0 0;">Quitarla parte la cadena en dos. También puedes soltar una tarjeta encima de la flecha.</p></div>';
+    }
+  }
+  var i = _circSecSel ? circEstacionIdx(c, _circSecSel) : -1;
+  if (i >= 0){
+    var s = c.estaciones[i], r = num.por[s.id], id = escapeAttr(s.id), d2 = circSecDonde(c, s.id);
+    var kx = d2 ? c.planSec.cadenas[d2.k] : null;
+    return h + '<div class="circ-selp"><div class="circ-selp-t"><span class="csl-rot" style="background:' + (r ? r.color : '') + ';">' + escapeHtml(r ? r.rotulo : "") + '</span> '
+      + escapeHtml(circEstacionNombre(s))
+      + '<button class="btn btn-ghost btn-sm" style="margin-left:auto;" onclick="circSecSelLimpiar()" title="Quitar la selección" aria-label="Quitar la selección">✕</button></div>'
+      + '<div class="circ-selp-f">'
+      + '<button class="btn btn-secondary btn-sm" onclick="circSecEnlazarDesde(\'' + id + '\')" title="Después toca la tarjeta a la que va la flecha">⛓ Enlazar</button>'
+      + (kx && kx.nodos.length > 1 ? '<button class="btn btn-ghost btn-sm" onclick="circSecDesencadenarBtn(\'' + id + '\')" title="La saca de su cadena y deja unidos a los de los lados">Desencadenar</button>' : '')
+      + '<span class="circ-flechas" style="margin-left:auto;">'
+        + '<button class="btn btn-ghost btn-sm" onclick="circSecMoverTarjeta(\'' + id + '\',-1,0)" title="Mover a la izquierda" aria-label="Mover a la izquierda">←</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="circSecMoverTarjeta(\'' + id + '\',0,-1)" title="Mover arriba" aria-label="Mover arriba">↑</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="circSecMoverTarjeta(\'' + id + '\',0,1)" title="Mover abajo" aria-label="Mover abajo">↓</button>'
+        + '<button class="btn btn-ghost btn-sm" onclick="circSecMoverTarjeta(\'' + id + '\',1,0)" title="Mover a la derecha" aria-label="Mover a la derecha">→</button>'
+      + '</span>'
+      + '</div>'
+      + '<div class="circ-selp-f csl-dosis">'
+      + '<label class="blz-mini">Repeticiones <input type="text" maxlength="20" value="' + escapeAttr(s.rep || "") + '" placeholder="10" onchange="circSecNodoCampo(\'' + id + '\',\'rep\',this.value)"></label>'
+      + '<label class="blz-mini">o tiempo <input type="number" min="0" max="' + CIRC_SEC_MAX_SEG + '" value="' + (circSecNodoTiempo(s) || "") + '" placeholder="s" onchange="circSecNodoCampo(\'' + id + '\',\'trabajo\',this.value)"> s</label>'
+      + '<label class="blz-mini">Carga <input type="text" maxlength="30" value="' + escapeAttr(s.carga || "") + '" placeholder="12 kg" onchange="circSecNodoCampo(\'' + id + '\',\'carga\',this.value)"></label>'
+      + '<label class="blz-mini">Tempo <input type="text" maxlength="12" value="' + escapeAttr(s.tempo || "") + '" placeholder="3-1-1" onchange="circSecNodoCampo(\'' + id + '\',\'tempo\',this.value)"></label>'
+      + '<label class="blz-mini">Lado <select onchange="circSecNodoCampo(\'' + id + '\',\'lado\',this.value)">'
+        + CIRC_SEC_LADOS.map(function(l){ return '<option value="' + l.id + '"' + ((s.lado || "bilateral") === l.id ? ' selected' : '') + '>' + escapeHtml(l.nombre) + '</option>'; }).join("")
+      + '</select></label>'
+      + '<label class="blz-mini" style="flex:1 1 180px;">Nota <input type="text" maxlength="80" value="' + escapeAttr(s.nota || "") + '" onchange="circSecNodoCampo(\'' + id + '\',\'nota\',this.value)"></label>'
+      + '</div>'
+      + '<p class="text-xs text-muted" style="margin:.35rem 0 0;">Con tiempo, el cronómetro cuenta solo; con repeticiones, espera a que marques «Hecho».</p></div>';
+  }
+  return h + '<p class="text-xs text-muted" style="margin:.5rem 0 0;">Toca una tarjeta para darle repeticiones, carga o tiempo, o para enlazarla. Con el ratón, arrastra desde el punto ● de su borde hasta otra tarjeta.</p>';
+}
+
+/* ---------- la lista de cadenas y la lectura de la sesion ---------- */
+function circSecListaHtml(c){
+  var num = circSecNumeracion(c), n = num.cadenas.length, h = '';
+  h += '<div class="csl"><div class="csl-cab"><b>Orden de las cadenas</b>'
+    + '<span class="text-xs text-muted">Arrastra por ⠿ o usa las flechas. La letra sale del orden.</span>'
+    + '<select class="csl-plant" onchange="circSecPlantilla(this.value);this.selectedIndex=0;" title="Añade una cadena de la casa al final; después se edita como cualquier otra">'
+    + '<option value="">+ Cadena de plantilla…</option>'
+    + CIRC_SEC_PLANTILLAS.map(function(t){ return '<option value="' + escapeAttr(t.id) + '">' + escapeHtml(t.nombre) + '</option>'; }).join("")
+    + '</select></div>';
+  if (!n) h += '<p class="text-xs text-muted" style="margin:.4rem 0;">Sin ejercicios todavía. Búscalos abajo: cada uno entra como una cadena de uno, y después los enlazas.</p>';
+  h += '<ol class="csl-lista" id="csl-lista">';
+  num.cadenas.forEach(function(x, i){
+    var k = x.cadena, kid = escapeAttr(k.id);
+    var nombres = k.nodos.map(function(id, j){
+      var e = circEstacionIdx(c, id);
+      return '<button type="button" class="csl-nodo" onclick="circSecSel(\'' + escapeAttr(id) + '\')">' + escapeHtml(x.letra + (j + 1)) + ' ' + escapeHtml(e >= 0 ? circEstacionNombre(c.estaciones[e]) : "") + '</button>';
+    }).join('<span class="csl-fl" aria-hidden="true">→</span>');
+    h += '<li class="csl-fila" data-cad="' + kid + '" style="--csl-col:' + x.color + ';">'
+      + '<span class="csl-asa" title="Arrastra para cambiar el orden" aria-hidden="true">⠿</span>'
+      + '<span class="csl-letra">' + escapeHtml(x.letra) + '</span>'
+      + '<div class="csl-cuerpo">'
+      + '<div class="csl-nodos">' + nombres + '</div>'
+      + '<div class="csl-par">'
+      + '<select onchange="circSecCadenaCampo(\'' + kid + '\',\'etiqueta\',this.value)" aria-label="Rótulo de la cadena ' + escapeAttr(x.letra) + '">'
+        + CIRC_SEC_ETIQUETAS.map(function(t){ return '<option' + (k.etiqueta === t ? ' selected' : '') + '>' + escapeHtml(t) + '</option>'; }).join("") + '</select>'
+      + (k.etiqueta === "Personalizado" ? '<input type="text" maxlength="40" value="' + escapeAttr(k.nombre || "") + '" placeholder="nombre" onchange="circSecCadenaCampo(\'' + kid + '\',\'nombre\',this.value)" aria-label="Nombre de la cadena">' : '')
+      + '<label class="blz-mini">Vueltas <input type="number" min="1" max="' + CIRC_SEC_MAX_VUELTAS + '" value="' + k.vueltas + '" onchange="circSecCadenaCampo(\'' + kid + '\',\'vueltas\',this.value)"></label>'
+      + (k.nodos.length > 1 ? '<label class="blz-mini">Entre ejercicios <input type="number" min="0" max="' + CIRC_SEC_MAX_SEG + '" value="' + k.descansoEntreEjerciciosSeg + '" onchange="circSecCadenaCampo(\'' + kid + '\',\'descansoEntreEjerciciosSeg\',this.value)"> s</label>' : '')
+      + '<label class="blz-mini">Al terminar la vuelta <input type="number" min="0" max="' + CIRC_SEC_MAX_SEG + '" value="' + k.descansoEntreVueltasSeg + '" onchange="circSecCadenaCampo(\'' + kid + '\',\'descansoEntreVueltasSeg\',this.value)"> s</label>'
+      + '</div></div>'
+      + '<span class="csl-mover">'
+      + '<button class="btn btn-ghost btn-sm" onclick="circSecCadenaMover(\'' + kid + '\',-1)" title="Subir" aria-label="Subir la cadena ' + escapeAttr(x.letra) + '"' + (i === 0 ? ' disabled' : '') + '>▲</button>'
+      + '<button class="btn btn-ghost btn-sm" onclick="circSecCadenaMover(\'' + kid + '\',1)" title="Bajar" aria-label="Bajar la cadena ' + escapeAttr(x.letra) + '"' + (i === n - 1 ? ' disabled' : '') + '>▼</button>'
+      + '</span></li>';
+  });
+  h += '</ol>';
+  h += '<p class="text-xs text-muted" style="margin:.5rem 0 0;">En «' + escapeHtml(CIRC_SEC_NOMBRE) + '» mandan las vueltas y los descansos de cada cadena: los de arriba (grupos, trabajo, cambio) son del modo circuito y se quedan guardados para cuando vuelvas.</p>';
+  h += '<div class="csl-cab" style="margin-top:.8rem;"><b>La sesión, en texto</b>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circSecCopiar()">Copiar</button>'
+    + '<button class="btn btn-ghost btn-sm" onclick="circGuardarYImprimir()" title="Guarda y abre la hoja para imprimir">🖨 Hoja</button></div>'
+    + '<pre class="csl-texto">' + escapeHtml(circSecTexto(c)) + '</pre>'
+    + '<label class="blz-mini" style="display:flex;margin-top:.4rem;">Notas de la sesión <input type="text" maxlength="400" style="flex:1;" value="' + escapeAttr(c.planSec.notas || "") + '" onchange="circSecNotas(this.value)"></label>';
+  return h + '</div>';
+}
+function circSecPintarLista(){
+  var box = document.getElementById("circ-sec-box");
+  if (!box || !_circEdit) return;
+  if (!circSecActivo(_circEdit)){ box.innerHTML = ""; return; }
+  box.innerHTML = circSecListaHtml(_circEdit);
+  circSecListaMontar(box);
+}
+/* Arrastre de la lista con el dedo o el raton, por el asa. Un solo juego de
+   oyentes sobre el contenedor, que no se sustituye: el innerHTML cambia por
+   debajo. Subir y bajar hacen lo mismo con dos botones, que es lo unico
+   fiable en un telefono estrecho. */
+function circSecListaMontar(box){
+  if (!box || box._secMontado) return;
+  box._secMontado = true;
+  var arr = null;
+  box.addEventListener("pointerdown", function(ev){
+    var asa = ev.target && ev.target.closest ? ev.target.closest(".csl-asa") : null;
+    if (!asa || !_circEdit) return;
+    var fila = asa.closest(".csl-fila"), filas = Array.prototype.slice.call(box.querySelectorAll(".csl-fila"));
+    arr = { fila: fila, desde: filas.indexOf(fila), hasta: filas.indexOf(fila), filas: filas };
+    try { asa.setPointerCapture(ev.pointerId); } catch(e){}
+    fila.classList.add("drag");
+    ev.preventDefault();
+  });
+  box.addEventListener("pointermove", function(ev){
+    if (!arr) return;
+    var y = ev.clientY, h = arr.desde;
+    arr.filas.forEach(function(f, i){
+      var r = f.getBoundingClientRect();
+      if (y > r.top + r.height / 2) h = (i >= arr.desde) ? i : i + 1;
+    });
+    if (y < arr.filas[0].getBoundingClientRect().top) h = 0;
+    arr.hasta = Math.max(0, Math.min(arr.filas.length - 1, h));
+    arr.filas.forEach(function(f, i){ f.classList.toggle("csl-aqui", i === arr.hasta && i !== arr.desde); });
+  });
+  var fin = function(){
+    if (!arr) return;
+    var d = arr.desde, h = arr.hasta;
+    arr.filas.forEach(function(f){ f.classList.remove("drag"); f.classList.remove("csl-aqui"); });
+    arr = null;
+    if (_circEdit && d !== h && circSecMoverCadena(_circEdit, d, h)) circSecRepintar();
+  };
+  box.addEventListener("pointerup", fin);
+  box.addEventListener("pointercancel", fin);
+}
+
+/* ---------- las acciones de la pantalla ---------- */
+window.circSecActivar = function(){
+  var c = _circEdit; if (!c || c._ro) return;
+  if (!c.planSec || typeof c.planSec !== "object" || Array.isArray(c.planSec)){
+    c.planSec = { modo: "secuencias", version: CIRC_SEC_VERSION, cadenas: [], notas: "" };
+  }
+  c.planSec.modo = "secuencias";
+  circSecNormalizar(c);
+  circSecLimpiarEstado();
+  _circSelPod = ""; _circSelEl = "";
+  circSecRepintar();
+};
+window.circSecEnlazarDesde = function(id){
+  if (!_circEdit || circEstacionIdx(_circEdit, id) < 0) return;
+  circSecEntrarEnlace({ de: id });
+  _circSecSel = id;
+  circPintarMapa();
+};
+window.circSecInsertarAqui = function(de, a){
+  if (!_circEdit) return;
+  circSecEntrarEnlace({ de: de, a: a, insertar: true });
+  circPintarMapa();
+};
+window.circSecCancelar = function(){
+  circSecSalirEnlace();
+  _circSecOferta = null;
+  circPintarMapa();
+};
+window.circSecAceptarOferta = function(){
+  var c = _circEdit, o = _circSecOferta; if (!c || !o) return;
+  _circSecOferta = null;
+  if (circSecInsertar(c, o.nodo, o.ref, o.tipo === "antes")){ _circSecSel = o.nodo; toast("Metida en medio", "success"); }
+  circSecRepintar();
+};
+window.circSecDescartarOferta = function(){ _circSecOferta = null; circPintarMapa(); };
+window.circSecMoverTarjeta = function(id, dx, dy){
+  var c = _circEdit; if (!c) return;
+  var i = circEstacionIdx(c, id); if (i < 0) return;
+  var p = circPos(c, i);
+  c.disposicion = "libre";
+  circMoverEstacion(c, i, p.x + dx * 0.02, p.y + dy * 0.02);
+  circPintarMapa();
+};
+/* Elegir desde la lista. Con una flecha empezada, la lista hace de destino:
+   asi se enlaza tambien sin tocar el plano (teclado, lector de pantalla). */
+window.circSecSel = function(id){
+  if (_circSecOrigen && _circEdit){ circSecTocarTarjeta(circEstacionIdx(_circEdit, id)); return; }
+  _circSecSel = id; _circSecFlecha = ""; _circSecOferta = null; _circSelPod = ""; _circSelEl = "";
+  circPintarMapa();
+  var m = document.getElementById("circ-mapa-box");
+  if (m && m.scrollIntoView){ try { m.scrollIntoView({ block: "nearest", behavior: "smooth" }); } catch(e){} }
+};
+window.circSecSelLimpiar = function(){ _circSecSel = ""; _circSecFlecha = ""; circPintarMapa(); };
+window.circSecQuitarFlecha = function(de, a){
+  if (!_circEdit) return;
+  if (circSecQuitarEnlace(_circEdit, de, a)) toast("Flecha quitada: la cadena queda en dos", "success");
+  _circSecFlecha = "";
+  circSecRepintar();
+};
+window.circSecDesencadenarBtn = function(id){
+  if (!_circEdit) return;
+  if (circSecDesencadenar(_circEdit, id)) toast("Fuera de su cadena: los de los lados quedan unidos", "success");
+  circSecRepintar();
+};
+window.circSecNodoCampo = function(id, campo, valor){
+  var c = _circEdit; if (!c) return;
+  var i = circEstacionIdx(c, id); if (i < 0) return;
+  var s = c.estaciones[i];
+  if (campo === "trabajo") s.trabajo = blzEnt(valor, 0, 0, CIRC_SEC_MAX_SEG);
+  else if (campo === "rep") s.rep = blzTexto(valor, 20).trim();
+  else if (campo === "carga") s.carga = blzTexto(valor, 30).trim();
+  else if (campo === "tempo") s.tempo = blzTexto(valor, 12).trim();
+  else if (campo === "lado") s.lado = circSecLado(valor).id;
+  else if (campo === "nota") s.nota = blzTexto(valor, 80);
+  else return;
+  /* Solo lo que cambia: el plano (la nota se ve en la tarjeta), la lectura y el
+     resumen. El panel no se repinta para no quitarle el foco al campo. */
+  var box = document.getElementById("circ-mapa-box");
+  if (box) box.innerHTML = circMapaHtml(c, circMapaOptsEditor(c));
+  circSecPintarLista();
+  circPintarResumen();
+  if (campo === "nota" || campo === "trabajo"){
+    var f = document.querySelector('#circ-estaciones input[data-i="' + i + '"][data-k="' + campo + '"]');
+    if (f) f.value = (campo === "trabajo") ? (s.trabajo || "") : s.nota;
+  }
+};
+window.circSecCadenaCampo = function(cid, campo, valor){
+  var c = _circEdit; if (!c) return;
+  var x = circSecCadenaPorId(c, cid); if (!x) return;
+  var k = x.cadena;
+  if (campo === "etiqueta") k.etiqueta = CIRC_SEC_ETIQUETAS.indexOf(valor) >= 0 ? valor : "Bloque";
+  else if (campo === "nombre") k.nombre = blzTexto(valor, 40).trim();
+  else if (campo === "vueltas") k.vueltas = blzEnt(valor, 3, 1, CIRC_SEC_MAX_VUELTAS);
+  else if (campo === "descansoEntreEjerciciosSeg" || campo === "descansoEntreVueltasSeg") k[campo] = blzEnt(valor, 0, 0, CIRC_SEC_MAX_SEG);
+  else return;
+  circSecPintarLista();
+  circPintarResumen();
+};
+window.circSecCadenaMover = function(cid, d){
+  var c = _circEdit; if (!c) return;
+  var x = circSecCadenaPorId(c, cid); if (!x) return;
+  if (circSecMoverCadena(c, x.idx, x.idx + d)) circSecRepintar();
+};
+window.circSecNotas = function(v){
+  if (!_circEdit || !_circEdit.planSec) return;
+  _circEdit.planSec.notas = blzTexto(v, 400);
+  circSecPintarLista();
+};
+window.circSecCopiar = function(){
+  if (!_circEdit) return;
+  var t = (_circEdit.nombre ? _circEdit.nombre + "\n\n" : "") + circSecTexto(_circEdit);
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ toast("Sesión copiada", "success"); }).catch(function(){ legacyCopy(t); });
+  } else legacyCopy(t);
+};
+/* Una plantilla entra al final: sus ejercicios como estaciones nuevas y una
+   cadena con sus parametros. No toca nada de lo que ya habia. */
+window.circSecPlantilla = function(tid){
+  var c = _circEdit; if (!c || !tid) return;
+  var t = null;
+  for (var i = 0; i < CIRC_SEC_PLANTILLAS.length; i++) if (CIRC_SEC_PLANTILLAS[i].id === tid) t = CIRC_SEC_PLANTILLAS[i];
+  if (!t) return;
+  var ids = circSecAplicarPlantilla(c, t);
+  if (ids.length){ _circSecSel = ids[0]; circPintarEstaciones(); circSecRepintar(); toast("Añadida: " + t.nombre, "success"); }
+};
+function circSecAplicarPlantilla(c, t){
+  if (!c.planSec || typeof c.planSec !== "object") c.planSec = { modo: "secuencias", version: CIRC_SEC_VERSION, cadenas: [], notas: "" };
+  circSecNormalizar(c);
+  var ids = [];
+  u19Arr(t.pasos).forEach(function(p){
+    var e = p.ex ? getExercise(p.ex) : null;
+    var s = { id: genId(), exerciseId: e ? e.id : "", nombre: e ? (e.name || p.nombre) : p.nombre, nota: "" };
+    if (p.rep) s.rep = String(p.rep);
+    if (p.tiempo) s.trabajo = blzEnt(p.tiempo, 0, 0, CIRC_SEC_MAX_SEG);
+    if (p.lado) s.lado = circSecLado(p.lado).id;
+    c.estaciones.push(s);
+    circColocarNueva(c);
+    ids.push(s.id);
+  });
+  c.planSec.cadenas.push(circSecCadenaNueva(ids, { etiqueta: t.etiqueta, vueltas: t.vueltas,
+    descansoEntreEjerciciosSeg: t.dEj, descansoEntreVueltasSeg: t.dVu }));
+  return ids;
+}
+/* Las opciones con las que el editor pinta el plano: las mismas en el
+   repintado entero y en el parcial. */
+function circMapaOptsEditor(c){
+  return { selPod: _circSelPod, selEl: _circSelEl, lectura: !!c._ro,
+           selSec: _circSecSel, selFlecha: _circSecFlecha, origenSec: _circSecOrigen ? _circSecOrigen.de : "" };
+}
+/* Duplicar un circuito entero: ids nuevos para las estaciones, y lo que las
+   nombra por id (los Pods atados y las cadenas) apuntando a los nuevos. Antes
+   solo cambiaban las estaciones y los Pods de la copia se quedaban sueltos. */
+function circCopiaConIdsNuevos(c){
+  var copia = JSON.parse(JSON.stringify(c)), mapa = {};
+  copia.id = genId();
+  u19Arr(copia.estaciones).forEach(function(s){ var n = genId(); if (s.id) mapa[s.id] = n; s.id = n; });
+  u19Arr(copia.pods).forEach(function(p){ if (p && p.estacionId) p.estacionId = mapa[p.estacionId] || null; });
+  if (copia.planSec && typeof copia.planSec === "object"){
+    u19Arr(copia.planSec.cadenas).forEach(function(k){
+      if (!k) return;
+      k.id = "cad" + genId();
+      k.nodos = u19Arr(k.nodos).map(function(id){ return mapa[id] || ""; }).filter(Boolean);
+    });
+  }
+  return copia;
+}
+/* El enlace compartido: las cadenas viajan con INDICES de estacion, porque los
+   ids no viajan (al otro lado se generan de nuevo). */
+function circSecCompartir(c){
+  if (!c || !c.planSec || typeof c.planSec !== "object") return null;
+  circSecNormalizar(c);
+  return { modo: c.planSec.modo, notas: c.planSec.notas || "",
+           cadenas: c.planSec.cadenas.map(function(k){
+             return { etiqueta: k.etiqueta, nombre: k.nombre || "", vueltas: k.vueltas,
+                      dEj: k.descansoEntreEjerciciosSeg, dVu: k.descansoEntreVueltasSeg,
+                      nodos: k.nodos.map(function(id){ return circEstacionIdx(c, id); }).filter(function(i){ return i >= 0; }) };
+           }) };
+}
+function circSecRecibir(c, src){
+  if (!src || typeof src !== "object") return;
+  c.planSec = { modo: src.modo === "secuencias" ? "secuencias" : "circuito", version: CIRC_SEC_VERSION, notas: blzTexto(src.notas, 400),
+                cadenas: u19Arr(src.cadenas).map(function(k){
+                  return circSecCadenaNueva(u19Arr(k && k.nodos).map(function(i){
+                    var s = c.estaciones[blzEnt(i, -1, -1, 999)];
+                    return s ? s.id : "";
+                  }).filter(Boolean), { etiqueta: k && k.etiqueta, nombre: k && k.nombre, vueltas: k && k.vueltas,
+                                         descansoEntreEjerciciosSeg: k && k.dEj, descansoEntreVueltasSeg: k && k.dVu });
+                }) };
+  circSecNormalizar(c);
+}
+
+/* ---------- en vivo, la pizarra y la hoja ---------- */
+/* Lo que se ve en la pantalla en vivo cuando la sesion va por cadenas. El resto
+   de la vista (barra, controles, sonido, Pods) es la del circuito. */
+function circLiveSecSub(c, p){
+  var num = circSecNumeracion(c), x = num.cadenas[p.cadena] || num.cadenas[0];
+  if (p.tipo === "fin") return "Tiempo total " + circFmt(Math.max(0, _live ? _live.total - 5 : 0));
+  if (!x) return "";
+  return circSecRotuloCadena(x.cadena) + " " + x.letra + ", vuelta " + (Math.min(p.ronda, x.cadena.vueltas - 1) + 1) + " de " + x.cadena.vueltas;
+}
+function circLiveSecHtml(c, p){
+  var num = circSecNumeracion(c), plan = _live ? _live.plan : [], i = _live ? _live.i : 0, h = "";
+  var sig = null;
+  for (var k = i + 1; k < plan.length; k++) if (plan[k].tipo === "trabajo"){ sig = plan[k]; break; }
+  var s = c.estaciones[p.estacion];
+  var rot = function(q){ var st = c.estaciones[q.estacion]; return (st && num.por[st.id]) ? num.por[st.id].rotulo : ""; };
+  if (p.tipo === "trabajo"){
+    h += '<div class="cl-est"><span class="cl-sec-rot">' + escapeHtml(rot(p)) + '</span> ' + escapeHtml(circEstacionNombre(s)) + '</div>';
+    var dosis = circSecDosis(s);
+    if (dosis) h += '<div class="cl-sig">' + escapeHtml(dosis) + '</div>';
+    if (s.nota) h += '<div class="cl-sig">' + escapeHtml(s.nota) + '</div>';
+    if (sig) h += '<div class="cl-sig">Siguiente: ' + escapeHtml(rot(sig) + " " + circEstacionNombre(c.estaciones[sig.estacion])) + '</div>';
+  } else if (p.tipo !== "fin"){
+    var q = (p.tipo === "listos") ? plan[1] : sig;
+    if (q && q.tipo === "trabajo"){
+      h += '<div class="cl-est">Prepara: ' + escapeHtml(rot(q) + " " + circEstacionNombre(c.estaciones[q.estacion])) + '</div>';
+      var dq = circSecDosis(c.estaciones[q.estacion]);
+      if (dq) h += '<div class="cl-sig">' + escapeHtml(dq) + '</div>';
+    }
+  } else {
+    h += '<div class="cl-est">' + escapeHtml(c.nombre || "") + '</div><div class="cl-sig">' + num.cadenas.length + ' cadena' + (num.cadenas.length === 1 ? '' : 's') + '</div>';
+  }
+  var act = (p.tipo === "trabajo") ? p.estacion : ((sig && p.tipo !== "fin") ? sig.estacion : null);
+  return h + circMapaHtml(c, { activa: act, compacto: true, clase: "cl-mapa cl-mapa-min" });
+}
+/* Marcar hecha una serie por repeticiones. Si la sesion estaba en pausa, con
+   esto arranca: quien marca «hecho» esta entrenando. */
+window.circLiveHecho = function(){
+  var L = _live; if (!L) return;
+  var p = circLiveFase(); if (!p || !p.manual) return;
+  if (!L.corriendo){ L.corriendo = true; circWakeOn(); L.timer = setInterval(circLiveTick, 200); }
+  circLiveAvanzar(true);
+};
+function circSecPizarraSecciones(c){
+  var num = circSecNumeracion(c);
+  return num.cadenas.map(function(x){
+    var k = x.cadena;
+    return { nombre: x.letra + " — " + circSecRotuloCadena(k) + ", " + k.vueltas + " vuelta" + (k.vueltas === 1 ? "" : "s")
+               + (k.nodos.length > 1 ? (k.descansoEntreEjerciciosSeg ? ", " + k.descansoEntreEjerciciosSeg + " s entre ejercicios" : ", sin descanso entre ejercicios") : "")
+               + (k.vueltas > 1 ? ", " + k.descansoEntreVueltasSeg + " s entre vueltas" : ""),
+             items: k.nodos.map(function(id, j){
+               var i = circEstacionIdx(c, id), s = c.estaciones[i];
+               return { nombre: x.letra + (j + 1) + " " + circEstacionNombre(s), gif: circGifDe(s), detalle: circSecDosis(s), nota: s.nota || "" };
+             }) };
+  });
+}
+/* «A rutina» desde secuencias: los ejercicios en el orden de las cadenas, las
+   vueltas como series y la dosis de cada uno. La rutina en vivo va ejercicio
+   por ejercicio (no alterna una superserie), por eso la cadena queda escrita
+   en la nota de cada fila. */
+function circSecFilasRutina(c){
+  var num = circSecNumeracion(c), filas = [];
+  num.cadenas.forEach(function(x){
+    var k = x.cadena;
+    k.nodos.forEach(function(id, j){
+      var s = c.estaciones[circEstacionIdx(c, id)];
+      if (!s || !s.exerciseId || !getExercise(s.exerciseId)) return;
+      var t = circSecNodoTiempo(s), rep = circSecNodoRep(s), ultimo = (j === k.nodos.length - 1);
+      filas.push({ exerciseId: s.exerciseId, sets: String(k.vueltas), reps: rep || (t ? t + " s" : ""), weight: String(s.carga || ""),
+                   rest: (ultimo ? k.descansoEntreVueltasSeg : k.descansoEntreEjerciciosSeg) + "s", rir: "",
+                   notes: [x.letra + (j + 1) + " " + circSecRotuloCadena(k), s.tempo ? "tempo " + s.tempo : "",
+                           (s.lado && s.lado !== "bilateral") ? circSecLado(s.lado).nombre.toLowerCase() : "", s.nota || ""].filter(Boolean).join(", ") });
+    });
+  });
+  return filas;
+}
+function circSecHojaHtml(c){
+  var num = circSecNumeracion(c), d = '';
+  num.cadenas.forEach(function(x){
+    var k = x.cadena;
+    d += '<h2 style="border-bottom-color:' + x.color + '">' + escapeHtml(x.letra + " — " + circSecRotuloCadena(k)) + '</h2>'
+      + '<p class="meta">' + escapeHtml(k.vueltas + " vuelta" + (k.vueltas === 1 ? "" : "s")
+          + (k.nodos.length > 1 ? (k.descansoEntreEjerciciosSeg ? ", " + k.descansoEntreEjerciciosSeg + " s entre ejercicios" : ", sin descanso entre ejercicios") : "")
+          + (k.vueltas > 1 ? ", " + k.descansoEntreVueltasSeg + " s entre vueltas" : "")) + '</p>'
+      + '<table><thead><tr><th style="width:40px">#</th><th>Ejercicio</th><th>Dosis</th><th>Nota</th><th style="width:22%">Observaciones</th></tr></thead><tbody>';
+    k.nodos.forEach(function(id, j){
+      var i = circEstacionIdx(c, id), s = c.estaciones[i];
+      d += '<tr><td><b>' + escapeHtml(x.letra + (j + 1)) + '</b></td><td><b>' + escapeHtml(circEstacionNombre(s)) + '</b></td>'
+        + '<td>' + escapeHtml(circSecDosis(s) || "—") + '</td><td>' + escapeHtml(s.nota || "") + '</td><td></td></tr>';
+    });
+    d += '</tbody></table>';
+  });
+  var dur = circSecDuracion(c);
+  d += '<p><b>Duración aproximada:</b> ' + escapeHtml(circFmt(dur.seg) + (dur.manuales ? ", más " + dur.manuales + " series por repeticiones" : "")) + '</p>';
+  if (String(c.planSec.notas || "").trim()) d += '<p><b>Notas:</b> ' + escapeHtml(c.planSec.notas) + '</p>';
+  return d;
 }
 
 /* --- BlazePod --- */

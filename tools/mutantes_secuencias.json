@@ -1,0 +1,99 @@
+{
+  "suite": "tools/secuencias.js",
+  "fuente": "index.html",
+  "acompana": [
+    "us19_catalogo.json"
+  ],
+  "mutantes": [
+    {
+      "nombre": "permitir un ciclo: B→A cuando ya existe A→B",
+      "de": "    if (B.j < A.j) return { ok: false, motivo: \"ciclo\" };",
+      "a": "    if (false) return { ok: false, motivo: \"ciclo\" };"
+    },
+    {
+      "nombre": "permitir una bifurcacion: dos flechas saliendo del mismo nodo",
+      "de": "  if (origenConSiguiente) return { ok: false, motivo: \"bifurcacion\", oferta: { tipo: \"tras\", nodo: a, ref: de } };",
+      "a": "  if (false) return { ok: false, motivo: \"bifurcacion\", oferta: { tipo: \"tras\", nodo: a, ref: de } };"
+    },
+    {
+      "nombre": "el respaldo pierde las cadenas",
+      "de": "    horasMenos: u19Arr(state.horasMenos),\n    libFav: state.libFav || {},\n    libRec: state.libRec || [],\n    circuitos: state.circuitos || [],",
+      "a": "    horasMenos: u19Arr(state.horasMenos),\n    libFav: state.libFav || {},\n    libRec: state.libRec || [],\n    circuitos: (state.circuitos || []).map(function(c){ var o = JSON.parse(JSON.stringify(c)); delete o.planSec; return o; }),"
+    },
+    {
+      "nombre": "la sincronizacion pierde las cadenas",
+      "de": "    protocols: state.protocols,\n    libFav: state.libFav || {},\n    libRec: state.libRec || [],\n    circuitos: state.circuitos || [],",
+      "a": "    protocols: state.protocols,\n    libFav: state.libFav || {},\n    libRec: state.libRec || [],\n    circuitos: (state.circuitos || []).map(function(c){ var o = JSON.parse(JSON.stringify(c)); delete o.planSec; return o; }),"
+    },
+    {
+      "nombre": "el enlace compartido pierde las cadenas",
+      "de": "  if (ps) d.circuito.planSec = ps;",
+      "a": "  if (false) d.circuito.planSec = ps;"
+    },
+    {
+      "nombre": "guardar desde el editor pierde las cadenas",
+      "de": "  circSecNormalizar(c);\n  c.updatedAt = Date.now();",
+      "a": "  delete c.planSec;\n  c.updatedAt = Date.now();"
+    },
+    {
+      "nombre": "renumerar mal al borrar un nodo: la cadena vacia se queda y corre las letras",
+      "de": "    if (nodos.length) cadenas.push(circSecCadenaLimpia(k, nodos));",
+      "a": "    cadenas.push(circSecCadenaLimpia(k, nodos));"
+    },
+    {
+      "nombre": "dejar una flecha huerfana: el id de un ejercicio borrado se queda en la cadena",
+      "de": "      if (!hay[id] || visto[id]){ tiradas++; return; }",
+      "a": "      if (visto[id]){ tiradas++; return; }"
+    },
+    {
+      "nombre": "no escapar la lectura de la sesion (notas y nombres)",
+      "de": "    + '<pre class=\"csl-texto\">' + escapeHtml(circSecTexto(c)) + '</pre>'",
+      "a": "    + '<pre class=\"csl-texto\">' + circSecTexto(c) + '</pre>'"
+    },
+    {
+      "nombre": "no escapar la nota en el panel del ejercicio",
+      "de": "Nota <input type=\"text\" maxlength=\"80\" value=\"' + escapeAttr(s.nota || \"\") + '\"",
+      "a": "Nota <input type=\"text\" maxlength=\"80\" value=\"' + (s.nota || \"\") + '\""
+    },
+    {
+      "nombre": "el modo circuito se pinta como secuencias en cuanto hay cadenas guardadas",
+      "de": "  return !!(c && c.planSec && typeof c.planSec === \"object\" && c.planSec.modo === \"secuencias\");",
+      "a": "  return !!(c && c.planSec && typeof c.planSec === \"object\");"
+    },
+    {
+      "nombre": "el modo circuito pierde las flechas de rotacion",
+      "de": "  return circSecActivo(c) ? circSecFlechasSvg(c, H, opts) : circMapaFlechasSvg(c, H, opts);",
+      "a": "  return circSecFlechasSvg(c, H, opts);"
+    },
+    {
+      "nombre": "dejar un oyente vivo al salir del modo enlace o del editor",
+      "de": "  _circSecOrigen = null;\n  document.removeEventListener(\"keydown\", circSecTeclas);",
+      "a": "  _circSecOrigen = null;"
+    },
+    {
+      "nombre": "una serie por repeticiones pasa sola sin marcar Hecho",
+      "de": "  if (L.plan[L.i] && L.plan[L.i].manual) return;",
+      "a": ""
+    },
+    {
+      "nombre": "un ejercicio sin flechas no entra en la sesion",
+      "de": "  orden.forEach(function(id){ if (!visto[id]) cadenas.push(circSecCadenaNueva([id])); });",
+      "a": "  orden.forEach(function(id){});"
+    },
+    {
+      "nombre": "el cronometro recorre en otro orden que la pantalla",
+      "de": "  ks.forEach(function(k, ki){\n    var V = k.vueltas",
+      "a": "  ks.slice().reverse().forEach(function(k, ki){\n    var V = k.vueltas"
+    },
+    {
+      "nombre": "duplicar deja las cadenas apuntando a las estaciones del original",
+      "de": "      k.nodos = u19Arr(k.nodos).map(function(id){ return mapa[id] || \"\"; }).filter(Boolean);",
+      "a": "      k.nodos = u19Arr(k.nodos).slice();"
+    },
+    {
+      "nombre": "la capa de flechas tapa las tarjetas y se come el toque",
+      "de": ".circ-mapa .cm-capa-sec{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;}",
+      "a": ".circ-mapa .cm-capa-sec{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:auto;}"
+    }
+  ]
+}

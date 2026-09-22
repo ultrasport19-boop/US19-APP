@@ -2,7 +2,7 @@
 # Hook de pre-commit de US19-APP. Se instala con tools/instalar_hook.sh
 # (los hooks no viajan con el repo, hay que instalarlos en cada clon).
 #
-# Una barrera que corre SIEMPRE, y trece mas cuando el commit toca index.html.
+# Una barrera que corre SIEMPRE, y quince mas cuando el commit toca index.html.
 #
 #   0. secretos.js  - va fuera del `if` a proposito. Las otras siete
 #                     comprueban la app, y solo tiene sentido correrlas si
@@ -97,6 +97,14 @@ if git diff --cached --name-only | grep -q "^index.html$"; then
   #     no reproyecte nada (19-sep-2026).
   node "$RAIZ/tools/planilla.js" "$RAIZ/index.html" \
     || { echo ""; echo "la planilla unica no pasa la prueba: commit cancelado."; exit 1; }
+
+  # 15. secuencias.js - las cadenas que se arman a mano en Circuitos: que una
+  #     flecha no ramifique ni cierre un ciclo, que borrar un ejercicio no deje
+  #     una flecha colgando, que el cronometro espere a «Hecho» en una serie por
+  #     repeticiones, que respaldo, nube y enlace conserven las cadenas, y que
+  #     un circuito de los de siempre se pinte y se ejecute igual (22-sep-2026).
+  node "$RAIZ/tools/secuencias.js" "$RAIZ/index.html" \
+    || { echo ""; echo "las secuencias de Circuitos no pasan la prueba: commit cancelado."; exit 1; }
 
 fi
 exit 0
