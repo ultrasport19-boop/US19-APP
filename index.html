@@ -1491,6 +1491,7 @@ body.circ-live-open .modal-overlay{z-index:9500;}
 .csl-fl{color:var(--muted);}
 .csl-par{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center;margin-top:.35rem;}
 .csl-par input[type=number]{width:4.4rem;}
+.csl-par select,.csl-cab select,.csl-dosis select{width:auto;flex:0 0 auto;max-width:100%;}
 .csl-par input[type=text]{width:9rem;}
 .csl-mover{display:flex;flex-direction:column;gap:.15rem;}
 .csl-texto{white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:.6rem .7rem;font-size:.8rem;line-height:1.5;margin:.4rem 0 0;max-width:100%;color:var(--text);font-family:var(--font-body);}
@@ -21234,6 +21235,16 @@ function circSecPintarLista(){
   box.innerHTML = circSecListaHtml(_circEdit);
   circSecListaMontar(box);
 }
+/* Donde cae una fila que se arrastra: cuantas de las OTRAS filas tienen el
+   centro por encima del puntero. Es justo la posicion que espera
+   circSecMoverCadena, que la saca y la vuelve a meter ahi. (La primera
+   version contaba desde la fila de origen y, al subir una cadena por encima de
+   todas, no se movia: lo vio la prueba en el navegador, no el banco.) */
+function circSecIndiceSoltar(centros, desde, y){
+  var h = 0;
+  u19Arr(centros).forEach(function(m, i){ if (i !== desde && y > m) h++; });
+  return h;
+}
 /* Arrastre de la lista con el dedo o el raton, por el asa. Un solo juego de
    oyentes sobre el contenedor, que no se sustituye: el innerHTML cambia por
    debajo. Subir y bajar hacen lo mismo con dos botones, que es lo unico
@@ -21253,14 +21264,12 @@ function circSecListaMontar(box){
   });
   box.addEventListener("pointermove", function(ev){
     if (!arr) return;
-    var y = ev.clientY, h = arr.desde;
-    arr.filas.forEach(function(f, i){
-      var r = f.getBoundingClientRect();
-      if (y > r.top + r.height / 2) h = (i >= arr.desde) ? i : i + 1;
-    });
-    if (y < arr.filas[0].getBoundingClientRect().top) h = 0;
-    arr.hasta = Math.max(0, Math.min(arr.filas.length - 1, h));
-    arr.filas.forEach(function(f, i){ f.classList.toggle("csl-aqui", i === arr.hasta && i !== arr.desde); });
+    var centros = arr.filas.map(function(f){ var r = f.getBoundingClientRect(); return r.top + r.height / 2; });
+    arr.hasta = circSecIndiceSoltar(centros, arr.desde, ev.clientY);
+    /* Se marca la fila junto a la que va a caer. */
+    var otras = arr.filas.filter(function(f, i){ return i !== arr.desde; });
+    var junto = otras[Math.min(arr.hasta, otras.length - 1)];
+    arr.filas.forEach(function(f){ f.classList.toggle("csl-aqui", f === junto && arr.hasta !== arr.desde); });
   });
   var fin = function(){
     if (!arr) return;

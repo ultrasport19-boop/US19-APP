@@ -87,7 +87,7 @@ const codigo = [ENTORNO, fn('genId'), fn('u19Arr'), fn('escapeHtml'), fn('escape
 
 const EXPORTA = ['circSecActivo', 'circSecNormalizar', 'circSecNumeracion', 'circSecEnlaces', 'circSecEnlazar', 'circSecSacar',
   'circSecInsertar', 'circSecInsertarEnFlecha', 'circSecQuitarEnlace', 'circSecDesencadenar', 'circSecMoverCadena', 'circSecLetra',
-  'circSecTexto', 'circPlanSec', 'circSecDuracion', 'circDuracionTexto', 'circNumEstacion', 'circSecFlechaCerca', 'circSecCompartir',
+  'circSecTexto', 'circPlanSec', 'circSecDuracion', 'circSecIndiceSoltar', 'circDuracionTexto', 'circNumEstacion', 'circSecFlechaCerca', 'circSecCompartir',
   'circSecRecibir', 'circCopiaConIdsNuevos', 'circSecAplicarPlantilla', 'circSecListaHtml', 'circSecSelHtml', 'circSecHojaHtml',
   'circLiveSecHtml', 'circSecPizarraSecciones', 'circSecFilasRutina', 'circSecMotivoTexto', 'circSecDosis',
   'circMapaHtml', 'circMapaSvgImprimir', 'circPlan', 'circDuracion', 'circFmt', 'circShareData', 'showCircuitoView', 'circMigrarUno',
@@ -331,6 +331,11 @@ const CINCO = ['Sentadilla sumo', 'Remo posterior de deltoides con mancuernas', 
   m.circSecMoverCadena(c, 1, 2);
   igual('cambiar B y C solo toca esas dos letras', rotulos(c), ['C1', 'C2', 'B1', 'A1', 'A2']);
   di(!m.circSecMoverCadena(c, 0, 0), 'mover a su mismo sitio no hace nada');
+  /* Arrastrar por el asa: filas con el centro en 10, 30 y 50 px. */
+  igual('arrastre · la última, soltada arriba del todo, pasa a ser la primera', m.circSecIndiceSoltar([10, 30, 50], 2, 5), 0);
+  igual('arrastre · la primera, soltada entre la 2.ª y la 3.ª, queda segunda', m.circSecIndiceSoltar([10, 30, 50], 0, 40), 1);
+  igual('arrastre · la primera, soltada abajo del todo, queda la última', m.circSecIndiceSoltar([10, 30, 50], 0, 60), 2);
+  igual('arrastre · soltada donde estaba, no se mueve', m.circSecIndiceSoltar([10, 30, 50], 1, 25), 1);
   const plan = m.circPlanSec(c).filter(p => p.tipo === 'trabajo');
   igual('el cronómetro recorre en el MISMO orden que se ve', plan.map(p => p.rotulo), ['A1', 'A2', 'A1', 'A2', 'A1', 'A2', 'B1', 'B1', 'B1', 'C1', 'C2', 'C1', 'C2', 'C1', 'C2']);
   igual('letras más allá de la Z', [m.circSecLetra(25), m.circSecLetra(26), m.circSecLetra(27)], ['Z', 'AA', 'AB']);

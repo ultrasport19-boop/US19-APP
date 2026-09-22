@@ -94,6 +94,11 @@
       "nombre": "la capa de flechas tapa las tarjetas y se come el toque",
       "de": ".circ-mapa .cm-capa-sec{position:absolute;inset:0;width:100%;height:100%;z-index:2;pointer-events:none;}",
       "a": ".circ-mapa .cm-capa-sec{position:absolute;inset:0;width:100%;height:100%;z-index:6;pointer-events:auto;}"
+    },
+    {
+      "nombre": "arrastrar la lista cuenta tambien la fila que se mueve y la deja donde estaba",
+      "de": "  u19Arr(centros).forEach(function(m, i){ if (i !== desde && y > m) h++; });",
+      "a": "  u19Arr(centros).forEach(function(m, i){ if (y > m) h++; });"
     }
   ]
 }

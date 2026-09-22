@@ -190,8 +190,8 @@
     },
     {
       "nombre": "los Pods se encienden tambien fuera del bloque de trabajo",
-      "de": "  if (!c || !fase || fase.tipo !== \"trabajo\") return l;",
-      "a": "  if (!c || !fase) return l;"
+      "de": "  if (!c || !fase || fase.tipo !== \"trabajo\" || fase.manual) return l;",
+      "a": "  if (!c || !fase || fase.manual) return l;"
     },
     {
       "nombre": "los Pods sueltos los manda el bloque y no el usuario",

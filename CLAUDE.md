@@ -11,7 +11,7 @@ PWA de un solo archivo. Sin build, sin dependencias, sin servidor.
 > node -e "console.log(JSON.parse(require('fs').readFileSync('us19_catalogo.json','utf8')).length)"
 > node tools/validar_bloques.js index.html # los bloques, con sus líneas
 > ```
-> Al 21-sep-2026: 39.685 líneas · 10 aperturas · **3 bloques reales** · 2.377 fichas.
+> Al 22-sep-2026: 40.924 líneas, 9 aperturas, **3 bloques reales**, 2.377 fichas.
 
 > **Los mutantes se aplican sobre una COPIA, nunca sobre `index.html`.** El 8-sep un script
 > que mutaba el archivo de verdad tardó más de dos minutos, se fue a segundo plano y siguió
@@ -107,6 +107,26 @@ pizarra y el en vivo se vuelven mapa con `pzMapaCompartido`. La app tiene CSP si
 a la que se añade otra debajo pierde la comilla final, si no el bloque no parsea.
 `tools/circuitos.js` fija el reparto de grupos, el plan del cronómetro y la búsqueda.
 
+**Secuencias (22-sep-2026, Fase 14).** La tercera mirada del plano, al lado de «En círculo»
+y «En filas»: cadenas que Diego arma a mano con flechas (superseries, bloques). Vive en su
+propio tramo, `/* --- Secuencias: cadenas que se arman a mano`, justo antes de BlazePod.
+Lo que hay que saber antes de tocarla:
+- **Una sola verdad:** `c.planSec.cadenas[].nodos` (ids de estación, en orden). Las flechas
+  (`circSecEnlaces`) y las letras (`circSecNumeracion`) se DERIVAN; no se guardan. La dosis
+  vive en la estación: `rep`, `carga`, `tempo`, `lado` nuevos; el tiempo es `s.trabajo` y la
+  nota `s.nota`, los de siempre.
+- **Un circuito sin `planSec` no se toca**, y con `planSec.modo = "circuito"` se pinta y se
+  ejecuta igual carácter a carácter (comprobado contra el index anterior). Todo lo nuevo
+  entra por `circSecActivo(c)`.
+- **En vivo tiene su plan propio** (`circPlanSec`); `circPlan` no se tocó. Una serie por
+  repeticiones es una fase `manual` (dur 0) que espera a «Hecho»: `circLiveTick` la salta.
+- **La capa de flechas (`.cm-capa-sec`) nace con `pointer-events:none`** y va debajo de las
+  tarjetas: solo cada línea recibe el toque, con 48 px de zona (`vector-effect`).
+- `circCopiaConIdsNuevos` (duplicar) reapunta cadenas y Pods atados a los ids nuevos: antes
+  los Pods de la copia quedaban sueltos.
+- `tools/secuencias.js` ejecuta el módulo entero con `vm` y `window` como objeto global (así
+  las acciones `window.x` se llaman por su nombre, como en el navegador). 19 mutantes.
+
 ## Al parchear
 
 - Anclas de coincidencia exacta con `assert count == 1`. Cero o múltiples → abortar.
@@ -126,6 +146,7 @@ perdían al cerrarla; esas 28 suites ya no existen y no se pueden recuperar.
 | `node tools/pruebas.js` | Estructura, vídeo/imagen, lista blanca de `loadSettings`, guardas, secretos |
 | `node tools/taxonomia.js` | Tipo, patrón y nivel de 22 ejercicios conocidos: las trampas de las reglas («pino», «tibial», «lat») |
 | `node tools/circuitos.js` | Circuitos y búsqueda: reparto de grupos por estación, plan de fases, duración, tiempo por estación, plurales y sinónimos |
+| `node tools/secuencias.js` | **Las cadenas de Circuitos, ejecutadas**: que una flecha no ramifique ni cierre un ciclo, que borrar un ejercicio no deje flechas colgando, que el cronómetro espere a «Hecho», que respaldo, nube, guardado y enlace conserven las cadenas, y que un circuito normal se pinte igual |
 | `node tools/cifrado.js` | **Ejecuta** el cifrado, no lo lee: activar, cifrar/descifrar, sobre alterado, desbloquear en otro equipo, clave de recuperación y migración de los sobres de 150.000 vueltas |
 | `node tools/navegador.js` | **La app en el Chrome que ya tienes**, sin Playwright ni npm: la abre sin ventana, deja correr el JS y exige **cero errores de consola**. Complementa a `arranque.js` — esa entra por dentro con el candado abierto; esta comprueba que un navegador de verdad la carga limpia. Acepta también una URL |
 | `node tools/humo.js --pegar` | El arranque, en un navegador de verdad (necesita Playwright) |
