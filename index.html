@@ -38161,9 +38161,16 @@ function u19InformeUnicoDoc(inv, cli, opts){
   var inner = pgs.map(function(x){ return '<div class="pr-page">' + x + '</div>'; }).join('');
   /* Los modulos de estilo se suman solo si existen: que falte uno
      opcional no debe tumbar la generacion del informe entero. */
-  var _cssMods = ['RND_CSS','U19_CSS','U19_CSS_MAX','U19_CSS_PRO','U19_CSS_TEND'].map(function(n){
-    try { var v = eval(n); return (typeof v === 'string') ? v : ''; } catch(e){ return ''; }
-  }).join('');
+  /* 26-sep-2026: sin eval. La CSP de la app no permite 'unsafe-eval', asi que eval(n)
+     fallaba siempre y el catch lo callaba: estos cuatro estilos nunca llegaban al informe.
+     typeof de una variable no declarada no lanza, asi que un modulo ausente sigue siendo ''. */
+  var _cssMods = [
+    (typeof RND_CSS === 'string') ? RND_CSS : '',
+    (typeof U19_CSS === 'string') ? U19_CSS : '',
+    (typeof U19_CSS_MAX === 'string') ? U19_CSS_MAX : '',
+    (typeof U19_CSS_PRO === 'string') ? U19_CSS_PRO : '',
+    (typeof U19_CSS_TEND === 'string') ? U19_CSS_TEND : ''
+  ].join('');
   var css = INF_V2_CSS.split('@media print').join('@media all') + _cssMods
     + " #printableReport{display:block !important;} body{background:#64748b;margin:0;padding:16px;}"
     + " .pr-page{background:#fff;width:210mm;max-width:100%;margin:0 auto 14px !important;box-shadow:0 2px 10px rgba(0,0,0,.35);padding:10mm 12mm;box-sizing:border-box;position:relative;}"
