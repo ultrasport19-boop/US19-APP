@@ -6,7 +6,7 @@
  * origen entero deja de poder escribir y la app pierde la capacidad de
  * guardar. Ahora la media pesada no se cachea y el resto tiene tope.
  */
-var CACHE = "us19-cache-v27";
+var CACHE = "us19-cache-v28";
 /* El catalogo es nucleo (esNucleo lo dice), asi que tambien se precarga: sin esto,
    al activar una version nueva se borraba la cache vieja y el catalogo no volvia
    hasta el proximo fetch con red (auditoria Fable, 27-sep). */

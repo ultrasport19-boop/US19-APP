@@ -958,7 +958,7 @@ img{max-width:100%;display:block;}
     <div class="logo"><img id="header-logo" alt="Ultra-Sport 19"></div>
     <div class="brand">
       <div class="brand-title">ULTRA-SPORT <span class="num">19</span></div>
-      <div class="brand-tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div>
+      <div class="brand-tag">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div>
     </div>
     <div class="header-actions">
       <div class="gsearch-wrap"><input id="gsearch-input" class="gsearch-input" type="search" placeholder="Buscar cliente, rutina, ejercicio…" oninput="globalSearch(this.value)" onkeydown="gsKey(event)" onblur="setTimeout(function(){window.hideGSearch&&window.hideGSearch();},200)"><div id="gsearch-results" class="gsearch-results"></div></div>
@@ -9917,7 +9917,7 @@ function printQr(url, title, subtitle){
       + (subtitle ? '<h2>'+escapeHtml(subtitle)+'</h2>' : '')
       + '<div class="qr">'+qr.svg+'</div>'
       + '<div class="brand">ULTRA-SPORT 19</div>'
-      + '<div class="tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div>'
+      + '<div class="tag">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div>'
       + '<div class="url">'+escapeHtml(url)+'</div>'
       + '<script>window.onload=function(){setTimeout(function(){window.print();}, 300);};<\/script>'
       + '</body></html>';
@@ -10039,7 +10039,7 @@ function showClientView(shareData){
 
   html += buildHistorySection();
 
-  html += '<div class="brand-print-footer"><div style="font-family:serif;font-size:16pt;font-weight:900;letter-spacing:.06em;">ULTRA-SPORT 19</div><div style="font-size:8pt;letter-spacing:.25em;color:#888;margin-top:4px;">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div></div>';
+  html += '<div class="brand-print-footer"><div style="font-family:serif;font-size:16pt;font-weight:900;letter-spacing:.06em;">ULTRA-SPORT 19</div><div style="font-size:8pt;letter-spacing:.25em;color:#888;margin-top:4px;">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div></div>';
 
   html += '<div class="client-action-bar">'
     +'<button class="btn btn-secondary" onclick="saveSessionToHistory()">💾 Guardar sesión</button>'
@@ -10617,7 +10617,7 @@ function showProgressReport(data){
     html += '</div>';
   }
 
-  html += '<div class="brand-print-footer"><div style="font-family:serif;font-size:14pt;font-weight:900;letter-spacing:.06em;">ULTRA-SPORT 19</div><div style="font-size:8pt;letter-spacing:.2em;color:#888;margin-top:4px;">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div></div>';
+  html += '<div class="brand-print-footer"><div style="font-family:serif;font-size:14pt;font-weight:900;letter-spacing:.06em;">ULTRA-SPORT 19</div><div style="font-size:8pt;letter-spacing:.2em;color:#888;margin-top:4px;">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div></div>';
   document.getElementById("view-report").innerHTML = html;
 }
 
@@ -16417,30 +16417,6 @@ function triggerNotionWorkflow() {
     if (r.status === 204) return true;
     return r.json().then(function(d) { throw new Error(d.message || 'Error ' + r.status); });
   });
-}
-
-function writeNotionPending(updates, creates) {
-  var cfg = getGitHubConfig();
-  if (!cfg) return Promise.reject(new Error('GitHub no configurado'));
-  var repoFull = getDerivedRepo() || (cfg.owner + '/' + cfg.repo);
-  var content = { updates: updates || [], creates: creates || [], createdAt: new Date().toISOString() };
-  var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(content, null, 2))));
-  var path = 'sync/notion-pending.json';
-  var url = 'https://api.github.com/repos/' + repoFull + '/contents/' + path;
-  // Get current SHA first (from the data branch)
-  return ensureDataBranch(repoFull, cfg.token).then(function(){
-    return fetch(url + '?ref=' + DATA_BRANCH, { headers: { 'Authorization': 'token ' + cfg.token, 'Accept': 'application/vnd.github.v3+json' } });
-  })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      var body = { message: 'app: notion pending updates', content: b64, branch: DATA_BRANCH };
-      if (d.sha) body.sha = d.sha;
-      return fetch(url, {
-        method: 'PUT',
-        headers: { 'Authorization': 'token ' + cfg.token, 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-      });
-    });
 }
 
 function normalizeNameN(s) { return (s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
@@ -39348,7 +39324,7 @@ window.u19PlantelInforme = function(){
     + '.ft{margin-top:14px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;display:flex;justify-content:space-between;}'
     + 'th,.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{padding:0;}@page{size:A4 landscape;margin:12mm;}}';
   var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Plantel · Ultra-Sport 19 · ' + hoyISO + '</title><style>' + css + '</style></head><body>'
-    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div><div class="ttl">Resumen de composición corporal del plantel · últimos ' + _plantelBio.meses + ' meses</div></div>'
+    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div><div class="ttl">Resumen de composición corporal del plantel, últimos ' + _plantelBio.meses + ' meses</div></div>'
     + '<div class="meta">Emitido el ' + rndFdate(hoyISO) + '<br>' + ps.length + ' personas · ' + an.total + ' evaluaciones<br>Uso interno</div></div>'
     + '<div class="kpis">'
     + kpi('Mejoran', cnt.mejora, 'baja grasa o sube músculo', '#15803d')
@@ -40149,7 +40125,7 @@ window.u19BateriaInforme = function(clientId){
     + '.ft{margin-top:18px;border-top:2px solid #0e5132;padding-top:6px;font-size:7.5pt;color:#7c8a83;display:flex;justify-content:space-between;}'
     + 'th,.id,.hd{-webkit-print-color-adjust:exact;print-color-adjust:exact;}@media print{body{padding:0;}@page{size:A4;margin:12mm;}}';
   var html = '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>' + escapeHtml(folio || "Informe") + ' · ' + escapeHtml(c.name || "") + ' · Ultra-Sport 19</title><style>' + css + '</style></head><body>'
-    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO · VELOCIDAD · RESISTENCIA</div><div class="ttl">Informe de evaluación de rendimiento neuromuscular · ActivForce 2 y BlazePod</div></div>'
+    + '<div class="hd"><div><div class="brand">ULTRA-SPORT 19</div><div class="tag">RENDIMIENTO | VELOCIDAD | RESISTENCIA</div><div class="ttl">Informe de evaluación de rendimiento neuromuscular: ActivForce 2 y BlazePod</div></div>'
     + '<div class="meta">Folio <b>' + escapeHtml(folio || "—") + '</b><br>Emitido el ' + rndFdate(hoyISO) + '<br>Confidencial</div></div>'
     + '<div class="id"><div><span>Deportista</span><b>' + escapeHtml(c.name || "—") + '</b></div><div><span>Perfil</span><b>' + perfil + '</b></div>'
     + '<div><span>Pruebas</span><b>' + ps.length + '</b></div><div><span>Periodo</span><b>' + rndFdate(ps[0].fecha) + (ps.length > 1 ? ' – ' + rndFdate(ps[ps.length - 1].fecha) : '') + '</b></div></div>'
