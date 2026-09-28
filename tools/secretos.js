@@ -64,9 +64,18 @@ comprobar('git me dice qué archivos de texto hay', archivos.length > 0,
   'ls-files no devolvió nada — ¿esto es un repositorio?');
 
 const sucios = [];
+const ilegibles = [];
 archivos.forEach(function (rel) {
   let texto;
-  try { texto = fs.readFileSync(path.join(RAIZ, rel), 'utf8'); } catch (e) { return; }
+  /* Se revisa lo STAGED (git show :ruta), que es lo que de verdad entra al
+     commit: un token agregado con `git add` y luego borrado del disco pasaba
+     el barrido del arbol de trabajo (auditoria Fable 27-sep). Si no hay nada
+     staged para el archivo, la version del indice ES la que se commitea. */
+  try {
+    texto = execFileSync('git', ['show', ':' + rel], { cwd: RAIZ, maxBuffer: 64 * 1024 * 1024 }).toString('utf8');
+  } catch (e) {
+    try { texto = fs.readFileSync(path.join(RAIZ, rel), 'utf8'); } catch (e2) { ilegibles.push(rel); return; }
+  }
   PATRONES.forEach(function (p) {
     const m = p[1].exec(texto);
     /* Se dice QUÉ y DÓNDE. Nunca el valor: esto se ejecuta en una terminal
@@ -76,6 +85,8 @@ archivos.forEach(function (rel) {
 });
 comprobar('ni una credencial escrita en el repositorio', sucios.length === 0,
   sucios.join(' · '));
+comprobar('ningun archivo se salto el barrido por ilegible', ilegibles.length === 0,
+  'no pude leer: ' + ilegibles.join(', '));
 aviso(archivos.length + ' archivos de texto revisados, ' + PATRONES.length +
       ' formas de credencial buscadas');
 

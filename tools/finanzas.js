@@ -346,7 +346,20 @@ avisos.push('pago · «Marcar pagado» suma 30 días al vencimiento vigente, eje
    la aritmética, no la pantalla: total, neto, capacidad, fecha, cupo,
    abonos en las dos monedas, el ajuste desde el portal y deshacer. */
 const HOY_DEU = '2026-09-15';
-const md = m.deuNormalizar(JSON.parse(JSON.stringify(m.deuInicial)));
+/* Juego de datos PROPIO del banco: la semilla de index.html quedo vacia a proposito
+   (repositorio publico; auditoria Fable 27-sep). Estos numeros son de prueba. */
+const FIXTURE_DEU = { version: 1, actualizado: '2026-09-15', costosSistemaMensual: 75000,
+  ingresosComprometidos: [
+    { id: 'ing-a', nombre: 'Ingreso A', monto: 100000, estado: 'ESPERADO' },
+    { id: 'ing-b', nombre: 'Ingreso B', monto: 200000, estado: 'PROBABLE' }
+  ],
+  deudas: [
+    { id: 'tc-nacional', nombre: 'Deuda A (CLP con cupo)', tipo: 'tarjeta', moneda: 'CLP', saldo: 417915, cupo: 500000, tipoCambio: null, cuotaMensual: null, diaPago: null, tasaMensual: null, estado: 'CONFIRMADO', incluirEnTotal: true, actualizado: '2026-09-15', nota: '', abonos: [] },
+    { id: 'tc-internacional', nombre: 'Deuda B (USD)', tipo: 'tarjeta', moneda: 'USD', saldo: 612.00, cupo: 1200, tipoCambio: 940.91, cuotaMensual: null, diaPago: null, tasaMensual: null, estado: 'CONFIRMADO', incluirEnTotal: true, actualizado: '2026-09-15', nota: '', abonos: [] },
+    { id: 'trotadora', nombre: 'Deuda C (no urgente)', tipo: 'no_urgente', moneda: 'CLP', saldo: 1500000, cupo: null, tipoCambio: null, cuotaMensual: null, diaPago: null, tasaMensual: null, estado: 'CONFIRMADO', incluirEnTotal: false, actualizado: '2026-09-15', nota: '', abonos: [] },
+    { id: 'delex', nombre: 'Deuda D (por venir)', tipo: 'por_venir', moneda: 'CLP', saldo: 280000, cupo: null, tipoCambio: null, cuotaMensual: null, diaPago: null, tasaMensual: null, estado: 'PENDIENTE', incluirEnTotal: false, actualizado: '2026-09-15', nota: '', abonos: [] }
+  ] };
+const md = m.deuNormalizar(JSON.parse(JSON.stringify(FIXTURE_DEU)));
 const NAC = md.deudas[0], INT = md.deudas[1], TROT = md.deudas[2], DELEX = md.deudas[3];
 igual(NAC.id, 'tc-nacional', 'deudas · los valores de partida traen la nacional primero');
 igual(TROT.tipo, 'no_urgente', 'deudas · la trotadora es «no urgente»');

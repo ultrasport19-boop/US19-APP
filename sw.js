@@ -6,8 +6,11 @@
  * origen entero deja de poder escribir y la app pierde la capacidad de
  * guardar. Ahora la media pesada no se cachea y el resto tiene tope.
  */
-var CACHE = "us19-cache-v25";
-var CORE = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
+var CACHE = "us19-cache-v26";
+/* El catalogo es nucleo (esNucleo lo dice), asi que tambien se precarga: sin esto,
+   al activar una version nueva se borraba la cache vieja y el catalogo no volvia
+   hasta el proximo fetch con red (auditoria Fable, 27-sep). */
+var CORE = ["./", "./index.html", "./manifest.json", "./us19_catalogo.json", "./icon-192.png", "./icon-512.png"];
 
 /* Cuantas entradas guardamos como maximo fuera del nucleo. */
 var MAX_ENTRADAS = 60;
@@ -41,10 +44,13 @@ function podar(cache) {
 }
 
 self.addEventListener("install", function (e) {
+  /* Si la precarga falla (sin red a mitad de la actualizacion), la instalacion
+     FALLA y la version vieja sigue sirviendo con su cache intacta. Antes se
+     activaba igual y borraba la cache anterior: la app quedaba sin copia
+     offline hasta la proxima visita con red (auditoria Fable, 27-sep). */
   e.waitUntil(
     caches.open(CACHE).then(function (c) { return c.addAll(CORE); })
       .then(function () { return self.skipWaiting(); })
-      .catch(function () { return self.skipWaiting(); })
   );
 });
 

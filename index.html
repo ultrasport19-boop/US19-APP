@@ -9398,7 +9398,14 @@ function u19MensajeFaseSocio(nombre, etapa, url){
     + "-- *Ultra-Sport 19* | Pencahue";
 }
 
+
 function buildShareData(routine){
+  /* Solo nombre de pila e inicial: el enlace deja copia en la rama publica
+     y el nombre completo no tiene por que estar ahi (auditoria 27-sep). */
+  function u19NombreCompartir(nombre){
+    var p = String(nombre || "").trim().split(/\s+/);
+    return p[0] ? p[0] + (p[1] ? " " + p[1].charAt(0) + "." : "") : "";
+  }
   var client = getClient(routine.clientId);
   var usedExIds = {};
   if (routine.days){
@@ -9455,10 +9462,12 @@ function buildShareData(routine){
          dicen «rehabilitacion» o «terapeutica». Solo va la zona a proteger. */
       category: u19EsRehabCat(routine.category) ? "" : (routine.category || ""),
       enfoque: routine.enfoque === "terap" ? "" : (routine.enfoque || ""),
-      zonaTerap: routine.zonaTerap || "",
+      /* La zona a proteger es dato sensible: se queda en este navegador,
+         nunca viaja en el enlace ni a la rama publica (auditoria 27-sep). */
+      zonaTerap: "",
       days: routine.days || []
     },
-    client: client ? { id: client.id, name: client.name } : null,
+    client: client ? { id: client.id, name: u19NombreCompartir(client.name) } : null,
     exercises: exercises,
     skippedHeavy: skippedHeavy,
     faltan: faltan,
@@ -22921,7 +22930,10 @@ function exportReportsCsv(){
   var csv = rows.map(function(r){
     return r.map(function(v){
       v = String(v);
-      return (v.indexOf(",")>=0 || v.indexOf('"')>=0) ? '"'+v.replace(/"/g,'""')+'"' : v;
+      /* Los nombres llegan por el enlace #progreso/: un valor que empieza con
+         = + - o @ se ejecutaria como formula al abrir el CSV en Excel. */
+      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+      return (v.indexOf(",")>=0 || v.indexOf('"')>=0 || v.indexOf("'")===0) ? '"'+v.replace(/"/g,'""')+'"' : v;
     }).join(",");
   }).join("\n");
   var blob = new Blob(["\ufeff"+csv], { type:"text/csv;charset=utf-8" });
@@ -29746,9 +29758,9 @@ function u19CliVeredicto(mets, lsi){
     t.push("Te mantienes respecto de la última medición. Estabilidad no es estancamiento, pero conviene mover algo del plan.");
   }
   if (lsi && lsi.lsi != null){
-    if (lsi.lsi >= 90) t.push("Tus dos lados están parejos (" + lsi.lsi.toFixed(0) + "%), que es lo que buscamos para entrenar y competir sin riesgo.");
+    if (lsi.lsi >= 90) t.push("Tus dos lados están parejos (" + lsi.lsi.toFixed(0) + "%), la base que buscamos para entrenar y competir con confianza.");
     else if (lsi.lsi >= 85) t.push("Hay una diferencia leve entre tus dos lados (" + lsi.lsi.toFixed(0) + "%). La trabajamos con ejercicio de una pierna a la vez.");
-    else t.push("Un lado rinde bastante menos que el otro (" + lsi.lsi.toFixed(0) + "%). Es lo primero que vamos a corregir, porque es donde aparecen las lesiones.");
+    else t.push("Un lado rinde bastante menos que el otro (" + lsi.lsi.toFixed(0) + "%). Es lo primero que vamos a emparejar en el plan, con trabajo de un lado a la vez.");
   }
   return t;
 }
@@ -30613,38 +30625,13 @@ function u19FinGraficosHTML(d, ingresos, costo, clientes, mix, util){
    ============================================================ */
 var U19_DEUDAS_INICIAL = {
   version: 1,
-  actualizado: "2026-09-15",
+  actualizado: "",
   costosSistemaMensual: 75000,
-  ingresosComprometidos: [
-    { id: "ext-sep", nombre: "Ingreso externo septiembre", monto: 100000, estado: "ESPERADO" },
-    { id: "beta", nombre: "Pago beta", monto: 200000, estado: "PROBABLE" }
-  ],
-  deudas: [
-    { id: "tc-nacional", nombre: "Tarjeta nacional", tipo: "tarjeta",
-      moneda: "CLP", saldo: 417915, cupo: 500000, tipoCambio: null,
-      cuotaMensual: null, diaPago: null, tasaMensual: null,
-      estado: "CONFIRMADO", incluirEnTotal: true, actualizado: "2026-09-15",
-      nota: "Parte del saldo sin origen identificado. Revisar si hubo traspaso de deuda en dólares.",
-      abonos: [] },
-    { id: "tc-internacional", nombre: "Tarjeta internacional", tipo: "tarjeta",
-      moneda: "USD", saldo: 612.00, cupo: 1200, tipoCambio: 940.91,
-      cuotaMensual: null, diaPago: null, tasaMensual: null,
-      estado: "CONFIRMADO", incluirEnTotal: true, actualizado: "2026-09-15",
-      nota: "Portal 15-sep: disponible USD 588 → saldo = cupo 1.200 − 588. Si el cupo real fuera USD 1.000, el saldo sería USD 412.",
-      abonos: [] },
-    { id: "trotadora", nombre: "Trotadora", tipo: "no_urgente",
-      moneda: "CLP", saldo: 1500000, cupo: null, tipoCambio: null,
-      cuotaMensual: null, diaPago: null, tasaMensual: null,
-      estado: "CONFIRMADO", incluirEnTotal: false, actualizado: "2026-09-15",
-      nota: "No urgente: no suma al total ni a la fecha. Cuota, día de pago y tasa por confirmar.",
-      abonos: [] },
-    { id: "delex", nombre: "Importación Delex (BlazePod + ActivForce)", tipo: "por_venir",
-      moneda: "CLP", saldo: 280000, cupo: null, tipoCambio: null,
-      cuotaMensual: null, diaPago: null, tasaMensual: null,
-      estado: "PENDIENTE", incluirEnTotal: false, actualizado: "2026-09-15",
-      nota: "Estimado $220.000–350.000 (flete + IVA, y arancel si aplica). Se paga en pesos al llegar.",
-      abonos: [] }
-  ]
+  /* Sin datos reales aqui: este archivo es publico (GitHub Pages). Las deudas
+     de verdad se escriben en la app y viven cifradas en state.deudas; el banco
+     de pruebas usa su propio juego de datos (auditoria Fable, 27-sep). */
+  ingresosComprometidos: [],
+  deudas: []
 };
 
 var U19_DEU_TIPOS = ["tarjeta", "credito", "no_urgente", "por_venir"];

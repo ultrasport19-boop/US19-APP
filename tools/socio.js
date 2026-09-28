@@ -191,7 +191,10 @@ const sinEtiquetas = h => String(h).replace(/<[^>]*>/g, ' ');
   comprobar('enlace · la etiqueta terapeutica del ejercicio no viaja', !('terap' in ej), 'viaja terap=' + ej.terap);
   igual('enlace · la categoria de readaptacion no viaja', d.routine.category, '');
   igual('enlace · el enfoque terapeutico no viaja', d.routine.enfoque, '');
-  igual('enlace · la zona a proteger si viaja', d.routine.zonaTerap, 'Pierna');
+  /* 27-sep: Diego eligio la opcion A por Telegram (mensaje 2431): la zona a
+     proteger YA NO viaja en el enlace, porque el archivo del enlace queda en
+     la rama publica del repo. La cabecera del socio simplemente no la pinta. */
+  igual('enlace · la zona a proteger ya no viaja (decision de Diego, 27-sep)', d.routine.zonaTerap, '');
   igual('enlace · y la otra categoria de readaptacion tampoco', M.buildShareData(Object.assign({}, rehab, { category: 'rehab' })).routine.category, '');
   const malos = textos(d).map(textoVetado).filter(Boolean);
   comprobar('enlace · nada de lo que lleva el enlace esta vetado', malos.length === 0, malos.slice(0, 3).join('  |  '));

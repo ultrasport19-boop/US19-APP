@@ -372,7 +372,12 @@ function extraerFuncion(nombre) {
 
   /* --- b) Nunca subir el estado en claro ----------------------------- */
 
+  /* Estas cinco guardas vigilan lo unico que SALE del navegador. Si la funcion
+     se renombra, la guarda no puede volverse un «if» mudo: falla aqui mismo
+     y quien renombro tiene que venir a actualizarla (auditoria Fable 27-sep). */
   const prep = extraerFuncion('_syncPrepareContent');
+  comprobar('salida · _syncPrepareContent sigue existiendo (guarda viva)', prep !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
   if (prep) {
     comprobar('salida · _syncPrepareContent no devuelve el estado en claro',
       !/Promise\.resolve\s*\(\s*jsonStr\s*\)/.test(prep),
@@ -382,6 +387,8 @@ function extraerFuncion(nombre) {
   }
 
   const subir = extraerFuncion('syncUploadNow');
+  comprobar('salida · syncUploadNow sigue existiendo (guarda viva)', subir !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
   if (subir) {
     comprobar('salida · syncUploadNow aborta sin cifrado activo',
       /!\s*settings\.encEnabled/.test(subir),
@@ -391,6 +398,8 @@ function extraerFuncion(nombre) {
   /* --- b bis) El respaldo no reparte las llaves ---------------------- */
 
   const exp = extraerFuncion('exportBackup');
+  comprobar('salida · exportBackup sigue existiendo (guarda viva)', exp !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
   if (exp) {
     comprobar('salida · exportBackup no vuelca settings entero',
       !/\bsettings:\s*settings\s*,/.test(exp),
@@ -400,6 +409,8 @@ function extraerFuncion(nombre) {
   }
 
   const imp = extraerFuncion('importBackup');
+  comprobar('salida · importBackup sigue existiendo (guarda viva)', imp !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
   if (imp) {
     /* Si el respaldo ya no trae llaves, restaurarlo no debe borrar las que
        este navegador si tiene. Sin esto, el arreglo de arriba rompe la app. */
@@ -411,6 +422,8 @@ function extraerFuncion(nombre) {
   /* --- c) Nada del enlace se pinta sin pasar por un filtro ----------- */
 
   const rep = extraerFuncion('showProgressReport');
+  comprobar('salida · showProgressReport sigue existiendo (guarda viva)', rep !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
   if (rep) {
     /* stats llega dentro del enlace y pct acaba en un atributo style. */
     comprobar('salida · showProgressReport fuerza stats.pct a numero',
