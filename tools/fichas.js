@@ -406,6 +406,21 @@ const aviso = (t) => avisos.push(t);
   comprobar('completar · nunca quedan dos fichas de la app sobre una de Notion', nueva2.notionId === 'D9' && vieja.notionId === '',
     'la importación solo refrescaría la primera y la otra seguiría escribiendo');
   comprobar('completar · y la membresía por defecto no viaja a una ficha que ya existe', !('membresia' in nueva2.notionPend.datos));
+
+  /* 28-sep-2026 · Un «Activo» elegido a mano SÍ viaja a la ficha en Potencial ingreso: si no, completarla
+     era peor que crear otra, y así nacían los duplicados. Pero nunca pisa una ficha que ya es Activo. */
+  for (const [destino, queda] of [['Potencial ingreso', true], ['Activo', false], ['Inactivo', true]]) {
+    W = mundo();
+    const alta = { id: 'n', name: 'Ana Soto', notionPend: { datos: { nombre: 'Ana Soto', membresia: 'Activo', termino: '2026-10-01' }, ts: 1 } };
+    W.state.clients = [alta];
+    W.resp = { ok: true, simulado: true, cambios: [], duplicados: [], avisos: [] };
+    W.fn.fichaVistaPrevia_('n', { op: 'crear', datos: alta.notionPend.datos }, 1, { ok: true, cambios: [], avisos: [], errores: [],
+      duplicados: [{ id: 'D7', nombre: 'Ana Soto Pérez', membresia: destino, por: 'nombre parecido' }] });
+    W.fn.fichaEnlazar_('n', 0);
+    await ticks();
+    comprobar('completar · un «Activo» elegido a mano ' + (queda ? 'viaja' : 'NO viaja') + ' a una ficha en «' + destino + '»',
+      ('membresia' in alta.notionPend.datos) === queda, JSON.stringify(alta.notionPend.datos));
+  }
   aviso('vista previa y escritura · catorce casos, ejecutadas');
 }
 

@@ -5079,10 +5079,15 @@ function renderClients(){
     if (c.notionId) return true;
     return (typeof u19ClienteActivo === "function") ? u19ClienteActivo(c) : true;
   }
+  /* 28-sep-2026 · Los que están en «Potencial ingreso» en Notion van en su propio apartado. Mezclados
+     con las bajas, la secretaria no los veía y creaba una ficha nueva: de ahí salían los duplicados. */
+  function _cliPotencial(c){
+    return !_cliActivo(c) && /^potencial/i.test(String(c.notionEstado || "").trim());
+  }
   var noRoutineCount = 0, expiredCount = 0;
-  var inactivosN = 0;
+  var inactivosN = 0, potencialN = 0;
   state.clients.forEach(function(c){
-    if (!_cliActivo(c)){ inactivosN++; return; }
+    if (!_cliActivo(c)){ if (_cliPotencial(c)) potencialN++; else inactivosN++; return; }
     if (getClientType(c)!=="rehab" && !_hasRoutine[c.id]) noRoutineCount++;
     if (_cliPlanVencido(c)) expiredCount++;
   });
@@ -5090,13 +5095,14 @@ function renderClients(){
 
   // Filter bar
   html += '<div class="cat-bar">';
-  html += '<span class="cat-pill'+(_clientFilter===""?" active":"")+'" onclick="filterClients(\'\')">Activos<span class="cat-count">'+(state.clients.length - inactivosN)+'</span></span>';
+  html += '<span class="cat-pill'+(_clientFilter===""?" active":"")+'" onclick="filterClients(\'\')">Activos<span class="cat-count">'+(state.clients.length - inactivosN - potencialN)+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="gym"?" active":"")+'" onclick="filterClients(\'gym\')"><span class="cat-icon">🏋️</span>Gimnasio<span class="cat-count">'+typeCounts.gym+'</span></span>';
   html += '<span class="cat-pill'+(_clientFilter==="rehab"?" active":"")+'" onclick="filterClients(\'rehab\')"><span class="cat-icon">🩹</span>Rehabilitación<span class="cat-count">'+typeCounts.rehab+'</span></span>';
   if (notionCount) html += '<span class="cat-pill'+(_clientFilter==="notion"?" active":"")+'" onclick="filterClients(\'notion\')"><span class="cat-icon">🟢</span>Activos Notion<span class="cat-count">'+notionCount+'</span></span>';
   if (noRoutineCount) html += '<span class="cat-pill'+(_clientFilter==="noroutine"?" active":"")+'" onclick="filterClients(\'noroutine\')"><span class="cat-icon">🚫</span>Sin rutina<span class="cat-count">'+noRoutineCount+'</span></span>';
   if (expiredCount) html += '<span class="cat-pill'+(_clientFilter==="expired"?" active":"")+'" onclick="filterClients(\'expired\')"><span class="cat-icon">💳</span>Plan vencido<span class="cat-count">'+expiredCount+'</span></span>';
   if (_salud.total) html += '<span class="cat-pill'+(_clientFilter==="salud"?" active":"")+'" onclick="filterClients(\'salud\')" title="Clientes activos a los que les falta algun dato que el asistente necesita"><span class="cat-icon">🩺</span>Salud de datos<span class="cat-count">'+_salud.total+'</span></span>';
+  if (potencialN) html += '<span class="cat-pill'+(_clientFilter==="potencial"?" active":"")+'" onclick="filterClients(\'potencial\')" title="Se inscribieron y esperan el visto bueno: al aprobar, se completa ESA ficha, no se crea otra"><span class="cat-icon">🆕</span>Potencial ingreso<span class="cat-count">'+potencialN+'</span></span>';
   if (inactivosN) html += '<span class="cat-pill'+(_clientFilter==="inactivos"?" active":"")+'" onclick="filterClients(\'inactivos\')" title="Dados de baja en Notion o con plan vencido hace más de 30 días"><span class="cat-icon">💤</span>Inactivos<span class="cat-count">'+inactivosN+'</span></span>';
   html += '</div>';
   html += '<div class="cl-leyenda"><span><i style="background:var(--success);"></i>plan al día</span>'
@@ -5112,10 +5118,11 @@ function renderClients(){
     return (a.name||"").localeCompare(b.name||"");
   });
 
-  var activosL = sorted.filter(_cliActivo), inactivosL = sorted.filter(function(c){ return !_cliActivo(c); });
+  var activosL = sorted.filter(_cliActivo), potencialL = sorted.filter(_cliPotencial);
+  var inactivosL = sorted.filter(function(c){ return !_cliActivo(c) && !_cliPotencial(c); });
   if (_clientFilter){
-    var filtered = (_clientFilter==="inactivos" ? inactivosL : activosL).filter(function(c){
-      if (_clientFilter==="inactivos") return true;
+    var filtered = (_clientFilter==="inactivos" ? inactivosL : _clientFilter==="potencial" ? potencialL : activosL).filter(function(c){
+      if (_clientFilter==="inactivos" || _clientFilter==="potencial") return true;
       if (_clientFilter==="notion") return !!c.notionId;
       if (_clientFilter==="noroutine") return getClientType(c)!=="rehab" && !_hasRoutine[c.id];
       if (_clientFilter==="expired") return _cliPlanVencido(c);
@@ -5148,6 +5155,13 @@ function renderClients(){
       html += '<div class="cl-grid">'; for (var k=0;k<inGroup.length;k++) html += clientCardHtml(inGroup[k]); html += '</div>';
     }
     if (!activosL.length) html += '<p class="text-muted text-sm" style="text-align:center;padding:1.5rem 0;">No hay clientes activos. Revisa el apartado de inactivos o importa desde Notion.</p>';
+    /* 28-sep-2026 · Los de «Potencial ingreso», abiertos: son trabajo pendiente, no archivo. */
+    if (potencialL.length){
+      html += '<details class="u-acc cl-inactivos" open><summary>🆕 Potencial ingreso <span>' + potencialL.length + ' en Notion esperando el visto bueno; al aprobar, completa ESTA ficha (no crees otra): el asistente pone el monto del plan y la activa con el primer pago</span></summary>'
+        + '<div class="u-acc-body"><div class="cl-grid">';
+      for (var q1=0;q1<potencialL.length;q1++) html += clientCardHtml(potencialL[q1]);
+      html += '</div></div></details>';
+    }
     /* Los inactivos no se mezclan con los activos: quedan en su apartado, plegado. */
     if (inactivosL.length){
       html += '<details class="u-acc cl-inactivos"><summary>💤 Inactivos <span>' + inactivosL.length + ' · dados de baja en Notion o con plan vencido hace más de 30 días · no cuentan en Finanzas ni en el plantel</span></summary>'
@@ -5925,7 +5939,10 @@ window.importClientesNotion = async function(silencioso){
           id: genId(), name: nombre, rut: "", phone: _impTelFmt(tel), email: x.email || "",
           goal: "", notes: "", type: "gym", reevalDate: "", planEndDate: fin2 || "",
           targetWeight: "", targetDate: "", planPrice: monto2,
-          notionId: x.id || "", notionPlan: x.plan || "", notionEstado: x.estado || "",
+          notionId: x.id || "", notionPlan: x.plan || "",
+          /* 28-sep-2026: x.estado no existe (lo dice el caso de arriba): llegaban sin membresía y un
+             «Potencial ingreso» no se distinguía de una baja. */
+          notionEstado: _impCampo(x, ["estado", "membresia_activa", "Membresía Activa"]) || "",
           activo: false, createdAt: Date.now()
         });
         _impEnriquecer(state.clients[state.clients.length - 1], x);
@@ -6232,6 +6249,8 @@ function fichaVistaPrevia_(id, cuerpo, ts, r, extra){
             + '<td><button class="btn btn-sm btn-primary" onclick="fichaEnlazar_(\'' + escapeAttr(id) + '\',' + i + ')">Es esta: completarla</button></td></tr>';
         }).join("")
       + '</table></div>'
+      + (dups.some(function(d){ return /^potencial/i.test(String(d.membresia || "").trim()) || d.portero; })
+        ? '<p class="text-sm" style="margin-top:.5rem;color:var(--warn);font-weight:700;">Si es alguien que se acaba de inscribir, es la que está en «Potencial ingreso»: complétala. Crear otra deja dos fichas de la misma persona.</p>' : '')
       + '<p class="text-xs text-muted" style="margin-top:.4rem;">Si es otra persona (en las familias se comparte el teléfono), créala igual.</p>'
       + (avisos.length ? lista(avisos, "var(--warn)") : '') + tabla;
     botones = [{ label: "Ahora no", cls: "btn-ghost" }, { label: "Es otra persona: crearla", cls: "btn-secondary", onClick: function(){ closeModal(); fichaNotionSubir(id, { forzar: true }); } }];
@@ -6257,8 +6276,13 @@ function fichaVistaPrevia_(id, cuerpo, ts, r, extra){
 }
 /* «Es esta: completarla»: la ficha de la app se enlaza a la que ya estaba
    en Notion y lo pendiente se sube como actualizacion (con su vista previa).
-   La membresia NO viaja: en una ficha nueva era la de por defecto, y
-   aplicada a una que ya existe podria sacar de Activo a alguien que paga. */
+   La membresia NO viaja sobre una ficha Activo: en una ficha nueva era la de
+   por defecto, y podria sacar de Activo a alguien que paga.
+   28-sep-2026: un «Activo» elegido a mano SI viaja a una ficha que no lo
+   esta (Potencial ingreso, Prueba, Inactivo). Antes se borraba siempre, y
+   completar la ficha buena la dejaba igual mientras crear otra la dejaba
+   Activo: se creaba otra. La de por defecto («Potencial ingreso») sigue sin
+   viajar: devolveria a Potencial a alguien dado de baja. */
 function fichaEnlazar_(id, i){
   var c = getClient(id);
   var d = (_fichaDups && _fichaDups.id === id) ? _fichaDups.dups[i] : null;
@@ -6271,7 +6295,7 @@ function fichaEnlazar_(id, i){
     + (otra ? "\n\nOjo: esa ficha de Notion ya está en la app como «" + (otra.name || "") + "». Aquella quedará sin enlace (no se borra)." : ""))) return;
   if (otra){ otra.notionId = ""; otra.updatedAt = Date.now(); }
   c.notionId = d.id;
-  if (c.notionPend && c.notionPend.datos) delete c.notionPend.datos.membresia;
+  if (c.notionPend && c.notionPend.datos && !(c.notionPend.datos.membresia === "Activo" && String(d.membresia || "").trim() !== "Activo")) delete c.notionPend.datos.membresia;
   c.updatedAt = Date.now();
   saveState();
   closeModal();
@@ -6295,10 +6319,10 @@ function fichaEscribir_(id, cuerpo, ts, extra){
     saveState();
     renderClients();
     /* Una alta nueva no es Activo: esta en «Potencial ingreso», que la app
-       cuenta fuera de Finanzas (en Inactivos) hasta que se active. Se dice,
+       cuenta fuera de Finanzas (en su apartado) hasta que se active. Se dice,
        para que no parezca que se perdio. */
     if (!callado) toast(cuerpo.op !== "crear" ? (auto ? "Guardado en Notion ✓" : "Ficha actualizada en Notion")
-      : (mem && mem !== "Activo" ? "Ficha creada en Notion en «" + mem + "»: sale en «Esperando tu visto bueno» y aquí en Inactivos hasta que se active"
+      : (mem && mem !== "Activo" ? "Ficha creada en Notion en «" + mem + "»: sale en «Esperando tu visto bueno» y aquí en «Potencial ingreso» hasta que se active"
         : "Ficha creada en Notion"), "success");
     return true;
   }).catch(function(e){
