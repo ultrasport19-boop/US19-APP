@@ -404,8 +404,33 @@ function extraerFuncion(nombre) {
     comprobar('salida · exportBackup no vuelca settings entero',
       !/\bsettings:\s*settings\s*,/.test(exp),
       'el respaldo plano vuelve a llevarse githubToken, bitlyToken, calendlyToken, claudeKey y dashClave');
-    comprobar('salida · exportBackup limpia los campos secretos',
-      /RESP_SECRETO_CAMPOS/.test(exp));
+    comprobar('salida · exportBackup se lleva los ajustes sin llaves',
+      /\bsettings:\s*u19AjustesSinLlaves\s*\(\s*settings\s*\)/.test(exp),
+      'el respaldo plano ya no pasa los ajustes por u19AjustesSinLlaves');
+  }
+
+  /* Y la funcion que quita las llaves se EJECUTA, con llaves falsas
+     (auditoria Fable 29-sep, E24). Mirar que el nombre de la lista aparezca
+     no prueba que las quite: un mutante que dejaba las llaves puestas
+     pasaba en verde. */
+  const sinLlaves = extraerFuncion('u19AjustesSinLlaves');
+  const mCampos = /var RESP_SECRETO_CAMPOS = (\[[^\]]*\]);/.exec(src);
+  comprobar('salida · RESP_SECRETO_CAMPOS sigue existiendo (guarda viva)', mCampos !== null,
+    'se renombro la lista vigilada: renombra tambien la guarda');
+  if (sinLlaves && mCampos) {
+    const campos = JSON.parse(mCampos[1]);
+    const quitar = new Function('RESP_SECRETO_CAMPOS', sinLlaves + '\nreturn u19AjustesSinLlaves;')(campos);
+    const aj = { gymName: 'US19', encEnabled: true };
+    campos.forEach(function (c, i) { aj[c] = 'LLAVE_FALSA_' + i; });
+    const copia = quitar(aj);
+    comprobar('salida · la lista de llaves tiene las cinco de siempre',
+      ['githubToken', 'bitlyToken', 'calendlyToken', 'claudeKey', 'dashClave'].every(function (c) { return campos.indexOf(c) >= 0; }),
+      campos.join(', '));
+    campos.forEach(function (c) { igual('salida · el respaldo plano deja «' + c + '» en blanco', copia[c], ''); });
+    comprobar('salida · ninguna llave falsa queda en la copia', JSON.stringify(copia).indexOf('LLAVE_FALSA') < 0,
+      'el respaldo plano vuelve a llevarse una llave');
+    igual('salida · lo demas de los ajustes se conserva', copia.gymName, 'US19');
+    igual('salida · y los ajustes de verdad no se tocan', aj.githubToken, 'LLAVE_FALSA_0');
   }
 
   const imp = extraerFuncion('importBackup');
@@ -417,6 +442,32 @@ function extraerFuncion(nombre) {
     comprobar('salida · importBackup conserva las llaves locales',
       /RESP_SECRETO_CAMPOS/.test(imp),
       'restaurar un respaldo volveria a dejar los tokens en blanco');
+  }
+
+  /* --- b ter) El CSV no ejecuta formulas ------------------------------
+     Los nombres llegan por el enlace #progreso/. El arreglo del 28-sep no
+     tenia ninguna prueba (auditoria Fable 29-sep, E24). */
+
+  const celda = extraerFuncion('u19CsvCelda');
+  const csvFn = extraerFuncion('exportReportsCsv');
+  comprobar('salida · u19CsvCelda sigue existiendo (guarda viva)', celda !== null,
+    'se renombro la funcion vigilada: renombra tambien la guarda');
+  if (celda) {
+    const c = new Function(celda + '\nreturn u19CsvCelda;')();
+    ['=1+1', '+56 9 1234', '-5', '@SUM(A1)', '\tx', '\rx', '=HYPERLINK("http://x","y")'].forEach(function (v) {
+      const o = c(v);
+      comprobar('salida · la celda ' + JSON.stringify(v) + ' no empieza como una formula',
+        o.indexOf('"\'') === 0 && o.charAt(o.length - 1) === '"', 'sale ' + JSON.stringify(o));
+    });
+    igual('salida · un nombre normal sale tal cual', c('Ana Rojas'), 'Ana Rojas');
+    igual('salida · un numero sale tal cual', c(85), '85');
+    igual('salida · una coma obliga a comillas', c('Rojas, Ana'), '"Rojas, Ana"');
+    igual('salida · las comillas se doblan', c('di "hola"'), '"di ""hola"""');
+    igual('salida · una celda vacia sigue vacia', c(''), '');
+  }
+  if (csvFn) {
+    comprobar('salida · exportReportsCsv pasa cada celda por u19CsvCelda',
+      /u19CsvCelda\s*\(\s*v\s*\)/.test(csvFn), 'el CSV vuelve a escribir las celdas por su cuenta');
   }
 
   /* --- c) Nada del enlace se pinta sin pasar por un filtro ----------- */

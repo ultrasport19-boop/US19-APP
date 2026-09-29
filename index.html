@@ -7107,7 +7107,7 @@ function renderBuilder(){
   html += '<div class="builder-meta">';
   html += formField("Nombre de la rutina *", '<input type="text" id="rb-name" value="'+escapeAttr(r.name)+'" placeholder="Ej: Hipertrofia 4 días">');
   html += formField("Cliente", clientSelectHtml(r.clientId, "rb-client"));
-  html += formField("Duración (semanas)", '<input type="number" min="1" max="52" id="rb-weeks" value="'+(r.weeks||4)+'">');
+  html += formField("Duración (semanas)", '<input type="number" min="1" max="52" id="rb-weeks" value="'+(u19Semanas(r.weeks)||4)+'">');
   html += formField("Fecha de inicio", '<input type="date" id="rb-start" value="'+escapeAttr(r.startDate||"")+'">');
   html += formField("Estado", '<select id="rb-status"><option value="active"'+(r.status!=="archived"?" selected":"")+'>Activa</option><option value="archived"'+(r.status==="archived"?" selected":"")+'>Archivada</option></select>');
   var catSel='<select id="rb-category"><option value="">— Sin categoría —</option>';
@@ -8180,9 +8180,9 @@ function previewTextImport(){
   var html = '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem;">';
 
   html += '<div style="margin-bottom:.8rem;">';
-  html += '<div style="font-family:var(--font-display);font-size:1.2rem;letter-spacing:.04em;">'+(parsed.name||'<span class="text-muted">Sin nombre</span>')+'</div>';
+  html += '<div style="font-family:var(--font-display);font-size:1.2rem;letter-spacing:.04em;">'+(parsed.name?escapeHtml(parsed.name):'<span class="text-muted">Sin nombre</span>')+'</div>';
   if (parsed.clientName) html += '<div class="text-sm text-muted">Cliente: '+escapeHtml(parsed.clientName)+'</div>';
-  html += '<div class="text-sm text-muted">'+parsed.weeks+' semanas · '+parsed.days.length+' día'+(parsed.days.length===1?"":"s")+'</div>';
+  html += '<div class="text-sm text-muted">'+(u19Semanas(parsed.weeks)||4)+' semanas · '+parsed.days.length+' día'+(parsed.days.length===1?"":"s")+'</div>';
   if (parsed.notes) html += '<div class="text-sm text-muted">📝 '+escapeHtml(parsed.notes)+'</div>';
   html += '</div>';
 
@@ -9385,6 +9385,66 @@ function deleteExercise(id){
    ============================================================ */
 var U19_SOCIO_VETADAS = /rehabilit|patolog|diagn[oó]stic|tratamiento|terap|paciente|kin[eé]si|cl[ií]nic|fisioter|lesi[oó]n|tendin|manguito|menisc|\blca\b|ligament|esguince|luxaci|capsulit|epicond|carpiano|fascitis|pubalgia|trocant|hernia|ci[aá]tica|lumbago|cervicalg|dorsalg|condromalac|femoropatel|operatori|quir[uú]rg|cirug|reconstrucci|reparaci|fractur|s[ií]ndrome|dolor|edema|inflamaci/i;
 function u19EsRehabCat(c){ return c === "rehab" || c === "rehabilitacion"; }
+/* Las semanas de una rutina llegan dentro del enlace compartido: son un numero
+   o no son nada. Un texto aqui acababa pintado tal cual en la vista del socio,
+   que corre antes del PIN (auditoria 29-sep, E1). */
+function u19Semanas(v){
+  var n = parseInt(v, 10);
+  return (isFinite(n) && n > 0 && n <= 520) ? n : 0;
+}
+/* Que textos libres de una rutina chocan con la lista de arriba, y por que
+   palabra. El arreglo del 28-sep recorto el nombre del socio y vacio la zona,
+   pero el nombre de la rutina y las notas seguian subiendo tal como se
+   escribieron a la rama publica (auditoria 29-sep, E23). */
+function u19RutinaSensible(routine){
+  var r = routine || {}, out = [];
+  function anota(donde, palabra){
+    for (var i = 0; i < out.length; i++) if (out[i].donde === donde) return;
+    out.push({ donde: donde, palabra: palabra });
+  }
+  function mira(v, donde){
+    if (typeof v === "string"){
+      var m = U19_SOCIO_VETADAS.exec(v);
+      if (m) anota(donde, m[0]);
+    } else if (v && typeof v === "object"){
+      for (var k in v){
+        if (!Object.prototype.hasOwnProperty.call(v, k)) continue;
+        if (k === "exerciseId" || k === "id") continue;
+        mira(v[k], donde);
+      }
+    }
+  }
+  if (u19EsRehabCat(r.category) || r.enfoque === "terap" || String(r.zonaTerap || "").trim())
+    anota("el tipo de rutina", "readaptación");
+  mira(r.name, "el nombre");
+  mira(r.notes, "la nota general");
+  mira(r.weekNotes, "las notas por semana");
+  mira(r.days, "los textos de los ejercicios");
+  return out;
+}
+/* Por donde sale el enlace de una rutina. Una con texto sensible no pasa por
+   ningun servicio de fuera: se comparte el enlace largo, que lleva los datos
+   dentro y no deja copia en ninguna parte. */
+function u19CompartirDestino(sensible, hayBitly, hayGitHub){
+  if (sensible) return "largo";
+  if (hayBitly) return "bitly";
+  if (hayGitHub) return "github";
+  return "largo";
+}
+/* Lo que acompana a la rutina en el archivo que se sube a la rama de datos:
+   donde esta el repositorio, NUNCA una llave. Los tokens viajaban aqui
+   "enmascarados" con base64 invertido, que se deshace en una linea, y el
+   archivo acaba en una rama publica: cualquiera que recibiera un enlace se
+   llevaba el token de escritura del repo. Sin ellos el socio sigue pudiendo
+   mandar su progreso: la vista cae sola al enlace largo #progreso/. */
+function u19EnlaceSc(){
+  return {
+    gr: (getDerivedRepo() || settings.githubRepo || ""),
+    gb: DATA_BRANCH,
+    bd: settings.bitlyDomain || "",
+    bu: getAppBaseUrl()
+  };
+}
 /* El nombre de un programa del apartado Protocolos tal como lo vera el socio.
    Si lleva una condicion —las cinco plantillas base se llaman asi: «Tendinopatia
    de Manguito Rotador»— sale como «Programa de hombro». Si es neutro, tal cual. */
@@ -9474,7 +9534,9 @@ function buildShareData(routine){
     v: 1,
     routine: {
       id: routine.id,
-      name: routine.name || "",
+      /* El nombre de la rutina tal como lo puede leer el socio: si lleva una
+         condicion sale como «Programa de ejercicios» (auditoria 29-sep, E23). */
+      name: routine.name ? u19NombreParaSocio({ name: routine.name }) : "",
       clientId: routine.clientId || "",
       weeks: routine.weeks || 4,
       startDate: routine.startDate || "",
@@ -9692,6 +9754,16 @@ function routineShareIssues(r){
   if (!r.clientId) warnings.push("La rutina no tiene un cliente asignado.");
   if (noSets) warnings.push(noSets+" ejercicio"+(noSets===1?"":"s")+" sin series definidas.");
   if (noReps) warnings.push(noReps+" ejercicio"+(noReps===1?"":"s")+" sin reps definidas.");
+  /* Texto sensible: no bloquea, pero cambia por donde sale el enlace. */
+  var sens = u19RutinaSensible(r);
+  if (sens.length){
+    var _txt = sens.filter(function(x){ return x.donde !== "el tipo de rutina"; })
+      .map(function(x){ return x.donde + " («" + x.palabra + "»)"; });
+    warnings.push((sens.length > _txt.length ? "Es una rutina de readaptación. " : "")
+      + (_txt.length ? "Lleva palabras sensibles en " + _txt.join(", ") + ". " : "")
+      + "El enlace sale en su versión larga y no se guarda en GitHub ni en Bitly."
+      + (_txt.length === sens.length ? " Para el enlace corto, cambia esas palabras." : ""));
+  }
   return { blocker: total===0 ? "La rutina no tiene ejercicios en ningún día." : null, warnings: warnings, total: total };
 }
 function openShareModal(routineId, fromBuilder){
@@ -9738,12 +9810,16 @@ function openShareModal(routineId, fromBuilder){
 
   var longUrl = baseUrl + "#cliente/" + encoded;
   var hasGitHub = !!getGitHubConfig();
+  /* Una rutina con texto sensible no pasa por GitHub ni por Bitly (E23). */
+  var _sens = u19RutinaSensible(r);
+  var _destino = u19CompartirDestino(_sens.length > 0, !!settings.bitlyToken, hasGitHub);
 
   var bodyHtml =
     _warnBanner
     + (data.skippedHeavy ? '<div class="card" style="background:rgba(234,179,8,.08);border-color:rgba(234,179,8,.3);margin-bottom:.8rem;"><div class="card-main text-sm" style="color:var(--warn);">⚠ '+data.skippedHeavy+' GIF subido(s) como archivo no se incluirán en el link compartido. El cliente verá el ejercicio sin imagen.</div></div>' : '')
     + '<div id="share-status" class="text-sm text-muted" style="margin-bottom:.5rem;text-align:center;">'
-      + (hasGitHub ? '☁ Subiendo a GitHub para link corto...' : 'Modo link largo (sin GitHub configurado)')
+      + (_destino === "github" ? '☁ Subiendo a GitHub para link corto...'
+          : (_sens.length ? '🔒 Enlace largo: esta rutina no se guarda fuera de este equipo' : 'Modo link largo (sin GitHub configurado)'))
     + '</div>'
     + '<div class="share-qr-wrap" id="share-qr"></div>'
     + '<div class="share-link-box" id="share-link-text"></div>'
@@ -9780,7 +9856,7 @@ function openShareModal(routineId, fromBuilder){
         var greeting = clientName ? "Hola " + clientName + "!" : "Hola!";
         return greeting + "\n\n"
           + "Te comparto tu nueva planificacion:\n\n"
-          + "*" + (r.name||"Tu rutina") + "*\n"
+          + "*" + (data.routine.name||"Tu rutina") + "*\n"
           + dur.activeDays + " dias/semana - " + Math.round((dur.avgSec||0)/60) + " min por sesion\n\n"
           + "Accede a tu rutina aqui:\n" + currentUrl + "\n\n"
           + "Abrela desde tu celular. Marca cada serie completada y registra tus reps y peso.\n"
@@ -9796,15 +9872,17 @@ function openShareModal(routineId, fromBuilder){
         window.open("https://wa.me/" + phone + "?text=" + encodeURIComponent(msg), "_blank", "noopener");
       });
       document.getElementById("btn-download-qr").addEventListener("click", function(){
-        downloadQrPng(currentUrl, (r.name||"rutina") + " - Ultra-Sport 19", 600);
+        downloadQrPng(currentUrl, (data.routine.name||"rutina") + " - Ultra-Sport 19", 600);
       });
       document.getElementById("btn-print-qr").addEventListener("click", function(){
-        printQr(currentUrl, r.name||"Rutina", client ? client.name : "");
+        printQr(currentUrl, data.routine.name||"Rutina", client ? client.name : "");
       });
 
       function setStatus(html){ var s=document.getElementById("share-status"); if(s) s.innerHTML=html; }
 
-      if (settings.bitlyToken){
+      if (_destino === "largo" && _sens.length){
+        setStatus('<span class="text-muted">🔒 Enlace largo ('+currentUrl.length+' car). No se guarda en GitHub ni en Bitly.</span>');
+      } else if (_destino === "bitly"){
         setStatus("🔗 Acortando con Bitly...");
         shortenWithBitly(longUrl).then(function(short){
           currentUrl = short;
@@ -9814,7 +9892,7 @@ function openShareModal(routineId, fromBuilder){
           setStatus('<span style="color:var(--warn);">⚠ Bitly: '+escapeHtml(err.message)+'</span>');
           if (hasGitHub) tryGitHub();
         });
-      } else if (hasGitHub){
+      } else if (_destino === "github"){
         tryGitHub();
       } else {
         setStatus('<span class="text-muted">Link largo ('+currentUrl.length+' car). Configura GitHub en ⚙ para links cortos.</span>');
@@ -9823,18 +9901,8 @@ function openShareModal(routineId, fromBuilder){
       function tryGitHub(){
         setStatus("☁ Subiendo a GitHub...");
         var dataWithSc = JSON.parse(JSON.stringify(data));
-        dataWithSc.sc = {
-          /* Aqui NO van gt ni bt. Los tokens viajaban dentro del enlace
-             "enmascarados" con base64 invertido, que se deshace en una linea, y
-             el archivo acaba en la rama publica de datos: cualquiera que
-             recibiera un enlace se llevaba el token de escritura del repo.
-             Sin ellos el socio sigue pudiendo mandar su progreso: la vista cae
-             sola al enlace largo #progreso/, que no necesita subir nada. */
-          gr: (getDerivedRepo() || settings.githubRepo || ""),
-          gb: DATA_BRANCH,
-          bd: settings.bitlyDomain || "",
-          bu: getAppBaseUrl()
-        };
+        /* Aqui NO van gt ni bt: ver u19EnlaceSc. */
+        dataWithSc.sc = u19EnlaceSc();
         uploadToCloud(dataWithSc, "r").then(function(res){
           var shortUrl = baseUrl + "#r/" + res.fileId;
           currentUrl = shortUrl;
@@ -9965,6 +10033,8 @@ function showClientView(shareData){
   hideTrainerUI();
   showView("client");
   var r = shareData.routine;
+  /* Lo que llega en el enlace no es de fiar: las semanas, a numero. */
+  r.weeks = u19Semanas(r.weeks);
   _clientProgressKey = "ultrasport19_progress_" + r.id;
   var progress = loadProgress();
   var stats = computeSessionStats(r, progress);
@@ -9983,7 +10053,7 @@ function showClientView(shareData){
   if (r.subtitle){
     html += '<div class="text-sm text-muted" style="margin-top:.4rem;">'+escapeHtml(r.subtitle)+'</div>';
   } else {
-    html += '<div class="text-sm text-muted" style="margin-top:.4rem;">'+dur.activeDays+' días/semana · ~'+Math.round((dur.avgSec||0)/60)+' min/sesión'+(r.weeks?' · '+r.weeks+' semanas':'')+'</div>';
+    html += '<div class="text-sm text-muted" style="margin-top:.4rem;">'+dur.activeDays+' días/semana · ~'+Math.round((dur.avgSec||0)/60)+' min/sesión'+(u19Semanas(r.weeks)?' · '+u19Semanas(r.weeks)+' semanas':'')+'</div>';
   }
   html += '</div></div>';
 
@@ -10984,18 +11054,8 @@ function exportBackup(){
     deudas: state.deudas || null,
     finSim: state.finSim || null,
     reports: (typeof loadReports === "function" ? loadReports() : []),
-    settings: (function(){
-      /* El respaldo PLANO tampoco se lleva las llaves. El cifrado ya las quitaba
-         (RESP_SECRETO_CAMPOS) porque un respaldo filtrado no debe entregar ademas
-         los tokens; este archivo va SIN cifrar a la carpeta Descargas y encima
-         _autoBackup lo dispara solo cada 7 dias. Al restaurar, importBackup
-         conserva las llaves que ya haya en este navegador. */
-      var s = {}, k;
-      for (k in settings) if (Object.prototype.hasOwnProperty.call(settings, k)) s[k] = settings[k];
-      for (var i = 0; i < RESP_SECRETO_CAMPOS.length; i++)
-        if (RESP_SECRETO_CAMPOS[i] in s) s[RESP_SECRETO_CAMPOS[i]] = "";
-      return s;
-    })(),
+    /* El respaldo PLANO tampoco se lleva las llaves: ver u19AjustesSinLlaves. */
+    settings: u19AjustesSinLlaves(settings),
     dashboard: (function(){ try { return localStorage.getItem("us19_dashboard_v5"); } catch(e){ return null; } })()
   };
   var blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
@@ -11843,6 +11903,19 @@ function u19RespClaves(){
 }
 
 function u19RespEsSecreta(k){ return RESP_SECRETO_CLAVES.indexOf(k) >= 0; }
+
+/* Una copia de los ajustes con las llaves en blanco. El cifrado ya las quitaba
+   (RESP_SECRETO_CAMPOS) porque un respaldo filtrado no debe entregar ademas
+   los tokens; el respaldo plano va SIN cifrar a la carpeta Descargas y
+   _autoBackup lo dispara solo cada 7 dias. Al restaurar, importBackup
+   conserva las llaves que ya haya en este navegador. */
+function u19AjustesSinLlaves(aj){
+  var s = {}, k;
+  for (k in aj) if (Object.prototype.hasOwnProperty.call(aj, k)) s[k] = aj[k];
+  for (var i = 0; i < RESP_SECRETO_CAMPOS.length; i++)
+    if (RESP_SECRETO_CAMPOS[i] in s) s[RESP_SECRETO_CAMPOS[i]] = "";
+  return s;
+}
 
 /* Deja los tokens en blanco sin tocar el resto de los ajustes. */
 function u19RespSinSecretos(json){
@@ -14708,18 +14781,8 @@ function openPhaseShareModal(protocolId, phaseIdx){
       function tryGitHub(){
         setStatus("☁ Subiendo a GitHub...");
         var dataWithSc = JSON.parse(JSON.stringify(data));
-        dataWithSc.sc = {
-          /* Aqui NO van gt ni bt. Los tokens viajaban dentro del enlace
-             "enmascarados" con base64 invertido, que se deshace en una linea, y
-             el archivo acaba en la rama publica de datos: cualquiera que
-             recibiera un enlace se llevaba el token de escritura del repo.
-             Sin ellos el socio sigue pudiendo mandar su progreso: la vista cae
-             sola al enlace largo #progreso/, que no necesita subir nada. */
-          gr: (getDerivedRepo() || settings.githubRepo || ""),
-          gb: DATA_BRANCH,
-          bd: settings.bitlyDomain || "",
-          bu: getAppBaseUrl()
-        };
+        /* Aqui NO van gt ni bt: ver u19EnlaceSc. */
+        dataWithSc.sc = u19EnlaceSc();
         uploadToCloud(dataWithSc, "r").then(function(res){
           var shortUrl = baseUrl + "#r/" + res.fileId;
           currentUrl = shortUrl; renderQrFor(shortUrl);
@@ -22919,6 +22982,14 @@ window.purgeTrashItem = function(rid){
   toast("Eliminada definitivamente","success");
 };
 
+/* Una celda del CSV. Los nombres llegan por el enlace #progreso/: un valor que
+   empieza con = + - o @ se ejecutaria como formula al abrir el CSV en Excel. */
+function u19CsvCelda(v){
+  v = String(v);
+  if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
+  return (v.indexOf(",")>=0 || v.indexOf('"')>=0 || v.indexOf("'")===0) ? '"'+v.replace(/"/g,'""')+'"' : v;
+}
+
 /* --- Exportar CSV de métricas --- */
 function exportReportsCsv(){
   var reports = loadReports();
@@ -22928,13 +22999,7 @@ function exportReportsCsv(){
     rows.push([rp.clientName||"", rp.routineName||"", rp.sessionDate||"", rp.sentAt?new Date(rp.sentAt).toISOString().slice(0,10):"", rp.pct!=null?rp.pct:"", rp.done!=null?rp.done:"", rp.total!=null?rp.total:""]);
   });
   var csv = rows.map(function(r){
-    return r.map(function(v){
-      v = String(v);
-      /* Los nombres llegan por el enlace #progreso/: un valor que empieza con
-         = + - o @ se ejecutaria como formula al abrir el CSV en Excel. */
-      if (/^[=+\-@\t\r]/.test(v)) v = "'" + v;
-      return (v.indexOf(",")>=0 || v.indexOf('"')>=0 || v.indexOf("'")===0) ? '"'+v.replace(/"/g,'""')+'"' : v;
-    }).join(",");
+    return r.map(function(v){ return u19CsvCelda(v); }).join(",");
   }).join("\n");
   var blob = new Blob(["\ufeff"+csv], { type:"text/csv;charset=utf-8" });
   var a = document.createElement("a");
@@ -31655,8 +31720,8 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
       <div class="pr-cover-logo">${USPORT_LOGO_SVG}</div>
       <div class="pr-cover-id">
         <div class="pr-cover-brand">ULTRA-SPORT 19</div>
-        <div class="pr-cover-tag">Despierta tu instinto · Rendimiento · Velocidad · Resistencia</div>
-        <div class="pr-cover-title">Informe de seguimiento · Composición corporal</div>
+        <div class="pr-cover-tag">Rendimiento | Velocidad | Resistencia</div>
+        <div class="pr-cover-title">Informe de seguimiento: composición corporal</div>
       </div>
       <div class="pr-cover-meta">
         <div class="pr-conf">Confidencial</div>
@@ -31668,8 +31733,8 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
 
   const pageFooter = `
     <div class="pr-pagefoot">
-      <span class="pr-ft-l">Ultra-Sport 19 · ${folio} · Confidencial</span>
-      <span class="pr-ft-c">+56 9 2924 4042 · @ultrasport_19 · Pencahue, Maule, Chile</span>
+      <span class="pr-ft-l">Ultra-Sport 19 | ${folio} | Confidencial</span>
+      <span class="pr-ft-c">+56 9 2924 4042 | @ultrasport_19 | Pencahue, Maule, Chile</span>
       <span class="pr-ft-r"><span class="pr-pageno"></span></span>
     </div>`;
 
@@ -31839,7 +31904,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
   const esMenor = c.edad != null && Number(c.edad) < 18;
   const noteHtml = `
     <div class="pr-note">
-      <b>Nota:</b> Este informe tiene carácter descriptivo de seguimiento del progreso físico. No reemplaza la consulta con un profesional de la salud. Datos obtenidos mediante bioimpedanciometría (Fitdays) y mediciones antropométricas. Para diagnóstico clínico consulte a un profesional de salud habilitado.${esMenor ? ' Al tratarse de un evaluado menor de edad, se recomienda la supervisión de un profesional de salud y/o tutor.' : ''}
+      <b>Nota:</b> Este informe tiene carácter descriptivo de seguimiento del progreso físico. No reemplaza la consulta con un profesional de la salud. Datos obtenidos mediante bioimpedanciometría (Fitdays) y mediciones antropométricas.${esMenor ? ' Al tratarse de un evaluado menor de edad, se recomienda la supervisión de un profesional de salud y/o tutor.' : ''}
     </div>`;
 
   // ---------- E) FIRMAS ----------
@@ -32076,7 +32141,7 @@ function infV2BuildReport(payload, observations, bDelta, cDelta) {
   const clinicalBlock = `
     <div class="pr-sec">
       <div class="pr-letter">C</div>
-      <div class="pr-secttl"><h2>Clasificación por rangos de referencia</h2><p>Posición de cada indicador frente a estándares clínicos · ▲ valor actual · ┊ evaluación previa</p></div>
+      <div class="pr-secttl"><h2>Clasificación por rangos de referencia</h2><p>Posición de cada indicador frente a rangos de referencia publicados. ▲ valor actual, ┊ evaluación previa</p></div>
     </div>
     ${rbItems.length ? `<div class="pr-rb-wrap">${rbItems.join('')}</div>` : '<div class="pr-note">Sin datos suficientes para clasificación por rangos.</div>'}
     ${sinSexo ? '<div class="pr-rb-hint">Algunos rangos (grasa y agua corporal) dependen del sexo del evaluado; especifícalo en los datos del cliente para incluirlos.</div>' : ''}
@@ -34940,8 +35005,8 @@ function rndChrome(cli, m, opts){
     +'<div class="pr-cover-logo">'+USPORT_LOGO_SVG+'</div>'
     +'<div class="pr-cover-id">'
     +'<div class="pr-cover-brand">ULTRA-SPORT 19</div>'
-    +'<div class="pr-cover-tag">Despierta tu instinto · Rendimiento · Velocidad · Resistencia</div>'
-    +'<div class="pr-cover-title">Informe de rendimiento neuromuscular · Velocidad de reacción y agilidad</div></div>'
+    +'<div class="pr-cover-tag">Rendimiento | Velocidad | Resistencia</div>'
+    +'<div class="pr-cover-title">Informe de rendimiento neuromuscular: velocidad de reacción y agilidad</div></div>'
     +'<div class="pr-cover-meta"><div class="pr-conf">Confidencial</div>'
     +'<div class="pr-cm-row"><span>Folio</span><b>'+esc(folio)+'</b></div>'
     +'<div class="pr-cm-row"><span>Emisión</span><b>'+hoyFmt+'</b></div>'
@@ -34954,8 +35019,8 @@ function rndChrome(cli, m, opts){
     +'<div class="pr-pg">'+esc(cli.nombre||'')+'<br><span style="color:#94a3b8;font-weight:400;">'+per+'</span></div></div>';
 
   var foot='<div class="pr-pagefoot">'
-    +'<span class="pr-ft-l">Ultra-Sport 19 · '+esc(folio)+' · Confidencial</span>'
-    +'<span class="pr-ft-c">+56 9 2924 4042 · @ultrasport_19 · Pencahue, Maule, Chile</span>'
+    +'<span class="pr-ft-l">Ultra-Sport 19 | '+esc(folio)+' | Confidencial</span>'
+    +'<span class="pr-ft-c">+56 9 2924 4042 | @ultrasport_19 | Pencahue, Maule, Chile</span>'
     +'<span class="pr-ft-r"><span class="pr-pageno"></span></span></div>';
 
   var wm = opts.borrador ? '<div class="pr-watermark">BORRADOR</div>' : '';
@@ -39335,7 +39400,7 @@ window.u19PlantelInforme = function(){
     + kpi('Sin medirse 8+ sem', sinMedir + (an.sinBio.length ? ' + ' + an.sinBio.length : ''), an.sinBio.length ? an.sinBio.length + ' activos sin ninguna bio' : '', sinMedir ? '#b45309' : '')
     + '</div>'
     + '<h2>Personas</h2><table><thead><tr><th>Persona</th><th>N.º</th><th>Primera</th><th>Última</th><th>Peso (Δ)</th><th>Grasa (Δ)</th><th>Músculo (Δ)</th><th>Lectura</th></tr></thead><tbody>' + filas + '</tbody></table>'
-    + '<div class="leg"><b>Cómo leer.</b> Mejora: baja 1 punto o más de grasa, o sube 0,5 kg o más de músculo sin subir grasa. Sube grasa: 1 punto o más. Se estanca: nada de eso en 8 semanas o más. En curso: aún no pasaron 8 semanas. Δ es el cambio entre la primera y la última medición de la ventana. Fuente: bioimpedancia Fitdays registrada en Notion; describe composición corporal y no constituye un diagnóstico.</div>'
+    + '<div class="leg"><b>Cómo leer.</b> Mejora: baja 1 punto o más de grasa, o sube 0,5 kg o más de músculo sin subir grasa. Sube grasa: 1 punto o más. Se estanca: nada de eso en 8 semanas o más. En curso: aún no pasaron 8 semanas. Δ es el cambio entre la primera y la última medición de la ventana. Fuente: bioimpedancia Fitdays registrada en Notion; describe composición corporal y no reemplaza la consulta con un profesional de la salud.</div>'
     + '<div class="ft"><span>Ultra-Sport 19</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
     + '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>';
   w.document.open(); w.document.write(html); w.document.close();
@@ -39679,18 +39744,18 @@ function batCalcFuerza(v){
 var BAT_CATALOGO = [
   /* ---- ActivForce 2 ---- */
   { id: "af_rom", disp: "activforce", perfil: ["paciente"], nombre: "Rango de movimiento (goniometría digital)",
-    obj: "Movilidad activa y pasiva de la articulación, comparada con el lado sano.",
+    obj: "Movilidad activa y pasiva de la articulación, comparada con el otro lado.",
     campos: [
       { k: "mov", l: "Movimiento", t: "sel", opts: BAT_MOVS_ROM, req: true },
       { k: "lado", l: "Lado evaluado", t: "sel", opts: BAT_LADOS, req: true },
       { k: "activo", l: "ROM activo (°)", t: "num", req: true, ph: "ej. 118" },
       { k: "pasivo", l: "ROM pasivo (°)", t: "num", ph: "ej. 126" },
-      { k: "sano", l: "ROM activo del lado sano (°)", t: "num", ph: "ej. 135" }
+      { k: "sano", l: "ROM activo del otro lado (°)", t: "num", ph: "ej. 135" }
     ],
     calc: function(v){
       var out = { principal: v.activo + "° activo" + (v.pasivo != null ? " · " + v.pasivo + "° pasivo" : "") + " · " + batLado(v.lado), lineas: [] };
-      if (batNum(v.sano) && v.sano > 0){ out.deficitRom = batR((1 - v.activo / v.sano) * 100, 1); out.lineas.push("déficit de " + out.deficitRom + " % frente al lado sano (" + v.sano + "°)"); }
-      if (batNum(v.pasivo) != null && v.pasivo - v.activo >= 10) out.lineas.push("brecha activo/pasivo de " + batR(v.pasivo - v.activo, 0) + "°: falta control activo");
+      if (batNum(v.sano) && v.sano > 0){ out.deficitRom = batR((1 - v.activo / v.sano) * 100, 1); out.lineas.push("diferencia de " + out.deficitRom + " % con el otro lado (" + v.sano + "°)"); }
+      if (batNum(v.pasivo) != null && v.pasivo - v.activo >= 10) out.lineas.push("brecha activo/pasivo de " + batR(v.pasivo - v.activo, 0) + "°");
       return out;
     } },
   { id: "af_fuerza", disp: "activforce", perfil: ["paciente", "atleta"], nombre: "Fuerza isométrica máxima (peak force) con LSI",
@@ -40058,10 +40123,22 @@ function u19BateriaBloque(c){
    (infNextFolio), misma firma del evaluador y el registro que se haya
    escrito en Opciones del informe. Se guarda en c.batInformes[] qué folio
    se emitió y cuándo, para poder rastrearlo. */
+/* Las lineas de lectura se guardan al registrar la prueba, con el vocabulario
+   del dia en que se escribieron. Lo que se imprime para el socio pasa por
+   aqui: vocabulario de sala (auditoria 29-sep, E25). */
+function u19BateriaLineaSocio(t){
+  return String(t == null ? "" : t)
+    .replace(/d[eé]ficit de ([\d.,]+) % frente al lado sano/gi, "diferencia de $1 % con el otro lado")
+    .replace(/d[eé]ficit lateral/gi, "asimetría marcada")
+    .replace(/:\s*falta control activo/gi, "")
+    .replace(/\/\s*sano\)/gi, "/ otro lado)")
+    .replace(/lado sano/gi, "otro lado")
+    .replace(/d[eé]ficit/gi, "diferencia");
+}
 function u19BateriaLectura(p, ps){
   var d = p.d || {}, prev = null;
   for (var i = 0; i < ps.length; i++){ var q = ps[i]; if (q === p || q.prueba !== p.prueba || String(q.fecha) >= String(p.fecha)) continue; if ((q.v || {}).mov !== (p.v || {}).mov) continue; if (!prev || String(q.fecha) > String(prev.fecha)) prev = q; }
-  var out = { lineas: u19Arr(d.lineas).slice(), cambio: "", mejora: null, prev: prev };
+  var out = { lineas: u19Arr(d.lineas).map(u19BateriaLineaSocio), cambio: "", mejora: null, prev: prev };
   if (prev && prev.d){
     var pd = prev.d;
     if (d.lsi != null && pd.lsi != null){ out.cambio = (d.lsi - pd.lsi > 0 ? "+" : "") + batR(d.lsi - pd.lsi, 1) + " pts de LSI"; out.mejora = d.lsi >= pd.lsi; }
@@ -40083,7 +40160,7 @@ window.u19BateriaInforme = function(clientId){
   var hoyISO = u19HoyISO();
   c.batInformes = c.batInformes || []; c.batInformes.push({ folio: folio, fecha: hoyISO, n: ps.length }); saveState();
   /* Lo imprime y se lo lleva el socio: vocabulario de sala, no clinico. */
-  var perfil = u19BateriaPerfil(c) === "paciente" ? "Readaptación" : "Atleta";
+  var perfil = u19BateriaPerfil(c) === "paciente" ? "Acondicionamiento" : "Atleta";
   var lic = (typeof _infOpts !== "undefined" && _infOpts.opts && _infOpts.opts.licencia) ? String(_infOpts.opts.licencia).trim() : "";
   var firma = (typeof _infOpts !== "undefined" && _infOpts.firmas && _infOpts.firmas.evaluador) ? _infOpts.firmas.evaluador : "";
   function chipLSI(d){
@@ -40132,7 +40209,7 @@ window.u19BateriaInforme = function(clientId){
     + '<h2>A · Estado actual por prueba</h2><table><thead><tr><th>Prueba</th><th>Última</th><th>Resultado</th><th>Cambio</th><th>N.º</th></tr></thead><tbody>' + resumen + '</tbody></table>'
     + '<h2>B · Historial completo</h2><table><thead><tr><th>Fecha</th><th>Prueba</th><th>Resultado</th><th>Lectura</th></tr></thead><tbody>' + hist + '</tbody></table>'
     + '<div class="leg"><b>Cómo leer este informe.</b> LSI (índice de simetría entre lados): 90 % o más, simetría adecuada · 85–89 %, vigilar · bajo 85 %, asimetría marcada. En las pruebas de tiempo, menos segundos es mejor; en las de nivel y toques, más es mejor. '
-    + 'Los valores describen el rendimiento medido con ActivForce 2 y BlazePod en las fechas indicadas y sirven para ajustar el entrenamiento; no constituyen un diagnóstico.</div>'
+    + 'Los valores describen el rendimiento medido con ActivForce 2 y BlazePod en las fechas indicadas y sirven para ajustar el entrenamiento. Este informe no reemplaza la consulta con un profesional de la salud.</div>'
     + '<div class="signs"><div class="sign">' + (firma ? '<img src="' + firma + '" alt="">' : '') + '<div class="line"></div><b>Ultra-Sport 19</b><span class="sub">Pencahue, Maule' + (lic ? ' · Reg. N.º ' + escapeHtml(lic) : '') + '</span><span class="sub">Informe emitido por el centro</span></div>'
     + '<div class="sign"><div class="line"></div><b>' + escapeHtml(c.name || "—") + '</b><span class="sub">Deportista · toma conocimiento de sus resultados</span></div></div>'
     + '<div class="ft"><span>Ultra-Sport 19 · ' + escapeHtml(folio || "") + '</span><span>Generado en la app US19 · ' + rndFdate(hoyISO) + '</span></div>'
@@ -40401,7 +40478,7 @@ function fichaEntrenamiento(c){
   if (rut.length){
     out += u19Bloque('Rutinas', '<table class="u-tbl"><thead><tr><th>Rutina</th><th>Duración</th><th>Estado</th><th></th></tr></thead><tbody>' + rut.map(function(r){
       return '<tr><td><b>' + escapeHtml(r.name || 'Sin nombre') + '</b></td>'
-        + '<td>' + (r.weeks || '—') + ' sem</td>'
+        + '<td>' + (u19Semanas(r.weeks) || '—') + ' sem</td>'
         + '<td>' + (r.status === 'archived' ? '<span class="text-muted">archivada</span>' : '<span style="color:var(--success)">activa</span>') + '</td>'
         + '<td><button class="btn btn-ghost btn-sm" onclick="openRoutineBuilder(\'' + r.id + '\')">Abrir</button></td></tr>';
     }).join('') + '</tbody></table>');

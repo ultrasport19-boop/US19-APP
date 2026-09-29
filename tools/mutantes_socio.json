@@ -95,7 +95,7 @@
     },
     {
       "nombre": "el informe impreso vuelve a decir «Paciente en rehabilitacion»",
-      "de": "\"Readaptación\" : \"Atleta\";",
+      "de": "\"Acondicionamiento\" : \"Atleta\";",
       "a": "\"Paciente en rehabilitación\" : \"Atleta\";"
     },
     {
@@ -107,6 +107,156 @@
       "nombre": "vuelve «no constituye diagnóstico» al pie de un informe del socio",
       "de": "Este informe describe el progreso; no reemplaza la consulta con un profesional de la salud.</p>",
       "a": "Este informe describe el progreso; no constituye diagnóstico.</p>"
+    },
+    {
+      "nombre": "las semanas vuelven a pintarse tal como llegan en el enlace",
+      "de": "(u19Semanas(r.weeks)?' · '+u19Semanas(r.weeks)+' semanas':'')",
+      "a": "(r.weeks?' · '+r.weeks+' semanas':'')"
+    },
+    {
+      "nombre": "la vista del socio deja de pasar las semanas a numero",
+      "de": "  r.weeks = u19Semanas(r.weeks);\n",
+      "a": ""
+    },
+    {
+      "nombre": "u19Semanas deja pasar un texto",
+      "de": "  return (isFinite(n) && n > 0 && n <= 520) ? n : 0;",
+      "a": "  return v || 0;"
+    },
+    {
+      "nombre": "la ficha vuelve a pintar las semanas crudas",
+      "de": "(u19Semanas(r.weeks) || '—')",
+      "a": "(r.weeks || '—')"
+    },
+    {
+      "nombre": "el nombre de la rutina importada vuelve a entrar sin escapar",
+      "de": "(parsed.name?escapeHtml(parsed.name):'<span class=\"text-muted\">Sin nombre</span>')",
+      "a": "(parsed.name||'<span class=\"text-muted\">Sin nombre</span>')"
+    },
+    {
+      "nombre": "el nombre de la rutina vuelve a viajar tal como se escribio",
+      "de": "      name: routine.name ? u19NombreParaSocio({ name: routine.name }) : \"\",",
+      "a": "      name: routine.name || \"\","
+    },
+    {
+      "nombre": "el nombre del socio vuelve a viajar completo",
+      "de": "name: u19NombreCompartir(client.name) }",
+      "a": "name: client.name }"
+    },
+    {
+      "nombre": "las notas dejan de contar como texto sensible",
+      "de": "  mira(r.notes, \"la nota general\");\n",
+      "a": ""
+    },
+    {
+      "nombre": "las notas de los ejercicios dejan de contar como texto sensible",
+      "de": "  mira(r.days, \"los textos de los ejercicios\");\n",
+      "a": ""
+    },
+    {
+      "nombre": "una rutina de readaptacion deja de contar como sensible",
+      "de": "  if (u19EsRehabCat(r.category) || r.enfoque === \"terap\" || String(r.zonaTerap || \"\").trim())",
+      "a": "  if (false)"
+    },
+    {
+      "nombre": "el id de un ejercicio empieza a contar como texto",
+      "de": "        if (k === \"exerciseId\" || k === \"id\") continue;\n",
+      "a": ""
+    },
+    {
+      "nombre": "una rutina sensible vuelve a subir a GitHub",
+      "de": "  if (sensible) return \"largo\";\n",
+      "a": ""
+    },
+    {
+      "nombre": "el modal vuelve a acortar con Bitly sin mirar el destino",
+      "de": "      } else if (_destino === \"bitly\"){",
+      "a": "      } else if (settings.bitlyToken){"
+    },
+    {
+      "nombre": "el modal vuelve a subir a GitHub sin mirar el destino",
+      "de": "      } else if (_destino === \"github\"){",
+      "a": "      } else if (hasGitHub){"
+    },
+    {
+      "nombre": "compartir deja de avisar del texto sensible",
+      "de": "  var sens = u19RutinaSensible(r);\n",
+      "a": "  var sens = [];\n"
+    },
+    {
+      "nombre": "el WhatsApp de la rutina vuelve a llevar el nombre tal como se escribio",
+      "de": "          + \"*\" + (data.routine.name||\"Tu rutina\") + \"*\\n\"",
+      "a": "          + \"*\" + (r.name||\"Tu rutina\") + \"*\\n\""
+    },
+    {
+      "nombre": "el token de GitHub vuelve al archivo que se sube, leido de otra parte",
+      "de": "    gb: DATA_BRANCH,\n    bd: settings.bitlyDomain || \"\",",
+      "a": "    gb: DATA_BRANCH,\n    gt: maskToken(getGitHubConfig().token),\n    bd: settings.bitlyDomain || \"\","
+    },
+    {
+      "nombre": "el token de Bitly vuelve al archivo que se sube",
+      "de": "    bd: settings.bitlyDomain || \"\",\n    bu: getAppBaseUrl()",
+      "a": "    bd: settings.bitlyDomain || \"\",\n    bt: settings[\"bitly\" + \"Token\"],\n    bu: getAppBaseUrl()"
+    },
+    {
+      "nombre": "el modal de etapa vuelve a armar a mano lo que sube",
+      "de": "        /* Aqui NO van gt ni bt: ver u19EnlaceSc. */\n        dataWithSc.sc = u19EnlaceSc();\n        uploadToCloud(dataWithSc, \"r\").then(function(res){\n          var shortUrl = baseUrl + \"#r/\" + res.fileId;\n          currentUrl = shortUrl; renderQrFor(shortUrl);",
+      "a": "        dataWithSc.sc = { gr: settings.githubRepo, gb: DATA_BRANCH, gt: settings.githubToken };\n        uploadToCloud(dataWithSc, \"r\").then(function(res){\n          var shortUrl = baseUrl + \"#r/\" + res.fileId;\n          currentUrl = shortUrl; renderQrFor(shortUrl);"
+    },
+    {
+      "nombre": "el informe de la bateria vuelve a decir «Readaptación»",
+      "de": "\"Acondicionamiento\" : \"Atleta\";",
+      "a": "\"Readaptación\" : \"Atleta\";"
+    },
+    {
+      "nombre": "vuelve «no constituyen un diagnóstico» al informe de la bateria",
+      "de": "y sirven para ajustar el entrenamiento. Este informe no reemplaza la consulta con un profesional de la salud.</div>'",
+      "a": "y sirven para ajustar el entrenamiento; no constituyen un diagnóstico.</div>'"
+    },
+    {
+      "nombre": "las lineas guardadas vuelven a imprimirse sin pasar por el filtro",
+      "de": "lineas: u19Arr(d.lineas).map(u19BateriaLineaSocio),",
+      "a": "lineas: u19Arr(d.lineas).slice(),"
+    },
+    {
+      "nombre": "el filtro deja pasar «déficit lateral»",
+      "de": "    .replace(/d[eé]ficit lateral/gi, \"asimetría marcada\")\n",
+      "a": ""
+    },
+    {
+      "nombre": "el filtro deja pasar «lado sano»",
+      "de": "    .replace(/lado sano/gi, \"otro lado\")\n",
+      "a": ""
+    },
+    {
+      "nombre": "el filtro deja pasar «falta control activo»",
+      "de": "    .replace(/:\\s*falta control activo/gi, \"\")\n",
+      "a": ""
+    },
+    {
+      "nombre": "el catalogo vuelve a escribir «déficit … frente al lado sano»",
+      "de": "out.lineas.push(\"diferencia de \" + out.deficitRom + \" % con el otro lado (\" + v.sano + \"°)\"); }",
+      "a": "out.lineas.push(\"déficit de \" + out.deficitRom + \" % frente al lado sano (\" + v.sano + \"°)\"); }"
+    },
+    {
+      "nombre": "vuelve «Para diagnóstico clínico» al informe de composicion",
+      "de": "mediciones antropométricas.${esMenor",
+      "a": "mediciones antropométricas. Para diagnóstico clínico consulte a un profesional de salud habilitado.${esMenor"
+    },
+    {
+      "nombre": "vuelve «estándares clínicos» al informe de composicion",
+      "de": "frente a rangos de referencia publicados.",
+      "a": "frente a estándares clínicos."
+    },
+    {
+      "nombre": "vuelve el «·» a la portada del informe de rendimiento",
+      "de": "    +'<div class=\"pr-cover-tag\">Rendimiento | Velocidad | Resistencia</div>'",
+      "a": "    +'<div class=\"pr-cover-tag\">Rendimiento · Velocidad · Resistencia</div>'"
+    },
+    {
+      "nombre": "vuelve el «·» al pie del informe de composicion",
+      "de": "<span class=\"pr-ft-l\">Ultra-Sport 19 | ${folio} | Confidencial</span>",
+      "a": "<span class=\"pr-ft-l\">Ultra-Sport 19 · ${folio} · Confidencial</span>"
     }
   ]
 }

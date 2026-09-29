@@ -46,6 +46,31 @@
       "nombre": "un borrar TODO deja puestos los dias no trabajados del mes",
       "de": "  state.trash = []; state.horasExtra = []; state.horasMenos = [];",
       "a": "  state.trash = []; state.horasExtra = [];"
+    },
+    {
+      "nombre": "el respaldo plano vuelve a llevarse las llaves",
+      "de": "    if (RESP_SECRETO_CAMPOS[i] in s) s[RESP_SECRETO_CAMPOS[i]] = \"\";",
+      "a": "    if (false) s[RESP_SECRETO_CAMPOS[i]] = \"\";"
+    },
+    {
+      "nombre": "el respaldo plano vuelve a volcar los ajustes enteros",
+      "de": "    settings: u19AjustesSinLlaves(settings),",
+      "a": "    settings: settings,"
+    },
+    {
+      "nombre": "el respaldo plano se lleva los ajustes por otra funcion",
+      "de": "    settings: u19AjustesSinLlaves(settings),",
+      "a": "    settings: JSON.parse(JSON.stringify(settings)),"
+    },
+    {
+      "nombre": "el CSV deja de neutralizar las formulas",
+      "de": "  if (/^[=+\\-@\\t\\r]/.test(v)) v = \"'\" + v;",
+      "a": "  if (false) v = \"'\" + v;"
+    },
+    {
+      "nombre": "el CSV vuelve a escribir las celdas por su cuenta",
+      "de": "    return r.map(function(v){ return u19CsvCelda(v); }).join(\",\");",
+      "a": "    return r.join(\",\");"
     }
   ]
 }

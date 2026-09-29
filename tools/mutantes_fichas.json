@@ -88,7 +88,7 @@
     },
     {
       "nombre": "al completar una ficha existente viaja la membresía por defecto",
-      "de": "  if (c.notionPend && c.notionPend.datos) delete c.notionPend.datos.membresia;\n",
+      "de": "  if (c.notionPend && c.notionPend.datos && !(c.notionPend.datos.membresia === \"Activo\" && String(d.membresia || \"\").trim() !== \"Activo\")) delete c.notionPend.datos.membresia;\n",
       "a": ""
     },
     {
